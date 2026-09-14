@@ -20,3 +20,5 @@ while jugando:
 
 pygame.quit()
 sys.exit()
+
+#hacer los nodos, los arboles, verificar que funcionen. hacer los menus basicos (principal, seleccionar la cantidad de jugadores, roles y la de juego). y ver como hacer una prueba basica de la lógica y jugabilidad.
