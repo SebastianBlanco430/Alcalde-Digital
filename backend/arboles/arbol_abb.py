@@ -1,6 +1,3 @@
-from nodos.nodo_noticia import NodoNoticia
-
-
 class ArbolABB:
     def __init__(self):
         self.raiz = None
@@ -16,15 +13,6 @@ class ArbolABB:
             return self.buscar(nodo.izquierdo, id)
         else:
             return self.buscar(nodo.derecho, id)
-
-    def agregar(self, id, noticia, veracidad, rol):
-        nuevo_nodo = NodoNoticia(id, noticia, veracidad, rol)
-
-        if self.raiz is None:
-            self.raiz = nuevo_nodo
-            return
-
-        self.agregar_recursivo(self.raiz, nuevo_nodo)
 
     def agregar_recursivo(self, nodo, nuevo_nodo):
         if nuevo_nodo.id < nodo.id:
