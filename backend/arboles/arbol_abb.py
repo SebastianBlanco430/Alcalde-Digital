@@ -57,3 +57,14 @@ class ArbolABB:
             nodo.derecho = self.eliminar_recursivo(nodo.derecho, temp.id)
 
         return nodo
+
+    def isomorfo(self, A, B):
+        if A is None and B is None:
+            return True
+
+        if A is None or B is None:
+            return False
+
+        return self.isomorfo(A.izquierdo, B.izquierdo) and self.isomorfo(
+            A.derecho, B.derecho
+        )
