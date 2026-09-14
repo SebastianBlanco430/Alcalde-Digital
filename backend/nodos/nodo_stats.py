@@ -1,3 +1,6 @@
+from backend.nodos.nodo import Nodo
+
+
 class NodoStats(Nodo):
     def __init__(self, id, lista_izq, lista_der):
         super().__init__(id)

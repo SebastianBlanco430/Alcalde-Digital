@@ -1,5 +1,5 @@
-from arboles.arbol_abb import ArbolABB
-from nodos.nodo_noticia import NodoNoticia
+from backend.arboles.arbol_abb import ArbolABB
+from backend.nodos.nodo_noticia import NodoNoticia
 
 
 class ArbolNoticias(ArbolABB):

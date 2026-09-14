@@ -68,3 +68,12 @@ class ArbolABB:
         return self.isomorfo(A.izquierdo, B.izquierdo) and self.isomorfo(
             A.derecho, B.derecho
         )
+
+    def imprimir(self, nodo=None, nivel=0):
+        if nodo is None and nivel == 0:
+            nodo = self.raiz
+
+        if nodo is not None:
+            self.imprimir(nodo.derecho, nivel + 1)
+            print("  " * nivel + f"{nodo.id}")
+            self.imprimir(nodo.izquierdo, nivel + 1)

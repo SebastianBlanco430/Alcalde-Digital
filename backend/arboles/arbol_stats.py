@@ -1,5 +1,5 @@
-from arboles.arbol_abb import ArbolABB
-from nodos.nodo_stats import NodoStats
+from backend.arboles.arbol_abb import ArbolABB
+from backend.nodos.nodo_stats import NodoStats
 
 
 class ArbolStats(ArbolABB):
