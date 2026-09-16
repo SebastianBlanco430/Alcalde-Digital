@@ -77,3 +77,26 @@ class ArbolABB:
             self.imprimir(nodo.derecho, nivel + 1)
             print("  " * nivel + f"{nodo.id}")
             self.imprimir(nodo.izquierdo, nivel + 1)
+
+    def preorden(self, nodo):
+        if nodo is None:
+            return
+
+        print(nodo.id, " ")
+        self.preorden(nodo.izquierdo)
+        self.preorden(nodo.derecho)
+
+    def inorden(self, nodo):
+        if nodo is None:
+            return
+
+        self.inorden(nodo.izquierdo)
+        print(nodo.id, " ")
+        self.inorden(nodo.derecho)
+
+    def postorden(self, nodo):
+        if nodo is None:
+            return
+
+        self.postorden(nodo.izquierdo)
+        self.postorden(nodo.derecho)
