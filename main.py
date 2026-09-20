@@ -18,7 +18,7 @@ while jugando:
         if evento.type == pygame.QUIT:
             jugando = False
 
-    escena_actual.manejar_eventos(eventos)
+    escena_actual = escena_actual.manejar_eventos(eventos)
     escena_actual.actualizar()
     escena_actual.dibujar()
 

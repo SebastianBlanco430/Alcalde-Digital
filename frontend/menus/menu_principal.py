@@ -1,6 +1,7 @@
 import sys
 import pygame
 from frontend.escenas.escena import Escena
+from frontend.menus.menu_sel_rol import MenuSeleccionRoles
 
 
 class MenuPrincipal(Escena):
@@ -18,6 +19,8 @@ class MenuPrincipal(Escena):
         for evento in eventos:
             if evento.type == pygame.MOUSEBUTTONDOWN:
                 if evento.button == 1:
+                    if self.boton_jugar.collidepoint(evento.pos):
+                        return MenuSeleccionRoles(self.ventana)
                     if self.boton_salir.collidepoint(evento.pos):
                         pygame.quit()
                         sys.exit()
@@ -32,9 +35,6 @@ class MenuPrincipal(Escena):
 
         texto_titulo = self.fuente_titulo.render("Alcalde Digital", True, (0, 255, 0))
         self.ventana.blit(texto_titulo, (230, 100))
-
-        pygame.draw.rect(self.ventana, (0, 0, 0), self.boton_jugar)
-        pygame.draw.rect(self.ventana, (0, 0, 0), self.boton_salir)
 
         texto_jugar = self.fuente_boton.render("Jugar", True, (0, 255, 0))
         texto_salir = self.fuente_boton.render("Salir", True, (0, 255, 0))
