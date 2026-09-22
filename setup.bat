@@ -20,7 +20,7 @@ if not exist "venv" (
 
 echo Instalando/Actualizando Pygame dentro del entorno virtual...
 .\venv\Scripts\python.exe -m pip install --upgrade pip
-.\venv\Scripts\python.exe -m pip install pygame
+.\venv\Scripts\python.exe -m pip install pygame-ce
 
 echo ====================================================
 echo Entorno listo correctamente. 
