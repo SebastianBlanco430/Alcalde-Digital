@@ -7,7 +7,13 @@ venv.bak/
 
 
 __pycache__/
+.pytest_cache/
 *.py[cod]
+
+# Pruebas (tests, scripts de prueba y su configuracion): solo locales
+tests/
+scripts/
+pytest.ini
 *$py.class
 
 

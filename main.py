@@ -1,51 +1,69 @@
-import pygame
-import sys
+"""
+Punto de entrada de Alcalde Digital (Ursina).
 
-from frontend.escenas.pantalla_inicio import PantallaInicio
-from frontend.escenas.pantalla_juego import PantallaJuego
+Importar este modulo NO abre ninguna ventana: toda la construccion vive en
+`crear_aplicacion()`. Reemplaza al punto de entrada pygame original, retirado
+en el Modulo 5 de la migracion a Ursina.
+"""
 
-ANCHO = 800
-ALTO = 600
+from pathlib import Path
 
-pygame.init()
-pantalla = pygame.display.set_mode((ANCHO, ALTO))
-pygame.display.set_caption("Alcalde Digital")
-reloj = pygame.time.Clock()
-jugando = True
+from panda3d.core import WindowProperties
+from ursina import Ursina, application, window
 
-# Jugador de prueba: la selección real de jugador todavía no existe
-# (fuera de alcance de esta entrega, la construye arquitectura-mundos).
-jugador_prueba = {"nombre": "Jugador 1", "rol": "ciudadano"}
+from frontend import estilo
+from frontend.componentes import preparar_fuente, rgb
+from frontend.escenas.escena_inicio import EscenaInicio
+from frontend.escenas.escena_juego import EscenaJuego
+from frontend.gestor_escenas import GestorEscenas
 
-# --- Cambio de escena TEMPORAL ---------------------------------------------
-# Esto es un mecanismo mínimo (un flag + un if) solo para no arrancar el
-# juego directo en PantallaJuego. NO es un sistema de escenas/estados real:
-# eso lo diseñará más adelante el subagente `arquitectura-mundos`. No agregar
-# más pantallas a este esquema; cuando exista el sistema real, reemplazar
-# todo este bloque.
-pantalla_inicio = PantallaInicio(pantalla)
-escena_juego = None
+# Jugador de prueba: la seleccion real de jugador todavia no existe.
+JUGADOR_PRUEBA = {"nombre": "Jugador 1", "rol": "ciudadano"}
 
-while jugando:
-    for evento in pygame.event.get():
-        if evento.type == pygame.QUIT:
-            jugando = False
-        elif escena_juego is None:
-            pantalla_inicio.manejar_evento(evento)
-        else:
-            escena_juego.manejar_evento(evento)
+# Ventana 16:9 de tamano explicito y reproducible (el layout de las escenas esta
+# calculado para camera.ui a 16:9: x en [-0.888, 0.888], y en [-0.5, 0.5]).
+TAMANO_VENTANA = (1280, 720)
 
-    if escena_juego is None:
-        pantalla_inicio.actualizar()
-        pantalla_inicio.dibujar()
-        if pantalla_inicio.terminada:
-            escena_juego = PantallaJuego(pantalla, jugador_prueba)
-    else:
-        escena_juego.actualizar()
-        escena_juego.dibujar()
 
-    pygame.display.flip()
-    reloj.tick(60)
+def _fijar_tamano_ventana():
+    """Impide que el usuario redimensione o maximice la ventana.
 
-pygame.quit()
-sys.exit()
+    Ursina, al cambiar el aspecto, solo reubica en x las entidades hijas directas
+    de camera.ui (ursina/window.py: update_aspect_ratio), no su contenido; el
+    layout de las escenas esta calculado para 16:9, asi que redimensionar lo
+    deformaria. `forced_aspect_ratio` solo actua al fijar `window.size` por
+    codigo, no frena al usuario; `fixed_size` de Panda3D si (quita el borde de
+    redimension y el boton de maximizar).
+    """
+    propiedades = WindowProperties()
+    propiedades.set_fixed_size(True)
+    application.base.win.request_properties(propiedades)
+
+
+def crear_aplicacion():
+    """Crea la aplicacion Ursina, registra las escenas y activa "inicio".
+
+    Retorna (app, gestor). No inicia el loop: quien llama hace `app.run()`
+    (asi los scripts de prueba pueden programar pasos antes de arrancarlo).
+    """
+    # development_mode=False oculta el panel de desarrollo (contador de FPS, boton X
+    # rojo, contadores de entidades, engranaje); pero en Ursina 8.3.0 tambien
+    # activaria fullscreen por defecto, asi que se pide ventana explicita.
+    app = Ursina(title="Alcalde Digital", borderless=False, fullscreen=False,
+                 development_mode=False, size=TAMANO_VENTANA)
+    application.asset_folder = Path(__file__).resolve().parent / "assets"
+    window.color = rgb(estilo.COLOR_FONDO)
+    _fijar_tamano_ventana()
+    preparar_fuente()
+
+    gestor = GestorEscenas()
+    gestor.registrar("inicio", EscenaInicio(
+        al_comenzar=lambda: gestor.cambiar_a("juego", jugador=JUGADOR_PRUEBA)))
+    gestor.registrar("juego", EscenaJuego())
+    gestor.cambiar_a("inicio")
+    return app, gestor
+
+
+if __name__ == "__main__":
+    app, _ = crear_aplicacion()
+    app.run()
