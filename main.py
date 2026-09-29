@@ -6,7 +6,7 @@ from pathlib import Path
 from panda3d.core import WindowProperties
 from ursina import Ursina, application, window
 
-from frontend import estilo
+from frontend import compat_macos, estilo
 from frontend.componentes import preparar_fuente, rgb
 from frontend.escenas.escena_inicio import EscenaInicio
 from frontend.escenas.escena_juego import EscenaJuego
@@ -31,8 +31,10 @@ def crear_aplicacion():
     # Retorna (aplicacion, gestor) sin iniciar el loop: quien llama hace aplicacion.run().
     # development_mode=False oculta el panel de desarrollo, pero en Ursina 8.3.0
     # activaría fullscreen por defecto, así que se pide ventana explícita.
-    aplicacion = Ursina(title="Alcalde Digital", borderless=False, fullscreen=False,
+    compat_macos.aplicar()
+    app = Ursina(title="Alcalde Digital", borderless=False, fullscreen=False,
                  development_mode=False, size=TAMANO_VENTANA)
+    compat_macos.reaplicar()
     application.asset_folder = Path(__file__).resolve().parent / "assets"
     window.color = rgb(estilo.COLOR_FONDO)
     fijar_tamano_ventana()
