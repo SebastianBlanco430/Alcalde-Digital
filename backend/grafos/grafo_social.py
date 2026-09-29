@@ -86,7 +86,7 @@ class GrafoSocial:
 
 # Grafo de ejemplo con 10 ciudadanos: Ana muy conectada, Carlos con una sola
 # relación y Diana aislada (caso borde).
-def construir_grafo_social_demo():
+def construir_grafo_social_ejemplo():
     grafo = GrafoSocial()
 
     for ciudadano in (

@@ -91,8 +91,8 @@ class GrafoCiudad:
         return f"GrafoCiudad(lugares={self.numero_lugares()}, conexiones={self.numero_conexiones()})"
 
 
-# Grafo de ejemplo con 7 lugares conexos, coherente con noticias_seed.py.
-def construir_grafo_ciudad_demo():
+# Grafo de ejemplo con 7 lugares conexos, coherente con noticias_semilla.py.
+def construir_grafo_ciudad_ejemplo():
     grafo = GrafoCiudad()
 
     for lugar in (

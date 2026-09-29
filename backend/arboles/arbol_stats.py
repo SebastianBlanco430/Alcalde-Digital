@@ -7,7 +7,7 @@
 #
 # Este árbol se ordena por `gravedad`, no por `id`. Para que tenga la misma forma
 # que ArbolNoticias, el orden relativo de gravedad debe coincidir con el de id
-# (ver backend/datos/noticias_seed.py). Por eso el nodo isomorfo no se busca por
+# (ver backend/datos/noticias_semilla.py). Por eso el nodo isomorfo no se busca por
 # id aquí: se usa ArbolNoticias.buscar_con_camino(id) y se replica el camino con
 # obtener_por_camino.
 

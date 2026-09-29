@@ -28,10 +28,10 @@ def fijar_tamano_ventana():
 
 
 def crear_aplicacion():
-    # Retorna (app, gestor) sin iniciar el loop: quien llama hace app.run().
+    # Retorna (aplicacion, gestor) sin iniciar el loop: quien llama hace aplicacion.run().
     # development_mode=False oculta el panel de desarrollo, pero en Ursina 8.3.0
     # activaría fullscreen por defecto, así que se pide ventana explícita.
-    app = Ursina(title="Alcalde Digital", borderless=False, fullscreen=False,
+    aplicacion = Ursina(title="Alcalde Digital", borderless=False, fullscreen=False,
                  development_mode=False, size=TAMANO_VENTANA)
     application.asset_folder = Path(__file__).resolve().parent / "assets"
     window.color = rgb(estilo.COLOR_FONDO)
@@ -43,9 +43,9 @@ def crear_aplicacion():
         al_comenzar=lambda: gestor.cambiar_a("juego", jugador=JUGADOR_PRUEBA)))
     gestor.registrar("juego", EscenaJuego())
     gestor.cambiar_a("inicio")
-    return app, gestor
+    return aplicacion, gestor
 
 
 if __name__ == "__main__":
-    app, _ = crear_aplicacion()
-    app.run()
+    aplicacion, _ = crear_aplicacion()
+    aplicacion.run()

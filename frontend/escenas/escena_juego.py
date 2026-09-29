@@ -6,7 +6,7 @@
 
 from ursina import Entity, Text
 
-from backend.datos.noticias_seed import construir_arboles
+from backend.datos.noticias_semilla import construir_arboles
 from backend.logica.estado_partida import NOMBRES_INDICADORES, EstadoPartida
 from frontend import estilo
 from frontend.componentes import (
@@ -20,7 +20,7 @@ from frontend.componentes import (
 from frontend.escenas.escena_base import Escena
 
 ASPECTO = 16 / 9   # la ventana se fija en 16:9 (ver main.py)
-ANCHO_UI = ASPECTO  # ancho total de camera.ui (alto = 1)
+ANCHO_INTERFAZ = ASPECTO  # ancho total de camera.ui (alto = 1)
 
 
 # Partida en curso. Al entrar, si no se inyecta un `estado`, crea un EstadoPartida
@@ -44,23 +44,23 @@ class EscenaJuego(Escena):
     MARGEN_JUGADOR_X = a_unidades(12)
     MARGEN_JUGADOR_Y = a_unidades(10)
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, **opciones):
+        super().__init__(**opciones)
         self.estado = None
         self.jugador = {}
 
         # Panel superior con las tres barras.
         self.panel = Entity(
             parent=self, model="quad", color=rgb(estilo.COLOR_PANEL),
-            scale=(ANCHO_UI, self.ALTO_PANEL), position=(0, 0.5 - self.ALTO_PANEL / 2, 0.01),
+            scale=(ANCHO_INTERFAZ, self.ALTO_PANEL), position=(0, 0.5 - self.ALTO_PANEL / 2, 0.01),
         )
-        ancho_bloque = (ANCHO_UI - 2 * self.MARGEN_PANEL) / 3
+        ancho_bloque = (ANCHO_INTERFAZ - 2 * self.MARGEN_PANEL) / 3
         self.barras = {}
-        for i, nombre in enumerate(NOMBRES_INDICADORES):
+        for indice, nombre in enumerate(NOMBRES_INDICADORES):
             self.barras[nombre] = BarraIndicador(
                 estilo.ETIQUETAS_INDICADORES[nombre], ancho_bloque - self.HOLGURA_BARRA,
                 parent=self,
-                position=(-ANCHO_UI / 2 + self.MARGEN_PANEL + i * ancho_bloque, 0.5, 0),
+                position=(-ANCHO_INTERFAZ / 2 + self.MARGEN_PANEL + indice * ancho_bloque, 0.5, 0),
             )
 
         # Tarjeta de noticia.
@@ -75,18 +75,18 @@ class EscenaJuego(Escena):
         )
         x_botones = (self.SEPARACION_BOTONES + self.BOTON_ANCHO) / 2
         self.boton_compartir = BotonAccion(
-            "Compartir", on_click=self.compartir, ancho=self.BOTON_ANCHO, alto=self.BOTON_ALTO,
+            "Compartir", al_clic=self.compartir, ancho=self.BOTON_ANCHO, alto=self.BOTON_ALTO,
             parent=self, position=(-x_botones, y_botones),
         )
         self.boton_reportar = BotonAccion(
-            "Reportar", on_click=self.reportar, ancho=self.BOTON_ANCHO, alto=self.BOTON_ALTO,
+            "Reportar", al_clic=self.reportar, ancho=self.BOTON_ANCHO, alto=self.BOTON_ALTO,
             parent=self, position=(x_botones, y_botones),
         )
 
         # Info del jugador, abajo a la derecha.
         self.texto_jugador = Text(
             "", parent=self, origin=(0.5, -0.5),
-            position=(ANCHO_UI / 2 - self.MARGEN_JUGADOR_X, -0.5 + self.MARGEN_JUGADOR_Y),
+            position=(ANCHO_INTERFAZ / 2 - self.MARGEN_JUGADOR_X, -0.5 + self.MARGEN_JUGADOR_Y),
             scale=escala_fuente(16), color=rgb(estilo.COLOR_TEXTO_TENUE),
         )
 

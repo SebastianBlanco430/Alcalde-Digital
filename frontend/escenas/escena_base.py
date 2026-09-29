@@ -11,12 +11,12 @@ from ursina import Entity, camera
 # `parent` por defecto es camera.ui; para mundos 2.5D se puede pasar `scene`.
 class Escena(Entity):
 
-    def __init__(self, parent=None, **kwargs):
+    def __init__(self, parent=None, **opciones):
         # camera.ui se resuelve aquí porque solo existe tras crear la aplicación
         if parent is None:
             parent = camera.ui
-        kwargs.pop("enabled", None)
-        super().__init__(parent=parent, enabled=False, **kwargs)
+        opciones.pop("enabled", None)
+        super().__init__(parent=parent, enabled=False, **opciones)
 
     # Hook: el gestor lo llama al activar la escena con los `datos` de cambiar_a().
     def al_entrar(self, **datos):

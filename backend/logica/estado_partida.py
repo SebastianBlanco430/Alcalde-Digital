@@ -12,7 +12,7 @@ import logging
 
 from backend.logica.mazo_noticias import MazoNoticias
 
-_log = logging.getLogger(__name__)
+_registro = logging.getLogger(__name__)
 
 # Los indicadores viven en [0, 100]; todo delta se recorta a ese rango.
 INDICADOR_MIN = 0
@@ -26,7 +26,7 @@ VALOR_INICIAL = 50
 _DECISIONES_VALIDAS = ("compartir", "reportar")
 
 
-def clamp(valor, minimo=INDICADOR_MIN, maximo=INDICADOR_MAX):
+def recortar(valor, minimo=INDICADOR_MIN, maximo=INDICADOR_MAX):
     return max(minimo, min(maximo, valor))
 
 
@@ -67,7 +67,7 @@ class EstadoPartida:
     # claves que no son indicadores se ignoran.
     def aplicar_deltas(self, deltas):
         for nombre in NOMBRES_INDICADORES:
-            self._indicadores[nombre] = clamp(self._indicadores[nombre] + deltas.get(nombre, 0))
+            self._indicadores[nombre] = recortar(self._indicadores[nombre] + deltas.get(nombre, 0))
 
     # Pide la próxima noticia al mazo; si no hay, noticia_actual y camino_actual
     # quedan en None.
@@ -94,7 +94,7 @@ class EstadoPartida:
         nodo_stats = self.arbol_stats.obtener_por_camino(self._camino_actual)
         if nodo_stats is None:
             # no debería pasar con árboles bien construidos; se ignora la decisión
-            _log.warning(
+            _registro.warning(
                 "obtener_por_camino devolvió None para camino=%s (noticia id=%s): "
                 "isomorfismo roto entre ArbolNoticias y ArbolStats; decisión ignorada.",
                 self._camino_actual,

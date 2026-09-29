@@ -64,8 +64,8 @@ class BarraIndicador(Entity):
     Y_BARRA = -0.0817     # centro de la barra
     ALTO_BARRA = 0.03
 
-    def __init__(self, etiqueta, ancho, valor=50, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, etiqueta, ancho, valor=50, **opciones):
+        super().__init__(**opciones)
         self.etiqueta = etiqueta
         self.ancho_barra = ancho
         self.alto_barra = self.ALTO_BARRA
@@ -115,11 +115,11 @@ class BarraIndicador(Entity):
 class TarjetaNoticia(Entity):
 
     MENSAJE_VACIO = "No hay más noticias disponibles."
-    PADDING = a_unidades(24)       # 24 px en la versión pygame
+    RELLENO = a_unidades(24)       # 24 px en la versión pygame
     LINEA_ALTURA = 1.35            # separación entre líneas (1 = apretado)
 
-    def __init__(self, ancho, alto, tamano_fuente_px=24, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, ancho, alto, tamano_fuente_px=24, **opciones):
+        super().__init__(**opciones)
         self.ancho = ancho
         self.alto = alto
         self.mensaje_vacio = self.MENSAJE_VACIO
@@ -137,7 +137,7 @@ class TarjetaNoticia(Entity):
 
     # Ancho disponible para el texto (tarjeta menos relleno a ambos lados).
     def ancho_util(self):
-        return self.ancho - 2 * self.PADDING
+        return self.ancho - 2 * self.RELLENO
 
     # Ancho de `cadena` en unidades de camera.ui con la fuente y escala actuales.
     def medir(self, cadena):
@@ -178,23 +178,23 @@ class TarjetaNoticia(Entity):
 
 # Botón nativo de Ursina con estados normal / hover / deshabilitado. En Ursina
 # 8.3.0 `Button.disabled` no impide el clic, así que `on_click` apunta a
-# `al_hacer_clic`, que lo ignora mientras el botón está deshabilitado; la
+# `manejar_clic`, que lo ignora mientras el botón está deshabilitado; la
 # acción del usuario queda en `accion`.
 class BotonAccion(Button):
 
-    def __init__(self, texto, on_click=None, ancho=a_unidades(220), alto=a_unidades(56),
-                 habilitado=True, tamano_fuente_px=24, **kwargs):
+    def __init__(self, texto, al_clic=None, ancho=a_unidades(220), alto=a_unidades(56),
+                 habilitado=True, tamano_fuente_px=24, **opciones):
         super().__init__(
             text=texto, scale=(ancho, alto), radius=a_unidades(8) / alto,
             color=rgb(estilo.COLOR_BOTON), text_color=rgb(estilo.COLOR_BOTON_TEXTO),
-            text_size=escala_fuente(tamano_fuente_px), **kwargs,
+            text_size=escala_fuente(tamano_fuente_px), **opciones,
         )
-        self.accion = on_click
+        self.accion = al_clic
         self._habilitado = True
-        self.highlight_color = rgb(estilo.COLOR_BOTON_HOVER)
-        self.pressed_color = rgb(estilo.COLOR_BOTON_HOVER)  # sin color propio de "pulsado" en la paleta
+        self.highlight_color = rgb(estilo.COLOR_BOTON_RESALTADO)
+        self.pressed_color = rgb(estilo.COLOR_BOTON_RESALTADO)  # sin color propio de "pulsado" en la paleta
         self.highlight_text_color = rgb(estilo.COLOR_BOTON_TEXTO)
-        self.on_click = self.al_hacer_clic
+        self.on_click = self.manejar_clic
         self.fijar_habilitado(habilitado)
 
     def esta_habilitado(self):
@@ -212,7 +212,7 @@ class BotonAccion(Button):
             self.color = rgb(estilo.COLOR_BOTON_DESHABILITADO)
             self.text_color = rgb(estilo.COLOR_TEXTO_TENUE)
 
-    def al_hacer_clic(self):
+    def manejar_clic(self):
         if not self._habilitado or self.accion is None:
             return
         self.accion()

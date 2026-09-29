@@ -20,8 +20,8 @@ class EscenaInicio(Escena):
     Y_SUBTITULO = a_unidades(300 - 290)
     Y_BOTON = a_unidades(300 - 360)
 
-    def __init__(self, al_comenzar, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, al_comenzar, **opciones):
+        super().__init__(**opciones)
         self.texto_titulo = Text(
             TITULO, parent=self, origin=(0, 0), position=(0, self.Y_TITULO),
             scale=escala_fuente(48), color=rgb(estilo.COLOR_TEXTO),
@@ -31,5 +31,5 @@ class EscenaInicio(Escena):
             scale=escala_fuente(22), color=rgb(estilo.COLOR_TEXTO_TENUE),
         )
         self.boton_comenzar = BotonAccion(
-            "Comenzar", on_click=al_comenzar, parent=self, position=(0, self.Y_BOTON),
+            "Comenzar", al_clic=al_comenzar, parent=self, position=(0, self.Y_BOTON),
         )

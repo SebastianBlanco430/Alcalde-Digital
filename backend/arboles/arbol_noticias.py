@@ -14,8 +14,8 @@ class NodoNoticia:
         self.derecha = None
 
     def __repr__(self):
-        v = "verdadera" if self.veracidad else "falsa"
-        return f"NodoNoticia(id={self.id}, veracidad={v}, texto={self.texto!r})"
+        etiqueta_veracidad = "verdadera" if self.veracidad else "falsa"
+        return f"NodoNoticia(id={self.id}, veracidad={etiqueta_veracidad}, texto={self.texto!r})"
 
 
 # ABB de noticias, ordenado por `id` ascendente.

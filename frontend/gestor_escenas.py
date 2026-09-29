@@ -38,14 +38,14 @@ class GestorEscenas:
 
         actual = self.escena_actual()
         if actual is not None:
-            hook_salir = getattr(actual, "al_salir", None)
-            if callable(hook_salir):
-                hook_salir()
+            gancho_salir = getattr(actual, "al_salir", None)
+            if callable(gancho_salir):
+                gancho_salir()
             actual.enabled = False
 
         nueva = self._escenas[nombre]
         self._nombre_actual = nombre
         nueva.enabled = True
-        hook_entrar = getattr(nueva, "al_entrar", None)
-        if callable(hook_entrar):
-            hook_entrar(**datos)
+        gancho_entrar = getattr(nueva, "al_entrar", None)
+        if callable(gancho_entrar):
+            gancho_entrar(**datos)

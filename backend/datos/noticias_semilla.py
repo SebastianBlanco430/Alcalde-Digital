@@ -21,7 +21,7 @@
 #   id=55  gravedad=80  rumor agua contaminada (falsa)
 #   id=70  gravedad=95  rumor fraude electoral (falsa)
 #
-# El orden de NOTICIAS_SEED es desordenado respecto a id/gravedad para no
+# El orden de NOTICIAS_SEMILLA es desordenado respecto a id/gravedad para no
 # producir un árbol degenerado (tipo lista).
 
 from backend.arboles.arbol_noticias import ArbolNoticias
@@ -30,7 +30,7 @@ from backend.arboles.arbol_stats import ArbolStats
 
 # Cada entrada: (id, gravedad, texto, veracidad, deltas_compartir, deltas_reportar)
 # Orden de la lista = orden de inserción en ambos árboles.
-NOTICIAS_SEED = [
+NOTICIAS_SEMILLA = [
     (
         11,
         30,
@@ -89,12 +89,12 @@ NOTICIAS_SEED = [
 
 
 # Crea ArbolNoticias y ArbolStats insertando las noticias en el mismo orden de
-# NOTICIAS_SEED, así quedan isomorfos. Retorna (arbol_noticias, arbol_stats).
+# NOTICIAS_SEMILLA, así quedan isomorfos. Retorna (arbol_noticias, arbol_stats).
 def construir_arboles():
     arbol_noticias = ArbolNoticias()
     arbol_stats = ArbolStats()
 
-    for id_, gravedad, texto, veracidad, deltas_compartir, deltas_reportar in NOTICIAS_SEED:
+    for id_, gravedad, texto, veracidad, deltas_compartir, deltas_reportar in NOTICIAS_SEMILLA:
         arbol_noticias.insertar(id_, texto=texto, veracidad=veracidad)
         arbol_stats.insertar(
             id_,
