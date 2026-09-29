@@ -75,11 +75,11 @@ class EscenaJuego(Escena):
         )
         x_botones = (self.SEPARACION_BOTONES + self.BOTON_ANCHO) / 2
         self.boton_compartir = BotonAccion(
-            "Compartir", on_click=self._compartir, ancho=self.BOTON_ANCHO, alto=self.BOTON_ALTO,
+            "Compartir", on_click=self.compartir, ancho=self.BOTON_ANCHO, alto=self.BOTON_ALTO,
             parent=self, position=(-x_botones, y_botones),
         )
         self.boton_reportar = BotonAccion(
-            "Reportar", on_click=self._reportar, ancho=self.BOTON_ANCHO, alto=self.BOTON_ALTO,
+            "Reportar", on_click=self.reportar, ancho=self.BOTON_ANCHO, alto=self.BOTON_ALTO,
             parent=self, position=(x_botones, y_botones),
         )
 
@@ -102,14 +102,14 @@ class EscenaJuego(Escena):
 
     # -- Decisiones --
 
-    def _compartir(self):
-        self._decidir("compartir")
+    def compartir(self):
+        self.decidir("compartir")
 
-    def _reportar(self):
-        self._decidir("reportar")
+    def reportar(self):
+        self.decidir("reportar")
 
-    def _decidir(self, tipo):
-        if self.estado is None or not self.estado.hay_noticia:
+    def decidir(self, tipo):
+        if self.estado is None or not self.estado.hay_noticia():
             return
         self.estado.decidir(tipo)
         self.refrescar()
@@ -121,16 +121,16 @@ class EscenaJuego(Escena):
         if self.estado is None:
             return
 
-        indicadores = self.estado.indicadores
+        indicadores = self.estado.indicadores()
         for nombre in NOMBRES_INDICADORES:
             self.barras[nombre].actualizar(indicadores[nombre])
 
-        noticia = self.estado.noticia_actual
+        noticia = self.estado.noticia_actual()
         self.tarjeta.mostrar(None if noticia is None else noticia.texto)
 
-        hay_noticia = self.estado.hay_noticia
-        self.boton_compartir.habilitado = hay_noticia
-        self.boton_reportar.habilitado = hay_noticia
+        hay_noticia = self.estado.hay_noticia()
+        self.boton_compartir.fijar_habilitado(hay_noticia)
+        self.boton_reportar.fijar_habilitado(hay_noticia)
 
         nombre = self.jugador.get("nombre", "Jugador")
         rol = self.jugador.get("rol", "sin rol")

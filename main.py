@@ -19,7 +19,7 @@ JUGADOR_PRUEBA = {"nombre": "Jugador 1", "rol": "ciudadano"}
 TAMANO_VENTANA = (1280, 720)
 
 
-def _fijar_tamano_ventana():
+def fijar_tamano_ventana():
     # Impide redimensionar/maximizar: el layout está calculado para 16:9 y Ursina
     # solo reubica en x los hijos directos de camera.ui al cambiar el aspecto.
     propiedades = WindowProperties()
@@ -35,7 +35,7 @@ def crear_aplicacion():
                  development_mode=False, size=TAMANO_VENTANA)
     application.asset_folder = Path(__file__).resolve().parent / "assets"
     window.color = rgb(estilo.COLOR_FONDO)
-    _fijar_tamano_ventana()
+    fijar_tamano_ventana()
     preparar_fuente()
 
     gestor = GestorEscenas()

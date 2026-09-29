@@ -26,7 +26,7 @@ VALOR_INICIAL = 50
 _DECISIONES_VALIDAS = ("compartir", "reportar")
 
 
-def _clamp(valor, minimo=INDICADOR_MIN, maximo=INDICADOR_MAX):
+def clamp(valor, minimo=INDICADOR_MIN, maximo=INDICADOR_MAX):
     return max(minimo, min(maximo, valor))
 
 
@@ -47,21 +47,17 @@ class EstadoPartida:
     # -- Consulta --
 
     # copia: mutarla no altera el estado
-    @property
     def indicadores(self):
         return dict(self._indicadores)
 
     # NodoNoticia activo, o None si no hay noticia
-    @property
     def noticia_actual(self):
         return self._noticia_actual
 
     # camino ("izquierda"/"derecha") de la noticia activa, o None
-    @property
     def camino_actual(self):
         return self._camino_actual
 
-    @property
     def hay_noticia(self):
         return self._noticia_actual is not None
 
@@ -71,7 +67,7 @@ class EstadoPartida:
     # claves que no son indicadores se ignoran.
     def aplicar_deltas(self, deltas):
         for nombre in NOMBRES_INDICADORES:
-            self._indicadores[nombre] = _clamp(self._indicadores[nombre] + deltas.get(nombre, 0))
+            self._indicadores[nombre] = clamp(self._indicadores[nombre] + deltas.get(nombre, 0))
 
     # Pide la próxima noticia al mazo; si no hay, noticia_actual y camino_actual
     # quedan en None.

@@ -49,7 +49,7 @@ def preparar_fuente():
 # Malla de rectángulo con esquinas de `radio_px` (px de la versión pygame).
 # El radio de Quad es relativo al alto; se limita a la mitad del aspecto para no
 # generar una malla degenerada en barras muy estrechas.
-def _modelo_redondeado(ancho, alto, radio_px):
+def modelo_redondeado(ancho, alto, radio_px):
     aspecto = ancho / alto
     radio = min(radio_px / (alto * ALTO_REFERENCIA_PX), aspecto / 2 - 0.01)
     return Quad(radius=max(radio, 0), aspect=aspecto)
@@ -82,7 +82,7 @@ class BarraIndicador(Entity):
         self.fondo = Entity(
             parent=self, position=(ancho / 2, self.Y_BARRA, 0.001),
             scale=(ancho, self.alto_barra), color=rgb(estilo.COLOR_BARRA_FONDO),
-            model=_modelo_redondeado(ancho, self.alto_barra, 4),
+            model=modelo_redondeado(ancho, self.alto_barra, 4),
         )
         self.relleno = Entity(
             parent=self, position=(ancho / 2, self.Y_BARRA, 0),
@@ -104,7 +104,7 @@ class BarraIndicador(Entity):
         self.relleno.enabled = True
         self.relleno.scale_x = ancho_relleno
         self.relleno.x = ancho_relleno / 2   # borde izquierdo fijo en x = 0
-        self.relleno.model = _modelo_redondeado(ancho_relleno, self.alto_barra, 4)
+        self.relleno.model = modelo_redondeado(ancho_relleno, self.alto_barra, 4)
         self.rgb_relleno = estilo.rgb_por_valor(valor)
         self.relleno.color = rgb(self.rgb_relleno)
 
@@ -127,7 +127,7 @@ class TarjetaNoticia(Entity):
 
         self.fondo = Entity(
             parent=self, scale=(ancho, alto), color=rgb(estilo.COLOR_TARJETA),
-            model=_modelo_redondeado(ancho, alto, 10),
+            model=modelo_redondeado(ancho, alto, 10),
         )
         self.texto = Text(
             "", parent=self, origin=(0, 0), position=(0, 0, -0.001),
@@ -136,12 +136,11 @@ class TarjetaNoticia(Entity):
         self.texto.line_height = self.LINEA_ALTURA
 
     # Ancho disponible para el texto (tarjeta menos relleno a ambos lados).
-    @property
     def ancho_util(self):
         return self.ancho - 2 * self.PADDING
 
     # Ancho de `cadena` en unidades de camera.ui con la fuente y escala actuales.
-    def _medir(self, cadena):
+    def medir(self, cadena):
         nodo = TextNode("medida")
         nodo.setFont(self.texto.font)
         return nodo.calcWidth(cadena) * self.texto.size * self.texto.scale_x
@@ -153,7 +152,7 @@ class TarjetaNoticia(Entity):
         else:
             rgb_texto = estilo.COLOR_TEXTO
 
-        self.lineas = envolver_texto(texto, self._medir, self.ancho_util)
+        self.lineas = envolver_texto(texto, self.medir, self.ancho_util())
         self.texto.color = rgb(rgb_texto)
         self.texto.text = "\n".join(self.lineas)
 
@@ -179,7 +178,7 @@ class TarjetaNoticia(Entity):
 
 # Botón nativo de Ursina con estados normal / hover / deshabilitado. En Ursina
 # 8.3.0 `Button.disabled` no impide el clic, así que `on_click` apunta a
-# `_al_hacer_clic`, que lo ignora mientras el botón está deshabilitado; la
+# `al_hacer_clic`, que lo ignora mientras el botón está deshabilitado; la
 # acción del usuario queda en `accion`.
 class BotonAccion(Button):
 
@@ -195,15 +194,13 @@ class BotonAccion(Button):
         self.highlight_color = rgb(estilo.COLOR_BOTON_HOVER)
         self.pressed_color = rgb(estilo.COLOR_BOTON_HOVER)  # sin color propio de "pulsado" en la paleta
         self.highlight_text_color = rgb(estilo.COLOR_BOTON_TEXTO)
-        self.on_click = self._al_hacer_clic
-        self.habilitado = habilitado
+        self.on_click = self.al_hacer_clic
+        self.fijar_habilitado(habilitado)
 
-    @property
-    def habilitado(self):
+    def esta_habilitado(self):
         return self._habilitado
 
-    @habilitado.setter
-    def habilitado(self, valor):
+    def fijar_habilitado(self, valor):
         self._habilitado = bool(valor)
         self.disabled = not self._habilitado
         if self._habilitado:
@@ -215,7 +212,7 @@ class BotonAccion(Button):
             self.color = rgb(estilo.COLOR_BOTON_DESHABILITADO)
             self.text_color = rgb(estilo.COLOR_TEXTO_TENUE)
 
-    def _al_hacer_clic(self):
+    def al_hacer_clic(self):
         if not self._habilitado or self.accion is None:
             return
         self.accion()
