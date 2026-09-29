@@ -1,10 +1,5 @@
-"""
-Punto de entrada de Alcalde Digital (Ursina).
-
-Importar este modulo NO abre ninguna ventana: toda la construccion vive en
-`crear_aplicacion()`. Reemplaza al punto de entrada pygame original, retirado
-en el Modulo 5 de la migracion a Ursina.
-"""
+# Punto de entrada de Alcalde Digital (Ursina).
+# Importar este módulo no abre ventana: todo se construye en crear_aplicacion().
 
 from pathlib import Path
 
@@ -17,38 +12,25 @@ from frontend.escenas.escena_inicio import EscenaInicio
 from frontend.escenas.escena_juego import EscenaJuego
 from frontend.gestor_escenas import GestorEscenas
 
-# Jugador de prueba: la seleccion real de jugador todavia no existe.
+# Jugador de prueba: aún no existe la selección real de jugador.
 JUGADOR_PRUEBA = {"nombre": "Jugador 1", "rol": "ciudadano"}
 
-# Ventana 16:9 de tamano explicito y reproducible (el layout de las escenas esta
-# calculado para camera.ui a 16:9: x en [-0.888, 0.888], y en [-0.5, 0.5]).
+# Ventana 16:9 (camera.ui: x en [-0.888, 0.888], y en [-0.5, 0.5]).
 TAMANO_VENTANA = (1280, 720)
 
 
 def _fijar_tamano_ventana():
-    """Impide que el usuario redimensione o maximice la ventana.
-
-    Ursina, al cambiar el aspecto, solo reubica en x las entidades hijas directas
-    de camera.ui (ursina/window.py: update_aspect_ratio), no su contenido; el
-    layout de las escenas esta calculado para 16:9, asi que redimensionar lo
-    deformaria. `forced_aspect_ratio` solo actua al fijar `window.size` por
-    codigo, no frena al usuario; `fixed_size` de Panda3D si (quita el borde de
-    redimension y el boton de maximizar).
-    """
+    # Impide redimensionar/maximizar: el layout está calculado para 16:9 y Ursina
+    # solo reubica en x los hijos directos de camera.ui al cambiar el aspecto.
     propiedades = WindowProperties()
     propiedades.set_fixed_size(True)
     application.base.win.request_properties(propiedades)
 
 
 def crear_aplicacion():
-    """Crea la aplicacion Ursina, registra las escenas y activa "inicio".
-
-    Retorna (app, gestor). No inicia el loop: quien llama hace `app.run()`
-    (asi los scripts de prueba pueden programar pasos antes de arrancarlo).
-    """
-    # development_mode=False oculta el panel de desarrollo (contador de FPS, boton X
-    # rojo, contadores de entidades, engranaje); pero en Ursina 8.3.0 tambien
-    # activaria fullscreen por defecto, asi que se pide ventana explicita.
+    # Retorna (app, gestor) sin iniciar el loop: quien llama hace app.run().
+    # development_mode=False oculta el panel de desarrollo, pero en Ursina 8.3.0
+    # activaría fullscreen por defecto, así que se pide ventana explícita.
     app = Ursina(title="Alcalde Digital", borderless=False, fullscreen=False,
                  development_mode=False, size=TAMANO_VENTANA)
     application.asset_folder = Path(__file__).resolve().parent / "assets"

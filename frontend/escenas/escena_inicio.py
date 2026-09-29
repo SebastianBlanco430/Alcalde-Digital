@@ -1,10 +1,5 @@
-"""
-Escena de inicio (Ursina): título, subtítulo y botón "Comenzar".
-
-Replica el comportamiento y la paleta de la pantalla de inicio pygame original
-(retirada en el Módulo 5). No conoce al gestor de escenas:
-recibe el callback `al_comenzar` por constructor.
-"""
+# Escena de inicio (Ursina): título, subtítulo y botón "Comenzar".
+# No conoce al gestor de escenas: recibe el callback `al_comenzar`.
 
 from ursina import Text
 
@@ -16,18 +11,11 @@ TITULO = "Alcalde Digital"
 SUBTITULO = "Campaña electoral en Ciudad Nova · Civitas"
 
 
+# Pantalla de bienvenida; `al_comenzar` se invoca al pulsar "Comenzar".
 class EscenaInicio(Escena):
-    """Pantalla de bienvenida.
-
-    Args:
-        al_comenzar: callable sin argumentos que se invoca al pulsar "Comenzar".
-
-    Atributos públicos: `texto_titulo`, `texto_subtitulo`, `boton_comenzar`
-    (BotonAccion).
-    """
 
     # Posiciones verticales de la versión pygame (800x600) convertidas a
-    # camera.ui (0 = centro de la pantalla, positivo = arriba).
+    # camera.ui (0 = centro, positivo = arriba).
     Y_TITULO = a_unidades(300 - 240)
     Y_SUBTITULO = a_unidades(300 - 290)
     Y_BOTON = a_unidades(300 - 360)

@@ -1,52 +1,38 @@
-"""
-Gestor de escenas: registra escenas por nombre y garantiza que solo UNA esté
-activa a la vez.
-
-Es deliberadamente ajeno a Ursina (duck typing): una "escena" es cualquier
-objeto con el atributo `enabled` y, opcionalmente, los hooks
-`al_entrar(**datos)` y `al_salir()`. Así se prueba con escenas falsas, sin
-abrir ventana, y las escenas no necesitan conocer al gestor (reciben
-callbacks, no una referencia a él).
-"""
+# Gestor de escenas: registra escenas por nombre y mantiene una sola activa.
+# Es ajeno a Ursina (duck typing): una escena es cualquier objeto con `enabled` y,
+# opcionalmente, los hooks `al_entrar(**datos)` y `al_salir()`. Así se prueba con
+# escenas falsas y las escenas no necesitan conocer al gestor.
 
 
+# Máquina de estados simple: {nombre: escena} + una escena actual.
 class GestorEscenas:
-    """Máquina de estados simple: {nombre: escena} + una escena actual."""
 
     def __init__(self):
         self._escenas = {}
         self._nombre_actual = None
 
+    # Nombre de la escena activa, o None si aún no hay ninguna.
     @property
     def nombre_actual(self):
-        """Nombre de la escena activa, o None si todavía no se ha activado ninguna."""
         return self._nombre_actual
 
     @property
     def escena_actual(self):
-        """Objeto de la escena activa, o None."""
         if self._nombre_actual is None:
             return None
         return self._escenas[self._nombre_actual]
 
+    # Registra la escena desactivada; lanza ValueError si el nombre ya existe.
     def registrar(self, nombre, escena):
-        """Registra `escena` bajo `nombre` y la deja desactivada.
-
-        Lanza ValueError si el nombre ya está registrado.
-        """
         if nombre in self._escenas:
             raise ValueError(f"Ya existe una escena registrada con el nombre {nombre!r}.")
         escena.enabled = False
         self._escenas[nombre] = escena
 
+    # Orden: al_salir() de la vieja -> vieja.enabled = False -> nueva.enabled = True
+    # -> al_entrar(**datos) de la nueva. Cambiar a la escena activa la reinicia.
+    # Lanza ValueError, sin alterar nada, si `nombre` no está registrada.
     def cambiar_a(self, nombre, **datos):
-        """Activa la escena `nombre`, desactivando antes la actual.
-
-        Orden: al_salir() de la vieja (si existe) -> vieja.enabled = False ->
-        nueva.enabled = True -> al_entrar(**datos) de la nueva (si existe).
-        Cambiar a la escena ya activa la reinicia (sale y vuelve a entrar).
-        Lanza ValueError, sin alterar nada, si `nombre` no está registrada.
-        """
         if nombre not in self._escenas:
             raise ValueError(
                 f"Escena no registrada: {nombre!r}. Registradas: {sorted(self._escenas)}."

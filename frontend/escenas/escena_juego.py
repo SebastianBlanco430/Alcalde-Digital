@@ -1,17 +1,8 @@
-"""
-Escena de partida (Ursina): indicadores, noticia activa y botones de decisión.
-
-Replica el comportamiento y la paleta de la pantalla de partida pygame original
-(retirada en el Módulo 5). NO contiene lógica de partida: consume
-`backend.logica.estado_partida.EstadoPartida` (indicadores, noticia activa y
-`decidir`), y solo vuelca su estado a los componentes de `frontend/componentes.py`.
-
-Diseño en camera.ui (16:9: x en [-0.888, 0.888], y en [-0.5, 0.5]): el mismo
-orden vertical que la versión pygame de 800x600 (panel superior de
-indicadores, tarjeta de noticia, botones debajo, info del jugador abajo a la
-derecha); el panel y el texto conservan sus medidas (en proporción a la altura)
-y solo la tarjeta y los botones se ensanchan un poco para el ancho 16:9.
-"""
+# Escena de partida (Ursina): indicadores, noticia activa y botones de decisión.
+# No contiene lógica de partida: consume EstadoPartida y solo vuelca su estado a
+# los componentes de frontend/componentes.py.
+# Layout en camera.ui (16:9): panel superior de indicadores, tarjeta de noticia,
+# botones debajo e info del jugador abajo a la derecha.
 
 from ursina import Entity, Text
 
@@ -32,25 +23,15 @@ ASPECTO = 16 / 9   # la ventana se fija en 16:9 (ver main.py)
 ANCHO_UI = ASPECTO  # ancho total de camera.ui (alto = 1)
 
 
+# Partida en curso. Al entrar, si no se inyecta un `estado`, crea un EstadoPartida
+# nuevo con los árboles del seed (así "volver a jugar" reinicia la partida).
 class EscenaJuego(Escena):
-    """Partida en curso.
 
-    `al_entrar(jugador=None, estado=None)`: si no se inyecta un `estado`, crea un
-    `EstadoPartida` nuevo con los árboles del seed (así "volver a jugar" reinicia
-    la partida). Inyectar uno permite probar la vista con estados controlados.
-
-    Atributos públicos (para pruebas): `estado`, `jugador`, `panel`, `barras`
-    (dict indicador -> BarraIndicador), `tarjeta`, `boton_compartir`,
-    `boton_reportar`, `texto_jugador`; y el método `refrescar()`.
-    """
-
-    # --- Layout (unidades de camera.ui; medidas pygame / 600) ---------------
+    # --- Layout (unidades de camera.ui; medidas pygame / 600) ---
     ALTO_PANEL = a_unidades(100)
     MARGEN_PANEL = a_unidades(30)
     HOLGURA_BARRA = a_unidades(20)          # la barra es más corta que su bloque
 
-    # 16:9 dispone de más ancho y de más alto libre que 800x600: la tarjeta es
-    # algo más ancha y alta, y todo el bloque baja un poco para repartir mejor.
     TARJETA_ANCHO = 1.16
     TARJETA_ALTO = 0.40
     TARJETA_Y = 0.05                         # centro de la tarjeta
@@ -109,7 +90,7 @@ class EscenaJuego(Escena):
             scale=escala_fuente(16), color=rgb(estilo.COLOR_TEXTO_TENUE),
         )
 
-    # -- Ciclo de vida -----------------------------------------------------------
+    # -- Ciclo de vida --
 
     def al_entrar(self, jugador=None, estado=None, **datos):
         self.jugador = jugador or {}
@@ -119,7 +100,7 @@ class EscenaJuego(Escena):
         self.estado = estado
         self.refrescar()
 
-    # -- Decisiones ------------------------------------------------------------------
+    # -- Decisiones --
 
     def _compartir(self):
         self._decidir("compartir")
@@ -133,10 +114,10 @@ class EscenaJuego(Escena):
         self.estado.decidir(tipo)
         self.refrescar()
 
-    # -- Vista -------------------------------------------------------------------------
+    # -- Vista --
 
     def refrescar(self):
-        """Vuelca el estado actual a barras, tarjeta, botones e info del jugador."""
+        # vuelca el estado actual a barras, tarjeta, botones e info del jugador
         if self.estado is None:
             return
 

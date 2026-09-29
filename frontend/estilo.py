@@ -1,14 +1,9 @@
-"""
-Estilo visual compartido (paleta y reglas de color) de la interfaz.
+# Estilo visual compartido (paleta y reglas de color) de la interfaz.
+# Python puro: no importa ursina, así se prueba con pytest sin abrir ventana.
+# Los colores son tuplas RGB de 0 a 255; frontend/componentes.py las convierte
+# a `ursina.color`.
 
-Python PURO: no importa ursina ni pygame, así se prueba con pytest sin abrir
-ventana (tests/test_estilo.py). Los colores son tuplas RGB de 0 a 255 y son
-IDÉNTICOS a los de la versión pygame original (retirada en el Módulo 5, donde
-se verificó la paridad). La conversión a `ursina.color` (`color.rgb32(*rgb)`) la hace
-`frontend/componentes.py`.
-"""
-
-# --- Paleta ------------------------------------------------------------------
+# --- Paleta ---
 COLOR_FONDO = (24, 26, 38)
 COLOR_PANEL = (36, 39, 56)
 COLOR_TARJETA = (46, 50, 71)
@@ -25,7 +20,7 @@ COLOR_BOTON_HOVER = (95, 118, 185)
 COLOR_BOTON_DESHABILITADO = (55, 57, 70)
 COLOR_BOTON_TEXTO = (240, 240, 245)
 
-# --- Umbrales de los tercios de un indicador ------------------------------------
+# --- Umbrales de los tercios de un indicador ---
 UMBRAL_BAJO = 34     # valor < 34  -> "bajo"
 UMBRAL_ALTO = 66     # valor > 66  -> "alto"; entre ambos (inclusive) -> "medio"
 
@@ -37,12 +32,8 @@ ETIQUETAS_INDICADORES = {
 }
 
 
+# Clasifica un indicador en "bajo" (< 34), "medio" (34 a 66) o "alto" (> 66).
 def nivel_indicador(valor):
-    """Clasifica un indicador en tercios: "bajo" (< 34), "medio" (34 a 66) o "alto" (> 66).
-
-    Misma regla que `_color_por_valor` de la versión pygame: rojo/amarillo/verde
-    para que el jugador identifique de un vistazo qué indicador está en problemas.
-    """
     if valor < UMBRAL_BAJO:
         return "bajo"
     if valor <= UMBRAL_ALTO:
@@ -57,6 +48,6 @@ _RGB_POR_NIVEL = {
 }
 
 
+# Color RGB (0-255) del relleno de barra que corresponde a `valor`.
 def rgb_por_valor(valor):
-    """Tupla RGB (0-255) del relleno de barra que corresponde a `valor`."""
     return _RGB_POR_NIVEL[nivel_indicador(valor)]

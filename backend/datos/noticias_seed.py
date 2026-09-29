@@ -1,77 +1,35 @@
-"""
-Catálogo semilla de noticias para pruebas de ArbolNoticias / ArbolStats.
-
-Ambientación: Ciudad Nova, campaña electoral a la alcaldía, red social ficticia
-"Civitas". Mezcla de noticias verdaderas y falsas con su paquete de impacto
-correspondiente sobre los indicadores globales:
-    - convivencia
-    - confianza
-    - desinformacion
-
-Criterio narrativo usado para los deltas (rango usado: -15 a +15):
-    - Compartir una noticia FALSA: sube desinformacion, baja confianza,
-      y suele bajar convivencia (genera roces entre ciudadanos).
-    - Reportar una noticia FALSA: sube confianza (se frena el bulo), no
-      empeora desinformacion (incluso puede bajarla un poco), efecto neutro
-      o levemente positivo en convivencia.
-    - Compartir una noticia VERDADERA: sube confianza y convivencia, no
-      afecta (o mejora levemente) desinformacion.
-    - Reportar una noticia VERDADERA (falso positivo, se está frenando
-      información legítima): pequeña penalización en confianza y/o
-      convivencia, sin beneficio real en desinformacion.
-
-Criterio de `gravedad` (entero, mayor = más severo): se basa en la magnitud
-del peor delta de cada noticia (el delta negativo más fuerte entre
-deltas_compartir y deltas_reportar), y en cuánto compromete la convivencia o
-la legitimidad institucional de Ciudad Nova. Las noticias verdaderas, cuyo
-único riesgo es el "falso positivo" de ser reportadas/ocultadas, quedan con
-gravedad baja. Las noticias falsas, cuyo riesgo es viralizarse, quedan con
-gravedad media o alta según el daño potencial (un rumor sobre agua
-contaminada o sobre fraude electoral es más grave que un rumor puntual sobre
-un candidato).
-
-IMPORTANTE — por qué los `id` fueron reasignados (restricción matemática):
-En cualquier ABB, el recorrido in-order queda ordenado ascendentemente por la
-clave de comparación. ArbolNoticias compara por `id`; ArbolStats (ver
-backend/arboles/arbol_stats.py) ahora compara por `gravedad`. El juego ubica
-el nodo isomorfo en ArbolStats replicando en ese árbol la MISMA secuencia de
-decisiones izquierda/derecha que tomó la búsqueda por id en ArbolNoticias
-(ArbolNoticias.buscar_con_camino + ArbolStats.obtener_por_camino). Para que
-esa réplica de camino aterrice siempre en el nodo de la MISMA noticia, ambos
-árboles deben tener la misma forma. Insertando la misma secuencia de
-noticias en ambos árboles, la ÚNICA forma de garantizar formas idénticas
-cuando un árbol compara por id y el otro por gravedad es que el orden
-relativo de gravedad entre las noticias coincida con el orden relativo de
-id (id ascendente = gravedad ascendente). Por eso aquí se reasignaron los
-`id` para que su orden ascendente coincida exactamente con el orden
-ascendente de `gravedad` diseñado para cada noticia.
-
-Tabla id / gravedad (orden ascendente en ambas columnas, a propósito):
-    id= 3  gravedad=10  becas municipales (verdadera)
-    id= 8  gravedad=20  debate de candidatos (verdadera)
-    id=11  gravedad=30  rutas de buses nocturnos (verdadera)
-    id=40  gravedad=65  rumor cierre de hospital (falsa)
-    id=55  gravedad=80  rumor agua contaminada (falsa)
-    id=70  gravedad=95  rumor fraude electoral (falsa)
-
-La secuencia de INSERCIÓN (orden de aparición en NOTICIAS_SEED) se mantiene
-desordenada respecto a id/gravedad, para no producir un árbol degenerado
-(tipo lista). Como id y gravedad varían en el mismo orden relativo entre
-estas 6 noticias, insertar esa misma secuencia en ambos árboles produce
-automáticamente la misma forma en los dos (se verifica más abajo).
-
-`construir_arboles()` inserta las noticias en ArbolNoticias y en ArbolStats
-EN EL MISMO ORDEN. Esa igualdad de orden, junto con la correlación id/gravedad
-de arriba, es lo que garantiza el isomorfismo (misma forma, mismas
-posiciones) entre ambos árboles.
-"""
+# Catálogo semilla de noticias de Ciudad Nova (red "Civitas") con su paquete de
+# impacto sobre convivencia, confianza y desinformación (deltas de -15 a +15).
+#
+# Criterio de deltas:
+#   - Compartir una noticia falsa: sube desinformación, baja confianza y convivencia.
+#   - Reportar una noticia falsa: sube confianza, baja desinformación.
+#   - Compartir una noticia verdadera: sube confianza y convivencia.
+#   - Reportar una noticia verdadera (falso positivo): leve penalización.
+#
+# `gravedad` (mayor = más severa) sale del peor delta negativo de cada noticia:
+# las verdaderas quedan bajas y las falsas medias o altas según el daño potencial.
+#
+# Los `id` se asignaron para que su orden coincida con el de `gravedad`. Así,
+# insertando las noticias en el mismo orden, ArbolNoticias (por id) y ArbolStats
+# (por gravedad) tienen la misma forma y el camino de uno sirve en el otro.
+#
+#   id= 3  gravedad=10  becas municipales (verdadera)
+#   id= 8  gravedad=20  debate de candidatos (verdadera)
+#   id=11  gravedad=30  rutas de buses nocturnos (verdadera)
+#   id=40  gravedad=65  rumor cierre de hospital (falsa)
+#   id=55  gravedad=80  rumor agua contaminada (falsa)
+#   id=70  gravedad=95  rumor fraude electoral (falsa)
+#
+# El orden de NOTICIAS_SEED es desordenado respecto a id/gravedad para no
+# producir un árbol degenerado (tipo lista).
 
 from backend.arboles.arbol_noticias import ArbolNoticias
 from backend.arboles.arbol_stats import ArbolStats
 
 
 # Cada entrada: (id, gravedad, texto, veracidad, deltas_compartir, deltas_reportar)
-# Orden de la lista = orden de inserción en ambos árboles (ver docstring arriba).
+# Orden de la lista = orden de inserción en ambos árboles.
 NOTICIAS_SEED = [
     (
         11,
@@ -130,13 +88,9 @@ NOTICIAS_SEED = [
 ]
 
 
+# Crea ArbolNoticias y ArbolStats insertando las noticias en el mismo orden de
+# NOTICIAS_SEED, así quedan isomorfos. Retorna (arbol_noticias, arbol_stats).
 def construir_arboles():
-    """Crea un ArbolNoticias y un ArbolStats, insertando ambos con el MISMO
-    orden de noticias (el orden en que aparecen en NOTICIAS_SEED) para
-    garantizar que queden isomorfos. ArbolNoticias compara por `id`,
-    ArbolStats compara por `gravedad`; ambos quedan con la misma forma porque
-    id y gravedad están diseñados con el mismo orden relativo (ver docstring
-    del módulo). Retorna (arbol_noticias, arbol_stats)."""
     arbol_noticias = ArbolNoticias()
     arbol_stats = ArbolStats()
 

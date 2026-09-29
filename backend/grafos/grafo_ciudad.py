@@ -1,50 +1,22 @@
-"""
-Grafo de la ciudad: vértices = lugares de Ciudad Nova, aristas = conexiones
-(calles/rutas) entre ellos.
-
-No dirigido y sin peso por ahora: solo interesa "se puede ir de un lugar a
-otro", no distancias ni costos. Se implementa con lista de adyacencia
-(dict[str, list[str]]), que preserva el orden de inserción de cada lugar y
-de sus vecinos (relevante para que BFS/DFS den un orden determinista y
-fácil de verificar en las pruebas).
-
-Este módulo es base/fundacional para el laboratorio de Estructura de Datos II
-(estructura de grafos obligatoria). NO se integra todavía con la jugabilidad
-(PantallaJuego, roles de jugador): eso depende de mecánicas que se diseñan en
-una entrega posterior.
-"""
+# Grafo de la ciudad: vértices = lugares de Ciudad Nova, aristas = conexiones.
+# No dirigido y sin peso, con lista de adyacencia (dict[str, list[str]]) que
+# conserva el orden de inserción, así BFS/DFS son deterministas.
 
 from collections import deque
 
 
 class GrafoCiudad:
-    """Grafo no dirigido y sin peso de lugares de Ciudad Nova.
-
-    Estructura interna: self._adyacencia es un dict[str, list[str]] donde
-    cada clave es un lugar y el valor es la lista de lugares vecinos
-    (conexión directa), sin duplicados.
-    """
 
     def __init__(self):
         self._adyacencia = {}
 
+    # No hace nada si el lugar ya existe.
     def agregar_lugar(self, nombre):
-        """Agrega un lugar (vértice) al grafo si no existe todavía.
-
-        Si el lugar ya existe, no hace nada (no duplica ni borra sus
-        conexiones actuales).
-        """
         if nombre not in self._adyacencia:
             self._adyacencia[nombre] = []
 
+    # Crea los lugares que falten, no duplica conexiones e ignora auto-conexiones.
     def agregar_conexion(self, lugar_a, lugar_b):
-        """Agrega una conexión no dirigida entre lugar_a y lugar_b.
-
-        Si alguno de los dos lugares no existe todavía, se crea
-        automáticamente (comodidad al construir el grafo). No se duplica
-        la conexión si ya existía. No se permiten auto-conexiones
-        (lugar_a == lugar_b se ignora).
-        """
         if lugar_a == lugar_b:
             return
 
@@ -56,43 +28,30 @@ class GrafoCiudad:
         if lugar_a not in self._adyacencia[lugar_b]:
             self._adyacencia[lugar_b].append(lugar_a)
 
+    # Lanza ValueError si el lugar no existe.
     def vecinos(self, lugar):
-        """Devuelve la lista de lugares directamente conectados a `lugar`.
-
-        Lanza ValueError si `lugar` no existe en el grafo.
-        """
         if lugar not in self._adyacencia:
             raise ValueError(f"Lugar inexistente en el grafo: {lugar!r}")
         return list(self._adyacencia[lugar])
 
+    # Consulta segura: False si algún lugar no existe.
     def existe_conexion(self, lugar_a, lugar_b):
-        """True si hay una conexión directa entre lugar_a y lugar_b.
-
-        Si alguno de los dos lugares no existe en el grafo, devuelve False
-        en lugar de lanzar una excepción (consulta segura).
-        """
         if lugar_a not in self._adyacencia or lugar_b not in self._adyacencia:
             return False
         return lugar_b in self._adyacencia[lugar_a]
 
     def lugares(self):
-        """Devuelve la lista de todos los lugares (vértices) del grafo."""
         return list(self._adyacencia.keys())
 
     def numero_lugares(self):
         return len(self._adyacencia)
 
     def numero_conexiones(self):
-        """Número de aristas (conexiones no dirigidas) del grafo."""
         total_grados = sum(len(vecinos) for vecinos in self._adyacencia.values())
         return total_grados // 2
 
+    # Recorrido en anchura; lanza ValueError si `origen` no existe.
     def recorrido_bfs(self, origen):
-        """Recorrido en anchura (BFS) desde `origen`.
-
-        Devuelve la lista de lugares en el orden en que fueron visitados.
-        Lanza ValueError si `origen` no existe en el grafo.
-        """
         if origen not in self._adyacencia:
             raise ValueError(f"Lugar inexistente en el grafo: {origen!r}")
 
@@ -110,13 +69,8 @@ class GrafoCiudad:
 
         return orden
 
+    # Recorrido en profundidad; lanza ValueError si `origen` no existe.
     def recorrido_dfs(self, origen):
-        """Recorrido en profundidad (DFS) desde `origen`.
-
-        Devuelve la lista de lugares en el orden en que fueron visitados,
-        siguiendo el orden de la lista de vecinos de cada lugar. Lanza
-        ValueError si `origen` no existe en el grafo.
-        """
         if origen not in self._adyacencia:
             raise ValueError(f"Lugar inexistente en el grafo: {origen!r}")
 
@@ -137,21 +91,8 @@ class GrafoCiudad:
         return f"GrafoCiudad(lugares={self.numero_lugares()}, conexiones={self.numero_conexiones()})"
 
 
+# Grafo de ejemplo con 7 lugares conexos, coherente con noticias_seed.py.
 def construir_grafo_ciudad_demo():
-    """Construye un GrafoCiudad de ejemplo con 7 lugares de Ciudad Nova,
-    coherentes con las noticias de backend/datos/noticias_seed.py (Alcaldía,
-    Universidad, Hospital y Barrio Las Flores, rutas de buses). El grafo
-    queda conexo: no hay lugares aislados.
-
-    Lugares y conexiones (no dirigidas):
-        Alcaldía          -- Plaza Central
-        Plaza Central     -- Universidad de Ciudad Nova
-        Plaza Central     -- Terminal de Buses
-        Terminal de Buses -- Barrio Las Flores
-        Barrio Las Flores -- Hospital Las Flores
-        Barrio Las Flores -- Parque Municipal
-        Universidad de Ciudad Nova -- Parque Municipal
-    """
     grafo = GrafoCiudad()
 
     for lugar in (

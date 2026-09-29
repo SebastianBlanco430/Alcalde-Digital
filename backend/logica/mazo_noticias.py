@@ -1,26 +1,14 @@
-"""
-Mazo de noticias: selección aleatoria, sin repetición, de noticias disponibles
-en ArbolNoticias.
-
-MazoNoticias no conoce nada de ArbolStats, deltas ni indicadores globales:
-solo decide QUÉ noticia (id + camino desde la raíz de ArbolNoticias) toca
-mostrar a continuación. El módulo que aplique impactos consumirá el `camino`
-devuelto aquí junto con ArbolStats.obtener_por_camino (ver arbol_stats.py).
-"""
+# Mazo de noticias: selección aleatoria, sin repetición, de las noticias de
+# ArbolNoticias. Solo decide qué noticia (nodo + camino) toca mostrar; no conoce
+# ArbolStats ni los indicadores.
 
 import random
 
 
+# Entrega noticias en orden aleatorio; al agotarlas reinicia la ronda.
+# ids_disponibles se calcula una vez con recorrido_inorden(); ids_vistos son los
+# ya entregados en la ronda actual.
 class MazoNoticias:
-    """Entrega noticias de ArbolNoticias en orden aleatorio sin repetición.
-
-    Atributos:
-        arbol_noticias (ArbolNoticias): árbol fuente de noticias.
-        ids_disponibles (list[int]): todos los ids del árbol, calculados una
-            vez en el constructor a partir de recorrido_inorden().
-        ids_vistos (set[int]): ids ya entregados por siguiente() en la ronda
-            actual. Se reinicia automáticamente cuando se agotan todos.
-    """
 
     def __init__(self, arbol_noticias):
         self.arbol_noticias = arbol_noticias
@@ -29,21 +17,15 @@ class MazoNoticias:
         ]
         self.ids_vistos = set()
 
+    # True si quedan ids sin ver en la ronda actual.
     def hay_pendientes(self):
-        """True si quedan ids sin ver en la ronda actual (antes de reinicio automático)."""
         return len(self.ids_vistos) < len(self.ids_disponibles)
 
     def reiniciar(self):
-        """Vacía manualmente la lista de vistos, reiniciando el catálogo."""
         self.ids_vistos.clear()
 
+    # Devuelve (NodoNoticia, camino) o None si el árbol está vacío.
     def siguiente(self):
-        """Elige aleatoriamente un id no visto, busca su nodo y camino, y lo
-        marca como visto. Si ya se vieron todos, reinicia la ronda antes de
-        elegir.
-
-        Retorna (NodoNoticia, list[str]) o None si el árbol está vacío.
-        """
         if not self.ids_disponibles:
             return None
 
