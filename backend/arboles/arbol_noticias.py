@@ -76,38 +76,38 @@ class ArbolNoticias:
     def recorrido_inorden(self):
         resultado = []
 
-        def _visitar(nodo):
+        def visitar(nodo):
             if nodo is None:
                 return
-            _visitar(nodo.izquierda)
+            visitar(nodo.izquierda)
             resultado.append(nodo)
-            _visitar(nodo.derecha)
+            visitar(nodo.derecha)
 
-        _visitar(self.raiz)
+        visitar(self.raiz)
         return resultado
 
     def recorrido_preorden(self):
         resultado = []
 
-        def _visitar(nodo):
+        def visitar(nodo):
             if nodo is None:
                 return
             resultado.append(nodo)
-            _visitar(nodo.izquierda)
-            _visitar(nodo.derecha)
+            visitar(nodo.izquierda)
+            visitar(nodo.derecha)
 
-        _visitar(self.raiz)
+        visitar(self.raiz)
         return resultado
 
     def recorrido_postorden(self):
         resultado = []
 
-        def _visitar(nodo):
+        def visitar(nodo):
             if nodo is None:
                 return
-            _visitar(nodo.izquierda)
-            _visitar(nodo.derecha)
+            visitar(nodo.izquierda)
+            visitar(nodo.derecha)
             resultado.append(nodo)
 
-        _visitar(self.raiz)
+        visitar(self.raiz)
         return resultado

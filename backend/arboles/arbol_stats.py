@@ -67,17 +67,17 @@ class ArbolStats:
     # Búsqueda O(n) por id, solo para pruebas/depuración: el árbol no se ordena por id.
     def buscar_por_id(self, id):
 
-        def _buscar(nodo):
+        def buscar(nodo):
             if nodo is None:
                 return None
             if nodo.id == id:
                 return nodo
-            encontrado = _buscar(nodo.izquierda)
+            encontrado = buscar(nodo.izquierda)
             if encontrado is not None:
                 return encontrado
-            return _buscar(nodo.derecha)
+            return buscar(nodo.derecha)
 
-        return _buscar(self.raiz)
+        return buscar(self.raiz)
 
     # Sigue `camino` (lista de "izquierda"/"derecha" de ArbolNoticias.buscar_con_camino)
     # y devuelve el NodoStats alcanzado. Devuelve None si el camino se corta,
@@ -98,38 +98,38 @@ class ArbolStats:
     def recorrido_inorden(self):
         resultado = []
 
-        def _visitar(nodo):
+        def visitar(nodo):
             if nodo is None:
                 return
-            _visitar(nodo.izquierda)
+            visitar(nodo.izquierda)
             resultado.append(nodo)
-            _visitar(nodo.derecha)
+            visitar(nodo.derecha)
 
-        _visitar(self.raiz)
+        visitar(self.raiz)
         return resultado
 
     def recorrido_preorden(self):
         resultado = []
 
-        def _visitar(nodo):
+        def visitar(nodo):
             if nodo is None:
                 return
             resultado.append(nodo)
-            _visitar(nodo.izquierda)
-            _visitar(nodo.derecha)
+            visitar(nodo.izquierda)
+            visitar(nodo.derecha)
 
-        _visitar(self.raiz)
+        visitar(self.raiz)
         return resultado
 
     def recorrido_postorden(self):
         resultado = []
 
-        def _visitar(nodo):
+        def visitar(nodo):
             if nodo is None:
                 return
-            _visitar(nodo.izquierda)
-            _visitar(nodo.derecha)
+            visitar(nodo.izquierda)
+            visitar(nodo.derecha)
             resultado.append(nodo)
 
-        _visitar(self.raiz)
+        visitar(self.raiz)
         return resultado

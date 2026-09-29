@@ -5,7 +5,7 @@
 
 
 # Parte una palabra que no cabe sola en `ancho_max` en trozos que sí caben.
-def _partir_palabra(palabra, medir, ancho_max):
+def partir_palabra(palabra, medir, ancho_max):
     trozos = []
     actual = ""
     for letra in palabra:
@@ -31,7 +31,7 @@ def envolver_texto(texto, medir, ancho_max):
 
     for palabra in texto.split():
         for trozo in (
-            [palabra] if medir(palabra) <= ancho_max else _partir_palabra(palabra, medir, ancho_max)
+            [palabra] if medir(palabra) <= ancho_max else partir_palabra(palabra, medir, ancho_max)
         ):
             candidata = f"{linea_actual} {trozo}" if linea_actual else trozo
             if medir(candidata) <= ancho_max:

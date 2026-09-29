@@ -77,14 +77,14 @@ class GrafoCiudad:
         visitados = set()
         orden = []
 
-        def _visitar(lugar):
+        def visitar(lugar):
             visitados.add(lugar)
             orden.append(lugar)
             for vecino in self._adyacencia[lugar]:
                 if vecino not in visitados:
-                    _visitar(vecino)
+                    visitar(vecino)
 
-        _visitar(origen)
+        visitar(origen)
         return orden
 
     def __repr__(self):

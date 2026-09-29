@@ -12,11 +12,9 @@ class GestorEscenas:
         self._nombre_actual = None
 
     # Nombre de la escena activa, o None si aún no hay ninguna.
-    @property
     def nombre_actual(self):
         return self._nombre_actual
 
-    @property
     def escena_actual(self):
         if self._nombre_actual is None:
             return None
@@ -38,7 +36,7 @@ class GestorEscenas:
                 f"Escena no registrada: {nombre!r}. Registradas: {sorted(self._escenas)}."
             )
 
-        actual = self.escena_actual
+        actual = self.escena_actual()
         if actual is not None:
             hook_salir = getattr(actual, "al_salir", None)
             if callable(hook_salir):
