@@ -59,27 +59,3 @@ class MazoNoticias:
         self.ids_vistos.add(id_elegido)
 
         return nodo, camino
-
-
-if __name__ == "__main__":
-    from backend.datos.noticias_seed import construir_arboles
-
-    arbol_noticias, _arbol_stats = construir_arboles()
-    mazo = MazoNoticias(arbol_noticias)
-
-    print(f"ids_disponibles: {mazo.ids_disponibles}\n")
-
-    vistos_previos = []
-    for i in range(1, 9):
-        resultado = mazo.siguiente()
-        if resultado is None:
-            print(f"Llamada {i}: mazo vacío (árbol sin nodos).")
-            continue
-
-        nodo, camino = resultado
-        ya_visto_antes = nodo.id in vistos_previos
-        print(
-            f"Llamada {i}: id={nodo.id:>2} camino={camino} "
-            f"{'<- REPETIDO (reinicio de ronda)' if ya_visto_antes else ''}"
-        )
-        vistos_previos.append(nodo.id)
