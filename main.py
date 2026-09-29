@@ -45,7 +45,7 @@ def crear_aplicacion():
         al_comenzar=lambda: gestor.cambiar_a("juego", jugador=JUGADOR_PRUEBA)))
     gestor.registrar("juego", EscenaJuego())
     gestor.cambiar_a("inicio")
-    return aplicacion, gestor
+    return application, gestor
 
 
 if __name__ == "__main__":
