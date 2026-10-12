@@ -69,6 +69,13 @@ class EstadoPartida:
         for nombre in NOMBRES_INDICADORES:
             self._indicadores[nombre] = recortar(self._indicadores[nombre] + deltas.get(nombre, 0))
 
+    # Fija indicadores (p. ej. al restaurar una partida) recortando a [0, 100];
+    # las claves ausentes no cambian y las que no son indicadores se ignoran.
+    def fijar_indicadores(self, valores):
+        for nombre in NOMBRES_INDICADORES:
+            if nombre in valores:
+                self._indicadores[nombre] = recortar(valores[nombre])
+
     # Pide la próxima noticia al mazo; si no hay, noticia_actual y camino_actual
     # quedan en None.
     def siguiente_noticia(self):
