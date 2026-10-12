@@ -10,6 +10,9 @@
 #
 # El mapa (necesita `coordenada(lugar)`) y el catálogo se INYECTAN; así los
 # tests usan versiones falsas. Toda transición inválida lanza ValueError.
+#
+# Mundo 3D: `punto_interaccion(lugar) -> (x, z)` es opcional; si se da, "llegar" se mide
+# contra él (la PUERTA del edificio) en vez de contra el centro de la plaza.
 
 import math
 from dataclasses import dataclass
@@ -38,8 +41,10 @@ class SistemaMisiones:
 
     # Valida el catálogo: ids únicos y destinos con coordenada en el mapa
     # (ValueError si no).
-    def __init__(self, mapa, catalogo, radio_interaccion=1.5, histeresis=0.3):
+    def __init__(self, mapa, catalogo, radio_interaccion=1.5, histeresis=0.3,
+                 punto_interaccion=None):
         self._mapa = mapa
+        self._punto_interaccion = punto_interaccion if punto_interaccion is not None else mapa.coordenada
         self._catalogo = list(catalogo)
         self.radio_interaccion = radio_interaccion
         self.histeresis = histeresis
@@ -49,7 +54,7 @@ class SistemaMisiones:
             if mision.id in ids:
                 raise ValueError(f"Id de misión repetido: {mision.id!r}")
             ids.add(mision.id)
-            mapa.coordenada(mision.destino)  # lanza ValueError si no existe
+            self._punto_interaccion(mision.destino)  # lanza ValueError si no existe
 
         self._estado = SIN_MISION
         self._mision = None
@@ -110,7 +115,7 @@ class SistemaMisiones:
         if self._estado not in (EN_RUTA, EN_RADIO):
             return
 
-        cx, cz = self._mapa.coordenada(self._mision.destino)
+        cx, cz = self._punto_interaccion(self._mision.destino)
         distancia = math.hypot(x - cx, z - cz)
         if self._estado == EN_RUTA and distancia <= self.radio_interaccion:
             self._estado = EN_RADIO
@@ -158,7 +163,7 @@ class SistemaMisiones:
     # activo exige misión; SIN_MISION no puede tener una). Los guardados antiguos sin
     # radio_interaccion / histeresis usan los valores por defecto.
     @classmethod
-    def desde_dict(cls, datos, mapa, catalogo):
+    def desde_dict(cls, datos, mapa, catalogo, punto_interaccion=None):
         estado = datos["estado"]
         if estado not in ESTADOS:
             raise ValueError(f"Estado de misión desconocido en los datos guardados: {estado!r}")
@@ -168,7 +173,7 @@ class SistemaMisiones:
                 f"Estado {estado!r} incoherente con la misión guardada {id_actual!r}."
             )
         extras = {k: datos[k] for k in ("radio_interaccion", "histeresis") if k in datos}
-        sistema = cls(mapa, catalogo, **extras)
+        sistema = cls(mapa, catalogo, punto_interaccion=punto_interaccion, **extras)
         por_id = {m.id: m for m in sistema._catalogo}
         if id_actual is not None and id_actual not in por_id:
             raise ValueError(f"Misión desconocida en los datos guardados: {id_actual!r}")

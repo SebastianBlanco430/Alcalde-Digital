@@ -40,10 +40,15 @@ class Jugador:
 
 
 # `estado_partida` se inyecta y se comparte entre todos los jugadores.
+# `escala_mundo` multiplica el spawn de cada rol (roles.py guarda los del mapa pequeño;
+# el mundo 3D usa ×4). ValueError si no es positiva.
 class SesionJuego:
 
-    def __init__(self, estado_partida):
+    def __init__(self, estado_partida, escala_mundo=1.0):
+        if escala_mundo <= 0:
+            raise ValueError("escala_mundo debe ser positiva.")
         self.estado_partida = estado_partida
+        self.escala_mundo = escala_mundo
         self._jugadores = []
         self._indice_turno = 0
         self._numero_turno = 0
@@ -67,7 +72,7 @@ class SesionJuego:
             # El mundo y el HUD usan el nombre como clave: no puede haber dos iguales.
             raise ValueError(f"Ya existe un jugador llamado {nombre!r}.")
         info = ROLES[rol]
-        jugador = Jugador(nombre, rol, info.spawn_x, info.spawn_y)
+        jugador = Jugador(nombre, rol, info.spawn_x * self.escala_mundo, info.spawn_y * self.escala_mundo)
         self._jugadores.append(jugador)
         return jugador
 

@@ -4,24 +4,36 @@
 # (frontend/transicion.py) lo llama cada frame con time.dt y los tests con dt fijos, así
 # es determinista y se prueba sin ventana. Con duraciones 0 la acción corre al instante.
 #
+# Negro sostenido (mundo 3D): con `sostener` > 0 la pantalla se queda en negro total ese
+# tiempo entre la salida y la entrada (fase SOSTENIENDO), y `ejecutar(accion, texto=...)`
+# deja un texto visible (`texto`) solo mientras dura ese negro ("Alcaldía de Ciudad Nova").
+# Con sostener = 0 (por defecto) la fase no existe y todo funciona como antes.
+#
+# Reentrancia: la acción puede iniciar otro fundido (con duraciones 0 el cambio al interior
+# termina al instante y pide otro hacia el mundo); el segundo no se pierde: la pantalla sigue
+# en negro, sin aclarar entre ambas acciones, y se ejecuta enseguida.
+#
 # Robustez: si la acción lanza una excepción el fundido se libera (alfa 0, no ocupado)
 # antes de propagarla, para no dejar nunca la pantalla negra.
 
 SALIENDO = "saliendo"
+SOSTENIENDO = "sosteniendo"
 ENTRANDO = "entrando"
 
 
 class Fundido:
 
-    # duracion_salida / duracion_entrada en segundos (>= 0).
-    def __init__(self, duracion_salida=0.25, duracion_entrada=0.25):
-        if duracion_salida < 0 or duracion_entrada < 0:
+    # duracion_salida / duracion_entrada / sostener en segundos (>= 0).
+    def __init__(self, duracion_salida=0.25, duracion_entrada=0.25, sostener=0.0):
+        if duracion_salida < 0 or duracion_entrada < 0 or sostener < 0:
             raise ValueError("Las duraciones del fundido no pueden ser negativas.")
         self.duracion_salida = duracion_salida
         self.duracion_entrada = duracion_entrada
+        self.sostener = sostener
         self._fase = None
         self._tiempo = 0.0
         self._accion = None
+        self._texto = None
 
     # -- Consulta --
 
@@ -29,6 +41,11 @@ class Fundido:
     @property
     def ocupada(self):
         return self._fase is not None
+
+    # Texto a mostrar centrado: solo durante el negro sostenido (None en cualquier otro momento).
+    @property
+    def texto(self):
+        return self._texto if self._fase == SOSTENIENDO else None
 
     # Opacidad del negro: 0 = transparente, 1 = pantalla negra.
     @property
@@ -38,6 +55,8 @@ class Fundido:
             if self.duracion_salida == 0:
                 return 1.0
             return min(1.0, self._tiempo / self.duracion_salida)
+        if self._fase == SOSTENIENDO:
+            return 1.0
         if self._fase == ENTRANDO:
             if self.duracion_entrada == 0:
                 return 0.0
@@ -49,42 +68,69 @@ class Fundido:
     # Inicia un fundido que ejecutará `accion` con la pantalla en negro. Si ya había uno
     # en su fase de salida, su acción pendiente se ejecuta antes (no se pierde); si estaba
     # en la entrada, la nueva salida arranca desde el alfa actual (sin saltos).
-    def ejecutar(self, accion):
-        if self.duracion_salida == 0 and self.duracion_entrada == 0 and not self.ocupada:
+    def ejecutar(self, accion, texto=None):
+        if (self.duracion_salida == 0 and self.duracion_entrada == 0 and self.sostener == 0
+                and not self.ocupada):
             accion()
             return
         if self._fase == SALIENDO:
             self._cerrar_salida()
         alfa_actual = self.alfa
         self._accion = accion
+        self._texto = texto
         self._fase = SALIENDO
         if self.duracion_salida == 0:
             self._tiempo = 0.0
             self._cerrar_salida()
-            if self.duracion_entrada == 0:
+            if self._fase == ENTRANDO and self.duracion_entrada == 0:
                 self._liberar()
         else:
             self._tiempo = alfa_actual * self.duracion_salida
 
     # Avanza `dt` segundos. dt <= 0 o sin fundido en curso: no hace nada. Un dt grande
-    # recorre ambas fases (la acción corre una sola vez).
+    # recorre todas las fases (cada acción corre una sola vez); es un bucle porque una acción
+    # puede iniciar otro fundido (reentrancia) y la fase vuelve a SALIENDO.
     def avanzar(self, dt):
         if dt <= 0 or self._fase is None:
             return
         restante = dt
-        if self._fase == SALIENDO:
-            falta = self.duracion_salida - self._tiempo
-            if restante < falta:
-                self._tiempo += restante
-                return
-            restante -= falta
-            self._cerrar_salida()
-        if self._fase == ENTRANDO:
-            falta = self.duracion_entrada - self._tiempo
-            if restante < falta:
-                self._tiempo += restante
-                return
-            self._liberar()
+        while self._fase is not None:
+            if self._fase == SALIENDO:
+                falta = self.duracion_salida - self._tiempo
+                if restante < falta:
+                    self._tiempo += restante
+                    return
+                restante -= falta
+                self._cerrar_salida()
+            elif self._fase == SOSTENIENDO:
+                falta = self.sostener - self._tiempo
+                if restante < falta:
+                    self._tiempo += restante
+                    return
+                restante -= falta
+                self._fase = ENTRANDO
+                self._tiempo = 0.0
+            else:                                    # ENTRANDO
+                falta = self.duracion_entrada - self._tiempo
+                if restante < falta:
+                    self._tiempo += restante
+                    return
+                restante -= falta
+                self._liberar()
+
+    # Termina el fundido YA (Espacio/Enter): si aún no corrió la acción pendiente, la ejecuta
+    # (en negro o no: el cambio de escena no se pierde) y libera sin pasar por el negro
+    # sostenido ni la entrada. Sin fundido en curso no hace nada. Si la acción lanza, el
+    # fundido se libera y la excepción se propaga. Devuelve True si había un fundido que saltar.
+    def saltar(self):
+        if self._fase is None:
+            return False
+        while self._fase is not None:
+            if self._fase == SALIENDO:
+                self._cerrar_salida()     # puede dejar otro fundido pendiente (reentrante): se repite
+            else:
+                self._liberar()
+        return True
 
     # -- Internos --
 
@@ -98,10 +144,13 @@ class Fundido:
         except BaseException:
             self._liberar()
             raise
-        self._fase = ENTRANDO
+        if self._accion is not None:
+            return          # la acción pidió OTRO fundido (reentrante): sigue en negro hasta ejecutarlo
+        self._fase = SOSTENIENDO if self.sostener > 0 else ENTRANDO
         self._tiempo = 0.0
 
     def _liberar(self):
         self._fase = None
         self._tiempo = 0.0
         self._accion = None
+        self._texto = None

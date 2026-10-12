@@ -1,5 +1,5 @@
 # HUD 2D del mundo (Ursina, en camera.ui): teléfono, minimapa, aviso de interacción
-# y panel de turno, más la ruta resaltada sobre las calles del mundo (en `scene`).
+# y panel de turno (la ruta en el piso la dibuja frontend/marcadores_mundo.py).
 # Todo se decide en frontend/hud_calculos.py (Python puro, con tests sin ventana);
 # aquí solo se dibuja lo que el modelo dice. Coordenadas de camera.ui: y en
 # [-0.5, 0.5] (0.5 = arriba), x en [-aspecto/2, aspecto/2].
@@ -15,9 +15,8 @@ from panda3d.core import TextNode
 from ursina import Entity, Mesh, Text, camera, color, destroy, window
 
 from backend.logica.roles import ROLES
-from frontend import estilo, geometria_mundo, hud_calculos
+from frontend import estilo, hud_calculos
 from frontend.componentes import BotonAccion, a_unidades, escala_fuente, modelo_redondeado, rgb
-from frontend.objetos_mundo import pieza
 from frontend.texto import envolver_texto
 
 MARGEN = 0.02                       # separación de los bordes de la pantalla
@@ -269,11 +268,13 @@ class Minimapa(Entity):
     ALTO = 200 / 720
     LARGO_FLECHA = 0.05
 
-    def __init__(self, mapa, yaw_grados=None, **opciones):
+    # rotacion_libre (mundo 3D): el yaw se cambia cada frame con fijar_yaw() y la escala no depende de él.
+    def __init__(self, mapa, yaw_grados=None, rotacion_libre=False, **opciones):
         super().__init__(**opciones)
         self._mapa = mapa
-        yaw = geometria_mundo.yaw_de_camara() if yaw_grados is None else yaw_grados
-        self.geometria = hud_calculos.GeometriaMinimapa(mapa, (self.ANCHO, self.ALTO), yaw)
+        yaw = 0 if yaw_grados is None else yaw_grados
+        self.geometria = hud_calculos.GeometriaMinimapa(
+            mapa, (self.ANCHO, self.ALTO), yaw, rotacion_libre=rotacion_libre)
         self.position = (window.aspect_ratio / 2 - MARGEN - self.ANCHO / 2,
                          0.5 - MARGEN - self.ALTO / 2)
 
@@ -294,6 +295,8 @@ class Minimapa(Entity):
         self.segmentos_ruta = []      # cuadros reutilizados para dibujar la ruta
         self.puntos = {}              # nombre -> (aro, punto) de cada jugador
         self.lugares = {}             # lugar -> círculo de la plaza
+        self.calles = []              # [(cuadro, a, b)] para recolocarlas al girar
+        self.marcas_edificios = {}    # lugar -> cuadrito en la puerta (solo mundo con edificios)
         self._firma_ruta = None
         self._construir_mapa()
         self.marcador_destino = Entity(parent=self.capa_lugares, model="circle", z=0.0005,
@@ -301,13 +304,39 @@ class Minimapa(Entity):
 
     def _construir_mapa(self):
         g = self.geometria
-        for p0, p1 in g.calles():
-            self._poner_segmento(Entity(parent=self.capa_calles, model="quad"), p0, p1,
-                                 g.ancho_calle(), rgb((112, 116, 132)))
+        for a, b in self._mapa.segmentos():
+            cuadro = Entity(parent=self.capa_calles, model="quad")
+            self.calles.append((cuadro, a, b))
         for lugar in self._mapa.lugares():
-            u, v = g.lugar(lugar)
-            self.lugares[lugar] = Entity(parent=self.capa_lugares, model="circle", position=(u, v),
+            self.lugares[lugar] = Entity(parent=self.capa_lugares, model="circle",
                                          scale=g.diametro_plaza(), color=rgb((150, 152, 164)))
+        for lugar in self._mapa.lugares():
+            try:
+                self._mapa.edificio_de(lugar)
+            except (AttributeError, ValueError):
+                continue
+            self.marcas_edificios[lugar] = Entity(
+                parent=self.capa_lugares, model="quad", z=-0.0005, scale=0.011,
+                color=rgb((60, 64, 84)))
+        self._colocar_mapa()
+
+    # Posiciona calles, plazas y marcas según el yaw actual de la geometría.
+    def _colocar_mapa(self):
+        g = self.geometria
+        for cuadro, a, b in self.calles:
+            self._poner_segmento(cuadro, g.lugar(a), g.lugar(b), g.ancho_calle(), rgb((112, 116, 132)))
+        for lugar, circulo in self.lugares.items():
+            circulo.position = g.lugar(lugar)
+        for lugar, marca in self.marcas_edificios.items():
+            marca.position = g.punto(*self._mapa.edificio_de(lugar).puerta())
+
+    # Gira el minimapa con la cámara. Barato: la escala no cambia, solo se recolocan 7 + 7 cuadros.
+    def fijar_yaw(self, yaw_grados):
+        if abs(yaw_grados - self.geometria.yaw) < 0.05:
+            return
+        self.geometria.girar(yaw_grados)
+        self._colocar_mapa()
+        self._firma_ruta = None            # la ruta y la flecha se redibujan con el nuevo yaw
 
     # Coloca un cuadro como línea gruesa de p0 a p1 (rotation_z en sentido horario).
     def _poner_segmento(self, cuadro, p0, p1, grosor, tono):
@@ -392,17 +421,34 @@ class Minimapa(Entity):
 class AvisoInteraccion(Entity):
 
     TEXTO = "Presiona E para acceder"
+    ANCHO_MIN, ANCHO_MAX, ALTO = 0.44, 0.66, 0.07    # el máximo deja libre el banner del teléfono
+    RELLENO = 0.05
 
     def __init__(self, **opciones):
         super().__init__(**opciones)
         self.position = (0, -0.5 + MARGEN + 0.04)
-        ancho, alto = 0.44, 0.07
-        _fondo(self, ancho, alto, COLOR_FONDO_HUD, 12, z=0.001)
+        self.fondo = _fondo(self, self.ANCHO_MIN, self.ALTO, COLOR_FONDO_HUD, 12, z=0.001)
         self.texto = Text(self.TEXTO, parent=self, origin=(0, 0), position=(0, 0, -0.001),
                           scale=escala_fuente(22), color=rgb(estilo.COLOR_TEXTO))
+        self._ancho = self.ANCHO_MIN
         self.enabled = False
 
-    def actualizar(self, estado_mision, estado_telefono):
+    # `texto`: otro mensaje (p. ej. "Presiona E para entrar a la Alcaldía"); None = el de siempre.
+    # El fondo se ajusta al ancho del texto (entre ANCHO_MIN y ANCHO_MAX; si aun así no cabe,
+    # el texto se achica).
+    def actualizar(self, estado_mision, estado_telefono, texto=None):
+        cadena = _seguro(texto if texto is not None else self.TEXTO)
+        if cadena != self.texto.text:
+            self.texto.text = cadena
+            self.texto.scale = escala_fuente(22)
+            ancho_texto = _medidor(self.texto)(cadena)
+            maximo = self.ANCHO_MAX - self.RELLENO
+            if ancho_texto > maximo:
+                self.texto.scale = escala_fuente(22) * maximo / ancho_texto
+                ancho_texto = maximo
+            self._ancho = max(self.ANCHO_MIN, ancho_texto + self.RELLENO)
+            self.fondo.model = modelo_redondeado(self._ancho, self.ALTO, 12)
+            self.fondo.scale = (self._ancho, self.ALTO)
         self.enabled = hud_calculos.aviso_visible(estado_mision, estado_telefono)
 
 
@@ -482,13 +528,15 @@ class HudMundo(Entity):
 
     # mapa: MapaCiudad. El HUD arranca desactivado (EscenaMundo lo activa al entrar).
     # al_menu: callback del botón "Volver al menú" del panel de fin de partida.
-    def __init__(self, mapa, obtener_flujo, al_menu=None, **opciones):
+    # rotacion_libre: mundo 3D (el minimapa gira con la cámara; ver actualizar(yaw_grados)).
+    def __init__(self, mapa, obtener_flujo, al_menu=None, rotacion_libre=False, **opciones):
         opciones.setdefault("parent", camera.ui)
         opciones.setdefault("enabled", False)
         super().__init__(**opciones)
+        self._mapa = mapa
         self._obtener_flujo = obtener_flujo
         self.panel_turno = PanelTurno(parent=self)
-        self.minimapa = Minimapa(mapa, parent=self)
+        self.minimapa = Minimapa(mapa, rotacion_libre=rotacion_libre, parent=self)
         self.telefono_ui = TelefonoUI(self._telefono_activo, self._mision_actual, parent=self)
         self.aviso = AvisoInteraccion(parent=self)
         self.panel_fin = PanelFinPartida(
@@ -505,10 +553,13 @@ class HudMundo(Entity):
 
     # Un paso del HUD (dt segundos): ruta, minimapa, teléfono y aviso con el estado del
     # modelo. Devuelve True si la ruta cambió (EscenaMundo redibuja la del mundo).
-    def actualizar(self, dt, sesion):
+    # yaw_grados (mundo 3D): yaw de la cámara; el minimapa gira con él (arriba = adelante).
+    def actualizar(self, dt, sesion, yaw_grados=None):
         flujo = self._obtener_flujo()
         if flujo is None or sesion is None:
             return False
+        if yaw_grados is not None:
+            self.minimapa.fijar_yaw(yaw_grados)
         activo = flujo.jugador_activo()
         mision = flujo.mision_actual()
         destino = mision.destino if mision is not None else None
@@ -518,55 +569,16 @@ class HudMundo(Entity):
             [(j.nombre, ROLES[j.rol].color, j.x, j.z) for j in sesion.jugadores()],
             activo.nombre, destino, self.guia.ruta)
         self.telefono_ui.avanzar(dt)
-        self.aviso.actualizar(flujo.estado_mision(), activo.telefono.estado())
+        self.aviso.actualizar(flujo.estado_mision(), activo.telefono.estado(),
+                              self._texto_aviso(destino))
         return cambio
 
-
-# -- Ruta en el mundo ----------------------------------------------------------------
-
-
-# Ruta BFS resaltada sobre las calles del mundo: cubos planos brillantes y discos en
-# las esquinas, ligeramente sobre las calles (tapa de las calles y=0.04, plazas 0.07,
-# disco del edificio 0.09, aro del avatar 0.12). Sin sombreado (siempre brillantes).
-class RutaMundo(Entity):
-
-    Y_SEGMENTO = 0.095       # cubo de 0.02: tapa en y = 0.105
-    Y_JUNTA = 0.110
-    ANCHO = 0.7
-
-    def __init__(self, mapa, **opciones):
-        super().__init__(**opciones)
-        self._mapa = mapa
-        self.segmentos = []
-        self.juntas = []
-        self._firma = None
-
-    def actualizar(self, x, z, ruta):
-        firma = (tuple(ruta), round(x, 2), round(z, 2))
-        if firma == self._firma:
-            return
-        self._firma = firma
-        puntos = hud_calculos.puntos_de_ruta(self._mapa, x, z, ruta)
-        pares = list(zip(puntos, puntos[1:]))
-        tono = rgb(COLOR_RUTA)
-        while len(self.segmentos) < len(pares):
-            self.segmentos.append(pieza(parent=self, model="cube", color=tono, shader=None))
-        while len(self.juntas) < len(puntos):
-            self.juntas.append(pieza(parent=self, model="circle", rotation_x=90, color=tono,
-                                     shader=None, scale=self.ANCHO))
-        for cubo, (p0, p1) in zip(self.segmentos, pares):
-            cx, cz, largo, rumbo = hud_calculos.segmento_mundo(p0, p1)
-            cubo.position = (cx, self.Y_SEGMENTO, cz)
-            cubo.scale = (self.ANCHO, 0.02, largo)
-            cubo.rotation_y = rumbo
-            cubo.enabled = True
-        for cubo in self.segmentos[len(pares):]:
-            cubo.enabled = False
-        for disco, (px, pz) in zip(self.juntas, puntos):
-            disco.position = (px, self.Y_JUNTA, pz)
-            disco.enabled = True
-        for disco in self.juntas[len(puntos):]:
-            disco.enabled = False
-
-    def segmentos_visibles(self):
-        return [s for s in self.segmentos if s.enabled]
+    # "Presiona E para entrar a <edificio>" si el mapa tiene edificios (mundo 3D); None = el de siempre.
+    def _texto_aviso(self, destino):
+        edificio_de = getattr(self._mapa, "edificio_de", None)
+        if destino is None or edificio_de is None:
+            return None
+        try:
+            return f"Presiona E para entrar a {edificio_de(destino).titulo}"
+        except ValueError:
+            return None

@@ -181,26 +181,54 @@ def caja_rotada(mapa, yaw_grados):
             min(v for _, v in puntos) - radio, max(v for _, v in puntos) + radio)
 
 
+# Radio del círculo, centrado en el centro de limites(), que contiene todas las plazas (con su
+# radio) y las esquinas de los edificios del mapa (si los tiene).
+def _radio_envolvente(mapa, limites):
+    cx, cz = (limites[0] + limites[1]) / 2, (limites[2] + limites[3]) / 2
+    radio = max(math.hypot(x - cx, z - cz) + mapa.radio_plaza
+                for x, z in (mapa.coordenada(lugar) for lugar in mapa.lugares()))
+    edificios = getattr(mapa, "edificios", None)
+    for edificio in (edificios() if callable(edificios) else []):
+        xmin, xmax, zmin, zmax = edificio.caja()
+        for x, z in ((xmin, zmin), (xmin, zmax), (xmax, zmin), (xmax, zmax)):
+            radio = max(radio, math.hypot(x - cx, z - cz))
+    return radio
+
+
 # Todo lo que el minimapa dibuja, en coordenadas locales (u, v) con el origen en el
 # CENTRO del minimapa (u a la derecha, v arriba). Rotado con el yaw de la cámara:
 # arriba en el minimapa = arriba en la pantalla. Usa navegacion.a_minimapa con
 # escala uniforme (no deforma): la mayor que deja caber caja_rotada() en `tamano`
 # menos el relleno; la caja queda centrada.
+#
+# rotacion_libre (mundo 3D, el yaw cambia cada frame): la escala NO depende del yaw para que
+# el mapa no "respire" al girar la cámara. Se usa el círculo que contiene toda la ciudad
+# (plazas con su radio y las esquinas de los edificios, si el mapa los tiene) alrededor del
+# centro de limites(), así que cabe con cualquier giro; `girar(yaw)` solo cambia el ángulo.
 class GeometriaMinimapa:
 
-    def __init__(self, mapa, tamano, yaw_grados, relleno=RELLENO_MINIMAPA):
+    def __init__(self, mapa, tamano, yaw_grados, relleno=RELLENO_MINIMAPA, rotacion_libre=False):
         self._mapa = mapa
         self.tamano = tamano
         self.yaw = yaw_grados
         self.limites = mapa.limites()
-        umin, umax, vmin, vmax = caja_rotada(mapa, yaw_grados)
-        self.escala = min((tamano[0] - 2 * relleno) / (umax - umin),
-                          (tamano[1] - 2 * relleno) / (vmax - vmin))
+        if rotacion_libre:
+            radio = _radio_envolvente(mapa, self.limites)
+            self.escala = (min(tamano) - 2 * relleno) / (2 * radio)
+            umin = umax = vmin = vmax = 0.0       # caja centrada en el centro de limites()
+        else:
+            umin, umax, vmin, vmax = caja_rotada(mapa, yaw_grados)
+            self.escala = min((tamano[0] - 2 * relleno) / (umax - umin),
+                              (tamano[1] - 2 * relleno) / (vmax - vmin))
         xmin, xmax, zmin, zmax = self.limites
         # a_minimapa calcula min(w/ancho, h/alto): con este tamaño equivalente da `escala`.
         self._tamano_equivalente = ((xmax - xmin) * self.escala, (zmax - zmin) * self.escala)
         # Desplazamiento que centra la caja en el minimapa.
         self._centro = (-(umin + umax) / 2 * self.escala, -(vmin + vmax) / 2 * self.escala)
+
+    # Cambia el yaw (solo útil con rotacion_libre: la escala y el centro no dependen de él).
+    def girar(self, yaw_grados):
+        self.yaw = yaw_grados
 
     def punto(self, x, z):
         return navegacion.a_minimapa(

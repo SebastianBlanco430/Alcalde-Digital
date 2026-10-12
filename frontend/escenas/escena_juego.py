@@ -20,6 +20,7 @@ from frontend.componentes import (
     rgb,
 )
 from frontend.escenas.escena_base import Escena
+from frontend.marco_pc import ESCALA_JUEGO, MarcoPC
 from frontend.panel_propagacion import PanelPropagacion
 
 ASPECTO = 16 / 9   # la ventana se fija en 16:9 (ver main.py)
@@ -38,6 +39,9 @@ ANCHO_INTERFAZ = ASPECTO  # ancho total de camera.ui (alto = 1)
 # "alcance_total". La animación corre en update() y nunca retrasa el fin de la misión.
 # La regla del lote (contador, deltas, propagaciones, fin y resultado) vive en
 # backend/logica/lote_mision.LoteMision; esta escena solo la llama y pinta.
+# Marco de monitor (mundo 3D): `al_entrar(marco=True, lugar=...)` dibuja el bisel y la barra
+# "Civitas · <Rol> · <Lugar>" detrás del juego y lo reduce para que quepa dentro. Por defecto
+# marco=False: la escena es exactamente la de siempre (también sin misión).
 class EscenaJuego(Escena):
 
     # --- Layout (unidades de camera.ui; medidas pygame / 600) ---
@@ -67,6 +71,7 @@ class EscenaJuego(Escena):
         super().__init__(**opciones)
         self.estado = None
         self.jugador = {}
+        self.marco = MarcoPC(parent=self.parent)    # hermano (detrás), no hijo: no se reduce con el juego
         self._reiniciar_mision(None, None)
 
         # Panel superior con las tres barras.
@@ -133,8 +138,9 @@ class EscenaJuego(Escena):
     # `al_terminar` activan el modo misión. Cada entrada reinicia el contador.
     # `grafo_social` (opcional, inyectado): activa el panel de propagación en modo misión.
     def al_entrar(self, jugador=None, estado=None, mision=None, al_terminar=None,
-                  grafo_social=None, **datos):
+                  grafo_social=None, marco=False, lugar="", **datos):
         self.jugador = jugador or {}
+        self._poner_marco(marco, lugar)
         if estado is None:
             arbol_noticias, arbol_stats = construir_arboles()
             estado = EstadoPartida(arbol_noticias, arbol_stats)
@@ -151,6 +157,17 @@ class EscenaJuego(Escena):
     # (ni completar la misión) si la escena ya no está activa.
     def al_salir(self):
         self._intento += 1
+        self._poner_marco(False, "")
+
+    # Con marco el contenido se reduce y se centra dentro del bisel; sin él, escala normal.
+    def _poner_marco(self, activo, lugar):
+        if activo:
+            nombre, rol = self._nombre_y_rol()
+            self.marco.mostrar(rol, lugar)
+            self.scale = ESCALA_JUEGO
+        else:
+            self.marco.ocultar()
+            self.scale = 1
 
     def _reiniciar_mision(self, mision, al_terminar):
         self.mision = mision

@@ -80,6 +80,23 @@ def _ruta_desde_calle(mapa, x, z, calle, destino):
     return mejor_ruta if mejor_ruta is not None else []
 
 
+# Puntos (x, z) para DIBUJAR el camino hasta la puerta del destino: el centro de cada lugar
+# de la ruta del GPS + el punto de entrada (1.2 m delante de la puerta) + la puerta. Estando
+# ya en la plaza del destino son solo [entrada, puerta]. Con un mapa sin edificios (sin
+# `edificio_de`) o un lugar sin edificio termina en el centro del destino.
+# ValueError si el destino no existe.
+def ruta_gps_hasta_puerta(mundo, x, z, destino):
+    puntos = [mundo.coordenada(lugar) for lugar in calcular_ruta_gps(mundo, x, z, destino)]
+    edificio_de = getattr(mundo, "edificio_de", None)
+    try:
+        edificio = edificio_de(destino) if edificio_de is not None else None
+    except ValueError:
+        edificio = None
+    if edificio is None:
+        return puntos or [mundo.coordenada(destino)]
+    return puntos + [edificio.punto_entrada(), edificio.puerta()]
+
+
 # Siguiente esquina del GPS, o None si ya llegó (o no hay camino).
 def siguiente_esquina(mapa, x, z, destino):
     ruta = calcular_ruta_gps(mapa, x, z, destino)
