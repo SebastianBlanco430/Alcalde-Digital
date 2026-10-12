@@ -1,0 +1,133 @@
+# Vista del grafo social "Civitas" (Python puro: NO importa ursina, se prueba con pytest
+# sin ventana). Decide DÓNDE se dibuja cada ciudadano en el panel y QUÉ estado tiene
+# cada nodo/arista en un instante `t` de la animación de una propagación.
+# frontend/panel_propagacion.py solo ejecuta este modelo en Ursina.
+#
+# La animación depende únicamente de `t` (suma de los dt), así que es determinista:
+#   t = 0            -> solo el origen está encendido
+#   t >= k * PASO    -> ya se alcanzó el salto k (propagacion["niveles"][k - 1])
+
+import math
+
+PASO_SEGUNDOS = 0.45          # duración de cada salto de la propagación
+
+ORIGEN = "origen"
+ALCANZADO = "alcanzado"
+PENDIENTE = "pendiente"
+FRENADO = "frenado"
+
+# Posiciones fijas (x, y) en [-1, 1] (y arriba) de los 10 ciudadanos del grafo de
+# ejemplo: Ana al centro, sus cuatro contactos en las diagonales y los de segundo salto
+# en las filas extremas. Diseñadas para que ninguna arista se cruce; Diana (aislada)
+# queda sola abajo en el centro.
+POSICIONES_EJEMPLO = {
+    "Ana": (0.0, 0.0),
+    "Elena": (-0.8, 0.45),
+    "Fabio": (0.8, 0.45),
+    "Hugo": (-0.4, 0.95),
+    "Iván": (0.4, 0.95),
+    "Beto": (-0.8, -0.45),
+    "Gina": (0.8, -0.45),
+    "Carlos": (-0.62, -0.95),
+    "Julia": (0.62, -0.95),
+    "Diana": (0.0, -0.95),
+}
+
+
+# {ciudadano: (x, y)} de todos los ciudadanos del grafo. Los conocidos usan la tabla
+# fija; los demás (otro grafo) se reparten en un círculo en orden de aparición, así el
+# resultado siempre es determinista.
+def posiciones(grafo_social):
+    nombres = grafo_social.ciudadanos()
+    resultado = {}
+    desconocidos = [n for n in nombres if n not in POSICIONES_EJEMPLO]
+    for nombre in nombres:
+        if nombre in POSICIONES_EJEMPLO:
+            resultado[nombre] = POSICIONES_EJEMPLO[nombre]
+    for indice, nombre in enumerate(desconocidos):
+        angulo = 2 * math.pi * indice / len(desconocidos)
+        resultado[nombre] = (round(math.cos(angulo), 4), round(math.sin(angulo), 4))
+    return resultado
+
+
+# Aristas únicas (a, b) del grafo, sin repetir (a, b) y (b, a), en orden estable.
+def aristas(grafo_social):
+    vistas = set()
+    resultado = []
+    for a in grafo_social.ciudadanos():
+        for b in grafo_social.vecinos(a):
+            clave = frozenset((a, b))
+            if clave not in vistas:
+                vistas.add(clave)
+                resultado.append((a, b))
+    return resultado
+
+
+# Salto alcanzado de cada ciudadano: el origen es 0 y los demás k según su nivel.
+# Los que no reciben la publicación no aparecen.
+def saltos_por_ciudadano(propagacion):
+    saltos = {propagacion["origen"]: 0}
+    for indice, nivel in enumerate(propagacion["niveles"], start=1):
+        for nombre in nivel:
+            saltos[nombre] = indice
+    return saltos
+
+
+# Segundos que dura la animación completa (0 si la publicación se frenó).
+def duracion_total(propagacion):
+    return len(propagacion["niveles"]) * PASO_SEGUNDOS
+
+
+# Último salto ya alcanzado en el instante `t` (0 = solo el origen).
+def salto_actual(propagacion, t):
+    if t <= 0:
+        return 0
+    return min(len(propagacion["niveles"]), int(t / PASO_SEGUNDOS + 1e-9))
+
+
+# ¿Terminó la animación en el instante `t`?
+def terminada(propagacion, t):
+    return t >= duracion_total(propagacion) - 1e-9
+
+
+# Cuántos ciudadanos (sin el origen) han recibido la publicación en el instante `t`.
+def alcanzados_hasta(propagacion, t):
+    return sum(len(n) for n in propagacion["niveles"][:salto_actual(propagacion, t)])
+
+
+# Estado de cada ciudadano en `t`: ORIGEN / ALCANZADO / PENDIENTE; con "reportar" el
+# origen queda FRENADO (la publicación no sale de él) y los demás PENDIENTE.
+def estado_nodos(propagacion, nombres, t):
+    saltos = saltos_por_ciudadano(propagacion)
+    actual = salto_actual(propagacion, t)
+    resultado = {}
+    for nombre in nombres:
+        if nombre == propagacion["origen"]:
+            frenado = propagacion["accion"] == "reportar"
+            resultado[nombre] = FRENADO if frenado else ORIGEN
+        elif nombre in saltos and saltos[nombre] <= actual:
+            resultado[nombre] = ALCANZADO
+        else:
+            resultado[nombre] = PENDIENTE
+    return resultado
+
+
+# Estado de cada arista en `t`: True (activa) cuando sus dos extremos ya están
+# alcanzados (origen incluido); con "reportar" ninguna se activa.
+def estado_aristas(propagacion, lista_aristas, t):
+    if propagacion["accion"] == "reportar":
+        return {arista: False for arista in lista_aristas}
+    saltos = saltos_por_ciudadano(propagacion)
+    actual = salto_actual(propagacion, t)
+    return {
+        (a, b): (a in saltos and b in saltos and saltos[a] <= actual and saltos[b] <= actual)
+        for a, b in lista_aristas
+    }
+
+
+# Texto bajo el grafo en el instante `t`. Compartir: el contador crece con los saltos
+# hasta "Alcanzó a N de M ciudadanos"; Reportar: el mensaje de frenado.
+def texto_resultado(propagacion, total_ciudadanos, t):
+    if propagacion["accion"] == "reportar":
+        return "Reporte: la publicación se frenó (alcance 0)"
+    return f"Alcanzó a {alcanzados_hasta(propagacion, t)} de {total_ciudadanos} ciudadanos"
