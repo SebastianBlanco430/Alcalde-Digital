@@ -51,9 +51,9 @@ if ! ./venv/bin/python -m pip install --upgrade pip; then
     exit 1
 fi
 
-echo "Instalando Ursina y pytest dentro del entorno virtual..."
-if ! ./venv/bin/python -m pip install ursina pytest; then
-    echo "[ERROR] No se pudieron instalar ursina y pytest. Revisa tu conexion a internet."
+echo "Instalando dependencias de requirements.txt dentro del entorno virtual..."
+if ! ./venv/bin/python -m pip install -r requirements.txt; then
+    echo "[ERROR] No se pudieron instalar las dependencias de requirements.txt. Revisa tu conexion a internet."
     exit 1
 fi
 

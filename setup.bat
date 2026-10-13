@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 echo ====================================================
 echo Configurando entorno para Alcalde Digital
 echo ====================================================
@@ -56,10 +57,10 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Instalando Ursina y pytest dentro del entorno virtual...
-.\venv\Scripts\python.exe -m pip install ursina pytest
+echo Instalando dependencias de requirements.txt dentro del entorno virtual...
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
 if errorlevel 1 (
-    echo [ERROR] No se pudieron instalar ursina y pytest. Revisa tu conexion a internet.
+    echo [ERROR] No se pudieron instalar las dependencias de requirements.txt. Revisa tu conexion a internet.
     pause
     exit /b 1
 )
