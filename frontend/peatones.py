@@ -5,7 +5,7 @@
 
 import random
 
-from ursina import Entity, color, time
+from ursina import Entity, time
 
 from frontend.peatones_calculos import crear_caminantes
 from frontend import poses

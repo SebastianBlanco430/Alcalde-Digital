@@ -181,7 +181,13 @@ class ConexionFlujo:
         if self.cinematicas is None:
             tras_la_entrada()
         else:
-            self.cinematicas.reproducir_entrada(jugador, lugar, tras_la_entrada)
+            try:
+                self.cinematicas.reproducir_entrada(jugador, lugar, tras_la_entrada)
+            except BaseException:
+                # Si la cinemática no arranca, E ya dejó la misión en EN_MINIJUEGO y los
+                # controles congelados: se revierte para que el jugador pueda reintentar.
+                self._revertir_al_mundo(flujo)
+                raise
 
     def _salir_del_edificio(self, resultado):
         flujo = self.flujo

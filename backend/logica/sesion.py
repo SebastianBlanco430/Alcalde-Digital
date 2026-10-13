@@ -126,7 +126,7 @@ class SesionJuego:
     # ValueError (sin tocar el estado) si los datos violan las reglas de la sesión:
     # más de 4 jugadores, roles o nombres repetidos, o índice de turno fuera de rango.
     @classmethod
-    def desde_dict(cls, datos, estado_partida):
+    def desde_dict(cls, datos, estado_partida, escala_mundo=1.0):
         jugadores = [Jugador.desde_dict(d) for d in datos["jugadores"]]
         if len(jugadores) > MAX_JUGADORES:
             raise ValueError(f"Datos guardados con más de {MAX_JUGADORES} jugadores.")
@@ -140,7 +140,7 @@ class SesionJuego:
         if not 0 <= indice < max(len(jugadores), 1):
             raise ValueError(f"Índice de turno fuera de rango: {indice!r}.")
 
-        sesion = cls(estado_partida)
+        sesion = cls(estado_partida, escala_mundo=escala_mundo)
         sesion._jugadores = jugadores
         sesion._indice_turno = indice
         sesion._numero_turno = datos["numero_turno"]
