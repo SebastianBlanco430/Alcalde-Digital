@@ -35,7 +35,7 @@ from backend.logica import navegacion
 from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 from backend.logica.roles import ROLES
 from frontend import camara_calculos as cc
-from frontend import geometria_mundo, poses
+from frontend import catalogo_assets, geometria_mundo, poses
 from frontend import guion_cinematicas as guion
 from frontend.camara_tercera_persona import CamaraTerceraPersona
 from frontend.cinematica import ease_in_out, lerp, lerp_angulo, lerp_vec3
@@ -75,13 +75,14 @@ class EscenaMundo(Escena):
         self.ciudad = Ciudad3D(mundo, sombras=sombras, parent=self)
         self.camara = CamaraTerceraPersona(self.ciudad.raiz_colisiones, parent=self)
         self.camara.objetivo = self._posicion_del_activo
+        self.camara.altura_en = mundo.altura_en
         self.controlador = ControladorJugador(
             self, mundo, al_interactuar, velocidad=VELOCIDAD_CAMINAR, velocidad_correr=VELOCIDAD_CORRER,
             obtener_yaw=lambda: self.camara.yaw)
         self.director = DirectorCinematica(parent=self)
         self.peatones = Peatones(mundo, parent=self)      # gente que pasea (decoración)
         self.baliza = Baliza(parent=self, enabled=False)
-        self.ruta_piso = RutaPiso(parent=self)
+        self.ruta_piso = RutaPiso(altura_en=mundo.altura_en, parent=self)
 
         # HUD 2D (camera.ui): hermano de la escena, no hijo (la escena cuelga de `scene`).
         self.hud = HudMundo(mundo, lambda: self.flujo, al_menu=al_menu, rotacion_libre=True)
@@ -198,7 +199,9 @@ class EscenaMundo(Escena):
             destroy(avatar)
         self.avatares = {}
         for jugador in self._sesion.jugadores():
-            self.avatares[jugador.nombre] = Personaje(jugador.nombre, ROLES[jugador.rol].color, parent=self)
+            self.avatares[jugador.nombre] = Personaje(
+                jugador.nombre, ROLES[jugador.rol].color, clave_asset=catalogo_assets.clave_rol(jugador.rol),
+                altura_en=self._mundo.altura_en, parent=self)
         self.camara.ignorar = list(self.avatares.values())
 
     # Rumbo (yaw) que mira desde el jugador activo hacia la puerta de su misión (o 0).
@@ -227,7 +230,8 @@ class EscenaMundo(Escena):
             self.baliza.enabled = False
         else:
             px, pz = self._mundo.punto_interaccion(mision.destino)
-            self.baliza.colocar(px, pz, self._mundo.edificio_de(mision.destino).alto + 2.2)
+            self.baliza.colocar(px, pz, self._mundo.edificio_de(mision.destino).alto + 2.2,
+                                base=self._mundo.altura_en(px, pz))
             self.baliza.enabled = True
         # Fin del catálogo: nadie tiene misiones pendientes -> panel "Partida terminada".
         if self.flujo.partida_terminada() and not self._cinematica:
@@ -283,7 +287,7 @@ class EscenaMundo(Escena):
         avatar = self.avatar_de(jugador)
         entrada = edificio.punto_entrada()
         inicio = (jugador.x, jugador.z)
-        toma = guion.toma_fachada(edificio)
+        toma = guion.toma_fachada(edificio, self._mundo.altura_en(*edificio.puerta()))
         camara0 = (tuple(camera.position), camera.rotation_x, camera.rotation_y)
         rumbo0, rumbo_puerta = avatar.rumbo, edificio.rumbo_puerta()
         distancia = math.dist(inicio, entrada)
@@ -333,10 +337,11 @@ class EscenaMundo(Escena):
         puerta = self.ciudad.puertas[lugar]
         avatar = self.avatar_de(jugador)
         entrada = edificio.punto_entrada()
-        toma = guion.toma_fachada(edificio)
+        toma = guion.toma_fachada(edificio, self._mundo.altura_en(*edificio.puerta()))
         dentro = self._mas_alla_de_la_puerta(edificio, 1.3)
         yaw, pitch = self.camara.yaw, self.camara.pitch
-        orbita = cc.posicion_orbital(cc.pivote_del_jugador(*entrada), yaw, pitch, self.camara.distancia)
+        pivote = cc.pivote_del_jugador(*entrada, suelo=self._mundo.altura_en(*entrada))
+        orbita = cc.posicion_orbital(pivote, yaw, pitch, self.camara.distancia)
 
         self._cinematica = True
         self.camara.tomar_control()

@@ -21,6 +21,7 @@ import math
 from dataclasses import dataclass
 
 from backend.grafos.mapa_ciudad import _distancia_punto_segmento
+from backend.logica.terreno import Terreno
 
 RADIO_JUGADOR = 0.35
 DISTANCIA_ENTRADA = 1.2          # m delante de la puerta donde se para el personaje
@@ -123,8 +124,10 @@ class MundoCiudad:
     # mapa (0 = el borde pasa pegado a la pared).
     # ValueError si un edificio es de un lugar inexistente o repetido, tapa una plaza o una
     # calle, o si alguna puerta, punto de entrada o spawn no es transitable.
+    # `terreno` (backend/logica/terreno.py) da la altura del suelo; None = plano (altura 0). Es solo
+    # vista: la lógica de movimiento, llegada y colisión sigue siendo 2D (x, z).
     def __init__(self, mapa, edificios, obstaculos, radio_jugador=RADIO_JUGADOR,
-                 spawns=None, margen_edificios=0.0):
+                 spawns=None, margen_edificios=0.0, terreno=None):
         if radio_jugador <= 0:
             raise ValueError("radio_jugador debe ser positivo.")
         self._mapa = mapa
@@ -133,6 +136,7 @@ class MundoCiudad:
         self.radio_jugador = radio_jugador
         self.spawns = dict(spawns) if spawns else {}
         self._por_lugar = {}
+        self._terreno = terreno if terreno is not None else Terreno.plano()
 
         for edificio in self._edificios:
             self._validar_edificio(edificio)
@@ -209,6 +213,20 @@ class MundoCiudad:
             return self._por_lugar[lugar].puerta()
         return self._mapa.coordenada(lugar)
 
+    # -- Terreno (solo altura; no afecta a es_transitable) --
+
+    @property
+    def terreno(self):
+        return self._terreno
+
+    # Altura del suelo en (x, z), en metros.
+    def altura_en(self, x, z):
+        return self._terreno.altura(x, z)
+
+    # Cota de la plataforma de un lugar (0 si el terreno es plano).
+    def elevacion_lugar(self, lugar):
+        return self._terreno.elevacion_lugar(lugar)
+
     # -- Movimiento --
 
     # (xmin, xmax, zmin, zmax): los límites del mapa ampliados para incluir los edificios.
@@ -225,12 +243,7 @@ class MundoCiudad:
     # -- Internos --
 
     def _calcular_limites(self, margen):
-        xmin, xmax, zmin, zmax = self._mapa.limites()
-        for e in self._edificios:
-            ex0, ex1, ez0, ez1 = e.caja()
-            xmin, xmax = min(xmin, ex0 - margen), max(xmax, ex1 + margen)
-            zmin, zmax = min(zmin, ez0 - margen), max(zmax, ez1 + margen)
-        return (xmin, xmax, zmin, zmax)
+        return limites_con_edificios(self._mapa, self._edificios, margen)
 
     def _validar_edificio(self, edificio):
         mapa = self._mapa
@@ -265,6 +278,16 @@ class MundoCiudad:
     def __repr__(self):
         return (f"MundoCiudad(lugares={len(self.lugares())}, edificios={len(self._edificios)}, "
                 f"obstaculos={len(self._obstaculos)})")
+
+
+# (xmin, xmax, zmin, zmax) del mapa ampliado para incluir los edificios (con `margen` m).
+def limites_con_edificios(mapa, edificios, margen=0.0):
+    xmin, xmax, zmin, zmax = mapa.limites()
+    for e in edificios:
+        ex0, ex1, ez0, ez1 = e.caja()
+        xmin, xmax = min(xmin, ex0 - margen), max(xmax, ex1 + margen)
+        zmin, zmax = min(zmin, ez0 - margen), max(zmax, ez1 + margen)
+    return (xmin, xmax, zmin, zmax)
 
 
 # -- Geometría auxiliar ----------------------------------------------------------------

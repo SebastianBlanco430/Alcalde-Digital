@@ -5,6 +5,8 @@
 # - Ratón (mientras `mouse.locked`): yaw libre, pitch 5°-60°. Rueda: zoom 3.5-12 m.
 # - Colisión: raycast del pivote hacia la cámara; si un edificio tapa al personaje la
 #   cámara se acerca (rápido) y al despejarse se aleja (lento, sin "saltar").
+# - Terreno: `altura_en(x, z)` (callable opcional) da la altura del suelo: el pivote sigue la
+#   altura bajo el jugador y la cámara nunca baja de ALTURA_MIN_SUELO sobre el terreno.
 # - `yaw` es público: lo leen el controlador (W = hacia donde mira) y el minimapa.
 # - `bloquear(True)`: el ratón no gira la cámara (teléfono/pausa abiertos).
 # - `tomar_control()` / `soltar_control()`: una cinemática mueve `camera` a mano; mientras
@@ -26,6 +28,7 @@ DISTANCIA_MIN, DISTANCIA_MAX = 3.5, 12.0
 DISTANCIA_INICIAL = 7.0
 PITCH_INICIAL = 22.0
 MARGEN_COLISION = 0.4
+ALTURA_MIN_SUELO = 0.4        # m mínimos entre la cámara y el terreno
 DISTANCIA_MIN_COLISION = 1.2  # la cámara nunca se mete más cerca del pivote que esto
 FOV = 65
 PLANO_CERCANO = 0.1
@@ -46,6 +49,7 @@ class CamaraTerceraPersona(Entity):
         self.distancia = DISTANCIA_INICIAL       # la que pide el jugador (rueda)
         self.distancia_real = DISTANCIA_INICIAL  # la que queda tras la colisión y el suavizado
         self.objetivo = None                     # callable -> (x, z) del jugador al que sigue
+        self.altura_en = None                    # callable (x, z) -> y del suelo (None = plano)
         self.ignorar = []                        # entidades que el raycast atraviesa (personajes)
         self.bloqueada = False
         self.controlada = False
@@ -105,14 +109,20 @@ class CamaraTerceraPersona(Entity):
         rapidez = cc.rapidez_de_seguimiento(math.hypot(meta[0] - px, meta[1] - pz), RAPIDEZ_SEGUIR, RAPIDEZ_VIAJE)
         self._pivote = cc.avanzar_pivote((px, pz), meta, dt, rapidez, vmax=VELOCIDAD_VIAJE)
 
-        pivote = cc.pivote_del_jugador(*self._pivote)
+        suelo = self.altura_en(*self._pivote) if self.altura_en is not None else 0.0
+        pivote = cc.pivote_del_jugador(*self._pivote, suelo=suelo)
         impacto = self._distancia_hasta_obstaculo(pivote)
         objetivo = cc.distancia_con_colision(
             self.distancia, impacto, MARGEN_COLISION, DISTANCIA_MIN_COLISION)
         suave = cc.suavizar_distancia(self.distancia_real, objetivo, dt)
         # Hacia adentro nunca por detrás de la pared: el suavizado solo afloja el alejarse.
         self.distancia_real = min(suave, objetivo)
-        camera.position = cc.posicion_orbital(pivote, self.yaw, self.pitch, self.distancia_real)
+        posicion = cc.posicion_orbital(pivote, self.yaw, self.pitch, self.distancia_real)
+        if self.altura_en is not None:
+            minimo = self.altura_en(posicion[0], posicion[2]) + ALTURA_MIN_SUELO
+            if posicion[1] < minimo:
+                posicion = (posicion[0], minimo, posicion[2])
+        camera.position = posicion
         camera.rotation = (self.pitch, self.yaw, 0)
 
     # Distancia del pivote al primer obstáculo en dirección a la cámara deseada (None si

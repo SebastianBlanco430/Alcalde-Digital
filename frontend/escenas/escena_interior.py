@@ -22,7 +22,7 @@ from ursina.shaders import lit_with_shadows_shader
 from backend.logica.roles import ROLES
 from frontend import camara_calculos as cc
 from frontend import guion_cinematicas as guion
-from frontend import poses
+from frontend import catalogo_assets, poses
 from frontend.cinematica import ease_in_out, lerp, lerp_angulo, lerp_vec3
 from frontend.componentes import rgb
 from frontend.director_cinematica import DirectorCinematica
@@ -341,7 +341,8 @@ class EscenaInterior(Escena):
     def _crear_personaje(self, jugador):
         if self.personaje is not None:
             destroy(self.personaje)
-        self.personaje = Personaje(jugador.nombre, ROLES[jugador.rol].color, parent=self)
+        self.personaje = Personaje(jugador.nombre, ROLES[jugador.rol].color,
+                                   clave_asset=catalogo_assets.clave_rol(jugador.rol), parent=self)
         self.personaje.automatico = False
         self.personaje.etiqueta.enabled = False
         self.personaje.aro.enabled = False

@@ -12,6 +12,7 @@
 # camino plaza -> puerta ni de un spawn, así que los recorridos siempre están despejados.
 
 import math
+from pathlib import Path
 
 from backend.grafos.grafo_ciudad import construir_grafo_ciudad_ejemplo
 from backend.grafos.mapa_ciudad import COORDENADAS_EJEMPLO, MapaCiudad, _distancia_punto_segmento
@@ -21,8 +22,10 @@ from backend.logica.mundo_ciudad import (
     Obstaculo,
     _distancia_punto_caja,
     _distancia_segmento_caja,
+    limites_con_edificios,
 )
 from backend.logica.roles import ROLES
+from backend.logica.terreno import PENDIENTE_MAXIMA_CALLE, Terreno
 
 ESCALA_MUNDO = 4
 ANCHO_CALLE = 8
@@ -31,6 +34,29 @@ MARGEN_EDIFICIOS = 4.0      # m de pasto transitable alrededor de los edificios 
 
 ESPACIO_LIBRE = 1.2         # m mínimos entre un obstáculo y las líneas que deben quedar libres
 ESPACIO_EDIFICIO = 1.0      # m mínimos entre un obstáculo decorativo y un edificio
+
+# -- Terreno ------------------------------------------------------------------------------------
+# Ladera: la Alcaldía y la Plaza Central están abajo; el Barrio Las Flores y el Hospital, arriba.
+# Cada lugar (su plaza y su edificio) queda sobre una plataforma plana a esta cota (metros sobre
+# la Alcaldía). Las calles suben en rampa lineal entre las cotas de sus dos lugares: con ~12-17 m
+# de rampa por calle, 2 m de desnivel ya son ~14 %. Si cambias una cota y una calle supera
+# PENDIENTE_MAXIMA_CALLE, construir_mundo_3d() lanza ValueError con la calle y su pendiente.
+ELEVACION_LUGAR = {
+    "Alcaldía": 0.0,                      # abajo: el centro cívico, plaza lisa
+    "Plaza Central": 1.5,                 # 12 % hasta la Alcaldía
+    "Terminal de Buses": 3.0,             # 9 % desde la Plaza Central
+    "Universidad de Ciudad Nova": 3.5,    # 12 % desde la Plaza Central
+    "Parque Municipal": 5.0,              # 11 % desde la Universidad
+    "Barrio Las Flores": 5.0,             # 14 % desde la Terminal; a nivel con el Parque
+    "Hospital Las Flores": 7.0,           # 14 % desde Las Flores: lo más alto
+}
+TERRENO_ACTIVO = True                     # False: suelo plano de siempre (altura 0 en todas partes)
+SEMILLA_TERRENO = 2026
+AMPLITUD_ONDULACION = 0.6                 # m de ondulación suave de la ladera natural
+# Si existe, este PNG en escala de grises reemplaza la ladera procedural: gris 0 -> primer valor,
+# gris 255 -> segundo valor (metros). Calles, plazas y edificios siguen a ELEVACION_LUGAR.
+RUTA_HEIGHTMAP = Path(__file__).resolve().parents[2] / "assets" / "terreno" / "heightmap.png"
+HEIGHTMAP_METROS = (0.0, 10.0)
 
 # (lugar, cx, cz, ancho en x, fondo en z, alto, lado de la puerta, nombre del letrero)
 _EDIFICIOS = (
@@ -183,4 +209,17 @@ def construir_mundo_3d():
     spawns = _spawns()
     despeje = _Despeje(mapa, edificios, spawns)
     obstaculos = _bancos(mapa, despeje) + _arboles_parque(mapa, despeje) + _farolas(mapa, despeje)
-    return MundoCiudad(mapa, edificios, obstaculos, spawns=spawns, margen_edificios=MARGEN_EDIFICIOS)
+    terreno = _construir_terreno(mapa, edificios) if TERRENO_ACTIVO else None
+    return MundoCiudad(mapa, edificios, obstaculos, spawns=spawns, margen_edificios=MARGEN_EDIFICIOS,
+                       terreno=terreno)
+
+
+# Terreno de ladera del mapa. ValueError si alguna calle supera PENDIENTE_MAXIMA_CALLE.
+def _construir_terreno(mapa, edificios):
+    limites = limites_con_edificios(mapa, edificios, MARGEN_EDIFICIOS)
+    heightmap = RUTA_HEIGHTMAP if RUTA_HEIGHTMAP.is_file() else None
+    terreno = Terreno.desde_mundo(mapa, edificios, ELEVACION_LUGAR, limites, semilla=SEMILLA_TERRENO,
+                                  amplitud=AMPLITUD_ONDULACION, ruta_heightmap=heightmap,
+                                  heightmap_metros=HEIGHTMAP_METROS)
+    terreno.validar_calles(PENDIENTE_MAXIMA_CALLE)
+    return terreno

@@ -17,9 +17,10 @@ from frontend.geometria_mundo import normalizar_angulo
 ALTURA_PIVOTE = 1.5
 
 
-# Pivote (x, y, z) al que apunta la cámara: la cabeza del personaje en (x, z).
-def pivote_del_jugador(x, z, altura=ALTURA_PIVOTE):
-    return (x, altura, z)
+# Pivote (x, y, z) al que apunta la cámara: la cabeza del personaje en (x, z). `suelo` es la
+# altura del terreno bajo el personaje (0 en un mundo plano).
+def pivote_del_jugador(x, z, altura=ALTURA_PIVOTE, suelo=0.0):
+    return (x, suelo + altura, z)
 
 
 # Posición de la cámara para el pivote, yaw y pitch (grados) y distancia dados.

@@ -26,7 +26,8 @@ class Peatones(Entity):
         self.personajes = []
         self._quietos = set()
         for i, caminante in enumerate(self.caminantes):
-            personaje = Personaje("", ROPA[i % len(ROPA)], parent=self)
+            personaje = Personaje("", ROPA[i % len(ROPA)], clave_asset="peaton",
+                                  altura_en=getattr(mundo, "altura_en", None), parent=self)
             personaje.etiqueta.enabled = False
             personaje.aro.enabled = False
             personaje.automatico = False              # se anima aquí, y solo mientras camina (rendimiento)
