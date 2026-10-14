@@ -2,6 +2,7 @@
 # Zona transitable = unión de plazas (círculo de radio_plaza en cada lugar) y
 # calles (cápsula de ancho_calle/2 alrededor de cada conexión). Lógica pura.
 
+import heapq
 import math
 
 from backend.grafos.grafo_ciudad import construir_grafo_ciudad_ejemplo
@@ -15,11 +16,18 @@ class MapaCiudad:
     # coordenadas = {lugar: (x, z)}; debe cubrir exactamente los lugares del grafo.
     def __init__(self, grafo, coordenadas, ancho_calle=2.0, radio_plaza=2.5):
         faltan = [lugar for lugar in grafo.lugares() if lugar not in coordenadas]
-        sobran = [lugar for lugar in coordenadas if lugar not in set(grafo.lugares())]
+        existentes = set(grafo.lugares())
+        sobran = [lugar for lugar in coordenadas if lugar not in existentes]
         if faltan:
             raise ValueError(f"Faltan coordenadas para: {faltan}")
         if sobran:
             raise ValueError(f"Coordenadas de lugares que no existen en el grafo: {sobran}")
+        if ancho_calle <= 0 or radio_plaza <= 0:
+            raise ValueError("ancho_calle y radio_plaza deben ser positivos")
+        for lugar in grafo.lugares():
+            punto = tuple(coordenadas[lugar])
+            if len(punto) != 2 or not all(math.isfinite(v) for v in punto):
+                raise ValueError(f"Coordenada inválida para {lugar!r}: {coordenadas[lugar]!r}")
 
         self._grafo = grafo
         self._coordenadas = {lugar: tuple(coordenadas[lugar]) for lugar in grafo.lugares()}
@@ -40,12 +48,14 @@ class MapaCiudad:
         return list(self._coordenadas.keys())
 
     # Una tupla (a, b) por conexión, sin duplicados, en orden de lugares/adyacencia.
+    # Los lugares añadidos al grafo después de construir el mapa (sin coordenadas) se
+    # ignoran; `validar()` los reporta.
     def segmentos(self):
         orden = {lugar: i for i, lugar in enumerate(self._coordenadas)}
         resultado = []
         for a in self._coordenadas:
             for b in self._grafo.vecinos(a):
-                if orden[a] < orden[b]:
+                if b in orden and orden[a] < orden[b]:
                     resultado.append((a, b))
         return resultado
 
@@ -86,6 +96,8 @@ class MapaCiudad:
 
     # (xmin, xmax, zmin, zmax): caja de las coordenadas ampliada en radio_plaza + MARGEN_LIMITES.
     def limites(self):
+        if not self._coordenadas:
+            raise ValueError("El mapa no tiene lugares")
         xs = [c[0] for c in self._coordenadas.values()]
         zs = [c[1] for c in self._coordenadas.values()]
         margen = self.radio_plaza + MARGEN_LIMITES
@@ -104,6 +116,77 @@ class MapaCiudad:
                 ):
                     return True
         return False
+
+    # --- Utilidades añadidas ---
+
+    # Distancia en metros entre los centros de dos lugares (ValueError si no existen).
+    def distancia_entre(self, lugar_a, lugar_b):
+        return math.dist(self.coordenada(lugar_a), self.coordenada(lugar_b))
+
+    # Longitud total de una ruta [lugar, ...] sumando sus tramos (0 con 0 o 1 lugares).
+    def longitud_ruta(self, ruta):
+        return sum(self.distancia_entre(a, b) for a, b in zip(ruta, ruta[1:]))
+
+    # Dijkstra con la longitud real de cada calle. Devuelve (ruta, metros); ([], None)
+    # si no hay camino. Puede diferir de grafo.ruta_mas_corta (menos saltos, no metros).
+    def ruta_mas_corta_metros(self, origen, destino):
+        self.coordenada(origen)
+        self.coordenada(destino)
+        if origen == destino:
+            return [origen], 0.0
+        mejores = {origen: 0.0}
+        padres = {origen: None}
+        orden = {lugar: i for i, lugar in enumerate(self._coordenadas)}
+        cola = [(0.0, orden[origen], origen)]
+        hechos = set()
+
+        while cola:
+            costo, _, actual = heapq.heappop(cola)
+            if actual in hechos:
+                continue
+            hechos.add(actual)
+            if actual == destino:
+                break
+            for vecino in self._grafo.vecinos(actual):
+                if vecino not in orden:
+                    continue  # lugar sin coordenadas: no transitable
+                nuevo = costo + self.distancia_entre(actual, vecino)
+                if vecino not in mejores or nuevo < mejores[vecino]:
+                    mejores[vecino] = nuevo
+                    padres[vecino] = actual
+                    heapq.heappush(cola, (nuevo, orden[vecino], vecino))
+
+        if destino not in hechos:
+            return [], None
+        ruta = []
+        lugar = destino
+        while lugar is not None:
+            ruta.append(lugar)
+            lugar = padres[lugar]
+        ruta.reverse()
+        return ruta, mejores[destino]
+
+    # Pares de lugares con exactamente la misma coordenada.
+    def lugares_superpuestos(self):
+        nombres = list(self._coordenadas)
+        return [(a, b) for i, a in enumerate(nombres) for b in nombres[i + 1:]
+                if self._coordenadas[a] == self._coordenadas[b]]
+
+    # Revisa invariantes del mapa; lista de problemas (vacía = mapa sano): grafo no
+    # conexo (lugares inalcanzables), lugares superpuestos y calles que se cruzan.
+    def validar(self):
+        problemas = []
+        sin_coord = [l for l in self._grafo.lugares() if l not in self._coordenadas]
+        if sin_coord:
+            problemas.append(f"lugares sin coordenadas: {sin_coord}")
+        componentes = self._grafo.componentes_conexas()
+        if len(componentes) > 1:
+            problemas.append(f"el grafo no es conexo: {len(componentes)} componentes")
+        for a, b in self.lugares_superpuestos():
+            problemas.append(f"{a!r} y {b!r} tienen la misma coordenada")
+        if self.segmentos_se_cruzan():
+            problemas.append("hay calles que se cruzan")
+        return problemas
 
     def __repr__(self):
         return f"MapaCiudad(lugares={len(self._coordenadas)}, calles={len(self.segmentos())})"

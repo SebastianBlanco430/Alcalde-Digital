@@ -75,39 +75,134 @@ class ArbolNoticias:
 
     def recorrido_inorden(self):
         resultado = []
-
-        def visitar(nodo):
-            if nodo is None:
-                return
-            visitar(nodo.izquierda)
-            resultado.append(nodo)
-            visitar(nodo.derecha)
-
-        visitar(self.raiz)
+        pila = []
+        actual = self.raiz
+        while pila or actual is not None:
+            while actual is not None:
+                pila.append(actual)
+                actual = actual.izquierda
+            actual = pila.pop()
+            resultado.append(actual)
+            actual = actual.derecha
         return resultado
 
     def recorrido_preorden(self):
         resultado = []
-
-        def visitar(nodo):
-            if nodo is None:
-                return
+        pila = [self.raiz] if self.raiz is not None else []
+        while pila:
+            nodo = pila.pop()
             resultado.append(nodo)
-            visitar(nodo.izquierda)
-            visitar(nodo.derecha)
-
-        visitar(self.raiz)
+            if nodo.derecha is not None:
+                pila.append(nodo.derecha)
+            if nodo.izquierda is not None:
+                pila.append(nodo.izquierda)
         return resultado
 
     def recorrido_postorden(self):
+        # preorden espejo (raíz, derecha, izquierda) invertido
         resultado = []
-
-        def visitar(nodo):
-            if nodo is None:
-                return
-            visitar(nodo.izquierda)
-            visitar(nodo.derecha)
+        pila = [self.raiz] if self.raiz is not None else []
+        while pila:
+            nodo = pila.pop()
             resultado.append(nodo)
-
-        visitar(self.raiz)
+            if nodo.izquierda is not None:
+                pila.append(nodo.izquierda)
+            if nodo.derecha is not None:
+                pila.append(nodo.derecha)
+        resultado.reverse()
         return resultado
+
+    # --- Utilidades añadidas (iterativas: no fallan con árboles degenerados) ---
+
+    def esta_vacio(self):
+        return self.raiz is None
+
+    def tamano(self):
+        return len(self.recorrido_por_niveles())
+
+    # Altura en nodos: 0 si está vacío, 1 con solo la raíz.
+    def altura(self):
+        return len(self.nodos_por_nivel())
+
+    # Lista de listas: nodos de cada nivel (raíz = nivel 0), de izquierda a derecha.
+    def nodos_por_nivel(self):
+        niveles = []
+        nivel = [self.raiz] if self.raiz is not None else []
+        while nivel:
+            niveles.append(nivel)
+            siguiente = []
+            for nodo in nivel:
+                if nodo.izquierda is not None:
+                    siguiente.append(nodo.izquierda)
+                if nodo.derecha is not None:
+                    siguiente.append(nodo.derecha)
+            nivel = siguiente
+        return niveles
+
+    # Recorrido en anchura (BFS), nivel por nivel.
+    def recorrido_por_niveles(self):
+        return [nodo for nivel in self.nodos_por_nivel() for nodo in nivel]
+
+    # Menor/mayor nodo según la clave de orden del árbol; None si está vacío.
+    def minimo(self):
+        actual = self.raiz
+        while actual is not None and actual.izquierda is not None:
+            actual = actual.izquierda
+        return actual
+
+    def maximo(self):
+        actual = self.raiz
+        while actual is not None and actual.derecha is not None:
+            actual = actual.derecha
+        return actual
+
+    # Forma del árbol como tupla anidada (izquierda, derecha) o None; sirve para
+    # comparar isomorfismo sin mirar los datos de los nodos.
+    def forma(self):
+        if self.raiz is None:
+            return None
+        formas = {}
+        pila = [(self.raiz, False)]
+        while pila:
+            nodo, listo = pila.pop()
+            if listo:
+                formas[id(nodo)] = (
+                    formas.get(id(nodo.izquierda)),
+                    formas.get(id(nodo.derecha)),
+                )
+            else:
+                pila.append((nodo, True))
+                for hijo in (nodo.derecha, nodo.izquierda):
+                    if hijo is not None:
+                        pila.append((hijo, False))
+        return formas[id(self.raiz)]
+
+    def contiene(self, id):
+        return self.buscar(id) is not None
+
+    # Profundidad de un nodo (raíz = 0); None si el id no existe.
+    def profundidad(self, id):
+        nodo, camino = self.buscar_con_camino(id)
+        return len(camino) if nodo is not None else None
+
+    # Noticias con desde <= id <= hasta, en orden ascendente (poda el ABB).
+    def rango(self, desde, hasta):
+        resultado = []
+        pila = []
+        actual = self.raiz
+        while pila or actual is not None:
+            while actual is not None:
+                pila.append(actual)
+                actual = actual.izquierda if actual.id >= desde else None
+            actual = pila.pop()
+            if actual.id > hasta:
+                break
+            if actual.id >= desde:
+                resultado.append(actual)
+            actual = actual.derecha
+        return resultado
+
+    # Ids repetidos o fuera de orden en el ABB (invariante de ordenación); True si es válido.
+    def es_abb_valido(self):
+        ids = [n.id for n in self.recorrido_inorden()]
+        return all(a < b for a, b in zip(ids, ids[1:]))

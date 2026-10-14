@@ -23,6 +23,7 @@ class FlujoPartida:
     def __init__(self, sesion, sistema_misiones):
         self._sesion = sesion
         self._sistema = sistema_misiones
+        self._sincronizar_roles()
 
     # Sesión que coordina (solo lectura): las vistas la usan para detectar partida nueva.
     @property
@@ -33,6 +34,7 @@ class FlujoPartida:
 
     # Asigna misión al jugador activo. ValueError si la sesión no tiene jugadores.
     def iniciar(self):
+        self._sincronizar_roles()
         if self._sesion.jugador_activo() is None:
             raise ValueError("No hay jugadores: no se puede iniciar la partida.")
         return self._dar_turno(pasar_antes=False)
@@ -56,6 +58,7 @@ class FlujoPartida:
 
     # True si no hay misión activa y a ningún jugador le quedan misiones.
     def partida_terminada(self):
+        self._sincronizar_roles()
         if self.hay_mision_activa():
             return False
         return not any(
@@ -67,6 +70,8 @@ class FlujoPartida:
     # Guarda la posición en el jugador activo (fuente de verdad) y delega.
     def actualizar_posicion(self, x, z):
         jugador = self._sesion.jugador_activo()
+        if jugador is None:
+            raise ValueError("No hay jugadores: no se puede actualizar la posición.")
         jugador.x = x
         jugador.z = z
         self._sistema.actualizar_posicion(x, z)
@@ -100,6 +105,7 @@ class FlujoPartida:
     # misión, o None si a nadie le queda una (entonces, con `pasar_antes`, el turno
     # avanza una vez y el activo es el siguiente jugador).
     def _dar_turno(self, pasar_antes):
+        self._sincronizar_roles()
         jugadores = self._sesion.jugadores()
         if not any(self._sistema.hay_misiones_pendientes(j.rol) for j in jugadores):
             if pasar_antes:
@@ -118,6 +124,11 @@ class FlujoPartida:
                 return mision
             self._avisar_sin_misiones(activo)
         return None   # inalcanzable: alguien tenía misión pendiente
+
+    # Informa al sistema de misiones qué roles juegan (los jugadores pueden cambiar si se
+    # carga otra partida); así las misiones de roles ausentes se reparten entre los presentes.
+    def _sincronizar_roles(self):
+        self._sistema.fijar_roles_en_juego(j.rol for j in self._sesion.jugadores())
 
     # No repite el aviso si el último mensaje del teléfono ya es ese.
     def _avisar_sin_misiones(self, jugador):

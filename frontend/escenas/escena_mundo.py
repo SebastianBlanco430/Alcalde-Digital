@@ -29,13 +29,14 @@
 
 import math
 
-from ursina import application, camera, destroy, mouse, scene, time
+from ursina import application, camera, mouse, scene, time
 
 from backend.logica import navegacion
 from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 from backend.logica.roles import ROLES
 from frontend import camara_calculos as cc
 from frontend import geometria_mundo, poses
+from frontend.componentes import destruir_arbol
 from frontend import guion_cinematicas as guion
 from frontend.camara_tercera_persona import CamaraTerceraPersona
 from frontend.cinematica import ease_in_out, lerp, lerp_angulo, lerp_vec3
@@ -195,7 +196,7 @@ class EscenaMundo(Escena):
 
     def _reconstruir_personajes(self):
         for avatar in self.avatares.values():
-            destroy(avatar)
+            destruir_arbol(avatar)
         self.avatares = {}
         for jugador in self._sesion.jugadores():
             self.avatares[jugador.nombre] = Personaje(jugador.nombre, ROLES[jugador.rol].color, parent=self)

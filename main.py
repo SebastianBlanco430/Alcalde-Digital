@@ -3,7 +3,11 @@
 
 from pathlib import Path
 
-from panda3d.core import ClockObject, WindowProperties
+import ursina as ursina_paquete
+
+from panda3d.core import ClockObject, WindowProperties, loadPrcFileData
+# Ursina trae un PNG con perfil iCCP antiguo: libpng avisa en cada arranque (inofensivo).
+loadPrcFileData("", "notify-level-pnmimage error")
 from ursina import Entity, Ursina, application, window
 
 from backend.datos.misiones_semilla import CATALOGO_MISIONES
@@ -116,7 +120,10 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     # development_mode=False oculta el panel de desarrollo, pero en Ursina 8.3.0
     # activaría fullscreen por defecto, así que se pide ventana explícita.
     compat_macos.aplicar()
-    aplicacion = Ursina(title="Alcalde Digital", borderless=False, fullscreen=False,
+    # El icono por defecto ('textures/ursina.ico') es relativo y Panda no lo encuentra (un error por
+    # cada cambio de propiedades de la ventana): se pasa la ruta absoluta del que trae Ursina.
+    icono = Path(ursina_paquete.__file__).resolve().parent / "textures" / "ursina.ico"
+    aplicacion = Ursina(title="Alcalde Digital", icon=icono.as_posix(), borderless=False, fullscreen=False,
                         development_mode=False, size=TAMANO_VENTANA)
     compat_macos.reaplicar()
     limitar_fps(FPS_MAXIMOS)

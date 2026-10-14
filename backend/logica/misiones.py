@@ -14,6 +14,7 @@
 # Mundo 3D: `punto_interaccion(lugar) -> (x, z)` es opcional; si se da, "llegar" se mide
 # contra él (la PUERTA del edificio) en vez de contra el centro de la plaza.
 
+import copy
 import math
 from dataclasses import dataclass
 
@@ -60,6 +61,14 @@ class SistemaMisiones:
         self._mision = None
         self._completadas = []
         self._resultado = None
+        self._roles_en_juego = None
+
+    # Roles de los jugadores en juego (iterable) o None = desconocidos. Con roles conocidos,
+    # las misiones de roles que NADIE juega (p. ej. influencer con 2 jugadores) pasan a ser
+    # asignables a cualquiera, después de las propias y las genéricas; así la partida no
+    # termina antes de tiempo ni deja misiones inalcanzables.
+    def fijar_roles_en_juego(self, roles):
+        self._roles_en_juego = None if roles is None else frozenset(roles)
 
     # -- Consulta --
 
@@ -90,8 +99,8 @@ class SistemaMisiones:
 
     # -- Transiciones --
 
-    # Primera misión no completada del rol; si no hay, la primera genérica; si
-    # tampoco, None (queda SIN_MISION). ValueError si ya hay una misión activa.
+    # Primera misión no completada del rol; si no hay, la primera genérica; si no, la primera
+    # de un rol que nadie juega (ver fijar_roles_en_juego); si tampoco, None (queda SIN_MISION). ValueError si ya hay una misión activa.
     def asignar(self, jugador):
         if self._estado != SIN_MISION:
             raise ValueError(
@@ -135,7 +144,7 @@ class SistemaMisiones:
     # Guarda el resultado, registra la misión como completada y la devuelve.
     def completar(self, resultado):
         self._exigir(EN_MINIJUEGO, "completar la misión")
-        self._resultado = resultado
+        self._resultado = copy.deepcopy(resultado)
         self._completadas.append(self._mision.id)
         self._estado = COMPLETADA
         return self._mision
@@ -154,7 +163,7 @@ class SistemaMisiones:
             "estado": self._estado,
             "mision_actual": self._mision.id if self._mision is not None else None,
             "completadas": list(self._completadas),
-            "resultado": self._resultado,
+            "resultado": copy.deepcopy(self._resultado),
             "radio_interaccion": self.radio_interaccion,
             "histeresis": self.histeresis,
         }
@@ -180,7 +189,7 @@ class SistemaMisiones:
         sistema._estado = estado
         sistema._mision = por_id[id_actual] if id_actual is not None else None
         sistema._completadas = list(datos["completadas"])
-        sistema._resultado = datos["resultado"]
+        sistema._resultado = copy.deepcopy(datos["resultado"])
         return sistema
 
     # -- Internos --
@@ -198,4 +207,9 @@ class SistemaMisiones:
         for mision in self._catalogo:
             if mision.rol is None and mision.id not in self._completadas:
                 return mision
+        if self._roles_en_juego is not None:
+            for mision in self._catalogo:
+                if (mision.rol is not None and mision.rol not in self._roles_en_juego
+                        and mision.id not in self._completadas):
+                    return mision
         return None

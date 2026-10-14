@@ -15,7 +15,7 @@
 
 import math
 
-from ursina import Entity, Text, camera, color, destroy, scene, time
+from ursina import Entity, Text, camera, color, scene, time
 from ursina.lights import AmbientLight, DirectionalLight
 from ursina.shaders import lit_with_shadows_shader
 
@@ -24,7 +24,7 @@ from frontend import camara_calculos as cc
 from frontend import guion_cinematicas as guion
 from frontend import poses
 from frontend.cinematica import ease_in_out, lerp, lerp_angulo, lerp_vec3
-from frontend.componentes import rgb
+from frontend.componentes import destruir_arbol, rgb
 from frontend.director_cinematica import DirectorCinematica
 from frontend.escenas.escena_base import Escena
 from frontend.personaje import Personaje
@@ -202,7 +202,7 @@ class EscenaInterior(Escena):
         tema = tema_de(lugar)
         self.lugar = lugar
         for e in self._tematico:
-            destroy(e)
+            destruir_arbol(e)
         self._tematico = []
         for pared in self._paredes:
             pared.color = rgb(tema.pared)
@@ -340,7 +340,7 @@ class EscenaInterior(Escena):
 
     def _crear_personaje(self, jugador):
         if self.personaje is not None:
-            destroy(self.personaje)
+            destruir_arbol(self.personaje)
         self.personaje = Personaje(jugador.nombre, ROLES[jugador.rol].color, parent=self)
         self.personaje.automatico = False
         self.personaje.etiqueta.enabled = False

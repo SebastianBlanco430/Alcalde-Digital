@@ -89,5 +89,7 @@ def avanzar_pivote(actual, objetivo, dt, rapidez, vmax=None):
 # hasta 2 m, `lejos` (viajar de un jugador a otro) desde 10 m y una transición suave (smoothstep)
 # entre ambas. Al ser continua en la distancia, la cámara no cambia de golpe de "viajar" a "seguir".
 def rapidez_de_seguimiento(distancia, cerca, lejos, d0=2.0, d1=10.0):
+    if d1 <= d0:
+        return lejos if distancia >= d1 else cerca
     t = min(1.0, max(0.0, (distancia - d0) / (d1 - d0)))
     return cerca + (lejos - cerca) * t * t * (3 - 2 * t)

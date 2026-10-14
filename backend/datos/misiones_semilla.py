@@ -1,6 +1,8 @@
 # Catálogo semilla de misiones (datos puros). Tono: notificación de Civitas.
 # Cada rol tiene al menos una misión cuyo destino NO es su lugar de inicio
 # (si no, el jugador ya estaría "llegado" al aparecer). rol=None = genérica.
+# Las misiones de roles que nadie juega las reparte SistemaMisiones entre los presentes,
+# por eso los textos son neutros (no hablan en segunda persona del rol).
 
 from backend.logica.misiones import Mision
 
@@ -15,11 +17,11 @@ CATALOGO_MISIONES = (
     ),
     Mision(
         "influencer_parque", "influencer", "Publicación viral",
-        "Civitas: tu publicación se mueve en el Parque Municipal. Pásate.", "Parque Municipal",
+        "Civitas: una publicación se mueve en el Parque Municipal. Pásate.", "Parque Municipal",
     ),
     Mision(
         "candidato_barrio", "candidato", "Voces del barrio",
-        "Civitas: vecinos de Barrio Las Flores quieren escucharte.", "Barrio Las Flores",
+        "Civitas: los vecinos de Barrio Las Flores quieren ser escuchados.", "Barrio Las Flores",
     ),
     Mision(
         "generica_hospital", None, "Alerta sanitaria",

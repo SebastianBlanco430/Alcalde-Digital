@@ -26,6 +26,7 @@
 
 from backend.arboles.arbol_noticias import ArbolNoticias
 from backend.arboles.arbol_stats import ArbolStats
+from backend.arboles.isomorfismo import validar_isomorfismo
 
 
 # Cada entrada: (id, gravedad, texto, veracidad, deltas_compartir, deltas_reportar)
@@ -103,4 +104,38 @@ def construir_arboles():
             deltas_reportar=deltas_reportar,
         )
 
+    # Falla al arrancar si los datos semilla desincronizan los dos árboles.
+    problemas = validar_isomorfismo(arbol_noticias, arbol_stats)
+    if problemas:
+        raise ValueError("Árboles de noticias no isomorfos: " + "; ".join(problemas))
+
     return arbol_noticias, arbol_stats
+
+
+# Revisa NOTICIAS_SEMILLA (o el catálogo recibido) y devuelve la lista de problemas
+# (vacía = datos sanos): ids/gravedades repetidos, gravedad que no sigue el orden de
+# id (rompería el isomorfismo), deltas fuera de [-15, +15] o con claves distintas.
+def validar_noticias_semilla(noticias=None):
+    noticias = NOTICIAS_SEMILLA if noticias is None else noticias
+    problemas = []
+    claves = {"convivencia", "confianza", "desinformacion"}
+
+    ids = [n[0] for n in noticias]
+    gravedades = [n[1] for n in noticias]
+    if len(set(ids)) != len(ids):
+        problemas.append("hay ids de noticia repetidos")
+    if len(set(gravedades)) != len(gravedades):
+        problemas.append("hay gravedades repetidas")
+
+    por_id = sorted(noticias, key=lambda n: n[0])
+    if [n[1] for n in por_id] != sorted(gravedades):
+        problemas.append("el orden de gravedad no coincide con el orden de id")
+
+    for id_, _grav, _texto, _ver, compartir, reportar in noticias:
+        for nombre, deltas in (("compartir", compartir), ("reportar", reportar)):
+            if set(deltas) != claves:
+                problemas.append(f"noticia {id_}: deltas de {nombre} con claves inválidas")
+            elif any(not -15 <= v <= 15 for v in deltas.values()):
+                problemas.append(f"noticia {id_}: deltas de {nombre} fuera de [-15, 15]")
+
+    return problemas

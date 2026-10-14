@@ -47,34 +47,60 @@ def mover_con_colisiones(mapa, x, z, dx, dz):
 # Lugares que faltan por recorrer, desde la siguiente esquina hasta el destino
 # ([] si el jugador ya está en la plaza del destino o no hay camino).
 #  - En la plaza de L: ruta_mas_corta(L, destino) sin L.
-#  - En una calle (a, b): se elige el extremo con menos saltos hacia el destino
-#    (empate: el más cercano en línea recta; luego el primero) y ese extremo es
+#  - En una calle (a, b): se elige el extremo con menos metros totales (tramo hasta
+#    el extremo + ruta hacia el destino; empate: el más cercano en línea recta; luego el primero) y ese extremo es
 #    la siguiente esquina, incluido en la lista.
 #  - Fuera de la zona transitable: se trata como si estuviera en la plaza del
 #    lugar más cercano.
 # ValueError si el destino no existe.
 def calcular_ruta_gps(mapa, x, z, destino):
-    grafo = mapa.grafo
     lugar = mapa.lugar_en_plaza(x, z)
     if lugar is None:
         calle = mapa.calle_en(x, z)
         if calle is None:
             lugar = mapa.lugar_mas_cercano(x, z)
+            if lugar is None:
+                return []
         else:
             return _ruta_desde_calle(mapa, x, z, calle, destino)
-    return grafo.ruta_mas_corta(lugar, destino)[1:]
+    return _ruta_entre(mapa, lugar, destino)[1:]
+
+
+# Ruta [origen, ..., destino] por metros reales (Dijkstra) si el mapa la ofrece; si no
+# hay camino o el mapa no tiene ruta_mas_corta_metros, usa BFS por saltos del grafo.
+# [] si no hay camino. ValueError si algún lugar no existe.
+def _ruta_entre(mapa, origen, destino):
+    metros = getattr(mapa, "ruta_mas_corta_metros", None)
+    if metros is not None:
+        ruta, _ = metros(origen, destino)
+        if ruta:
+            return ruta
+    return mapa.grafo.ruta_mas_corta(origen, destino)
+
+
+def _metros_ruta(mapa, ruta):
+    return sum(
+        math.hypot(bx - ax, bz - az)
+        for (ax, az), (bx, bz) in zip(map(mapa.coordenada, ruta), map(mapa.coordenada, ruta[1:]))
+    )
 
 
 def _ruta_desde_calle(mapa, x, z, calle, destino):
-    grafo = mapa.grafo
     mejor_ruta = None
     mejor_clave = None
     for extremo in calle:
-        ruta = grafo.ruta_mas_corta(extremo, destino)
+        ruta = _ruta_entre(mapa, extremo, destino)
         if not ruta:
             continue  # sin camino desde ese extremo
         cx, cz = mapa.coordenada(extremo)
-        clave = (len(ruta), math.hypot(x - cx, z - cz))
+        recta = math.hypot(x - cx, z - cz)
+        # Coste real: tramo hasta el extremo + metros de la ruta que se seguirá desde él.
+        # Sin ruta_mas_corta_metros en el mapa se usan los saltos (comportamiento previo).
+        if hasattr(mapa, "ruta_mas_corta_metros"):
+            costo = recta + _metros_ruta(mapa, ruta)
+        else:
+            costo = len(ruta)
+        clave = (costo, recta)
         if mejor_clave is None or clave < mejor_clave:
             mejor_ruta, mejor_clave = ruta, clave
     return mejor_ruta if mejor_ruta is not None else []
@@ -116,7 +142,9 @@ def siguiente_esquina(mapa, x, z, destino):
 # norte (+z) arriba y +x a la derecha.
 def a_minimapa(x, z, limites, centro, tamano, yaw_grados=0):
     xmin, xmax, zmin, zmax = limites
-    escala = min(tamano[0] / (xmax - xmin), tamano[1] / (zmax - zmin))
+    # límites degenerados (ancho o alto 0): sin división por cero, se ignora ese eje
+    razones = [t / d for t, d in ((tamano[0], xmax - xmin), (tamano[1], zmax - zmin)) if d > 0]
+    escala = min(razones) if razones else 1.0
     dx = x - (xmin + xmax) / 2
     dz = z - (zmin + zmax) / 2
     if yaw_grados:

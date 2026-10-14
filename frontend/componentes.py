@@ -17,6 +17,14 @@ from frontend.texto import envolver_texto
 ALTO_REFERENCIA_PX = 600
 
 
+# destroy() de Ursina 8.3 no recorre los hijos: quitaba el nodo de Panda3D pero dejaba a los
+# descendientes en scene.entities (fuga que crecía en cada ciclo). Esto los destruye primero.
+def destruir_arbol(entidad):
+    for hijo in list(entidad.children):
+        destruir_arbol(hijo)
+    destroy(entidad)
+
+
 # Tupla RGB 0-255 de `estilo` a Color de Ursina.
 def rgb(tupla):
     return color.rgb32(*tupla)

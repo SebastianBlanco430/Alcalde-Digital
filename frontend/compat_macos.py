@@ -11,6 +11,8 @@ import sys
 from ursina import Entity, window
 from ursina.shader import Shader
 
+# Arreglos uniform con tamaño fijo en los shaders de Ursina (lit_with_shadows: 1 luz).
+_LARGOS = {"p3d_LightSource": "1"}
 _RE_SALIDA_FRAGMENTO = re.compile(r"^\s*out\s+vec4\s+(\w+)\s*;\s*$", re.M)
 
 
@@ -18,17 +20,20 @@ def _a_glsl_120(vertex, fragment):
     # Devuelve (vertex, fragment) en GLSL 1.20; si ya están en 1.20 no cambia nada.
     if "#version 120" in vertex:
         return vertex, fragment
-    vertex = re.sub(r"#version\s+1[34]0", "#version 120", vertex)
+    vertex = re.sub(r"#version\s+1[345]0", "#version 120", vertex)
     vertex = re.sub(r"^(\s*)in\s+", r"\1attribute ", vertex, flags=re.M)
     vertex = re.sub(r"^(\s*)out\s+", r"\1varying ", vertex, flags=re.M)
 
-    fragment = re.sub(r"#version\s+1[34]0", "#version 120", fragment)
+    fragment = re.sub(r"#version\s+1[345]0", "#version 120", fragment)
     salida = _RE_SALIDA_FRAGMENTO.search(fragment)
     if salida:
         fragment = _RE_SALIDA_FRAGMENTO.sub("", fragment)
-        fragment = re.sub(rf"\b{salida.group(1)}\b(?=\s*[.=])", "gl_FragColor", fragment)
+        fragment = re.sub(rf"\b{salida.group(1)}\b", "gl_FragColor", fragment)
     fragment = re.sub(r"^(\s*)in\s+", r"\1varying ", fragment, flags=re.M)
     fragment = re.sub(r"\btexture\(", "texture2D(", fragment)
+    # GLSL 1.20 no tiene .length() en arreglos ni textureProj con sampler2DShadow.
+    fragment = re.sub(r"\b(\w+)\.length\(\)", lambda m: _LARGOS.get(m.group(1), m.group(0)), fragment)
+    fragment = re.sub(r"\btextureProj\(([^;]*)\);", r"shadow2DProj(\1).r;", fragment)
     return vertex, fragment
 
 

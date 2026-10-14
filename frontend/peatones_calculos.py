@@ -41,6 +41,9 @@ class Caminante:
             return
         if self._destino is None:
             self._elegir_destino()
+            if self._destino is None:             # lugar aislado: se queda quieto
+                self._espera = PAUSA_MAX
+                return
         tx, tz = self._objetivo()
         dx, dz = tx - self.x, tz - self.z
         distancia = math.hypot(dx, dz)
@@ -57,6 +60,8 @@ class Caminante:
 
     def _elegir_destino(self):
         vecinos = sorted(self._mundo.grafo.vecinos(self._origen))
+        if not vecinos:
+            return
         opciones = [v for v in vecinos if v != self._anterior] or vecinos
         self._destino = self._azar.choice(opciones)
 
@@ -64,7 +69,7 @@ class Caminante:
     def _objetivo(self):
         ax, az = self._mundo.coordenada(self._origen)
         bx, bz = self._mundo.coordenada(self._destino)
-        largo = math.hypot(bx - ax, bz - az)
+        largo = math.hypot(bx - ax, bz - az) or 1.0
         nx, nz = -(bz - az) / largo, (bx - ax) / largo
         return (bx + nx * self.desvio, bz + nz * self.desvio)
 

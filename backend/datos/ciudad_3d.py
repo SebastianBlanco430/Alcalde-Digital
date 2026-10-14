@@ -161,6 +161,8 @@ def _farolas(mapa, despeje):
     for a, b in mapa.segmentos():
         (ax, az), (bx, bz) = mapa.coordenada(a), mapa.coordenada(b)
         largo = math.dist((ax, az), (bx, bz))
+        if largo < 1e-9:
+            continue  # lugares superpuestos: calle sin dirección, sin farolas
         ux, uz = (bx - ax) / largo, (bz - az) / largo
         lado = 1
         s = margen

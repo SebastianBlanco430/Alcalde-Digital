@@ -131,3 +131,57 @@ def texto_resultado(propagacion, total_ciudadanos, t):
     if propagacion["accion"] == "reportar":
         return "Reporte: la publicación se frenó (alcance 0)"
     return f"Alcanzó a {alcanzados_hasta(propagacion, t)} de {total_ciudadanos} ciudadanos"
+
+
+# Resumen compacto de `resumen_red_social` (backend): dos líneas, % de la red alcanzada y
+# alcance por salto. Sin resumen o sin saltos -> "". No recalcula nada.
+MAX_SALTOS_MOSTRADOS = 4
+
+
+def texto_alcance_red(resumen):
+    if not resumen or not resumen.get("alcance_por_salto"):
+        return ""
+    saltos = resumen["alcance_por_salto"]
+    porcentaje = round(resumen["fraccion_alcanzada"] * 100)
+    partes = [f"S{s['salto']} +{s['nuevos']}" for s in saltos[:MAX_SALTOS_MOSTRADOS]]
+    if len(saltos) > MAX_SALTOS_MOSTRADOS:
+        partes.append("…")
+    return f"Red alcanzada: {porcentaje}%\n" + "  ".join(partes)
+
+
+# -- Ciudadanos influyentes y comunidades aisladas ------------------------------
+
+INFLUYENTES_MOSTRADOS = 3     # cuántos ciudadanos se destacan en el panel
+MAX_NOMBRES_AISLADOS = 2      # nombres que caben en la línea de aislados ("+N" el resto)
+
+
+# {ciudadano: grado} de los `n` más influyentes. Un grado 0 no influye: no se destaca.
+def influyentes(grafo_social, n=INFLUYENTES_MOSTRADOS):
+    return {c: g for c, g in grafo_social.ciudadanos_influyentes(n) if g > 0}
+
+
+# Ciudadanos (en orden del grafo) que una publicación desde `origen` jamás alcanzaría
+# por estar en otra comunidad. Origen desconocido -> vacío (no rompe el panel).
+def aislados(grafo_social, origen):
+    try:
+        fuera = set(grafo_social.inalcanzables_desde(origen))
+    except ValueError:
+        return []
+    return [c for c in grafo_social.ciudadanos() if c in fuera]
+
+
+# Diámetro del nodo: crece con el grado entre `base` y `base * factor_max` (el de mayor
+# grado). Con grado máximo 0 todos miden `base`.
+def diametro_nodo(grado, grado_maximo, base, factor_max=1.35):
+    if grado_maximo <= 0:
+        return base
+    return base * (1 + (factor_max - 1) * min(grado, grado_maximo) / grado_maximo)
+
+
+# Línea bajo el grafo con los ciudadanos que la publicación no alcanza ("" si no hay).
+def texto_aislados(nombres):
+    if not nombres:
+        return ""
+    visibles = ", ".join(nombres[:MAX_NOMBRES_AISLADOS])
+    resto = len(nombres) - MAX_NOMBRES_AISLADOS
+    return f"Sin alcance: {visibles}" + (f" +{resto}" if resto > 0 else "")

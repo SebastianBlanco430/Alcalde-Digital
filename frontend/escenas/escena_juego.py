@@ -149,6 +149,7 @@ class EscenaJuego(Escena):
         self.grafo_social = grafo_social
         if grafo_social is not None:
             self.panel_propagacion.fijar_grafo(grafo_social)
+            self.panel_propagacion.fijar_rol(self._rol_id())
         if mision is not None:
             self.lote = LoteMision(mision, grafo_social, rol=self._rol_id())
         self.refrescar()

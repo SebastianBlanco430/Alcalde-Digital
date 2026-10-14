@@ -12,11 +12,12 @@
 # malla propia) y Text interpreta "<...>" como etiquetas (por eso _seguro()).
 
 from panda3d.core import TextNode
-from ursina import Entity, Mesh, Text, camera, color, destroy, window
+from ursina import Entity, Mesh, Text, camera, color, window
 
 from backend.logica.roles import ROLES
 from frontend import estilo, hud_calculos
-from frontend.componentes import BotonAccion, a_unidades, escala_fuente, modelo_redondeado, rgb
+from frontend.componentes import (
+    BotonAccion, a_unidades, destruir_arbol, escala_fuente, modelo_redondeado, rgb)
 from frontend.texto import envolver_texto
 
 MARGEN = 0.02                       # separación de los bordes de la pantalla
@@ -183,7 +184,8 @@ class TelefonoUI(Entity):
             self._firma_banner = vista.texto_notificacion
             self._armar_banner(vista.texto_notificacion)
         visible = vista.modo == hud_calculos.MODO_NOTIFICACION or self.nivel_banner > 0
-        self.banner.enabled = visible and bool(vista.texto_notificacion)
+        self.banner.enabled = (visible and bool(vista.texto_notificacion)
+                               and vista.modo != hud_calculos.MODO_ABIERTO)
         y_visible = self.y_inferior + self._alto_banner / 2
         y_oculto = -0.5 - self._alto_banner / 2 - MARGEN
         self.banner.position = (self.x_derecho - self.ANCHO_ICONO - 0.012 - self.ANCHO_BANNER / 2,
@@ -191,7 +193,7 @@ class TelefonoUI(Entity):
 
     def _armar_banner(self, texto):
         for hijo in list(self.banner.children):
-            destroy(hijo)
+            destruir_arbol(hijo)
         relleno = 0.012
         titulo = Text(hud_calculos.ENCABEZADO_TELEFONO, parent=self.banner, origin=(-0.5, 0.5),
                       scale=escala_fuente(15), color=rgb(estilo.COLOR_TEXTO_TENUE))
@@ -213,7 +215,7 @@ class TelefonoUI(Entity):
             return
         self._firma_panel = vista
         for hijo in list(self.panel.children):
-            destroy(hijo)
+            destruir_arbol(hijo)
         ancho, alto = self.ANCHO_PANEL, self.ALTO_PANEL
         relleno = 0.016
         izquierda, ancho_texto = -ancho / 2 + relleno, ancho - 2 * relleno
@@ -251,7 +253,7 @@ class TelefonoUI(Entity):
                 (izquierda + 0.008, y - 0.007, -0.002))
             alto_fila = alto_texto + 0.014
             if y - alto_fila < limite_inferior:   # no cabe: se omiten los más antiguos
-                destroy(cuerpo)
+                destruir_arbol(cuerpo)
                 break
             tono = COLOR_RESALTADO if fila.resaltado else estilo.COLOR_TARJETA
             _fondo(self.panel, ancho_texto, alto_fila, rgb(tono), 6,

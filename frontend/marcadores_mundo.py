@@ -4,7 +4,7 @@
 
 import math
 
-from ursina import Entity, color, time
+from ursina import Entity, color, destroy, time
 
 from frontend import geometria_mundo
 from frontend.componentes import rgb
@@ -14,6 +14,7 @@ COLOR_RUTA = (70, 220, 255)
 COLOR_BALIZA = (255, 220, 60)
 Y_RUTA = 0.24             # por encima de aceras (0.20) y plazas (0.14)
 ANCHO_RUTA = 0.7
+HOLGURA_POOL = 6          # piezas sobrantes que se conservan para rutas futuras
 
 
 # Rombo amarillo que flota y gira sobre la puerta, más un rayo de luz tenue que se ve de lejos.
@@ -75,6 +76,15 @@ class RutaPiso(Entity):
             disco.enabled = True
         for disco in self.juntas[len(puntos):]:
             disco.enabled = False
+        self._recortar(self.segmentos, len(pares))
+        self._recortar(self.juntas, len(puntos))
+
+    # Libera las piezas que sobran (más de HOLGURA_POOL sin usar) para que el pool no crezca sin tope.
+    @staticmethod
+    def _recortar(pool, usadas):
+        tope = usadas + HOLGURA_POOL
+        while len(pool) > tope:
+            destroy(pool.pop())
 
     def segmentos_visibles(self):
         return [s for s in self.segmentos if s.enabled]

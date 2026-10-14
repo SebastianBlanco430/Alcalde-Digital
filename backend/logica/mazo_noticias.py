@@ -16,6 +16,7 @@ class MazoNoticias:
             nodo.id for nodo in arbol_noticias.recorrido_inorden()
         ]
         self.ids_vistos = set()
+        self._ultimo_id = None
 
     # True si quedan ids sin ver en la ronda actual.
     def hay_pendientes(self):
@@ -35,9 +36,13 @@ class MazoNoticias:
         pendientes = [
             id_ for id_ in self.ids_disponibles if id_ not in self.ids_vistos
         ]
+        # Al empezar ronda nueva no repetir justo la última noticia de la anterior.
+        if len(pendientes) > 1 and self._ultimo_id in pendientes:
+            pendientes.remove(self._ultimo_id)
         id_elegido = random.choice(pendientes)
 
         nodo, camino = self.arbol_noticias.buscar_con_camino(id_elegido)
         self.ids_vistos.add(id_elegido)
+        self._ultimo_id = id_elegido
 
         return nodo, camino

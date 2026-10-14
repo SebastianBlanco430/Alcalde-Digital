@@ -74,17 +74,22 @@ class GrafoCiudad:
         if origen not in self._adyacencia:
             raise ValueError(f"Lugar inexistente en el grafo: {origen!r}")
 
-        visitados = set()
-        orden = []
+        # DFS iterativo (pila de iteradores): mismo orden que el recursivo, sin
+        # límite de recursión en grafos grandes.
+        visitados = {origen}
+        orden = [origen]
+        pila = [iter(self._adyacencia[origen])]
 
-        def visitar(lugar):
-            visitados.add(lugar)
-            orden.append(lugar)
-            for vecino in self._adyacencia[lugar]:
+        while pila:
+            for vecino in pila[-1]:
                 if vecino not in visitados:
-                    visitar(vecino)
+                    visitados.add(vecino)
+                    orden.append(vecino)
+                    pila.append(iter(self._adyacencia[vecino]))
+                    break
+            else:
+                pila.pop()
 
-        visitar(origen)
         return orden
 
     # BFS con padres; devuelve [origen, ..., destino], [origen] si son el mismo
@@ -114,6 +119,73 @@ class GrafoCiudad:
             lugar = padres[lugar]
         ruta.reverse()
         return ruta
+
+    # --- Utilidades añadidas ---
+
+    # Número de lugars directamente conectados; ValueError si no existe.
+    def grado(self, lugar):
+        return len(self.vecinos(lugar))
+
+    # {nombre: grado} de todos, en orden de inserción.
+    def grados(self):
+        return {n: len(v) for n, v in self._adyacencia.items()}
+
+    # Componentes conexas como listas de nombres; la más grande primero (en empate,
+    # la que contiene al primero insertado). Cada una en orden BFS.
+    def componentes_conexas(self):
+        vistos = set()
+        componentes = []
+        for inicio in self._adyacencia:
+            if inicio in vistos:
+                continue
+            componente = self.recorrido_bfs(inicio)
+            vistos.update(componente)
+            componentes.append(componente)
+        componentes.sort(key=len, reverse=True)  # sort estable
+        return componentes
+
+    # El grafo vacío se considera conexo.
+    def esta_conectado(self):
+        return len(self.componentes_conexas()) <= 1
+
+    # Saltos mínimos entre dos lugars; None si no hay camino. ValueError si no existen.
+    def distancia(self, origen, destino):
+        ruta = self.ruta_mas_corta(origen, destino)
+        return len(ruta) - 1 if ruta else None
+
+    # Puntos de articulación: quitarlos desconecta su componente (Tarjan iterativo).
+    def puntos_de_articulacion(self):
+        orden, bajo, padre = {}, {}, {}
+        criticos = set()
+        for raiz in self._adyacencia:
+            if raiz in orden:
+                continue
+            orden[raiz] = bajo[raiz] = len(orden)
+            padre[raiz] = None
+            hijos_raiz = 0
+            pila = [(raiz, iter(self._adyacencia[raiz]))]
+            while pila:
+                nodo, it = pila[-1]
+                for vecino in it:
+                    if vecino not in orden:
+                        padre[vecino] = nodo
+                        orden[vecino] = bajo[vecino] = len(orden)
+                        if nodo == raiz:
+                            hijos_raiz += 1
+                        pila.append((vecino, iter(self._adyacencia[vecino])))
+                        break
+                    elif vecino != padre[nodo]:
+                        bajo[nodo] = min(bajo[nodo], orden[vecino])
+                else:
+                    pila.pop()
+                    if pila:
+                        papa = pila[-1][0]
+                        bajo[papa] = min(bajo[papa], bajo[nodo])
+                        if papa != raiz and bajo[nodo] >= orden[papa]:
+                            criticos.add(papa)
+            if hijos_raiz > 1:
+                criticos.add(raiz)
+        return [n for n in self._adyacencia if n in criticos]
 
     def __repr__(self):
         return f"GrafoCiudad(lugares={self.numero_lugares()}, conexiones={self.numero_conexiones()})"
