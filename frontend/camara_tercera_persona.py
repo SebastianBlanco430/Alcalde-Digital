@@ -4,7 +4,9 @@
 #
 # - Ratón (mientras `mouse.locked`): yaw libre, pitch 5°-60°. Rueda: zoom 3.5-12 m.
 # - Colisión: raycast del pivote hacia la cámara; si un edificio tapa al personaje la
-#   cámara se acerca (rápido) y al despejarse se aleja (lento, sin "saltar").
+#   cámara se acerca (rápido) y al despejarse se aleja (lento, sin "saltar"). Contra la ladera
+#   no hay raycast: se muestrea la altura del suelo a lo largo del tramo (camara_calculos).
+# - `suelo(x, z)`: altura del terreno (MundoCiudad.altura); el pivote va sobre ella.
 # - `yaw` es público: lo leen el controlador (W = hacia donde mira) y el minimapa.
 # - `bloquear(True)`: el ratón no gira la cámara (teléfono/pausa abiertos).
 # - `tomar_control()` / `soltar_control()`: una cinemática mueve `camera` a mano; mientras
@@ -38,9 +40,10 @@ VELOCIDAD_VIAJE = 32.0        # m/s máximos del pivote al viajar (sin tirón in
 class CamaraTerceraPersona(Entity):
 
     # raiz_colisiones: Entity cuyos hijos con collider bloquean la cámara (los edificios).
-    def __init__(self, raiz_colisiones=None, **opciones):
+    def __init__(self, raiz_colisiones=None, suelo=None, **opciones):
         super().__init__(**opciones)
         self.raiz_colisiones = raiz_colisiones
+        self.suelo = suelo or (lambda x, z: 0.0)
         self.yaw = 0.0
         self.pitch = PITCH_INICIAL
         self.distancia = DISTANCIA_INICIAL       # la que pide el jugador (rueda)
@@ -105,8 +108,13 @@ class CamaraTerceraPersona(Entity):
         rapidez = cc.rapidez_de_seguimiento(math.hypot(meta[0] - px, meta[1] - pz), RAPIDEZ_SEGUIR, RAPIDEZ_VIAJE)
         self._pivote = cc.avanzar_pivote((px, pz), meta, dt, rapidez, vmax=VELOCIDAD_VIAJE)
 
-        pivote = cc.pivote_del_jugador(*self._pivote)
+        px, pz = self._pivote
+        pivote = cc.pivote_del_jugador(px, pz, suelo=self.suelo(px, pz))
         impacto = self._distancia_hasta_obstaculo(pivote)
+        deseada = cc.posicion_orbital(pivote, self.yaw, self.pitch, self.distancia)
+        impacto_suelo = cc.distancia_libre_de_suelo(pivote, deseada, self.suelo)
+        if impacto_suelo is not None:
+            impacto = impacto_suelo if impacto is None else min(impacto, impacto_suelo)
         objetivo = cc.distancia_con_colision(
             self.distancia, impacto, MARGEN_COLISION, DISTANCIA_MIN_COLISION)
         suave = cc.suavizar_distancia(self.distancia_real, objetivo, dt)

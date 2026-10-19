@@ -74,7 +74,7 @@ class EscenaMundo(Escena):
         self._cinematica = False                 # ¿hay una cinemática en curso?
 
         self.ciudad = Ciudad3D(mundo, sombras=sombras, parent=self)
-        self.camara = CamaraTerceraPersona(self.ciudad.raiz_colisiones, parent=self)
+        self.camara = CamaraTerceraPersona(self.ciudad.raiz_colisiones, suelo=mundo.altura, parent=self)
         self.camara.objetivo = self._posicion_del_activo
         self.controlador = ControladorJugador(
             self, mundo, al_interactuar, velocidad=VELOCIDAD_CAMINAR, velocidad_correr=VELOCIDAD_CORRER,
@@ -82,7 +82,7 @@ class EscenaMundo(Escena):
         self.director = DirectorCinematica(parent=self)
         self.peatones = Peatones(mundo, parent=self)      # gente que pasea (decoración)
         self.baliza = Baliza(parent=self, enabled=False)
-        self.ruta_piso = RutaPiso(parent=self)
+        self.ruta_piso = RutaPiso(suelo=mundo.altura, parent=self)
 
         # HUD 2D (camera.ui): hermano de la escena, no hijo (la escena cuelga de `scene`).
         self.hud = HudMundo(mundo, lambda: self.flujo, al_menu=al_menu, rotacion_libre=True)
@@ -199,7 +199,9 @@ class EscenaMundo(Escena):
             destruir_arbol(avatar)
         self.avatares = {}
         for jugador in self._sesion.jugadores():
-            self.avatares[jugador.nombre] = Personaje(jugador.nombre, ROLES[jugador.rol].color, parent=self)
+            avatar = Personaje(jugador.nombre, ROLES[jugador.rol].color, parent=self)
+            avatar.suelo = self._mundo.altura
+            self.avatares[jugador.nombre] = avatar
         self.camara.ignorar = list(self.avatares.values())
 
     # Rumbo (yaw) que mira desde el jugador activo hacia la puerta de su misión (o 0).
@@ -228,7 +230,8 @@ class EscenaMundo(Escena):
             self.baliza.enabled = False
         else:
             px, pz = self._mundo.punto_interaccion(mision.destino)
-            self.baliza.colocar(px, pz, self._mundo.edificio_de(mision.destino).alto + 2.2)
+            self.baliza.colocar(px, pz, self._mundo.edificio_de(mision.destino).alto + 2.2,
+                                suelo=self._mundo.altura(px, pz))
             self.baliza.enabled = True
         # Fin del catálogo: nadie tiene misiones pendientes -> panel "Partida terminada".
         if self.flujo.partida_terminada() and not self._cinematica:
@@ -337,7 +340,8 @@ class EscenaMundo(Escena):
         toma = guion.toma_fachada(edificio)
         dentro = self._mas_alla_de_la_puerta(edificio, 1.3)
         yaw, pitch = self.camara.yaw, self.camara.pitch
-        orbita = cc.posicion_orbital(cc.pivote_del_jugador(*entrada), yaw, pitch, self.camara.distancia)
+        orbita = cc.posicion_orbital(cc.pivote_del_jugador(*entrada, suelo=edificio.y), yaw, pitch,
+                                     self.camara.distancia)
 
         self._cinematica = True
         self.camara.tomar_control()

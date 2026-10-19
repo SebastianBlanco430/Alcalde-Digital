@@ -15,21 +15,46 @@
 # Puertas: `puertas[lugar]` es un PuertaEdificio. Su raíz está en la puerta del modelo y
 # gira con el rumbo de entrada (su +z local apunta hacia DENTRO del edificio, -z hacia la
 # calle); la bisagra está a la derecha y la hoja se abre hacia afuera con rotation_y = -100.
+#
+# Modelos 3D (assets/modelos/edificios, exportados de Blender con buildings/exportar_edificios.py):
+# un edificio con `modelo` se dibuja con ese .glb en lugar de cubos y ventanas. Los modelos NO
+# se combinan (combine() pierde texturas y materiales): son una Entity por edificio. La puerta
+# animada se dibuja encima de la puerta pintada del modelo, con su tamaño y su textura.
+#
+# Ladera: si el MundoCiudad trae terreno, el suelo es una malla de la grilla del Terreno
+# (backend/datos/terreno.py), las calles y aceras son cintas que siguen su altura (cada
+# TRAMO_CINTA m) y todo lo demás (plazas, edificios, puertas, árboles, casas) se apoya en
+# `mundo.altura(x, z)`. Sin terreno, el suelo es el plano de siempre (y = 0). El suelo, las calles
+# y las plazas no proyectan sombra (se ocultan a la cámara de la luz): solo la reciben.
+#
+# Sombras horneadas: la luz y la ciudad no se mueven, así que el mapa de sombras se dibuja UNA
+# vez (buffer one-shot) al encender la luz y cuando se mueve una puerta, no en cada frame:
+# redibujarlo cada frame costaba la mitad de los FPS (ver MODELOS_3D.md). Por eso solo la
+# ciudad proyecta sombra; los personajes y peatones, que se mueven, quedan fuera del mapa.
 
 import math
 
-from ursina import Entity, Sky, Text, color, scene
+from panda3d.core import (BitMask32, Geom, GeomLines, GeomNode, GeomTriangles, GeomVertexData, GeomVertexFormat,
+                          GeomVertexWriter, NodePath)
+from ursina import Cylinder, Entity, Mesh, Sky, Text, application, color, scene
 from ursina.lights import AmbientLight, DirectionalLight
 from ursina.shaders import lit_with_shadows_shader
 
-from frontend import geometria_mundo
+from backend.datos.modelos_edificios import CARPETA_MODELOS, escala_de, modelo_de
+from frontend.casas_decorativas import color_base_como_color, construir_casas
 from frontend.componentes import rgb
 from frontend.piezas import encender_luz, pieza, silenciar
 
-SOMBRAS = True                       # decidido en la Fase 0: cuestan ~0.1 ms con combine()
+SOMBRAS = True                       # horneadas: el mapa se redibuja solo si algo de la ciudad se mueve
 RESOLUCION_SOMBRAS = (4096, 4096)
 
 COLOR_PASTO = (84, 142, 74)
+COLOR_TIERRA = (138, 106, 78)        # taludes empinados de la ladera
+COLOR_ESCALERA = (168, 164, 154)
+COLOR_BARANDA = (60, 62, 70)
+# La malla de la ladera tiene normales y el shader le SUMA la luz (el plano de antes no tenía): se
+# oscurece el color de los vértices para que el pasto se vea como antes.
+BRILLO_LADERA = 0.6
 COLOR_ASFALTO = (66, 68, 78)
 COLOR_LINEA = (235, 220, 150)
 COLOR_ACERA = (178, 178, 186)
@@ -45,10 +70,8 @@ PALETA_EDIFICIOS = (
     (232, 196, 214), (240, 224, 164), (206, 190, 232),
 )
 
-# Alturas (y) de las capas planas del piso (cada una por encima de la anterior).
-Y_ASFALTO = 0.05          # cubo de 0.10: tapa en y = 0.10
-Y_LINEA = 0.106
-Y_ACERA = 0.10            # cubo de 0.20: tapa en y = 0.20
+# Alturas (y) de las capas planas del piso sobre el suelo (cada una por encima de la anterior).
+# Las cintas de las calles: asfalto 0.10, línea central 0.12, aceras 0.20.
 Y_ANILLO = 0.12
 Y_PLAZA = 0.14
 Y_EMBLEMA = 0.16
@@ -57,23 +80,46 @@ ANCHO_PUERTA, ALTO_PUERTA = 1.6, 2.4
 ANGULO_PUERTA_ABIERTA = -100
 SEPARACION_LINEAS = 4.0
 SEPARACION_VENTANAS = 3.2
+TRAMO_CINTA = 1.0         # m entre muestras de las cintas de calle y acera
+ALTO_PELDANO = 0.17       # m: contrahuella de las escaleras de la favela
+PENDIENTE_TIERRA = (25.0, 40.0)   # grados: de pasto a tierra en los taludes
+MASCARA_LUZ = BitMask32.bit(0)    # la cámara de sombras de DirectionalLight (camera mask 0b0001)
+GIRO_MODELO = 180         # el frente (+z) del modelo mira hacia afuera: rumbo de entrada + 180
+# Tinte suave por edificio para que los modelos repetidos no se vean idénticos.
+TINTES_MODELOS = ((255, 255, 255), (255, 236, 222), (226, 236, 255), (236, 255, 232))
+# Fachadas de la favela: tintes vivos que multiplican la textura (rosa, amarillo, celeste, verde,
+# naranja, lila y sin tinte). Los edificios jugables mantienen los suaves de arriba.
+TINTES_FAVELA = ((255, 178, 190), (255, 232, 140), (160, 205, 255), (180, 238, 160),
+                 (255, 196, 130), (222, 184, 255), (255, 255, 255))
+COLOR_TANQUE = (40, 96, 190)
+COLOR_CABLE = (22, 22, 26)
+PROPORCION_TANQUES = 0.45         # casas con tanque de agua en el techo
+ALTURA_CABLE = 4.0                # m sobre el suelo donde los cables se atan a las farolas
+DISTANCIA_CABLE = 15.0            # m máximos entre dos farolas unidas por un cable
+DISTANCIA_CABLE_CASA = 9.0        # m máximos de una farola a la casa a la que le tira un cable
 
 
 # Una puerta con bisagra: la hoja gira sobre `bisagra`. abrir(t) con t en [0, 1].
 class PuertaEdificio(Entity):
 
-    def __init__(self, edificio, **opciones):
+    # `ancho`, `alto` y `textura` cambian la hoja (con modelo 3D: la puerta pintada del modelo).
+    def __init__(self, edificio, ancho=ANCHO_PUERTA, alto=ALTO_PUERTA, textura=None, **opciones):
         px, pz = edificio.puerta()
-        super().__init__(position=(px, 0, pz), rotation_y=edificio.rumbo_puerta(), **opciones)
+        super().__init__(position=(px, edificio.y, pz), rotation_y=edificio.rumbo_puerta(), **opciones)
         self.edificio = edificio
+        self.alto = alto
         self.marco = pieza(parent=self, model="cube", color=rgb(COLOR_MARCO_PUERTA),
-                           position=(0, ALTO_PUERTA / 2 + 0.05, 0), scale=(ANCHO_PUERTA + 0.3, ALTO_PUERTA + 0.1, 0.12))
-        self.bisagra = Entity(parent=self, position=(ANCHO_PUERTA / 2, 0, -0.07))
-        self.hoja = pieza(parent=self.bisagra, model="cube", color=rgb(COLOR_MADERA),
-                          position=(-ANCHO_PUERTA / 2, ALTO_PUERTA / 2, 0),
-                          scale=(ANCHO_PUERTA, ALTO_PUERTA, 0.1))
+                           position=(0, alto / 2 + 0.05, 0), scale=(ancho + 0.3, alto + 0.1, 0.12))
+        self.bisagra = Entity(parent=self, position=(ancho / 2, 0, -0.07))
+        self.hoja = pieza(parent=self.bisagra, model="cube", position=(-ancho / 2, alto / 2, 0),
+                          scale=(ancho, alto, 0.1))
+        if textura:
+            self.hoja.texture = textura
+            self.hoja.color = color.white
+        else:
+            self.hoja.color = rgb(COLOR_MADERA)
         pieza(parent=self.bisagra, model="sphere", color=color.rgb32(220, 200, 120),
-              position=(-ANCHO_PUERTA + 0.2, ALTO_PUERTA / 2, -0.09), scale=0.12)
+              position=(-ancho + 0.2, alto / 2, -0.09), scale=0.12)
 
     # 0 = cerrada, 1 = abierta del todo.
     def abrir(self, t):
@@ -90,11 +136,20 @@ class Ciudad3D(Entity):
         opciones.setdefault("parent", scene)
         super().__init__(**opciones)
         self._mundo = mundo
+        self._suelo = mundo.altura
+        self._sombras = sombras
+        self._hornear_sombras = False      # ¿hay que redibujar el mapa de sombras en el próximo frame?
+        self._puertas_horneadas = None     # aperturas de las puertas en el último horneado
         self.puertas = {}              # lugar -> PuertaEdificio
         self.letreros = {}             # lugar -> Text
         self.raiz_colisiones = Entity(parent=self)
         self._grupos = {nombre: Entity(parent=self, shader=lit_with_shadows_shader) for nombre in (
-            "suelo", "calles", "plazas", "edificios", "vegetacion", "mobiliario")}
+            "suelo", "calles", "plazas", "edificios", "vegetacion", "mobiliario", "escaleras")}
+        # Edificios de cubos (grupo combinado) y modelos 3D (sin combinar) bajo una misma raíz,
+        # que es la que define el volumen de las sombras.
+        self._raiz_edificios = Entity(parent=self)
+        self._grupos["edificios"].parent = self._raiz_edificios
+        self._modelos = Entity(parent=self._raiz_edificios)
         # Lo que debe verse brillante, sin sombreado (ventanas y focos de las farolas).
         self._grupos["ventanas"] = Entity(parent=self, shader=None)
         self._grupos["luces"] = Entity(parent=self, shader=None)
@@ -110,21 +165,44 @@ class Ciudad3D(Entity):
         self._construir_plazas()
         self._construir_edificios()
         self._construir_obstaculos()
+        self._construir_escaleras()
         for grupo in self._grupos.values():
-            grupo.combine()
+            if grupo.children:             # p. ej. "edificios" queda vacío si todos tienen modelo
+                grupo.combine()
+        self._grupos["calles"].double_sided = True      # las cintas no cuidan el sentido de sus caras
         for hijo in self.children:
             if hijo is not self.cielo:
                 silenciar(hijo)            # lo estático no necesita update() (ver piezas.silenciar)
         if sombras:
             self.luz.shadows = True
-            # El volumen de sombra abarca los edificios (no el suelo gigante: restaría precisión).
-            self.luz.update_bounds(self._grupos["edificios"])
+            # Con ladera el volumen abarca todo el terreno (si no, lo que queda más abajo que los
+            # edificios cae fuera del rango de profundidad); en plano, solo los edificios.
+            self.luz.update_bounds(self if mundo.terreno is not None else self._raiz_edificios)
+            self.luz._light.set_scene(self)          # solo la ciudad (sin personajes) va al mapa
+        for nombre in ("suelo", "calles", "plazas"):
+            self._grupos[nombre].hide(MASCARA_LUZ)    # reciben sombra, no la proyectan
         self.encender_luces(False)           # EscenaMundo la enciende en al_entrar
 
     # La ciudad enciende su luz al entrar a la escena y la apaga al salir (ver piezas.encender_luz).
     def encender_luces(self, encendidas):
         encender_luz(self.luz, encendidas)
         encender_luz(self.ambiente, encendidas)
+        self._hornear_sombras = encendidas and self._sombras
+
+    def update(self):
+        if not self._sombras:
+            return
+        aperturas = tuple(puerta.bisagra.rotation_y for puerta in self.puertas.values())
+        if aperturas != self._puertas_horneadas:
+            self._hornear_sombras = True
+        if self._hornear_sombras:
+            # El buffer lo crea Panda al primer render con la luz encendida; hasta entonces no
+            # existe y dibuja solo (cada frame), así que se reintenta en el siguiente.
+            buffer = self.luz._light.get_shadow_buffer(application.base.win.gsg)
+            if buffer is not None:
+                buffer.set_one_shot(True)
+                self._hornear_sombras = False
+                self._puertas_horneadas = aperturas
 
     def cerrar_puertas(self):
         for puerta in self.puertas.values():
@@ -133,38 +211,42 @@ class Ciudad3D(Entity):
     # -- Suelo, calles y plazas --
 
     def _construir_suelo(self):
+        if self._mundo.terreno is not None:
+            # Hija directa de la ciudad (no del grupo): combine() sería lento con ~40 000 vértices.
+            self._grupos["suelo"] = pieza(parent=self, model=_malla_terreno(self._mundo.terreno),
+                                          double_sided=True)
+            return
         xmin, xmax, zmin, zmax = self._mundo.limites()
         pieza(parent=self._grupos["suelo"], model="plane", color=rgb(COLOR_PASTO),
               position=((xmin + xmax) / 2, 0, (zmin + zmax) / 2),
               scale=(xmax - xmin + 80, 1, zmax - zmin + 80))
 
+    # Calles como cintas que siguen el suelo: asfalto de plaza a plaza, aceras con bordillo entre
+    # las plazas y la línea central discontinua.
     def _construir_calles(self):
         mundo = self._mundo
         calles = self._grupos["calles"]
         semiancho = mundo.ancho_calle / 2
         for a, b in mundo.segmentos():
-            (ax, az), (bx, bz) = mundo.coordenada(a), mundo.coordenada(b)
-            largo = math.hypot(bx - ax, bz - az)
-            ux, uz = (bx - ax) / largo, (bz - az) / largo
-            rumbo = geometria_mundo.rumbo_de(bx - ax, bz - az)
-            pieza(parent=calles, model="cube", color=rgb(COLOR_ASFALTO),
-                  position=((ax + bx) / 2, Y_ASFALTO, (az + bz) / 2),
-                  scale=(mundo.ancho_calle, 0.10, largo), rotation_y=rumbo)
+            pa, pb = mundo.coordenada(a), mundo.coordenada(b)
+            largo = math.dist(pa, pb)
+            if largo < 1e-9:
+                continue
+            pieza(parent=calles, model=_cinta(self._suelo, pa, pb, 0, largo, -semiancho, semiancho, 0.10, lados=0.10),
+                  color=rgb(COLOR_ASFALTO))
             # Aceras: a cada lado, entre las plazas (el aro de la plaza las recibe).
-            tramo = largo - 2 * (mundo.radio_plaza + 0.9)
-            if tramo > 0:
-                mx, mz = (ax + bx) / 2, (az + bz) / 2
+            borde = mundo.radio_plaza + 0.9
+            if largo - 2 * borde > 0:
                 for lado in (-1, 1):
-                    d = semiancho + 1.0
-                    pieza(parent=calles, model="cube", color=rgb(COLOR_ACERA),
-                          position=(mx - uz * lado * d, Y_ACERA, mz + ux * lado * d),
-                          scale=(2.0, 0.20, tramo), rotation_y=rumbo)
+                    d0, d1 = sorted((lado * semiancho, lado * (semiancho + 2.0)))
+                    pieza(parent=calles, model=_cinta(self._suelo, pa, pb, borde, largo - borde, d0, d1, 0.20,
+                                                      lados=0.20),
+                          color=rgb(COLOR_ACERA))
             # Línea central discontinua.
             s = mundo.radio_plaza + 2.0
             while s + 1.0 <= largo - mundo.radio_plaza - 2.0:
-                pieza(parent=calles, model="cube", color=rgb(COLOR_LINEA),
-                      position=(ax + ux * (s + 1.0), Y_LINEA, az + uz * (s + 1.0)),
-                      scale=(0.22, 0.02, 2.0), rotation_y=rumbo)
+                pieza(parent=calles, model=_cinta(self._suelo, pa, pb, s, s + 2.0, -0.11, 0.11, 0.12),
+                      color=rgb(COLOR_LINEA))
                 s += SEPARACION_LINEAS
 
     def _construir_plazas(self):
@@ -172,33 +254,52 @@ class Ciudad3D(Entity):
         radio = self._mundo.radio_plaza
         for lugar in self._mundo.lugares():
             cx, cz = self._mundo.coordenada(lugar)
+            h = self._suelo(cx, cz)           # las plazas son terrazas planas
             for y, r, tono in ((Y_ANILLO, radio + 0.9, COLOR_ANILLO_PLAZA), (Y_PLAZA, radio, COLOR_PLAZA),
                                (Y_EMBLEMA, 1.6, COLOR_EMBLEMA)):
-                pieza(parent=plazas, model="circle", rotation_x=90, position=(cx, y, cz),
+                pieza(parent=plazas, model="circle", rotation_x=90, position=(cx, h + y, cz),
                       scale=2 * r, color=rgb(tono))
 
     # -- Edificios --
 
     def _construir_edificios(self):
         for i, edificio in enumerate(self._mundo.edificios()):
-            tono = PALETA_EDIFICIOS[i % len(PALETA_EDIFICIOS)]
-            self._cuerpo_del_edificio(edificio, tono)
-            self._ventanas(edificio)
-            self.puertas[edificio.lugar] = PuertaEdificio(edificio, parent=self)
+            if edificio.modelo:
+                self.puertas[edificio.lugar] = self._modelo_del_edificio(edificio, i)
+            else:
+                tono = PALETA_EDIFICIOS[i % len(PALETA_EDIFICIOS)]
+                self._cuerpo_del_edificio(edificio, tono)
+                self._ventanas(edificio)
+                self.puertas[edificio.lugar] = PuertaEdificio(edificio, parent=self)
             self._letrero(edificio)
-            # Collider solo para el raycast de la cámara.
-            Entity(parent=self.raiz_colisiones, model="cube", collider="box", visible=False,
-                   position=(edificio.cx, edificio.alto / 2, edificio.cz),
-                   scale=(edificio.ancho, edificio.alto, edificio.fondo))
+            self._collider_camara(edificio.cx, edificio.cz, edificio.ancho, edificio.fondo, edificio.alto,
+                                  edificio.y)
+
+    # Collider solo para el raycast de la cámara.
+    def _collider_camara(self, cx, cz, ancho, fondo, alto, y=0.0):
+        Entity(parent=self.raiz_colisiones, model="cube", collider="box", visible=False,
+               position=(cx, y + alto / 2, cz), scale=(ancho, alto, fondo))
+
+    # El .glb del edificio, escalado a su caja y con el frente hacia la fachada de la puerta.
+    # Devuelve la PuertaEdificio, del tamaño y con la textura de la puerta del modelo.
+    def _modelo_del_edificio(self, e, indice):
+        m = modelo_de(e.modelo)
+        s = escala_de(e)
+        modelo = pieza(parent=self._modelos, model=m.archivo, position=(e.cx, e.y, e.cz),
+                       rotation_y=e.rumbo_puerta() + GIRO_MODELO, scale=s,
+                       color=rgb(TINTES_MODELOS[indice % len(TINTES_MODELOS)]))
+        color_base_como_color(modelo.model)
+        return PuertaEdificio(e, ancho=m.puerta_ancho * s, alto=m.puerta_alto * s,
+                              textura=f"{CARPETA_MODELOS}/{m.textura_puerta}", parent=self)
 
     def _cuerpo_del_edificio(self, e, tono):
         g = self._grupos["edificios"]
         oscuro = tuple(int(c * 0.62) for c in tono)
-        pieza(parent=g, model="cube", color=rgb(tono), position=(e.cx, e.alto / 2, e.cz),
+        pieza(parent=g, model="cube", color=rgb(tono), position=(e.cx, e.y + e.alto / 2, e.cz),
               scale=(e.ancho, e.alto, e.fondo))
-        pieza(parent=g, model="cube", color=rgb((120, 120, 130)), position=(e.cx, 0.35, e.cz),
+        pieza(parent=g, model="cube", color=rgb((120, 120, 130)), position=(e.cx, e.y + 0.35, e.cz),
               scale=(e.ancho + 0.3, 0.7, e.fondo + 0.3))                              # zócalo
-        pieza(parent=g, model="cube", color=rgb(oscuro), position=(e.cx, e.alto + 0.18, e.cz),
+        pieza(parent=g, model="cube", color=rgb(oscuro), position=(e.cx, e.y + e.alto + 0.18, e.cz),
               scale=(e.ancho + 0.7, 0.36, e.fondo + 0.7))                             # techo
 
     # Ventanas en las cuatro caras (en la de la puerta, solo a los lados de ella).
@@ -221,52 +322,268 @@ class Ciudad3D(Entity):
                     x = e.cx + nx * (e.ancho / 2 + 0.03) + (desfase if nx == 0 else 0)
                     z = e.cz + nz * (e.fondo / 2 + 0.03) + (desfase if nz == 0 else 0)
                     escala = (1.5, 1.3, 0.06) if nx == 0 else (0.06, 1.3, 1.5)
-                    pieza(parent=g, model="cube", color=rgb(COLOR_VENTANA), position=(x, y + 0.6, z),
+                    pieza(parent=g, model="cube", color=rgb(COLOR_VENTANA), position=(x, e.y + y + 0.6, z),
                           scale=escala, shader=None)
 
-    # Cartel sobre la puerta: tablero oscuro y texto con el nombre del edificio.
+    # Cartel sobre la puerta: tablero oscuro y texto con el nombre del edificio. Cuelga de la
+    # puerta pero va centrado en la fachada (si la puerta está corrida, el +x local de la puerta
+    # apunta en sentido contrario al desfase, así que el centro de la fachada está en x = desfase).
     def _letrero(self, e):
         puerta = self.puertas[e.lugar]
-        ancho = min(max(len(e.titulo) * 0.42, 3.0), e.ancho - 0.5)
+        ancho = min(max(len(e.titulo) * 0.42, 3.0), e.frente - 0.5)
+        x, y = e.desfase_puerta, puerta.alto + 0.75
         pieza(parent=puerta, model="cube", color=rgb(COLOR_LETRERO),
-              position=(0, ALTO_PUERTA + 0.75, -0.12), scale=(ancho, 0.8, 0.14))
-        texto = Text(e.titulo, parent=puerta, origin=(0, 0), position=(0, ALTO_PUERTA + 0.75, -0.22),
+              position=(x, y, -0.12), scale=(ancho, 0.8, 0.14))
+        texto = Text(e.titulo, parent=puerta, origin=(0, 0), position=(x, y, -0.22),
                      scale=11, color=color.rgb32(240, 240, 245))
         self.letreros[e.lugar] = texto
+
+    # -- Escaleras de la favela --
+
+    # Peldaños a lo largo de cada escalera: tantos como pide su desnivel (ALTO_PELDANO), cada uno
+    # con la tapa sobre el suelo en su centro y el cuerpo hasta por debajo del suelo, así siguen
+    # la ladera sin flotar. Una baranda de un lado.
+    def _construir_escaleras(self):
+        g = self._grupos["escaleras"]
+        for e in self._mundo.escaleras():
+            a, b = (e.ax, e.az), (e.bx, e.bz)
+            ux, uz = (b[0] - a[0]) / e.largo, (b[1] - a[1]) / e.largo
+            rumbo = math.degrees(math.atan2(ux, uz))
+            desnivel = abs(self._suelo(*b) - self._suelo(*a))
+            peldanos = max(4, math.ceil(desnivel / ALTO_PELDANO))
+            huella = e.largo / peldanos
+            for k in range(peldanos):
+                s = (k + 0.5) * huella
+                x, z = a[0] + ux * s, a[1] + uz * s
+                tapa = self._suelo(x, z) + 0.12
+                fondo = min(self._suelo(a[0] + ux * t, a[1] + uz * t) for t in (s - huella / 2, s + huella / 2)) - 0.3
+                tono = COLOR_ESCALERA if k % 2 else tuple(c - 10 for c in COLOR_ESCALERA)
+                pieza(parent=g, model="cube", color=rgb(tono), rotation_y=rumbo,
+                      position=(x, (tapa + fondo) / 2, z), scale=(e.ancho, tapa - fondo, huella + 0.02))
+            # Baranda: postes cada ~2 m y un pasamanos entre poste y poste, del lado derecho.
+            dx, dz = uz * (e.ancho / 2 - 0.05), -ux * (e.ancho / 2 - 0.05)
+            postes = max(2, math.ceil(e.largo / 2) + 1)
+            puntos = []
+            for k in range(postes):
+                s = e.largo * k / (postes - 1)
+                x, z = a[0] + ux * s + dx, a[1] + uz * s + dz
+                y = self._suelo(x, z) + 0.12
+                puntos.append((x, y + 0.9, z))
+                pieza(parent=g, model="cube", color=rgb(COLOR_BARANDA), position=(x, y + 0.45, z),
+                      scale=(0.06, 0.9, 0.06))
+            for p, q in zip(puntos, puntos[1:]):
+                horizontal = math.dist((p[0], p[2]), (q[0], q[2]))
+                pieza(parent=g, model="cube", color=rgb(COLOR_BARANDA), position=tuple((p[i] + q[i]) / 2 for i in range(3)),
+                      rotation=(-math.degrees(math.atan2(q[1] - p[1], horizontal)), rumbo, 0),
+                      scale=(0.05, 0.05, math.hypot(horizontal, q[1] - p[1])))
 
     # -- Árboles, farolas y bancos (salen de los obstáculos del modelo) --
 
     def _construir_obstaculos(self):
+        casas = []
         for o in self._mundo.obstaculos():
-            if o.tipo == "arbol":
+            if o.tipo == "casa":
+                casas.append(o)
+                self._collider_camara(o.cx, o.cz, o.ancho, o.fondo, modelo_de(o.modelo).alto * o.escala * o.pisos,
+                                      _base_de_caja(self._suelo, o))
+            elif o.tipo == "arbol":
                 self._arbol(o)
             elif o.tipo == "farola":
                 self._farola(o)
             elif o.tipo == "banco":
                 self._banco(o)
+            elif o.tipo == "arbusto":
+                self._arbusto(o)
+        if casas:
+            # Bajo la raíz de los edificios: entran en el volumen de sombra.
+            alturas = [_base_de_caja(self._suelo, c) for c in casas]
+            construir_casas(self._raiz_edificios, casas, TINTES_FAVELA, alturas=alturas)
+            self._tanques(casas, alturas)
+        self._cables([o for o in self._mundo.obstaculos() if o.tipo == "farola"], casas)
 
     def _arbol(self, o):
         g = self._grupos["vegetacion"]
+        y = self._suelo(o.cx, o.cz) - 0.15           # algo enterrado: en la pendiente no flota
         variante = (int(abs(o.cx * 7 + o.cz * 13)) % 3)
         verde = ((58, 130, 62), (74, 148, 70), (46, 112, 70))[variante]
-        pieza(parent=g, model="cube", color=rgb((98, 68, 44)), position=(o.cx, 0.9, o.cz),
+        pieza(parent=g, model="cube", color=rgb((98, 68, 44)), position=(o.cx, y + 0.9, o.cz),
               scale=(0.32, 1.8, 0.32))
-        pieza(parent=g, model="sphere", color=rgb(verde), position=(o.cx, 2.9, o.cz), scale=(2.7, 2.4, 2.7))
+        pieza(parent=g, model="sphere", color=rgb(verde), position=(o.cx, y + 2.9, o.cz), scale=(2.7, 2.4, 2.7))
         pieza(parent=g, model="sphere", color=rgb(tuple(min(255, c + 14) for c in verde)),
-              position=(o.cx + 0.2, 3.9, o.cz - 0.1), scale=1.7)
+              position=(o.cx + 0.2, y + 3.9, o.cz - 0.1), scale=1.7)
+
+    def _arbusto(self, o):
+        y = self._suelo(o.cx, o.cz) - 0.1
+        verde = ((70, 128, 60), (92, 140, 64), (60, 110, 76))[int(abs(o.cx * 5 + o.cz * 11)) % 3]
+        pieza(parent=self._grupos["vegetacion"], model="sphere", color=rgb(verde),
+              position=(o.cx, y + 0.45, o.cz), scale=(1.3, 1.0, 1.3))
+
+    # Tanques de agua azules en el techo de una parte de las casas (elegidas por su posición,
+    # siempre las mismas), en una esquina del último piso.
+    def _tanques(self, casas, alturas):
+        g = self._grupos["mobiliario"]
+        # Una sola malla para todos: cada Cylinder() de Ursina deja ~30 entidades auxiliares vivas
+        # (que Ursina recorre cada frame), así que crearlo por tanque costaba FPS.
+        cilindro = Cylinder(resolution=12)
+        for casa, y in zip(casas, alturas):
+            if _azar_de(casa.cx, casa.cz) >= PROPORCION_TANQUES:
+                continue
+            techo = y + modelo_de(casa.modelo).alto * casa.escala * casa.pisos
+            esquina = 1 if _azar_de(casa.cz, casa.cx) < 0.5 else -1
+            x, z = casa.cx + esquina * casa.ancho / 4, casa.cz + casa.fondo / 4
+            pieza(parent=g, model=cilindro, color=rgb(COLOR_TANQUE),
+                  position=(x, techo - 0.15, z), scale=(1.1, 1.0, 1.1))
+            pieza(parent=g, model="cube", color=rgb(tuple(c + 30 for c in COLOR_TANQUE)),
+                  position=(x, techo + 0.9, z), scale=(0.9, 0.08, 0.9))
+
+    # Cables de luz: de cada farola a la siguiente de la misma calle (cruzando en zigzag, como
+    # salen en el orden del modelo) y de cada farola al techo de la casa más cercana. Cada
+    # cable cuelga como una parábola. Una sola malla de líneas, sin sombreado ni sombra.
+    def _cables(self, farolas, casas):
+        tramos = []
+        for f, g in zip(farolas, farolas[1:]):
+            if math.dist((f.cx, f.cz), (g.cx, g.cz)) <= DISTANCIA_CABLE:
+                tramos.append((self._punta_farola(f), self._punta_farola(g)))
+        for f in farolas:
+            cerca = [c for c in casas if math.dist((f.cx, f.cz), (c.cx, c.cz)) <= DISTANCIA_CABLE_CASA]
+            if cerca:
+                c = min(cerca, key=lambda c: math.dist((f.cx, f.cz), (c.cx, c.cz)))
+                alto = modelo_de(c.modelo).alto * c.escala
+                tramos.append((self._punta_farola(f), (c.cx, _base_de_caja(self._suelo, c) + alto * 0.8, c.cz)))
+        vertices = []
+        for p, q in tramos:
+            caida = 0.25 + 0.04 * math.dist(p, q)
+            puntos = [tuple(p[i] + (q[i] - p[i]) * k / 10 for i in range(3)) for k in range(11)]
+            puntos = [(x, y - caida * 4 * (k / 10) * (1 - k / 10), z) for k, (x, y, z) in enumerate(puntos)]
+            for a, b in zip(puntos, puntos[1:]):
+                vertices += [a, b]
+        if vertices:
+            cables = Entity(parent=self, model=_lineas(vertices), color=rgb(COLOR_CABLE), shader=None)
+            cables.set_render_mode_thickness(2)
+            cables.hide(MASCARA_LUZ)
+
+    def _punta_farola(self, o):
+        return (o.cx, self._suelo(o.cx, o.cz) - 0.1 + ALTURA_CABLE, o.cz)
 
     def _farola(self, o):
+        y = self._suelo(o.cx, o.cz) - 0.1
         pieza(parent=self._grupos["mobiliario"], model="cube", color=rgb((70, 72, 82)),
-              position=(o.cx, 2.1, o.cz), scale=(0.14, 4.2, 0.14))
+              position=(o.cx, y + 2.1, o.cz), scale=(0.14, 4.2, 0.14))
         pieza(parent=self._grupos["luces"], model="sphere", color=rgb((255, 238, 170)),
-              position=(o.cx, 4.35, o.cz), scale=0.5, shader=None)
+              position=(o.cx, y + 4.35, o.cz), scale=0.5, shader=None)
 
     def _banco(self, o):
         g = self._grupos["mobiliario"]
         madera = rgb((140, 96, 60))
-        pieza(parent=g, model="cube", color=madera, position=(o.cx, 0.46, o.cz), scale=(o.ancho, 0.1, o.fondo))
-        pieza(parent=g, model="cube", color=madera, position=(o.cx, 0.82, o.cz + o.fondo / 2 - 0.04),
+        y = self._suelo(o.cx, o.cz) + Y_PLAZA        # los bancos están en las plazas
+        pieza(parent=g, model="cube", color=madera, position=(o.cx, y + 0.46, o.cz), scale=(o.ancho, 0.1, o.fondo))
+        pieza(parent=g, model="cube", color=madera, position=(o.cx, y + 0.82, o.cz + o.fondo / 2 - 0.04),
               scale=(o.ancho, 0.5, 0.08))
         for dx in (-o.ancho / 2 + 0.15, o.ancho / 2 - 0.15):
-            pieza(parent=g, model="cube", color=rgb((60, 62, 72)), position=(o.cx + dx, 0.22, o.cz),
+            pieza(parent=g, model="cube", color=rgb((60, 62, 72)), position=(o.cx + dx, y + 0.22, o.cz),
                   scale=(0.1, 0.44, o.fondo - 0.1))
+
+
+# Número en [0, 1) que depende solo de (a, b): decide detalles (tanques) siempre igual.
+def _azar_de(a, b):
+    return (math.sin(a * 12.9898 + b * 78.233) * 43758.5453) % 1.0
+
+
+# -- Geometría de la ladera ---------------------------------------------------------------------
+
+
+# Altura de apoyo de una caja (cx, cz, ancho, fondo) en la pendiente: la más baja entre su centro y
+# sus esquinas, así ningún lado queda flotando (el lado alto se entierra).
+def _base_de_caja(suelo, o):
+    puntos = [(o.cx, o.cz)] + [(o.cx + sx * o.ancho / 2, o.cz + sz * o.fondo / 2) for sx in (-1, 1) for sz in (-1, 1)]
+    return min(suelo(x, z) for x, z in puntos)
+
+
+# Normal del suelo en (x, z) por diferencias centrales.
+def _normal_suelo(suelo, x, z, h=0.5):
+    nx = -(suelo(x + h, z) - suelo(x - h, z)) / (2 * h)
+    nz = -(suelo(x, z + h) - suelo(x, z - h)) / (2 * h)
+    largo = math.sqrt(nx * nx + 1 + nz * nz)
+    return (nx / largo, 1 / largo, nz / largo)
+
+
+# Cinta sobre el suelo a lo largo de a -> b: de `s0` a `s1` m desde a y de `d0` a `d1` m a la izquierda
+# del eje, `alto` m sobre el suelo y muestreada cada TRAMO_CINTA m. Con `lados` > 0 agrega las dos
+# paredes laterales (de `lados` m hacia abajo) para que el borde no se vea hueco en la pendiente.
+def _cinta(suelo, a, b, s0, s1, d0, d1, alto, lados=0.0):
+    largo = math.dist(a, b)
+    ux, uz = (b[0] - a[0]) / largo, (b[1] - a[1]) / largo
+    nx, nz = -uz, ux
+    pasos = max(1, math.ceil((s1 - s0) / TRAMO_CINTA))
+    vertices, normales, triangulos = [], [], []
+    bordes = {d0: [], d1: []}
+    for k in range(pasos + 1):
+        s = s0 + (s1 - s0) * k / pasos
+        for d in (d0, d1):
+            x, z = a[0] + ux * s + nx * d, a[1] + uz * s + nz * d
+            bordes[d].append((x, suelo(x, z) + alto, z))
+            vertices.append(bordes[d][-1])
+            normales.append(_normal_suelo(suelo, x, z))
+    for k in range(pasos):
+        i = 2 * k
+        triangulos += [(i, i + 1, i + 3), (i, i + 3, i + 2)]
+    if lados > 0:
+        for d, signo in ((d0, -1), (d1, 1)):
+            base = len(vertices)
+            for x, y, z in bordes[d]:
+                vertices += [(x, y, z), (x, y - lados - 0.05, z)]
+                normales += [(nx * signo, 0, nz * signo)] * 2
+            for k in range(pasos):
+                i = base + 2 * k
+                triangulos += [(i, i + 2, i + 3), (i, i + 3, i + 1)]
+    return Mesh(vertices=vertices, triangles=triangulos, normals=normales)
+
+
+# Segmentos sueltos (vértices de a pares) en un solo Geom. Mesh(mode="line") de Ursina los uniría
+# todos en una sola línea continua.
+def _lineas(vertices):
+    datos = GeomVertexData("lineas", GeomVertexFormat.get_v3(), Geom.UH_static)
+    datos.set_num_rows(len(vertices))
+    escritor = GeomVertexWriter(datos, "vertex")
+    for v in vertices:
+        escritor.add_data3(*v)
+    lineas = GeomLines(Geom.UH_static)
+    for i in range(0, len(vertices) - 1, 2):
+        lineas.add_vertices(i, i + 1)
+    geom = Geom(datos)
+    geom.add_primitive(lineas)
+    nodo = GeomNode("lineas")
+    nodo.add_geom(geom)
+    return NodePath(nodo)
+
+
+# Malla del suelo con la grilla del Terreno: pasto, que pasa a tierra en los taludes empinados.
+def _malla_terreno(terreno):
+    x0, z0, paso, filas = terreno.grilla()
+    nz_, nx_ = len(filas), len(filas[0])
+    datos = GeomVertexData("terreno", GeomVertexFormat.get_v3n3c4(), Geom.UH_static)
+    datos.set_num_rows(nx_ * nz_)
+    vertice, normal, tono = (GeomVertexWriter(datos, c) for c in ("vertex", "normal", "color"))
+    pasto, tierra = (tuple(c / 255 * BRILLO_LADERA for c in rgb_) for rgb_ in (COLOR_PASTO, COLOR_TIERRA))
+    tan_desde, tan_hasta = (math.tan(math.radians(g)) for g in PENDIENTE_TIERRA)
+    for j in range(nz_):
+        for i in range(nx_):
+            h = filas[j][i]
+            gx = (filas[j][min(i + 1, nx_ - 1)] - filas[j][max(i - 1, 0)]) / (2 * paso)
+            gz = (filas[min(j + 1, nz_ - 1)][i] - filas[max(j - 1, 0)][i]) / (2 * paso)
+            largo = math.sqrt(gx * gx + 1 + gz * gz)
+            vertice.add_data3(x0 + i * paso, h, z0 + j * paso)
+            normal.add_data3(-gx / largo, 1 / largo, -gz / largo)
+            t = min(1.0, max(0.0, (math.hypot(gx, gz) - tan_desde) / (tan_hasta - tan_desde)))
+            tono.add_data4(*(p + (q - p) * t for p, q in zip(pasto, tierra)), 1)
+    triangulos = GeomTriangles(Geom.UH_static)
+    for j in range(nz_ - 1):
+        for i in range(nx_ - 1):
+            v = j * nx_ + i
+            triangulos.add_vertices(v, v + nx_, v + nx_ + 1)
+            triangulos.add_vertices(v, v + nx_ + 1, v + 1)
+    geom = Geom(datos)
+    geom.add_primitive(triangulos)
+    nodo = GeomNode("terreno")
+    nodo.add_geom(geom)
+    return NodePath(nodo)

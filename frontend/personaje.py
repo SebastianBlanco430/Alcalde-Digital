@@ -42,6 +42,7 @@ class Personaje(Entity):
         self.rumbo_objetivo = 0.0
         self.velocidad = 0.0          # m/s reales; la fija el controlador
         self.automatico = True        # False: el director controla pose y giro
+        self.suelo = None             # altura del suelo (x, z) -> y; None = se queda en su y
         self._fase = 0.0
         self._intensidad = 0.0
         self._activo = False
@@ -119,7 +120,7 @@ class Personaje(Entity):
     # -- Posición y rumbo --
 
     def colocar(self, x, z):
-        self.position = (x, self.y, z)
+        self.position = (x, self.y if self.suelo is None else self.suelo(x, z), z)
 
     # Rumbo al que debe girar el cuerpo (giro suave en update()).
     def mirar_hacia(self, rumbo):

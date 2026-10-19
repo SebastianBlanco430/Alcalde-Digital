@@ -16,6 +16,11 @@
 #     choca <=> |p - q| < r   (dentro de la caja q = p, distancia 0, choca)
 #   - contra otro círculo (árbol, farola): choca <=> |p - c| < r + rc
 # Tocar justo el borde (distancia == r) NO cuenta como choque.
+#
+# Altura: la colisión sigue siendo 2D en (x, z). La altura del suelo la da `altura(x, z)` (el
+# Terreno de backend/datos/terreno.py, o 0 en un mundo plano) y cada Edificio guarda en `y` la
+# altura de su umbral (la de su plaza). Con terreno, los taludes demasiado empinados
+# (Terreno.caminable) tampoco son transitables: hacen de muro, salvo sobre una Escalera.
 
 import math
 from dataclasses import dataclass
@@ -29,6 +34,9 @@ LADOS_PUERTA = ("n", "s", "e", "o")
 _RUMBO_ENTRADA = {"s": 0.0, "o": 90.0, "n": 180.0, "e": -90.0}
 # Vector unitario hacia afuera de cada cara.
 _NORMAL_FUERA = {"n": (0, 1), "s": (0, -1), "e": (1, 0), "o": (-1, 0)}
+# Vector unitario A LO LARGO de cada cara: el eje +x de un modelo girado para que su frente
+# (+z) mire hacia afuera (rotation_y = rumbo de entrada + 180; "derecha" = (cos ψ, -sin ψ)).
+_TANGENTE = {"n": (1, 0), "s": (-1, 0), "e": (0, -1), "o": (0, 1)}
 
 
 @dataclass(frozen=True)
@@ -70,6 +78,51 @@ class Obstaculo:
 
 
 @dataclass(frozen=True)
+class CasaDecorativa(Obstaculo):
+    """Casa no interactiva: un obstáculo de caja que se dibuja con un modelo 3D (ver
+    frontend/casas_decorativas.py). `rumbo` es la rotation_y del modelo en grados, múltiplo de
+    90 para que la caja siga alineada a los ejes; `variante` elige el tinte."""
+
+    modelo: str = ""
+    rumbo: float = 0.0
+    escala: float = 1.0
+    variante: int = 0
+    pisos: int = 1              # copias del modelo apiladas (favela: 1 o 2)
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not self.modelo or not self.es_caja:
+            raise ValueError("Casa decorativa: necesita un modelo y una caja (ancho y fondo).")
+        if self.rumbo % 90 != 0:
+            raise ValueError(f"Casa decorativa: el rumbo {self.rumbo} no es múltiplo de 90.")
+        if self.pisos < 1:
+            raise ValueError("Casa decorativa: necesita al menos un piso.")
+
+
+@dataclass(frozen=True)
+class Escalera:
+    """Escalera de la favela, de (ax, az) a (bx, bz) y `ancho` m: se dibuja con peldaños que
+    siguen el suelo y deja caminar por taludes que de otro modo serían muro."""
+
+    ax: float
+    az: float
+    bx: float
+    bz: float
+    ancho: float = 1.6
+
+    def __post_init__(self):
+        if self.ancho <= 0 or math.hypot(self.bx - self.ax, self.bz - self.az) <= 0:
+            raise ValueError("Escalera: necesita largo y ancho positivos.")
+
+    @property
+    def largo(self):
+        return math.hypot(self.bx - self.ax, self.bz - self.az)
+
+    def contiene(self, x, z):
+        return _distancia_punto_segmento((x, z), (self.ax, self.az), (self.bx, self.bz)) <= self.ancho / 2
+
+
+@dataclass(frozen=True)
 class Edificio:
     """Un edificio por lugar: caja (cx, cz, ancho en x, fondo en z, alto) con UNA puerta."""
 
@@ -81,21 +134,33 @@ class Edificio:
     alto: float
     lado_puerta: str
     nombre: str = ""            # texto del letrero; vacío = el nombre del lugar
+    modelo: str = ""            # modelo 3D (backend/datos/modelos_edificios.py); vacío = cubos
+    desfase_puerta: float = 0.0  # m desde el centro de la cara, a lo largo de _TANGENTE
+    y: float = 0.0              # altura del umbral de la puerta (= su plaza en la ladera)
 
     def __post_init__(self):
         if self.lado_puerta not in LADOS_PUERTA:
             raise ValueError(f"lado_puerta debe ser uno de {LADOS_PUERTA}, no {self.lado_puerta!r}.")
         if self.ancho <= 0 or self.fondo <= 0 or self.alto <= 0:
             raise ValueError(f"El edificio de {self.lugar!r} necesita ancho, fondo y alto positivos.")
+        if abs(self.desfase_puerta) >= self.frente / 2:
+            raise ValueError(f"La puerta de {self.lugar!r} queda fuera de su fachada.")
+
+    # Largo de la fachada con la puerta.
+    @property
+    def frente(self):
+        return self.ancho if self.lado_puerta in ("n", "s") else self.fondo
 
     @property
     def titulo(self):
         return self.nombre or self.lugar
 
-    # Puerta: centro de la cara `lado_puerta`, sobre la fachada.
+    # Puerta: sobre la fachada `lado_puerta`, en su centro corrido `desfase_puerta` m a lo largo.
     def puerta(self):
         nx, nz = _NORMAL_FUERA[self.lado_puerta]
-        return (self.cx + nx * self.ancho / 2, self.cz + nz * self.fondo / 2)
+        tx, tz = _TANGENTE[self.lado_puerta]
+        return (self.cx + nx * self.ancho / 2 + tx * self.desfase_puerta,
+                self.cz + nz * self.fondo / 2 + tz * self.desfase_puerta)
 
     # Punto de la calle `distancia` m delante de la puerta (donde se para el personaje).
     def punto_entrada(self, distancia=DISTANCIA_ENTRADA):
@@ -124,7 +189,7 @@ class MundoCiudad:
     # ValueError si un edificio es de un lugar inexistente o repetido, tapa una plaza o una
     # calle, o si alguna puerta, punto de entrada o spawn no es transitable.
     def __init__(self, mapa, edificios, obstaculos, radio_jugador=RADIO_JUGADOR,
-                 spawns=None, margen_edificios=0.0):
+                 spawns=None, margen_edificios=0.0, terreno=None, escaleras=()):
         if radio_jugador <= 0:
             raise ValueError("radio_jugador debe ser positivo.")
         self._mapa = mapa
@@ -139,6 +204,8 @@ class MundoCiudad:
             self._por_lugar[edificio.lugar] = edificio
 
         self._fisicos = [e.como_obstaculo() for e in self._edificios] + self._obstaculos
+        self.terreno = terreno           # objeto con altura(x, z); None = mundo plano
+        self._escaleras = list(escaleras)
         self._limites = self._calcular_limites(margen_edificios)
 
         for edificio in self._edificios:
@@ -151,6 +218,13 @@ class MundoCiudad:
         for nombre, (x, z) in self.spawns.items():
             if not self.es_transitable(x, z):
                 raise ValueError(f"El spawn {nombre!r} en ({x}, {z}) no es transitable.")
+
+    def escaleras(self):
+        return list(self._escaleras)
+
+    # Altura del suelo en (x, z).
+    def altura(self, x, z):
+        return self.terreno.altura(x, z) if self.terreno is not None else 0.0
 
     # -- Delegación al mapa (lo que usa el GPS) --
 
@@ -219,6 +293,9 @@ class MundoCiudad:
     def es_transitable(self, x, z):
         xmin, xmax, zmin, zmax = self._limites
         if not (xmin <= x <= xmax and zmin <= z <= zmax):
+            return False
+        if (self.terreno is not None and not self.terreno.caminable(x, z)
+                and not any(e.contiene(x, z) for e in self._escaleras)):
             return False
         return not any(o.choca(x, z, self.radio_jugador) for o in self._fisicos)
 

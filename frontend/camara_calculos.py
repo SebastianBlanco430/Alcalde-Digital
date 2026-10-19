@@ -17,9 +17,9 @@ from frontend.geometria_mundo import normalizar_angulo
 ALTURA_PIVOTE = 1.5
 
 
-# Pivote (x, y, z) al que apunta la cámara: la cabeza del personaje en (x, z).
-def pivote_del_jugador(x, z, altura=ALTURA_PIVOTE):
-    return (x, altura, z)
+# Pivote (x, y, z) al que apunta la cámara: la cabeza del personaje parado en (x, suelo, z).
+def pivote_del_jugador(x, z, altura=ALTURA_PIVOTE, suelo=0.0):
+    return (x, suelo + altura, z)
 
 
 # Posición de la cámara para el pivote, yaw y pitch (grados) y distancia dados.
@@ -52,6 +52,23 @@ def distancia_con_colision(deseada, distancia_impacto, margen, dmin=1.0):
     if distancia_impacto is None:
         return deseada
     return min(deseada, max(dmin, distancia_impacto - margen))
+
+
+# Distancia desde el pivote, hacia `posicion` (la cámara deseada), a la que el tramo pasa a menos
+# de `margen` m por encima del suelo (`altura_suelo(x, z)`), o None si no lo toca. Se muestrea
+# cada `paso` m: la ladera es suave a esa escala y no hace falta un raycast contra la malla.
+def distancia_libre_de_suelo(pivote, posicion, altura_suelo, margen=0.4, paso=0.5):
+    dx, dy, dz = (posicion[i] - pivote[i] for i in range(3))
+    largo = math.sqrt(dx * dx + dy * dy + dz * dz)
+    if largo < 1e-9:
+        return None
+    pasos = max(1, int(math.ceil(largo / paso)))
+    for k in range(1, pasos + 1):
+        t = k / pasos
+        x, y, z = pivote[0] + dx * t, pivote[1] + dy * t, pivote[2] + dz * t
+        if y < altura_suelo(x, z) + margen:
+            return largo * (k - 1) / pasos
+    return None
 
 
 # Acerca `actual` a `objetivo` con una exponencial (independiente de los fps). Hacia

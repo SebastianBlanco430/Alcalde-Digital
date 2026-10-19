@@ -33,3 +33,6 @@ build/
 dist/
 *.egg-info/
 
+
+# Texturas fuente de Blender (120 MB): los .glb ya las incluyen. Se comparten aparte.
+buildings/textures/

@@ -82,14 +82,15 @@ _NORMAL_FUERA = {"n": (0, 1), "s": (0, -1), "e": (1, 0), "o": (-1, 0)}
 ALTURA_OBJETIVO_PUERTA = 1.3
 
 
-# Cámara a 7 m de la puerta hacia afuera, 4 m de lado y 2.4 m de altura, mirando a la puerta.
-# Devuelve {"position", "pitch", "yaw", "target"}.
+# Cámara a 7 m de la puerta hacia afuera, 4 m de lado y 2.4 m sobre el umbral (edificio.y),
+# mirando a la puerta. Devuelve {"position", "pitch", "yaw", "target"}.
 def toma_fachada(edificio):
     nx, nz = _NORMAL_FUERA[edificio.lado_puerta]
     lx, lz = -nz, nx
     px, pz = edificio.puerta()
-    posicion = (px + nx * 7 + lx * 4, 2.4, pz + nz * 7 + lz * 4)
-    objetivo = (px, ALTURA_OBJETIVO_PUERTA, pz)
+    y = getattr(edificio, "y", 0.0)
+    posicion = (px + nx * 7 + lx * 4, y + 2.4, pz + nz * 7 + lz * 4)
+    objetivo = (px, y + ALTURA_OBJETIVO_PUERTA, pz)
     pitch, yaw = rotacion_mirando(posicion, objetivo)
     return {"position": posicion, "pitch": pitch, "yaw": yaw, "target": objetivo}
 

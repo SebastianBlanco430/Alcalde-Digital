@@ -30,6 +30,7 @@ class Peatones(Entity):
             personaje.etiqueta.enabled = False
             personaje.aro.enabled = False
             personaje.automatico = False              # se anima aquí, y solo mientras camina (rendimiento)
+            personaje.suelo = mundo.altura
             personaje.colocar(caminante.x, caminante.z)
             personaje.fijar_rumbo(caminante.rumbo)
             self.personajes.append(personaje)

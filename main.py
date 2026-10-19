@@ -18,7 +18,7 @@ from backend.logica.estado_partida import EstadoPartida
 from backend.logica.flujo_partida import FlujoPartida
 from backend.logica.misiones import SistemaMisiones
 from backend.logica.sesion import SesionJuego
-from frontend import compat_macos, estilo
+from frontend import compat_macos, estilo, medidor_fps
 from frontend.componentes import preparar_fuente, rgb
 from frontend.conexion_flujo import INICIO, INTERIOR, JUEGO, MUNDO, SELECCION_ROL, ConexionFlujo
 from frontend.escenas.escena_inicio import EscenaInicio
@@ -126,7 +126,10 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     aplicacion = Ursina(title="Alcalde Digital", icon=icono.as_posix(), borderless=False, fullscreen=False,
                         development_mode=False, size=TAMANO_VENTANA)
     compat_macos.reaplicar()
-    limitar_fps(FPS_MAXIMOS)
+    if medidor_fps.modo() != "libre":
+        limitar_fps(FPS_MAXIMOS)
+    if medidor_fps.modo():
+        medidor_fps.MedidorFps()
     application.asset_folder = Path(__file__).resolve().parent / "assets"
     window.color = rgb(estilo.COLOR_FONDO)
     fijar_tamano_ventana()
