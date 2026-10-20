@@ -1,6 +1,7 @@
 # Punto de entrada de Alcalde Digital (Ursina).
 # Importar este módulo no abre ventana: todo se construye en crear_aplicacion().
 
+import os
 from pathlib import Path
 
 import ursina as ursina_paquete
@@ -13,7 +14,7 @@ from ursina import Entity, Ursina, application, window
 from backend.datos.misiones_semilla import CATALOGO_MISIONES
 from backend.datos.noticias_semilla import construir_arboles
 from backend.grafos.grafo_social import construir_grafo_social_ejemplo
-from backend.datos.ciudad_3d import ESCALA_MUNDO, construir_mundo_3d
+from backend.datos.ciudad_3d import ESCALA_MUNDO, SEMILLA_CASAS, construir_mundo_3d
 from backend.logica.estado_partida import EstadoPartida
 from backend.logica.flujo_partida import FlujoPartida
 from backend.logica.misiones import SistemaMisiones
@@ -113,6 +114,21 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
     return conexion
 
 
+# Semilla de la favela: la variable de entorno ALCALDE_SEMILLA (entero) elige otra disposición de
+# casas; sin ella, o si no es un entero, se usa la de siempre.
+def leer_semilla():
+    bruto = os.environ.get("ALCALDE_SEMILLA")
+    if bruto is None:
+        return SEMILLA_CASAS
+    try:
+        semilla = int(bruto)
+    except ValueError:
+        print(f"[Mundo] ALCALDE_SEMILLA={bruto!r} no es un entero; uso {SEMILLA_CASAS}.")
+        return SEMILLA_CASAS
+    print(f"[Mundo] semilla de la favela: {semilla}")
+    return semilla
+
+
 def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematica=DURACION_CINEMATICA):
     # Retorna (aplicacion, gestor) sin iniciar el loop: quien llama hace aplicacion.run().
     # duracion_transicion=0 quita el fundido y duracion_cinematica=0 las cinemáticas (los scripts
@@ -136,7 +152,7 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     preparar_fuente()
 
     gestor = GestorEscenas()
-    registrar_escenas(gestor, construir_mundo_3d(), duracion_transicion, duracion_cinematica)
+    registrar_escenas(gestor, construir_mundo_3d(semilla=leer_semilla()), duracion_transicion, duracion_cinematica)
     gestor.cambiar_a(INICIO)
     return aplicacion, gestor
 

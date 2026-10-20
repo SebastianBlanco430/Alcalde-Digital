@@ -464,6 +464,45 @@ taludes no caminables. Con los anteriores son 22, y todos pasan.
 tapan, escaleras que no cruzan calles ni plazas, que sobre una escalera se camine en un talud
 y la vegetación). En total hay 27, y todos pasan.
 
+### Fase G: detalles de favela (2026-10-19)
+
+Ocho mejoras de la favela, hechas con subagentes en paralelo (bloques A–F) y unidas en `Ciudad3D`.
+Todo es determinista (el azar sale de `azar_de(a, b)` en `frontend/azar_fijo.py`, nunca del
+`random.Random` del backend) y el mundo plano (`ladera=False`) sigue funcionando.
+
+| Mejora | Dónde | Qué hace y constantes |
+|---|---|---|
+| Muros de contención | `backend/datos/muros.py`, `frontend/muros_contencion.py` | Una losa por celda de talud no caminable, a lo largo de la curva de nivel, fusionadas en cadena (±15°, ≤ 0.6 pasos de desvío): 138 celdas dan 38 muros. Largo = paso × 1.1; base = mínimo de esquinas − 0.3 m; tope = máximo + 0.4 m. Excluye ~1.6 m en torno a escaleras, calles y accesos, y las cajas de edificios y casas. Dibujo: cubo de 0.35 m de grosor, `COLOR_MURO` (128, 124, 116) alternando con un tono 8 más oscuro, y tapa de 0.08 m. No cambian la colisión. |
+| Semilla | `construir_mundo_3d(semilla=SEMILLA_CASAS)`, `main.py` | Casas con `semilla`, vegetación con `semilla + 1`, muros al final. `ALCALDE_SEMILLA` (entero) elige otra favela; con la semilla por defecto la favela es idéntica a la anterior. |
+| Velocidad por pendiente | `backend/logica/navegacion.py`, `frontend/controlador_jugador.py` | `factor_pendiente`: subiendo `max(0.6, 1 − 0.9 t)` (≈ 0.76 a 15°), bajando `min(1.1, 1 + 0.3 \|t\|)`. Mide el desnivel 0.5 m adelante y escala el paso antes de las colisiones; también al correr. |
+| Zócalos y pilotes | `frontend/ciudad_3d.py`, `frontend/geometria_mundo.py` | La planta baja se apoya en `alto` de `apoyo_de_caja` = (bajo, alto) sobre 9 puntos de la huella. Desnivel ≤ 1.5 m: zócalo `COLOR_ZOCALO` (150, 146, 138); mayor: losa (≥ 0.25 m, más gruesa si hace falta) y 4 pilotes de 0.3 × 0.3 m. Cada modelo de casa trae un plinto propio bajo el umbral (`hondo` en `modelos_edificios.py`, 0.17–0.54 u): la base lo tapa por completo y es 0.06 m más ancha por lado que la casa (`medidas_zocalo` / `medidas_losa`), así no hay caras coplanares ni textura de pared bajo la base. 125 casas con zócalo y 25 con pilotes (desnivel máximo 2.88 m). Las casas del lado alto suben 1–3 m. El cable de la farola llega al 80 % del alto total. |
+| Ladrillo | `frontend/casas_decorativas.py` | 2.º piso con `TINTE_LADRILLO` (200, 124, 92) si `azar_de(cx + 3.1, cz) < 0.5`. |
+| Terreno de una cara | `_malla_terreno` | Sin `double_sided`; se invirtió el orden de los vértices (antihorario visto desde +y), verificado con una captura aérea. |
+| Antenas y ropa | `frontend/detalles_calculos.py`, `frontend/detalles_techos.py` | Antenas en ~20 % de las casas (32), en la esquina opuesta al tanque (mástil 0.05 × 0.6 m, plato de una esfera compartida). Hasta 40 tendederos entre casas con 1.2–4 m de separación, sin cruzar calles, accesos, escaleras ni otras casas; prendas cada ~0.5 m con borde inferior ≥ 2.15 m. Las cuerdas se suman a la malla de líneas de los cables. |
+| Banderas | `frontend/banderas.py`, `frontend/banderas_calculos.py` | Una por edificio jugable, en la esquina trasera del techo opuesta a la puerta; 7 colores (`COLORES_BANDERA`). Mástil de `ALTO_MASTIL` = 4 m y tela de 6 franjas que ondea (25° en la punta, 3 rad/s). La del destino de la misión se agranda 1.4×, ondea 1.6× más rápido y lleva borde `COLOR_BALIZA`. Se anima desde `Ciudad3D.update()` y no proyecta sombra. |
+| Neblina | `frontend/niebla.py`, `escena_mundo.py` | `activar_niebla(color=(196, 218, 222), fin=260, intensidad=0.55)` al entrar al mundo y `desactivar_niebla()` al salir; a 30 m pesa ~6 %. Solo afecta a las entidades ya creadas y no a las de `shader=None`. |
+| Minimapa | `frontend/hud.py` (`Minimapa`), `frontend/hud_calculos.py` | Casas (88, 92, 108, algo transparente) y escaleras (200, 190, 160) en una malla cada una; se reconstruyen solo si el yaw cambia más de 1.5°. |
+
+**Orden en `Ciudad3D.__init__`:** suelo, calles, plazas, edificios, obstáculos (casas con base, tanques,
+detalles, cables con la ropa), escaleras, muros, `combine()`, `silenciar()`, banderas, sombras.
+
+**Refactor previo (Fase 0):** `azar_de` (antes `_azar_de`), `lineas_sueltas` en `piezas.py`,
+`CasaDecorativa.alto_piso` / `alto_total` y `MASCARA_LUZ` definida solo en `piezas.py`.
+
+**Mediciones:**
+- `construir_mundo_3d()`: 1.69 s antes, 1.75 s después (límite del plan: +0.3 s).
+- Entidades sin fundir nuevas: las 7 banderas (unas 63–70, todas silenciadas salvo su animación).
+- FPS con tope y libre: **pendiente de medir a mano** (`$env:ALCALDE_FPS="1"` y `"libre"`; criterio: media ≥ 57 y 1 % bajo ≥ 30).
+- Tests: 10 fallos preexistentes (1 desactualizado por la favela y 9 sin investigar: `test_flujo_partida`, `test_guion_cinematicas` ×7, `test_mazo_noticias`) y el resto pasa.
+
+**Pendiente:**
+- Medir FPS y mirar a ojo las banderas, la ropa, los pilotes y el minimapa.
+- Las banderas quedan tapadas por casas más altas de la ladera; para verlas siempre haría falta un mástil de 8–12 m.
+- Los muros no tienen collider de cámara (la cámara de tercera persona puede atravesarlos).
+- Las entidades con `shader=None` (ventanas, luces, cables) no reciben la neblina.
+- Una casa en el borde del minimapa desaparece entera y puede parpadear al girar.
+- `tests/test_favela.py` y `tests/test_terreno.py` no están en el repo; las reglas de la favela se repiten en `tests/test_muros.py`.
+
 ### Pendiente del equipo
 - Texturizar en Blender las caras que quedaron grises y reexportar.
 - Pasar a quien lo necesite `buildings/textures/`, que no se sube al repo.

@@ -16,6 +16,7 @@ import random
 from dataclasses import replace
 
 from backend.datos.modelos_edificios import MODELOS, modelo_de
+from backend.datos.muros import muros_de_contencion
 from backend.datos.terreno import Terreno
 from backend.grafos.grafo_ciudad import construir_grafo_ciudad_ejemplo
 from backend.grafos.mapa_ciudad import COORDENADAS_EJEMPLO, MapaCiudad, _distancia_punto_segmento
@@ -58,7 +59,7 @@ ANCHO_ESCALERA = 1.6
 DESNIVEL_ESCALERA = 1.5     # m mínimos que tiene que salvar una escalera
 # Vegetación suelta en la ladera (ver _vegetacion).
 CANTIDAD_VEGETACION = 70
-SEPARACION_VEGETACION = 0.8 # m entre una planta y cualquier otra cosa         # sorteo: cada modelo ya tiene ~2 plantas; 2 copias = una casa de 4
+SEPARACION_VEGETACION = 0.8 # m entre una planta y cualquier otra cosa
 
 # (lugar, cx, cz, ancho en x, fondo en z, alto, lado de la puerta, nombre del letrero, modelo 3D)
 # Con modelo, (cx, cz, ancho, fondo) es el LOTE: el modelo se escala sin deformarse para caber
@@ -159,6 +160,10 @@ class _Despeje:
     # Otra línea que debe quedar libre (p. ej. el eje de una escalera).
     def agregar_linea(self, a, b):
         self._lineas.append((a, b))
+
+    # Copia de las líneas que deben quedar libres (calles, accesos y escaleras agregadas).
+    def lineas(self):
+        return list(self._lineas)
 
     def permite(self, obstaculo):
         if any(_distancia_a_segmento(obstaculo, a, b) < ESPACIO_LIBRE for a, b in self._lineas):
@@ -448,7 +453,10 @@ def _vegetacion(mapa, despeje, ocupados, terreno, cantidad=CANTIDAD_VEGETACION, 
 
 # ladera=False: el mundo plano de antes (y = 0 en todas partes, sin casas decorativas).
 # casas: cuántas casas decorativas generar en la ladera (0 = ninguna).
-def construir_mundo_3d(ladera=True, casas=CANTIDAD_CASAS):
+# semilla: azar de la favela; las casas usan `semilla` y la vegetación `semilla + 1`. Con la de
+# por defecto sale la favela de siempre. Los muros de contención se calculan al FINAL, sobre lo
+# ya colocado, y no consumen azar.
+def construir_mundo_3d(ladera=True, casas=CANTIDAD_CASAS, semilla=SEMILLA_CASAS):
     mapa = _construir_mapa()
     edificios = _construir_edificios()
     spawns = _spawns()
@@ -463,7 +471,9 @@ def construir_mundo_3d(ladera=True, casas=CANTIDAD_CASAS):
     escaleras = _escaleras(mapa, edificios, obstaculos, terreno)
     for e in escaleras:
         despeje.agregar_linea((e.ax, e.az), (e.bx, e.bz))
-    obstaculos = obstaculos + _casas_favela(mapa, despeje, obstaculos, terreno, cantidad=casas)
-    obstaculos = obstaculos + _vegetacion(mapa, despeje, obstaculos, terreno)
+    obstaculos = obstaculos + _casas_favela(mapa, despeje, obstaculos, terreno, cantidad=casas, semilla=semilla)
+    obstaculos = obstaculos + _vegetacion(mapa, despeje, obstaculos, terreno, semilla=semilla + 1)
+    cajas = [e.caja() for e in edificios] + [_caja(o) for o in obstaculos if isinstance(o, CasaDecorativa)]
+    muros = muros_de_contencion(terreno, escaleras, cajas, lineas_libres=despeje.lineas())
     return MundoCiudad(mapa, edificios, obstaculos, spawns=spawns, margen_edificios=MARGEN_EDIFICIOS,
-                       terreno=terreno, escaleras=escaleras)
+                       terreno=terreno, escaleras=escaleras, muros=muros)

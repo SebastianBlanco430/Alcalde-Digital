@@ -9,6 +9,9 @@
 # la altura del umbral de la puerta; el frente (la fachada con la puerta) mira a +z de Ursina.
 #   frente: ancho de la huella (eje x del modelo); fondo: profundidad (eje z); alto: hasta el techo.
 #   puerta_x: centro de la puerta respecto del centro de la fachada, sobre el eje x del modelo.
+#   hondo: cuánto baja el modelo POR DEBAJO del umbral (un plinto propio, con la textura de la pared,
+#     de la misma huella que las paredes): -y mínimo de get_tight_bounds() del .glb. No lo imprime
+#     exportar_edificios.py: se mide con load_model(...).get_tight_bounds() y se pega aquí.
 
 from dataclasses import dataclass
 
@@ -25,13 +28,14 @@ class ModeloEdificio:
     puerta_ancho: float
     puerta_alto: float
     textura_puerta: str     # imagen de la hoja de la puerta, junto al .glb
+    hondo: float = 0.0      # profundidad del plinto bajo el umbral, en unidades del modelo (>= 0)
 
 
 MODELOS = {
-    "casa1": ModeloEdificio("casa1", frente=2.366, fondo=2.594, alto=3.108, puerta_x=-0.082, puerta_ancho=0.604, puerta_alto=1.043, textura_puerta="casa1_puerta.jpg"),
-    "casa2": ModeloEdificio("casa2", frente=2.721, fondo=3.707, alto=3.369, puerta_x=-0.860, puerta_ancho=0.591, puerta_alto=0.943, textura_puerta="casa2_puerta.jpg"),
-    "casa3": ModeloEdificio("casa3", frente=2.774, fondo=4.394, alto=2.531, puerta_x=-0.822, puerta_ancho=0.450, puerta_alto=0.922, textura_puerta="casa3_puerta.jpg"),
-    "casa4": ModeloEdificio("casa4", frente=2.352, fondo=1.749, alto=3.593, puerta_x=-0.738, puerta_ancho=0.576, puerta_alto=1.029, textura_puerta="casa4_puerta.jpg"),
+    "casa1": ModeloEdificio("casa1", frente=2.366, fondo=2.594, alto=3.108, puerta_x=-0.082, puerta_ancho=0.604, puerta_alto=1.043, textura_puerta="casa1_puerta.jpg", hondo=0.255),
+    "casa2": ModeloEdificio("casa2", frente=2.721, fondo=3.707, alto=3.369, puerta_x=-0.860, puerta_ancho=0.591, puerta_alto=0.943, textura_puerta="casa2_puerta.jpg", hondo=0.536),
+    "casa3": ModeloEdificio("casa3", frente=2.774, fondo=4.394, alto=2.531, puerta_x=-0.822, puerta_ancho=0.450, puerta_alto=0.922, textura_puerta="casa3_puerta.jpg", hondo=0.166),
+    "casa4": ModeloEdificio("casa4", frente=2.352, fondo=1.749, alto=3.593, puerta_x=-0.738, puerta_ancho=0.576, puerta_alto=1.029, textura_puerta="casa4_puerta.jpg", hondo=0.483),
 }
 
 

@@ -2,11 +2,17 @@
 # Todo lo que se dibuja en `scene` en 3D real (ciudad, personajes, interior) se arma con
 # estas primitivas (cubo, esfera, plano, círculo).
 
+from panda3d.core import (BitMask32, Geom, GeomLines, GeomNode, GeomVertexData, GeomVertexFormat,
+                          GeomVertexWriter, NodePath)
 from ursina import Entity, Text, color
 from ursina.shaders import lit_with_shadows_shader
 
 from frontend import estilo
 from frontend.componentes import rgb
+
+# Máscara de la cámara de sombras de DirectionalLight (camera mask 0b0001): `hide(MASCARA_LUZ)` saca
+# una pieza del mapa de sombras. Definición única; la importan ciudad_3d y banderas.
+MASCARA_LUZ = BitMask32.bit(0)
 
 # Ajustes del shader (se aplican a las piezas que se creen después): bias NEGATIVO (en Ursina el
 # positivo agrega sombra) para que las
@@ -74,3 +80,21 @@ def etiqueta(texto, **opciones):
     texto_3d = Text(texto, billboard=True, origin=(0, 0), **opciones)
     texto_3d.create_background(padding=(0.03, 0.015), radius=0.3, color=color.rgba32(10, 12, 20, 170))
     return texto_3d
+
+
+# Segmentos sueltos (vértices de a pares) en un solo Geom. Mesh(mode="line") de Ursina los uniría
+# todos en una sola línea continua.
+def lineas_sueltas(vertices):
+    datos = GeomVertexData("lineas", GeomVertexFormat.get_v3(), Geom.UH_static)
+    datos.set_num_rows(len(vertices))
+    escritor = GeomVertexWriter(datos, "vertex")
+    for v in vertices:
+        escritor.add_data3(*v)
+    lineas = GeomLines(Geom.UH_static)
+    for i in range(0, len(vertices) - 1, 2):
+        lineas.add_vertices(i, i + 1)
+    geom = Geom(datos)
+    geom.add_primitive(lineas)
+    nodo = GeomNode("lineas")
+    nodo.add_geom(geom)
+    return NodePath(nodo)

@@ -21,6 +21,8 @@
 # dx = h·cosθ + v·sinθ, dz = -h·sinθ + v·cosθ, eso da W = hacia donde mira la cámara y
 # D = su derecha (lo fija scripts/prueba_mundo.py con la cámara real y 5 yaw distintos).
 
+import math
+
 from ursina import Entity, held_keys, time
 
 from backend.logica import navegacion
@@ -28,7 +30,8 @@ from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 from frontend import geometria_mundo
 
 VELOCIDAD = 7.0     # unidades de mundo por segundo
-DT_MAXIMO = 0.05    # tope por frame: un tirón no atraviesa paredes ni salta la cámara
+DISTANCIA_PENDIENTE = 0.5  # m adelante en que se mide el desnivel para frenar en subida
+DT_MAXIMO = 0.05   # tope por frame: un tirón no atraviesa paredes ni salta la cámara
 
 
 class ControladorJugador(Entity):
@@ -79,6 +82,15 @@ class ControladorJugador(Entity):
         x0, z0 = jugador.x, jugador.z
         x, z = x0, z0
         if dx != 0 or dz != 0:
+            # Cuesta: se mide el desnivel 0.5 m adelante y se frena/acelera (corriendo también).
+            # El mapa 2D no tiene `altura`; el mundo plano devuelve 0 -> factor 1.
+            altura = getattr(self._mapa, "altura", None)
+            if altura is not None:
+                largo = math.hypot(dx, dz)
+                desnivel = altura(x0 + dx / largo * DISTANCIA_PENDIENTE,
+                                  z0 + dz / largo * DISTANCIA_PENDIENTE) - altura(x0, z0)
+                factor = navegacion.factor_pendiente(desnivel, DISTANCIA_PENDIENTE)
+                dx, dz = dx * factor, dz * factor
             x, z = navegacion.mover_con_colisiones(self._mapa, x, z, dx, dz)
         # Se notifica siempre (también quieto): mantiene al día EN_RUTA / EN_RADIO.
         flujo.actualizar_posicion(x, z)

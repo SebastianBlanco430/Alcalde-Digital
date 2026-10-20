@@ -269,6 +269,10 @@ class Minimapa(Entity):
     ANCHO = 280 / 720                # ~280 x 200 px de la ventana de 1280 x 720
     ALTO = 200 / 720
     LARGO_FLECHA = 0.05
+    YAW_MIN_CASAS = 1.5              # grados de giro a partir de los cuales se rehacen casas y escaleras
+    COLOR_CASAS = color.rgba32(88, 92, 108, 200)    # casas: algo transparentes
+    COLOR_ESCALERAS = color.rgba32(200, 190, 160, 255)
+    ANCHO_MIN_ESCALERA = 0.003       # grosor mínimo de una escalera en camera.ui (unidades)
 
     # rotacion_libre (mundo 3D): el yaw se cambia cada frame con fijar_yaw() y la escala no depende de él.
     def __init__(self, mapa, yaw_grados=None, rotacion_libre=False, **opciones):
@@ -283,6 +287,7 @@ class Minimapa(Entity):
         # Capas con z cada vez más negativo = más cerca de la cámara de camera.ui.
         self.fondo = _fondo(self, self.ANCHO, self.ALTO, COLOR_FONDO_HUD, 10)
         self.capa_calles = Entity(parent=self, z=-0.001)
+        self.capa_casas = Entity(parent=self, z=-0.0015)      # casas y escaleras (una malla cada una)
         self.capa_ruta = Entity(parent=self, z=-0.002)
         self.capa_lugares = Entity(parent=self, z=-0.003)
         self.capa_jugadores = Entity(parent=self, z=-0.004)
@@ -300,7 +305,13 @@ class Minimapa(Entity):
         self.calles = []              # [(cuadro, a, b)] para recolocarlas al girar
         self.marcas_edificios = {}    # lugar -> cuadrito en la puerta (solo mundo con edificios)
         self._firma_ruta = None
+        self.malla_casas = Entity(parent=self.capa_casas, enabled=False, color=self.COLOR_CASAS)
+        self.malla_escaleras = Entity(parent=self.capa_casas, z=-0.0003, enabled=False,
+                                      color=self.COLOR_ESCALERAS)
+        self.reconstrucciones_casas = 0   # cuántas veces se rehicieron las mallas (lo usan los tests)
+        self._yaw_casas = None            # yaw con el que se construyeron las mallas
         self._construir_mapa()
+        self._reconstruir_casas()
         self.marcador_destino = Entity(parent=self.capa_lugares, model="circle", z=0.0005,
                                        color=rgb(COLOR_DESTINO), enabled=False)
 
@@ -332,13 +343,44 @@ class Minimapa(Entity):
         for lugar, marca in self.marcas_edificios.items():
             marca.position = g.punto(*self._mapa.edificio_de(lugar).puerta())
 
-    # Gira el minimapa con la cámara. Barato: la escala no cambia, solo se recolocan 7 + 7 cuadros.
+    # Gira el minimapa con la cámara. Barato: la escala no cambia, solo se recolocan 7 + 7 cuadros;
+    # las mallas de casas y escaleras se rehacen solo si el yaw cambió más de YAW_MIN_CASAS.
     def fijar_yaw(self, yaw_grados):
         if abs(yaw_grados - self.geometria.yaw) < 0.05:
             return
         self.geometria.girar(yaw_grados)
         self._colocar_mapa()
         self._firma_ruta = None            # la ruta y la flecha se redibujan con el nuevo yaw
+        if (self._yaw_casas is not None
+                and hud_calculos.diferencia_yaw(yaw_grados, self._yaw_casas) > self.YAW_MIN_CASAS):
+            self._reconstruir_casas()
+
+    # Rehace las dos mallas (casas y escaleras) con el yaw actual. Mundo sin obstaculos() o
+    # escaleras() (mapa 2D): no hay nada que dibujar y las mallas quedan apagadas.
+    def _reconstruir_casas(self):
+        g = self.geometria
+        obstaculos = getattr(self._mapa, "obstaculos", None)
+        escaleras = getattr(self._mapa, "escaleras", None)
+        cuadros = g.cuadros_casas(obstaculos()) if callable(obstaculos) else []
+        rectangulos = [hud_calculos.segmento_a_rectangulo(p0, p1, max(ancho, self.ANCHO_MIN_ESCALERA))
+                       for p0, p1, ancho in (g.segmentos_escaleras(escaleras())
+                                             if callable(escaleras) else [])]
+        self._yaw_casas = g.yaw
+        self.reconstrucciones_casas += 1
+        for entidad, cuadrilateros in ((self.malla_casas, cuadros),
+                                       (self.malla_escaleras, rectangulos)):
+            entidad.enabled = bool(cuadrilateros)
+            entidad.model = self._malla_de_cuadrilateros(cuadrilateros) if cuadrilateros else None
+
+    # Una sola Mesh con todos los cuadriláteros [(c0, c1, c2, c3)] de (u, v): dos triángulos cada uno.
+    @staticmethod
+    def _malla_de_cuadrilateros(cuadrilateros):
+        vertices, triangulos = [], []
+        for i, esquinas in enumerate(cuadrilateros):
+            base = 4 * i
+            vertices += [(u, v, 0) for u, v in esquinas]
+            triangulos += [(base, base + 1, base + 2), (base, base + 2, base + 3)]
+        return Mesh(vertices=vertices, triangles=triangulos)
 
     # Coloca un cuadro como línea gruesa de p0 a p1 (rotation_z en sentido horario).
     def _poner_segmento(self, cuadro, p0, p1, grosor, tono):

@@ -18,11 +18,15 @@ from ursina import Entity, load_model
 from ursina.shaders import lit_with_shadows_shader
 
 from backend.datos.modelos_edificios import modelo_de
+from frontend.azar_fijo import azar_de
 from frontend.componentes import rgb
+
+TINTE_LADRILLO = (200, 124, 92)     # 2.º piso "a la vista": ladrillo sin revocar en parte de las casas
 
 
 # Entity con todas las `casas` fundidas, colgada de `padre`. `tintes`: lista de (r, g, b) que
-# se elige con casa.variante. `alturas`: la y de apoyo de cada casa (None = todas en 0).
+# se elige con casa.variante. `alturas`: la y de la planta baja de cada casa, o sea el `alto` de
+# su apoyo (None = todas en 0).
 def construir_casas(padre, casas, tintes, alturas=None):
     lote = Entity(parent=padre, shader=lit_with_shadows_shader)
     raiz = NodePath("casas_decorativas")
@@ -37,11 +41,19 @@ def construir_casas(padre, casas, tintes, alturas=None):
             copia.set_pos(casa.cx, y + piso * alto_piso, casa.cz)
             copia.set_hpr(-casa.rumbo, 0, 0)
             copia.set_scale(casa.escala)
-            copia.set_color_scale(rgb(tintes[(casa.variante + piso) % len(tintes)]))
+            copia.set_color_scale(rgb(_tinte_del_piso(casa, piso, tintes)))
     raiz.clear_model_nodes()     # el ModelRoot de cada .glb impide fundir las copias entre sí
     raiz.flatten_strong()
     raiz.reparent_to(lote)
     return lote
+
+
+# Tinte de un piso: el de la paleta (siguiente en cada piso) o, en el 2.º piso de la mitad de las
+# casas (decidido por su posición, siempre las mismas), ladrillo a la vista.
+def _tinte_del_piso(casa, piso, tintes):
+    if piso == 1 and azar_de(casa.cx + 3.1, casa.cz) < 0.5:
+        return TINTE_LADRILLO
+    return tintes[(casa.variante + piso) % len(tintes)]
 
 
 # El modelo cargado una vez, con el color base de sus materiales pasado a color plano.

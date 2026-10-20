@@ -29,6 +29,25 @@ def mover_isometrico(h, v, yaw_grados, velocidad, dt):
     return (dx * factor, dz * factor)
 
 
+PENDIENTE_FACTOR_MINIMO = 0.6   # multiplicador de velocidad más lento (subida muy empinada)
+PENDIENTE_FACTOR_MAXIMO = 1.1   # multiplicador más rápido (bajada empinada)
+PENDIENTE_COEF_SUBIDA = 0.9     # cuánto frena cada unidad de pendiente t subiendo
+PENDIENTE_COEF_BAJADA = 0.3     # cuánto acelera cada unidad de pendiente |t| bajando
+PENDIENTE_DISTANCIA_MIN = 1e-6  # m: por debajo se considera sin distancia (factor 1)
+
+
+# Multiplicador de velocidad según la pendiente, con t = desnivel / distancia (m/m):
+# subiendo (t > 0) max(0.6, 1 - 0.9·t) (≈ 0.76 a 15°); bajando (t < 0) min(1.1, 1 + 0.3·|t|);
+# plano o distancia ~0 -> 1.
+def factor_pendiente(desnivel, distancia):
+    if distancia <= PENDIENTE_DISTANCIA_MIN:
+        return 1.0
+    t = desnivel / distancia
+    if t > 0:
+        return max(PENDIENTE_FACTOR_MINIMO, 1 - PENDIENTE_COEF_SUBIDA * t)
+    return min(PENDIENTE_FACTOR_MAXIMO, 1 + PENDIENTE_COEF_BAJADA * abs(t))
+
+
 # Colisión con deslizamiento: prueba (x+dx, z+dz), luego (x+dx, z), luego
 # (x, z+dz); si ninguna es transitable se queda en (x, z).
 def mover_con_colisiones(mapa, x, z, dx, dz):

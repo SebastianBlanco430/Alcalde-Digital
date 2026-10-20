@@ -25,6 +25,7 @@
 import math
 from dataclasses import dataclass
 
+from backend.datos.modelos_edificios import modelo_de
 from backend.grafos.mapa_ciudad import _distancia_punto_segmento
 
 RADIO_JUGADOR = 0.35
@@ -97,6 +98,21 @@ class CasaDecorativa(Obstaculo):
             raise ValueError(f"Casa decorativa: el rumbo {self.rumbo} no es múltiplo de 90.")
         if self.pisos < 1:
             raise ValueError("Casa decorativa: necesita al menos un piso.")
+
+    @property
+    def alto_piso(self):
+        """Alto en m de un piso: el del modelo por su escala."""
+        return modelo_de(self.modelo).alto * self.escala
+
+    @property
+    def alto_total(self):
+        """Alto en m de la casa entera (todos sus pisos apilados)."""
+        return self.alto_piso * self.pisos
+
+    @property
+    def hondo_umbral(self):
+        """Cuántos m baja el plinto del modelo por debajo del umbral (y del piso de la casa)."""
+        return modelo_de(self.modelo).hondo * self.escala
 
 
 @dataclass(frozen=True)
@@ -189,7 +205,7 @@ class MundoCiudad:
     # ValueError si un edificio es de un lugar inexistente o repetido, tapa una plaza o una
     # calle, o si alguna puerta, punto de entrada o spawn no es transitable.
     def __init__(self, mapa, edificios, obstaculos, radio_jugador=RADIO_JUGADOR,
-                 spawns=None, margen_edificios=0.0, terreno=None, escaleras=()):
+                 spawns=None, margen_edificios=0.0, terreno=None, escaleras=(), muros=()):
         if radio_jugador <= 0:
             raise ValueError("radio_jugador debe ser positivo.")
         self._mapa = mapa
@@ -206,6 +222,7 @@ class MundoCiudad:
         self._fisicos = [e.como_obstaculo() for e in self._edificios] + self._obstaculos
         self.terreno = terreno           # objeto con altura(x, z); None = mundo plano
         self._escaleras = list(escaleras)
+        self._muros = list(muros)        # losas de contención (backend/datos/muros.py): solo se dibujan
         self._limites = self._calcular_limites(margen_edificios)
 
         for edificio in self._edificios:
@@ -221,6 +238,10 @@ class MundoCiudad:
 
     def escaleras(self):
         return list(self._escaleras)
+
+    # Muros de contención de los taludes (la colisión no los usa: el talud ya bloquea el paso).
+    def muros(self):
+        return list(self._muros)
 
     # Altura del suelo en (x, z).
     def altura(self, x, z):

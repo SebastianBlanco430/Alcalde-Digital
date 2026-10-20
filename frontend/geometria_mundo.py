@@ -78,3 +78,40 @@ def rumbo_de(dx, dz):
     return math.degrees(math.atan2(dx, dz))
 
 
+# -- Apoyo de una caja sobre el suelo ---------------------------------------
+
+
+# Apoyo de una caja (cx, cz, ancho, fondo) sobre `suelo(x, z)`: (bajo, alto) = mínima y máxima
+# altura del suelo bajo su huella, muestreada en el centro, las 4 esquinas y los 4 puntos medios
+# de los lados. La planta baja se apoya en `alto` (el umbral nunca queda enterrado) y el hueco
+# hasta `bajo` lo llena un zócalo o unos pilotes.
+def apoyo_de_caja(suelo, cx, cz, ancho, fondo):
+    mx, mz = ancho / 2, fondo / 2
+    alturas = [suelo(cx + sx * mx, cz + sz * mz) for sx in (-1, 0, 1) for sz in (-1, 0, 1)]
+    return (min(alturas), max(alturas))
+
+
+# -- Base de una casa (zócalo o losa de pilotes) ------------------------------
+
+# Todas en m. Los modelos de casa tienen un plinto propio (con la textura de la pared) que baja
+# `hondo` bajo el umbral con la MISMA huella que las paredes: la base debe taparlo por completo.
+ENTIERRO_BASE = 0.3        # m que la base se hunde bajo el punto más bajo de la huella
+SOBRESALE_ZOCALO = 0.1     # m que la base sube por encima del piso (tapa el umbral/peldaño de 0.03 u del modelo)
+HOLGURA_ZOCALO = 0.12      # m que la base ensancha la huella (en total, ancho y fondo: 0.06 por lado)
+GROSOR_LOSA = 0.25         # m mínimos de la losa de los pilotes, bajo el piso de la casa
+MARGEN_BASE = 0.08         # m que la base baja de más bajo el plinto del modelo (para taparlo seguro)
+
+
+# Zócalo macizo: (pie, tope, holgura) en m. Del más bajo entre "enterrado bajo el suelo" y "bajo el
+# plinto del modelo" hasta algo por encima del piso; `holgura` es lo que ensancha ancho y fondo,
+# así ninguna pared del modelo queda coplanar con las caras del zócalo.
+def medidas_zocalo(bajo, alto, hondo):
+    pie = min(bajo - ENTIERRO_BASE, alto - hondo - MARGEN_BASE)
+    return (pie, alto + SOBRESALE_ZOCALO, HOLGURA_ZOCALO)
+
+
+# Losa sobre pilotes: (pie, tope, holgura) en m. Más gruesa que GROSOR_LOSA si el plinto del modelo
+# baja más, para que lo cubra entero; los pilotes cuelgan de `pie`.
+def medidas_losa(alto, hondo):
+    grosor = max(GROSOR_LOSA, hondo + MARGEN_BASE)
+    return (alto - grosor, alto + SOBRESALE_ZOCALO, HOLGURA_ZOCALO)

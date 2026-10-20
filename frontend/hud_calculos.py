@@ -267,6 +267,49 @@ class GeometriaMinimapa:
     def contiene(self, u, v, holgura=1e-9):
         return abs(u) <= self.tamano[0] / 2 + holgura and abs(v) <= self.tamano[1] / 2 + holgura
 
+    # [(c0, c1, c2, c3)] con las esquinas (u, v) de cada casa (obstáculo de tipo "casa", caja
+    # alineada a los ejes) rotadas con el yaw actual. Se descartan las casas con alguna esquina
+    # fuera del minimapa: así el dibujo nunca se sale de su rectángulo. Orden de esquinas: el
+    # contorno (sin diagonales), apto para dos triángulos (0,1,2) y (0,2,3).
+    def cuadros_casas(self, obstaculos):
+        cuadros = []
+        for o in obstaculos:
+            if o.tipo != "casa" or not o.es_caja:
+                continue
+            mx, mz = o.ancho / 2, o.fondo / 2
+            esquinas = [self.punto(o.cx + dx, o.cz + dz)
+                        for dx, dz in ((-mx, -mz), (mx, -mz), (mx, mz), (-mx, mz))]
+            if all(self.contiene(u, v) for u, v in esquinas):
+                cuadros.append(tuple(esquinas))
+        return cuadros
+
+    # [(p0, p1, ancho)] de cada escalera (extremos en (u, v) y ancho ya escalado); se descartan
+    # las que tengan algún extremo fuera del minimapa.
+    def segmentos_escaleras(self, escaleras):
+        segmentos = []
+        for e in escaleras:
+            p0, p1 = self.punto(e.ax, e.az), self.punto(e.bx, e.bz)
+            if self.contiene(*p0) and self.contiene(*p1):
+                segmentos.append((p0, p1, e.ancho * self.escala))
+        return segmentos
+
+
+# Diferencia angular más corta entre dos yaw en grados, en [0, 180] (sin saltar al cruzar ±180).
+def diferencia_yaw(a, b):
+    return abs((a - b + 180) % 360 - 180)
+
+
+# Esquinas (c0, c1, c2, c3) del rectángulo de grosor `ancho` centrado en el segmento p0-p1
+# (mismo orden de contorno que cuadros_casas). Segmento de largo 0: rectángulo vacío en p0.
+def segmento_a_rectangulo(p0, p1, ancho):
+    dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+    largo = math.hypot(dx, dy)
+    if largo == 0:
+        return (p0, p0, p0, p0)
+    nx, ny = -dy / largo * ancho / 2, dx / largo * ancho / 2
+    return ((p0[0] - nx, p0[1] - ny), (p1[0] - nx, p1[1] - ny),
+            (p1[0] + nx, p1[1] + ny), (p0[0] + nx, p0[1] + ny))
+
 
 # (cu, cv, largo, rotacion_z) de un cuadro horizontal (largo en su eje x) que cubre el
 # segmento p0-p1 del minimapa. rotation_z de Ursina gira en sentido HORARIO en

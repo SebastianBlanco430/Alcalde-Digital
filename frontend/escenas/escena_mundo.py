@@ -47,6 +47,7 @@ from frontend.escenas.escena_base import Escena
 from frontend.hud import HudMundo
 from frontend.marcadores_mundo import Baliza, RutaPiso
 from frontend.menu_pausa import MenuPausa
+from frontend.niebla import activar_niebla, desactivar_niebla
 from frontend.peatones import Peatones
 from frontend.personaje import Personaje
 
@@ -102,6 +103,7 @@ class EscenaMundo(Escena):
             self.flujo = flujo
         self.hud.enabled = True
         self.ciudad.encender_luces(True)
+        activar_niebla()          # tras construir la ciudad: solo afecta a lo que ya existe
         self.camara.preparar_camara()
         self._restablecer_tras_cinematica()
         self._cinematica = salida is not None     # al salir de un edificio hay cinemática (y panel de fin oculto)
@@ -112,6 +114,7 @@ class EscenaMundo(Escena):
         if nueva_partida:
             self._sesion = self.flujo.sesion
             self._reconstruir_personajes()
+            activar_niebla()      # otra vez: los Personaje recién creados no la tenían (solo cuenta lo ya existente)
         self.refrescar()
         if nueva_partida:
             self.camara.yaw = self._yaw_hacia_el_destino()
@@ -129,6 +132,7 @@ class EscenaMundo(Escena):
         self.hud.enabled = False
         mouse.locked = False
         self.ciudad.encender_luces(False)
+        desactivar_niebla()       # nada de niebla en el interior ni en los menús
         self.camara.restaurar_camara()
 
     # -- Frame --
@@ -233,6 +237,10 @@ class EscenaMundo(Escena):
             self.baliza.colocar(px, pz, self._mundo.edificio_de(mision.destino).alto + 2.2,
                                 suelo=self._mundo.altura(px, pz))
             self.baliza.enabled = True
+        # La bandera del edificio destino ondea más fuerte y con borde amarillo.
+        destino = mision.destino if mision is not None else None
+        for lugar, bandera in self.ciudad.banderas.items():
+            bandera.destacar(lugar == destino)
         # Fin del catálogo: nadie tiene misiones pendientes -> panel "Partida terminada".
         if self.flujo.partida_terminada() and not self._cinematica:
             self.hud.panel_fin.mostrar(self._sesion.estado_partida.indicadores())
