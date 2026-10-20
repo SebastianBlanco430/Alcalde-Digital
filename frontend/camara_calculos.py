@@ -12,7 +12,7 @@
 
 import math
 
-from frontend.geometria_mundo import normalizar_angulo
+from frontend.geometria_mundo import normalizar_angulo, suavizar
 
 ALTURA_PIVOTE = 1.5
 
@@ -39,6 +39,16 @@ def aplicar_raton(yaw, pitch, dx, dy, sensibilidad, pitch_min, pitch_max):
     nuevo_yaw = normalizar_angulo(yaw + sensibilidad * dx)
     nuevo_pitch = min(pitch_max, max(pitch_min, pitch - sensibilidad * dy))
     return nuevo_yaw, nuevo_pitch
+
+
+# mouse.velocity (dx, dy) menos el "reposo": dónde deja Ursina el cursor tras recentrarlo. En
+# ventana normal es (0, 0); en la pantalla completa de macOS (F11 de Ursina) la ventana no mide lo
+# pedido y el cursor queda desplazado, lo que sesga cada movimiento y clava el pitch en un extremo.
+# Sin movimiento (0, 0) no se resta nada.
+def quitar_reposo(velocidad, reposo):
+    if velocidad[0] == 0 and velocidad[1] == 0:
+        return (0.0, 0.0)
+    return (velocidad[0] - reposo[0], velocidad[1] - reposo[1])
 
 
 # Rueda del ratón: rueda > 0 (hacia adelante) acerca, < 0 aleja. Cada "clic" mueve `paso` m.
@@ -110,3 +120,48 @@ def rapidez_de_seguimiento(distancia, cerca, lejos, d0=2.0, d1=10.0):
         return lejos if distancia >= d1 else cerca
     t = min(1.0, max(0.0, (distancia - d0) / (d1 - d0)))
     return cerca + (lejos - cerca) * t * t * (3 - 2 * t)
+
+
+# -- FOV dinámico al correr (T14) --
+
+# ¿Corre el jugador? Por la velocidad real del objetivo (m/s): entre `umbral` (a medio camino entre
+# caminar y correr) y `tope`. Por encima del tope no es correr sino un salto (cambio de turno,
+# cinemática, teletransporte) y el FOV no se toca. Valores no finitos cuentan como "no corre".
+def corriendo_por_velocidad(velocidad, umbral=6.5, tope=14.0):
+    if not (velocidad == velocidad) or velocidad in (math.inf, -math.inf):
+        return False
+    return umbral <= velocidad <= tope
+
+
+# Velocidad (m/s) del objetivo entre dos posiciones (x, z) separadas `dt` s (0 si dt <= 0).
+def velocidad_del_objetivo(anterior, actual, dt):
+    if dt <= 0 or anterior is None:
+        return 0.0
+    return math.hypot(actual[0] - anterior[0], actual[1] - anterior[1]) / dt
+
+
+# Un paso del FOV hacia `base` (+ `extra` si corre) con la exponencial de geometria_mundo.suavizar,
+# independiente de los fps. Sube con `rapidez_subir` (12 -> ~95% en 250 ms) y baja con `rapidez_bajar`
+# (7,5 -> ~95% en 400 ms). Con dt <= 0 no cambia.
+def fov_al_correr(actual, base, corriendo, dt, extra=4.0, rapidez_subir=12.0, rapidez_bajar=7.5):
+    if dt <= 0:
+        return actual
+    objetivo = base + (extra if corriendo else 0.0)
+    rapidez = rapidez_subir if objetivo > actual else rapidez_bajar
+    return suavizar(actual, objetivo, rapidez, dt)
+
+
+# -- Anillo de la baliza (T14) --
+
+# Estado del anillo cian de la baliza en el instante `t` (s): (escala, alfa 0-1). Cada `periodo` s
+# se expande de `desde` a `hasta` veces su radio (ease-out: arranca rápido y se frena) y se
+# desvanece: sube en el primer 10% del ciclo (sin "pop") y baja a 0 al final, así el reinicio
+# del ciclo es invisible. Continua en t y periódica.
+def pulso_anillo(t, periodo=1.6, desde=1.0, hasta=1.6, alfa_max=0.85):
+    if not (t == t) or periodo <= 0:
+        return (desde, 0.0)
+    fase = (t % periodo) / periodo
+    avance = 1.0 - (1.0 - fase) ** 2
+    entrada = min(1.0, fase / 0.10)
+    salida = 1.0 - fase
+    return (desde + (hasta - desde) * avance, alfa_max * entrada * salida)

@@ -49,7 +49,7 @@ from frontend.marcadores_mundo import Baliza, RutaPiso
 from frontend.menu_pausa import MenuPausa
 from frontend.niebla import activar_niebla, desactivar_niebla
 from frontend.peatones import Peatones
-from frontend.personaje import Personaje
+from frontend.personaje_modelo import crear_personaje
 
 VELOCIDAD_CAMINAR = 4.8     # m/s: ~25 s de punta a punta de la ciudad
 VELOCIDAD_CORRER = 8.5      # m/s con Shift: ~14 s
@@ -203,7 +203,7 @@ class EscenaMundo(Escena):
             destruir_arbol(avatar)
         self.avatares = {}
         for jugador in self._sesion.jugadores():
-            avatar = Personaje(jugador.nombre, ROLES[jugador.rol].color, parent=self)
+            avatar = crear_personaje(jugador.nombre, jugador.rol, ROLES[jugador.rol].color, parent=self)
             avatar.suelo = self._mundo.altura
             self.avatares[jugador.nombre] = avatar
         self.camara.ignorar = list(self.avatares.values())

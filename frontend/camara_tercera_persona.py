@@ -34,6 +34,7 @@ PLANO_CERCANO = 0.1
 PLANO_LEJANO = 500
 RAPIDEZ_SEGUIR = 10.0         # el pivote alcanza al jugador (caminando casi no se nota)
 RAPIDEZ_VIAJE = 3.0           # cuando está lejos (cambio de turno) se desliza más despacio
+FOV_EXTRA_CORRER = 4.0        # grados de FOV que se suman al correr (sube en ~250 ms, baja en ~400 ms)
 VELOCIDAD_VIAJE = 32.0        # m/s máximos del pivote al viajar (sin tirón inicial al cambiar de turno)
 
 
@@ -54,6 +55,9 @@ class CamaraTerceraPersona(Entity):
         self.controlada = False
         self._pivote = None                      # (x, z) suavizado
         self._guardada = None
+        self._fov = float(FOV)                   # FOV suavizado (FOV al caminar, +FOV_EXTRA_CORRER al correr)
+        self._meta_previa = None                 # (x, z) del objetivo en el frame anterior
+        self._reposo = (0.0, 0.0)                # sesgo del recentrado del cursor (ver quitar_reposo)
 
     # -- Estado --
 
@@ -62,6 +66,10 @@ class CamaraTerceraPersona(Entity):
 
     def tomar_control(self):
         self.controlada = True
+        self._reposo = (0.0, 0.0)
+        self._meta_previa = None
+        camera.fov = FOV                         # las cinemáticas parten del FOV normal, no del ensanchado al correr
+        self._fov = float(FOV)
 
     # Devuelve la cámara a la órbita. Parte de la distancia pedida para que no "salte".
     def soltar_control(self):
@@ -84,9 +92,13 @@ class CamaraTerceraPersona(Entity):
         if self.controlada:
             return
         if mouse.locked and not self.bloqueada:
+            vx, vy = cc.quitar_reposo(mouse.velocity, self._reposo)
             self.yaw, self.pitch = cc.aplicar_raton(
-                self.yaw, self.pitch, mouse.velocity[0], mouse.velocity[1], SENSIBILIDAD,
-                PITCH_MIN, PITCH_MAX)
+                self.yaw, self.pitch, vx, vy, SENSIBILIDAD, PITCH_MIN, PITCH_MAX)
+            if mouse.velocity[0] or mouse.velocity[1]:      # hubo recentrado: el cursor quedó en prev_x/prev_y
+                self._reposo = (mouse.prev_x, mouse.prev_y)
+        else:
+            self._reposo = (0.0, 0.0)
         self.actualizar(time.dt)
 
     def input(self, key):
@@ -122,6 +134,18 @@ class CamaraTerceraPersona(Entity):
         self.distancia_real = min(suave, objetivo)
         camera.position = cc.posicion_orbital(pivote, self.yaw, self.pitch, self.distancia_real)
         camera.rotation = (self.pitch, self.yaw, 0)
+        self._actualizar_fov(meta, dt)
+
+    # FOV dinámico: +FOV_EXTRA_CORRER al correr. La señal sale de la velocidad real del objetivo
+    # (no hay que tocar el controlador); un salto de posición (cambio de turno) no cuenta como correr.
+    def _actualizar_fov(self, meta, dt):
+        if dt <= 0:
+            self._meta_previa = tuple(meta)
+            return
+        corre = cc.corriendo_por_velocidad(cc.velocidad_del_objetivo(self._meta_previa, meta, dt))
+        self._meta_previa = tuple(meta)
+        self._fov = cc.fov_al_correr(self._fov, FOV, corre, dt, FOV_EXTRA_CORRER)
+        camera.fov = self._fov
 
     # Distancia del pivote al primer obstáculo en dirección a la cámara deseada (None si
     # no hay). El raycast no toca personajes (`ignorar`) ni nada sin collider.
@@ -148,6 +172,8 @@ class CamaraTerceraPersona(Entity):
         camera.parent = scene
         camera.orthographic = False
         camera.fov = FOV
+        self._fov = float(FOV)
+        self._meta_previa = None
         camera.clip_plane_near = PLANO_CERCANO
         camera.clip_plane_far = PLANO_LEJANO
 

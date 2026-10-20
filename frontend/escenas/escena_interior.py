@@ -27,7 +27,7 @@ from frontend.cinematica import ease_in_out, lerp, lerp_angulo, lerp_vec3
 from frontend.componentes import destruir_arbol, rgb
 from frontend.director_cinematica import DirectorCinematica
 from frontend.escenas.escena_base import Escena
-from frontend.personaje import Personaje
+from frontend.personaje_modelo import crear_personaje
 from frontend.piezas import encender_luz, pieza, silenciar
 from frontend.temas_interior import tema_de
 
@@ -341,7 +341,7 @@ class EscenaInterior(Escena):
     def _crear_personaje(self, jugador):
         if self.personaje is not None:
             destruir_arbol(self.personaje)
-        self.personaje = Personaje(jugador.nombre, ROLES[jugador.rol].color, parent=self)
+        self.personaje = crear_personaje(jugador.nombre, jugador.rol, ROLES[jugador.rol].color, parent=self)
         self.personaje.automatico = False
         self.personaje.etiqueta.enabled = False
         self.personaje.aro.enabled = False

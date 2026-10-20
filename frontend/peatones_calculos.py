@@ -9,10 +9,16 @@
 # (random.Random) para que sea determinista en los tests.
 
 import math
+import random
 
 VELOCIDAD = 1.5          # m/s
 DESVIO_MAXIMO = 1.6      # m a un lado del eje de la calle (el asfalto mide 8 y las farolas están a 4.8)
 PAUSA_MIN, PAUSA_MAX = 1.0, 5.0
+
+# Paletas de aspecto de los peatones (RGB), apagadas para no parecerse a los roles jugables.
+PIELES = ((235, 200, 170), (224, 172, 130), (198, 134, 92), (141, 96, 66), (100, 66, 46), (245, 214, 190))
+PELOS = ((48, 36, 30), (20, 18, 18), (92, 62, 38), (150, 108, 60), (196, 170, 110), (130, 130, 134))
+PANTALONES = ((52, 58, 82), (70, 64, 58), (36, 40, 46), (96, 86, 70), (60, 78, 70), (110, 70, 80))
 
 
 class Caminante:
@@ -74,7 +80,28 @@ class Caminante:
         return (bx + nx * self.desvio, bz + nz * self.desvio)
 
 
-# `cantidad` caminantes repartidos por los lugares del mapa.
-def crear_caminantes(mundo, cantidad, azar):
+# `cantidad` caminantes repartidos por los lugares del mapa; `inicio` es el índice del primero (el lugar
+# que le toca sale de ese índice).
+def crear_caminantes(mundo, cantidad, azar, inicio=0):
     lugares = mundo.lugares()
-    return [Caminante(mundo, lugares[i % len(lugares)], azar) for i in range(cantidad)]
+    return [Caminante(mundo, lugares[i % len(lugares)], azar) for i in range(inicio, inicio + cantidad)]
+
+
+# Los ORIGINALES primeros caminantes usan el azar de siempre (mismo recorrido que cuando eran solo
+# esos); los que se añaden después usan otro generador aparte, para no alterar los originales.
+ORIGINALES = 6
+
+
+def crear_peatones(mundo, cantidad, semilla):
+    primeros = min(cantidad, ORIGINALES)
+    caminantes = crear_caminantes(mundo, primeros, random.Random(semilla))
+    if cantidad > primeros:
+        caminantes += crear_caminantes(mundo, cantidad - primeros, random.Random(semilla + 1), primeros)
+    return caminantes
+
+
+# Aspecto del peatón `indice` (pantalón, piel y pelo): determinista por semilla e índice, sin tocar
+# el azar de los caminantes (así su recorrido no cambia al variar la ropa).
+def aspecto_peaton(indice, semilla):
+    azar = random.Random(semilla * 1000 + indice)
+    return {"pantalon": azar.choice(PANTALONES), "piel": azar.choice(PIELES), "pelo": azar.choice(PELOS)}

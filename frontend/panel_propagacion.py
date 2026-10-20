@@ -16,8 +16,8 @@ from frontend.componentes import destruir_arbol, escala_fuente, modelo_redondead
 from frontend.texto import envolver_texto
 
 # Colores de los nodos por estado / salto (RGB 0-255), misma paleta que el HUD.
-COLOR_ORIGEN = (255, 220, 60)                  # amarillo: quien publica
-COLORES_SALTO = {1: (70, 220, 255), 2: (80, 190, 110)}   # cian, verde
+COLOR_ORIGEN = estilo.COLOR_DESTINO                  # amarillo: quien publica
+COLORES_SALTO = {1: estilo.COLOR_RUTA, 2: (80, 190, 110)}   # cian, verde
 COLOR_SALTO_LEJANO = (235, 140, 60)            # saltos 3 o más
 COLOR_PENDIENTE = estilo.COLOR_BARRA_FONDO
 COLOR_FRENADO = estilo.COLOR_BARRA_BAJO

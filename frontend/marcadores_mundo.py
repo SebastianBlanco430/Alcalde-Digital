@@ -5,20 +5,39 @@
 
 import math
 
-from ursina import Entity, color, destroy, time
+from ursina import Entity, Mesh, Vec3, color, destroy, time
+
+from frontend import camara_calculos, estilo
 
 from frontend import geometria_mundo
 from frontend.componentes import rgb
 from frontend.piezas import pieza
 
-COLOR_RUTA = (70, 220, 255)
-COLOR_BALIZA = (255, 220, 60)
+COLOR_RUTA = estilo.COLOR_RUTA          # fuente única: frontend/estilo.py
+COLOR_BALIZA = estilo.COLOR_DESTINO
 Y_RUTA = 0.24             # por encima de aceras (0.20) y plazas (0.14)
 ANCHO_RUTA = 0.7
 HOLGURA_POOL = 6          # piezas sobrantes que se conservan para rutas futuras
 PASO_FIRMA = 0.25         # m: resolución con la que la ruta nota que el jugador se movió
 TOLERANCIA_RUTA = 0.05    # m que la ruta puede apartarse del suelo antes de partir un tramo
 TRAMO_MINIMO = 1.0        # m: no se parte más fino que esto
+RADIO_ANILLO = 2.4        # m del anillo de la baliza al empezar el pulso (llega a 1,6 veces)
+GROSOR_ANILLO = 0.35      # m de ancho de la corona
+Y_ANILLO = 0.3            # m sobre el suelo: por encima de aceras (0.20) y de la ruta (0.24)
+SEGMENTOS_ANILLO = 48
+
+
+# Corona plana (anillo) en el plano XZ, de radio exterior 1 y radio interior `interior`.
+def malla_anillo(interior=0.85, segmentos=SEGMENTOS_ANILLO):
+    vertices, triangulos = [], []
+    for i in range(segmentos):
+        a0, a1 = 2 * math.pi * i / segmentos, 2 * math.pi * (i + 1) / segmentos
+        base = len(vertices)
+        vertices += [Vec3(math.cos(a0), 0, math.sin(a0)), Vec3(math.cos(a1), 0, math.sin(a1)),
+                     Vec3(interior * math.cos(a1), 0, interior * math.sin(a1)),
+                     Vec3(interior * math.cos(a0), 0, interior * math.sin(a0))]
+        triangulos += [(base, base + 1, base + 2), (base, base + 2, base + 3)]
+    return Mesh(vertices=vertices, triangles=triangulos, mode="triangle")
 
 
 # Rombo amarillo que flota y gira sobre la puerta, más un rayo de luz tenue que se ve de lejos.
@@ -28,8 +47,11 @@ class Baliza(Entity):
         super().__init__(**opciones)
         self.rombo = pieza(parent=self, model="diamond", color=rgb(COLOR_BALIZA), scale=(0.7, 1.1, 0.7),
                            shader=None)
-        self.rayo = pieza(parent=self, model="cube", color=color.rgba32(255, 220, 60, 70),
+        self.rayo = pieza(parent=self, model="cube", color=color.rgba32(*COLOR_BALIZA, 70),
                           scale=(0.35, 60, 0.35), y=30, shader=None)
+        # Anillo cian en el piso que se expande y se desvanece (color plano con alfa, sin shader).
+        self.anillo = pieza(parent=self, model=malla_anillo(1 - GROSOR_ANILLO / RADIO_ANILLO), y=Y_ANILLO,
+                            color=rgb(COLOR_RUTA), double_sided=True, shader=None)
         self.altura = 5.0
         self._tiempo = 0.0
 
@@ -38,11 +60,15 @@ class Baliza(Entity):
         self.altura = altura
         self.position = (x, suelo, z)
         self.rombo.y = altura
+        self.anillo.y = Y_ANILLO
 
     def update(self):
         self._tiempo += time.dt
         self.rombo.y = self.altura + 0.2 * math.sin(self._tiempo * 3)
         self.rombo.rotation_y = self._tiempo * 90
+        escala, alfa = camara_calculos.pulso_anillo(self._tiempo)
+        self.anillo.scale = RADIO_ANILLO * escala
+        self.anillo.color = color.rgba32(*COLOR_RUTA, int(255 * alfa))
 
 
 # Línea del GPS en el piso: cubos planos entre puntos consecutivos y un disco en cada junta.
@@ -97,7 +123,6 @@ class RutaPiso(Entity):
 
     def segmentos_visibles(self):
         return [s for s in self.segmentos if s.enabled]
-
 
     # Tramos [(p, q)] que cubren a -> b: se parte por la mitad mientras el suelo en 1/4, 1/2 o 3/4
     # se aparte más de TOLERANCIA_RUTA de la recta entre los extremos (con solo el medio, una
