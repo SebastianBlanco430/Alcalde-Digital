@@ -19,6 +19,8 @@ COLOR_BOTON = (70, 90, 150)
 COLOR_BOTON_RESALTADO = (95, 118, 185)
 COLOR_BOTON_DESHABILITADO = (55, 57, 70)
 COLOR_BOTON_TEXTO = (240, 240, 245)
+COLOR_ACENTO = (255, 220, 60)           # amarillo del destino; reservado para el botón primario
+COLOR_ACENTO_TEXTO = (24, 26, 38)      # texto oscuro sobre el acento
 
 # --- Umbrales de los tercios de un indicador ---
 UMBRAL_BAJO = 34     # valor < 34  -> "bajo"
@@ -51,3 +53,64 @@ _RGB_POR_NIVEL = {
 # Color RGB (0-255) del relleno de barra que corresponde a `valor`.
 def rgb_por_valor(valor):
     return _RGB_POR_NIVEL[nivel_indicador(valor)]
+
+
+# ===========================================================================
+# Roles de color (T1, docs/DISENO.md sección 2). Solo se AÑADEN constantes:
+# los valores de arriba no cambian. Los valores del cian y del amarillo viven
+# aquí (fuente única); los módulos que hoy los duplican se alinean después.
+# ===========================================================================
+
+# --- Tinta y papel (estilo «cómic cívico») ---
+TINTA = (18, 20, 32)              # contornos, sombras duras, texto sobre amarillo
+PAPEL = (250, 244, 228)           # iconos, teclas, retratos
+COLOR_SUPERFICIE_ALTA = (58, 62, 88)   # hover de tarjeta, chip
+
+# --- Acentos ---
+ACENTO_PRIMARIO = COLOR_ACENTO    # amarillo: destino y acción principal
+ACENTO_SECUNDARIO = (70, 220, 255)     # cian: ruta e información
+COLOR_RUTA = ACENTO_SECUNDARIO    # cian de la ruta (minimapa y mundo)
+COLOR_DESTINO = ACENTO_PRIMARIO   # amarillo del destino (igual que la baliza)
+
+# --- Estados ---
+ESTADO_EXITO = COLOR_BARRA_ALTO   # (80, 190, 110)
+ESTADO_AVISO = (215, 180, 60)
+ESTADO_ERROR = (214, 62, 62)
+ESTADO_INFO = ACENTO_SECUNDARIO
+
+# --- Botones: secundario y bordes ---
+GROSOR_BORDE_PX = 3               # borde de tinta (2 en HUD denso)
+GROSOR_BORDE_DENSO_PX = 2
+DESPLAZAMIENTO_SOMBRA_PX = (4, -5)  # sombra plana: (+x, -y) respecto al panel
+ALFA_SOMBRA = 160                 # sobre 255
+RADIO_CHIP_PX = 6
+RADIO_TARJETA_PX = 10
+RADIO_PANEL_PX = 14
+
+# --- Lugares: identidad, nunca estado ---
+COLORES_LUGAR = {
+    "Plaza Central": (240, 200, 90),
+    "Alcaldía": (70, 110, 190),
+    "Universidad": (140, 110, 200),
+    "Parque": (80, 170, 100),
+    "Barrio Las Flores": (230, 120, 150),
+    "Terminal": (235, 140, 60),
+    "Hospital": (60, 180, 170),
+}
+
+# --- Roles de personaje propuestos (decisión del dueño, T15; aún NO usados) ---
+COLORES_ROL_PROPUESTOS = {
+    "ciudadano": (66, 133, 244),
+    "periodista": (46, 184, 116),
+    "influencer": (232, 84, 150),
+    "candidato": (240, 226, 190),
+}
+
+
+# Contraste WCAG entre dos colores RGB 0-255 (1 a 21).
+def contraste(rgb_a, rgb_b):
+    def luminancia(c):
+        lineal = [(v / 255 / 12.92) if v / 255 <= 0.03928 else (((v / 255) + 0.055) / 1.055) ** 2.4 for v in c]
+        return 0.2126 * lineal[0] + 0.7152 * lineal[1] + 0.0722 * lineal[2]
+    claro, oscuro = sorted((luminancia(rgb_a), luminancia(rgb_b)), reverse=True)
+    return (claro + 0.05) / (oscuro + 0.05)

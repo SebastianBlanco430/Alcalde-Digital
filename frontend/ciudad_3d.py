@@ -36,50 +36,66 @@ import math
 
 from panda3d.core import (Geom, GeomNode, GeomTriangles, GeomVertexData, GeomVertexFormat,
                           GeomVertexWriter, NodePath)
-from ursina import Cylinder, Entity, Mesh, Sky, Text, application, color, scene, time
+from ursina import Cylinder, Entity, Mesh, Text, application, color, scene, time
 from ursina.lights import AmbientLight, DirectionalLight
 from ursina.shaders import lit_with_shadows_shader
 
 from backend.datos.modelos_edificios import CARPETA_MODELOS, escala_de, modelo_de
-from frontend.azar_fijo import azar_de
+from frontend.azar_fijo import azar_de, ruido_suave
 from frontend.banderas import crear_banderas
 from frontend.casas_decorativas import color_base_como_color, construir_casas
+from frontend.cielo import DIRECCION_SOL, CieloDegradado
 from frontend.componentes import rgb
 from frontend.detalles_calculos import esquina_del_tanque, franjas_prohibidas
 from frontend.detalles_techos import construir_detalles
 from frontend.geometria_mundo import ENTIERRO_BASE, apoyo_de_caja, medidas_losa, medidas_zocalo
 from frontend.muros_contencion import construir_muros
 from frontend.piezas import MASCARA_LUZ, encender_luz, lineas_sueltas, pieza, silenciar
+from frontend.props_mundo import cinta_con_tono, construir_props_mundo
 
+# combine() sin normales deja al shader sin `normal`: el atributo queda con lo que dejó el dibujo anterior
+# y la luz de las piezas combinadas cambia según el encuadre (plazas ora blancas, ora apagadas). Con
+# normales el sombreado es el mismo desde cualquier vista.
+COMBINAR_CON_NORMALES = True
 SOMBRAS = True                       # horneadas: el mapa se redibuja solo si algo de la ciudad se mueve
 RESOLUCION_SOMBRAS = (4096, 4096)
 
-COLOR_PASTO = (84, 142, 74)
+COLOR_PASTO = (92, 158, 70)
 COLOR_TIERRA = (138, 106, 78)        # taludes empinados de la ladera
 COLOR_ESCALERA = (168, 164, 154)
 COLOR_BARANDA = (60, 62, 70)
 # La malla de la ladera tiene normales y el shader le SUMA la luz (el plano de antes no tenía): se
 # oscurece el color de los vértices para que el pasto se vea como antes.
 BRILLO_LADERA = 0.6
-COLOR_ASFALTO = (66, 68, 78)
-COLOR_LINEA = (235, 220, 150)
-COLOR_ACERA = (178, 178, 186)
-COLOR_PLAZA = (206, 196, 176)
-COLOR_ANILLO_PLAZA = (172, 172, 180)
-COLOR_EMBLEMA = (150, 140, 124)
+# Las piezas combinadas no llevan normales: el shader les suma luz plena (~+0.3 en cada canal), así
+# que los tonos de las capas planas son BAJOS a propósito (el color que se ve es el de la captura).
+COLOR_ASFALTO = (46, 48, 60)
+COLOR_LINEA = (200, 176, 92)
+COLOR_ACERA = (129, 129, 133)
+COLOR_PLAZA = (146, 134, 114)
+COLOR_PLAZA_CENTRO = (160, 148, 126)     # disco interior de la plaza (adoquín más claro)
+COLOR_ANILLO_PLAZA = (122, 120, 124)
+COLOR_EMBLEMA = (112, 100, 84)
+COLOR_MARCA_VIAL = (172, 172, 168)       # cebras y líneas de borde
+AMPLITUD_RUIDO_ASFALTO = 16              # niveles 0-255 de variación del color (manchas y grano)
+AMPLITUD_RUIDO_ACERA = 14
+AMPLITUD_RUIDO_PASTO = 0.16              # fracción del color del pasto (ver _variar_pasto)
 COLOR_VENTANA = (150, 205, 235)
+COLOR_VENTANA_CALIDA = (255, 225, 150)   # ventanas cálidas, elegidas con azar_de
+PROPORCION_VENTANAS_CALIDAS = 0.25       # fracción de ventanas cálidas
 COLOR_MADERA = (122, 82, 52)
 COLOR_MARCO_PUERTA = (28, 28, 36)
 COLOR_LETRERO = (30, 32, 46)
 PALETA_EDIFICIOS = (
-    (226, 226, 232), (232, 196, 170), (176, 196, 232), (196, 232, 196),
-    (232, 196, 214), (240, 224, 164), (206, 190, 232),
+    (238, 226, 200), (238, 192, 162), (166, 192, 238), (190, 238, 190),
+    (238, 192, 212), (246, 224, 154), (202, 184, 238),
 )
 
 # Alturas (y) de las capas planas del piso sobre el suelo (cada una por encima de la anterior).
 # Las cintas de las calles: asfalto 0.10, línea central 0.12, aceras 0.20.
 Y_ANILLO = 0.12
 Y_PLAZA = 0.14
+Y_PLAZA_CENTRO = 0.15        # disco interior del adoquín, entre la plaza y el emblema
 Y_EMBLEMA = 0.16
 
 ANCHO_PUERTA, ALTO_PUERTA = 1.6, 2.4
@@ -171,21 +187,24 @@ class Ciudad3D(Entity):
         self._grupos["luces"] = Entity(parent=self, shader=None)
 
         # El cielo cuelga de la ciudad (no se ve en los menús 2D) y sigue a la cámara en su update().
-        self.cielo = Sky(parent=self)
-        self.luz = DirectionalLight(parent=self, shadows=False, shadow_map_resolution=RESOLUCION_SOMBRAS)
-        self.luz.look_at((1, -1.6, 0.8))
-        self.ambiente = AmbientLight(parent=self, color=color.rgba32(112, 112, 122, 255))
+        self.cielo = CieloDegradado(parent=self)
+        self.luz = DirectionalLight(parent=self, shadows=False, shadow_map_resolution=RESOLUCION_SOMBRAS,
+                                    color=color.rgba32(255, 244, 225, 255))
+        self.luz.look_at(DIRECCION_SOL)
+        self.ambiente = AmbientLight(parent=self, color=color.rgba32(122, 126, 140, 255))
 
         self._construir_suelo()
         self._construir_calles()
+        self._construir_marcas()
         self._construir_plazas()
         self._construir_edificios()
         self._construir_obstaculos()
+        self._construir_decorado()
         self._construir_escaleras()
         construir_muros(self._grupos["muros"], mundo.muros())
         for grupo in self._grupos.values():
             if grupo.children:             # p. ej. "edificios" queda vacío si todos tienen modelo
-                grupo.combine()
+                grupo.combine(include_normals=COMBINAR_CON_NORMALES)
         self._grupos["calles"].double_sided = True      # las cintas no cuidan el sentido de sus caras
         for hijo in self.children:
             if hijo is not self.cielo:
@@ -252,22 +271,52 @@ class Ciudad3D(Entity):
             largo = math.dist(pa, pb)
             if largo < 1e-9:
                 continue
-            pieza(parent=calles, model=_cinta(self._suelo, pa, pb, 0, largo, -semiancho, semiancho, 0.10, lados=0.10),
-                  color=rgb(COLOR_ASFALTO))
+            pieza(parent=calles, model=cinta_con_tono(self._suelo, pa, pb, 0, largo, -semiancho, semiancho, 0.10,
+                                                      COLOR_ASFALTO, AMPLITUD_RUIDO_ASFALTO, columnas=4, lados=0.10),
+                  color=color.white)
             # Aceras: a cada lado, entre las plazas (el aro de la plaza las recibe).
             borde = mundo.radio_plaza + 0.9
             if largo - 2 * borde > 0:
                 for lado in (-1, 1):
                     d0, d1 = sorted((lado * semiancho, lado * (semiancho + 2.0)))
-                    pieza(parent=calles, model=_cinta(self._suelo, pa, pb, borde, largo - borde, d0, d1, 0.20,
-                                                      lados=0.20),
-                          color=rgb(COLOR_ACERA))
+                    pieza(parent=calles, model=cinta_con_tono(self._suelo, pa, pb, borde, largo - borde, d0, d1, 0.20,
+                                                              COLOR_ACERA, AMPLITUD_RUIDO_ACERA, columnas=2, lados=0.20),
+                          color=color.white)
             # Línea central discontinua.
             s = mundo.radio_plaza + 2.0
             while s + 1.0 <= largo - mundo.radio_plaza - 2.0:
                 pieza(parent=calles, model=_cinta(self._suelo, pa, pb, s, s + 2.0, -0.11, 0.11, 0.12),
                       color=rgb(COLOR_LINEA))
                 s += SEPARACION_LINEAS
+
+    # Marcas viales sobre el asfalto (capa 0.12, como la línea central; el asfalto está en 0.10): líneas
+    # de borde continuas y una cebra en cada entrada a una plaza. Por tramos pegados al suelo.
+    def _construir_marcas(self):
+        mundo = self._mundo
+        calles = self._grupos["calles"]
+        semiancho = mundo.ancho_calle / 2
+        borde = mundo.radio_plaza + 0.9
+        for a, b in mundo.segmentos():
+            pa, pb = mundo.coordenada(a), mundo.coordenada(b)
+            largo = math.dist(pa, pb)
+            if largo < 1e-9 or largo - 2 * borde <= 0:
+                continue
+            for lado in (-1, 1):             # líneas de borde, un poco hacia adentro del asfalto
+                d = lado * (semiancho - 0.45)
+                pieza(parent=calles, model=_cinta(self._suelo, pa, pb, borde, largo - borde, d - 0.07, d + 0.07, 0.12),
+                      color=rgb(COLOR_MARCA_VIAL))
+            # Cebra: franjas paralelas a la calle justo fuera de la plaza, en sus dos extremos.
+            largo_cebra = min(2.4, (largo - 2 * borde) / 2 - 0.4)
+            if largo_cebra < 1.2:
+                continue
+            for desde in (borde + 0.5, largo - borde - 0.5 - largo_cebra):
+                for k in range(-3, 4):
+                    centro = 1.0 * k
+                    if abs(centro) < 0.5:
+                        continue               # deja libre la línea central
+                    pieza(parent=calles, model=_cinta(self._suelo, pa, pb, desde, desde + largo_cebra,
+                                                      centro - 0.25, centro + 0.25, 0.12),
+                          color=rgb(COLOR_MARCA_VIAL))
 
     def _construir_plazas(self):
         plazas = self._grupos["plazas"]
@@ -276,7 +325,7 @@ class Ciudad3D(Entity):
             cx, cz = self._mundo.coordenada(lugar)
             h = self._suelo(cx, cz)           # las plazas son terrazas planas
             for y, r, tono in ((Y_ANILLO, radio + 0.9, COLOR_ANILLO_PLAZA), (Y_PLAZA, radio, COLOR_PLAZA),
-                               (Y_EMBLEMA, 1.6, COLOR_EMBLEMA)):
+                               (Y_PLAZA_CENTRO, radio * 0.68, COLOR_PLAZA_CENTRO), (Y_EMBLEMA, 1.6, COLOR_EMBLEMA)):
                 pieza(parent=plazas, model="circle", rotation_x=90, position=(cx, h + y, cz),
                       scale=2 * r, color=rgb(tono))
 
@@ -342,7 +391,9 @@ class Ciudad3D(Entity):
                     x = e.cx + nx * (e.ancho / 2 + 0.03) + (desfase if nx == 0 else 0)
                     z = e.cz + nz * (e.fondo / 2 + 0.03) + (desfase if nz == 0 else 0)
                     escala = (1.5, 1.3, 0.06) if nx == 0 else (0.06, 1.3, 1.5)
-                    pieza(parent=g, model="cube", color=rgb(COLOR_VENTANA), position=(x, e.y + y + 0.6, z),
+                    calida = azar_de(x + k, z + y) < PROPORCION_VENTANAS_CALIDAS
+                    pieza(parent=g, model="cube", color=rgb(COLOR_VENTANA_CALIDA if calida else COLOR_VENTANA),
+                          position=(x, e.y + y + 0.6, z),
                           scale=escala, shader=None)
 
     # Cartel sobre la puerta: tablero oscuro y texto con el nombre del edificio. Cuelga de la
@@ -396,6 +447,17 @@ class Ciudad3D(Entity):
                 pieza(parent=g, model="cube", color=rgb(COLOR_BARANDA), position=tuple((p[i] + q[i]) / 2 for i in range(3)),
                       rotation=(-math.degrees(math.atan2(q[1] - p[1], horizontal)), rumbo, 0),
                       scale=(0.05, 0.05, math.hypot(horizontal, q[1] - p[1])))
+
+    # Decorado nuevo (árboles variados, arbustos, farolas, bancos, vallas, carteles, jardineras y la
+    # fuente de la Plaza Central): dos mallas únicas hechas en props_mundo, sin colisión. La de luces
+    # (focos de las farolas) va sin sombreado y fuera del mapa de sombras.
+    def _construir_decorado(self):
+        opaca, luces = construir_props_mundo(self._mundo)
+        if opaca is not None:
+            pieza(parent=self, model=opaca, name="decorado")
+        if luces is not None:
+            focos = Entity(parent=self, model=luces, shader=None, name="focos_decorado")
+            focos.hide(MASCARA_LUZ)
 
     # -- Árboles, farolas y bancos (salen de los obstáculos del modelo) --
 
@@ -586,6 +648,17 @@ def _cinta(suelo, a, b, s0, s1, d0, d1, alto, lados=0.0):
     return Mesh(vertices=vertices, triangles=triangulos, normals=normales)
 
 
+# Variación del color del suelo en (x, z): manchas amplias (más claras/amarillas o más oscuras/azuladas)
+# y un grano fino; `pasto` (0-1) atenúa el efecto en la tierra de los taludes. Determinista.
+def _variar_pasto(x, z, rgb_, pasto):
+    mancha = ruido_suave(x, z, 13.0) - 0.5
+    parche = ruido_suave(x + 31, z - 9, 4.0) - 0.5
+    grano = azar_de(x * 1.7, z * 2.3) - 0.5
+    claro = 1 + AMPLITUD_RUIDO_PASTO * pasto * (1.2 * mancha + 0.7 * parche + 0.5 * grano)
+    amarillo = AMPLITUD_RUIDO_PASTO * pasto * 0.35 * mancha
+    return (rgb_[0] * (claro + amarillo), rgb_[1] * claro, rgb_[2] * (claro - amarillo))
+
+
 # Malla del suelo con la grilla del Terreno: pasto, que pasa a tierra en los taludes empinados.
 def _malla_terreno(terreno):
     x0, z0, paso, filas = terreno.grilla()
@@ -604,7 +677,7 @@ def _malla_terreno(terreno):
             vertice.add_data3(x0 + i * paso, h, z0 + j * paso)
             normal.add_data3(-gx / largo, 1 / largo, -gz / largo)
             t = min(1.0, max(0.0, (math.hypot(gx, gz) - tan_desde) / (tan_hasta - tan_desde)))
-            tono.add_data4(*(p + (q - p) * t for p, q in zip(pasto, tierra)), 1)
+            tono.add_data4(*_variar_pasto(x0 + i * paso, z0 + j * paso, tuple(p + (q - p) * t for p, q in zip(pasto, tierra)), 1 - t), 1)
     triangulos = GeomTriangles(Geom.UH_static)
     for j in range(nz_ - 1):
         for i in range(nx_ - 1):

@@ -15,17 +15,40 @@ from panda3d.core import TextNode
 from ursina import Entity, Mesh, Text, camera, color, window
 
 from backend.logica.roles import ROLES
-from frontend import estilo, hud_calculos
+from frontend import estilo, hud_calculos, iconos
 from frontend.componentes import (
-    BotonAccion, a_unidades, destruir_arbol, escala_fuente, modelo_redondeado, rgb)
+    BarraIndicador, BotonAccion, BotonPrimario, a_unidades, destruir_arbol, escala_fuente,
+    modelo_redondeado, panel_tinta, rgb)
 from frontend.texto import envolver_texto
 
 MARGEN = 0.02                       # separación de los bordes de la pantalla
 COLOR_FONDO_HUD = color.rgba32(12, 14, 24, 240)
-COLOR_RUTA = (70, 220, 255)         # cian brillante: la ruta (minimapa y mundo)
-COLOR_DESTINO = (255, 220, 60)      # amarillo: el destino (igual que la baliza del mundo)
+COLOR_RUTA = estilo.COLOR_RUTA          # cian: la ruta (minimapa y mundo); fuente única en estilo.py
+COLOR_DESTINO = estilo.COLOR_DESTINO    # amarillo: el destino (igual que la baliza del mundo)
 COLOR_ALERTA = (214, 62, 62)        # insignia de no leídos
 COLOR_RESALTADO = (62, 78, 138)     # mensaje sin leer en el teléfono
+
+
+# Curva de salida cuadrática (rápida al inicio, suave al final) para t en [0, 1].
+def _ease_out_quad(t):
+    t = max(0.0, min(1.0, t))
+    return 1 - (1 - t) ** 2
+
+
+# Icono cuadrado del HUD (textura de frontend/iconos.py) de `lado` unidades de camera.ui.
+def _icono(padre, nombre, lado, posicion, **opciones):
+    return Entity(parent=padre, model="quad", texture=iconos.textura_icono(nombre),
+                  scale=(lado, lado), position=posicion, **opciones)
+
+
+# Separa «Misión: X» en ("Misión:", "X"); otro texto (p. ej. «Sin misión activa») -> ("", texto).
+PREFIJO_MISION = "Misión:"
+
+
+def _separar_mision(cadena):
+    if cadena.startswith(PREFIJO_MISION):
+        return PREFIJO_MISION, cadena[len(PREFIJO_MISION):].lstrip()
+    return "", cadena
 
 
 # Text interpreta "<...>" como etiquetas: se cambian por paréntesis.
@@ -102,11 +125,8 @@ class TelefonoUI(Entity):
         ancho_pantalla, alto_pantalla = self.ANCHO_ICONO - 0.014, self.ALTO_ICONO - 0.026
         _fondo(self, ancho_pantalla, alto_pantalla, rgb(estilo.COLOR_BOTON), 5,
                position=(centro_x, centro_y + 0.004, -0.001))
-        # "burbuja" de mensaje dentro de la pantalla (la fuente no tiene íconos)
-        _fondo(self, ancho_pantalla - 0.026, 0.026, rgb(estilo.COLOR_TEXTO), 5,
-               position=(centro_x, centro_y + 0.012, -0.002))
-        _fondo(self, ancho_pantalla - 0.026, 0.016, rgb(estilo.COLOR_TEXTO_TENUE), 4,
-               position=(centro_x, centro_y - 0.016, -0.002))
+        # icono del teléfono (frontend/iconos.py) dentro de la pantalla
+        _icono(self, "telefono", ancho_pantalla, (centro_x, centro_y + 0.004, -0.002))
         # insignia roja con el contador de no leídos
         self.insignia = Entity(parent=self, position=(centro_x - 0.03, centro_y + 0.052, -0.004),
                                enabled=False)
@@ -189,21 +209,25 @@ class TelefonoUI(Entity):
         y_visible = self.y_inferior + self._alto_banner / 2
         y_oculto = -0.5 - self._alto_banner / 2 - MARGEN
         self.banner.position = (self.x_derecho - self.ANCHO_ICONO - 0.012 - self.ANCHO_BANNER / 2,
-                                hud_calculos.mezclar(y_oculto, y_visible, self.nivel_banner))
+                                hud_calculos.mezclar(y_oculto, y_visible,
+                                                     _ease_out_quad(self.nivel_banner)))
 
     def _armar_banner(self, texto):
         for hijo in list(self.banner.children):
             destruir_arbol(hijo)
         relleno = 0.012
         titulo = Text(hud_calculos.ENCABEZADO_TELEFONO, parent=self.banner, origin=(-0.5, 0.5),
-                      scale=escala_fuente(15), color=rgb(estilo.COLOR_TEXTO_TENUE))
+                      scale=escala_fuente(17), color=rgb(estilo.COLOR_TEXTO_TENUE))
+        lado_icono = a_unidades(24)
         cuerpo, alto_texto = _texto_envuelto(
             self.banner, texto, self.ANCHO_BANNER - 2 * relleno, 18, estilo.COLOR_TEXTO, (0, 0))
         self._alto_banner = a_unidades(15) * 1.3 + alto_texto + 2 * relleno
         _fondo(self.banner, self.ANCHO_BANNER, self._alto_banner, rgb(estilo.COLOR_PANEL), 10,
                z=0.002)
         izquierda, arriba = -self.ANCHO_BANNER / 2 + relleno, self._alto_banner / 2 - relleno
-        titulo.position = (izquierda, arriba, -0.001)
+        _icono(self.banner, "telefono", lado_icono,
+               (izquierda + lado_icono / 2, arriba - a_unidades(8), -0.001))
+        titulo.position = (izquierda + lado_icono + 0.006, arriba, -0.001)
         cuerpo.position = (izquierda, arriba - a_unidades(15) * 1.3, -0.001)
 
     _alto_banner = 0.12
@@ -225,14 +249,25 @@ class TelefonoUI(Entity):
         _fondo(self.panel, ancho, alto, rgb(estilo.COLOR_PANEL), 12, z=0.002)
 
         y = alto / 2 - relleno
-        Text(vista.encabezado, parent=self.panel, origin=(-0.5, 0.5), position=(izquierda, y, -0.001),
+        lado_icono = a_unidades(30)
+        _icono(self.panel, "telefono", lado_icono, (izquierda + lado_icono / 2, y - a_unidades(15), -0.001))
+        Text(vista.encabezado, parent=self.panel, origin=(-0.5, 0.5),
+             position=(izquierda + lado_icono + 0.008, y, -0.001),
              scale=escala_fuente(26), color=rgb(estilo.COLOR_TEXTO))
         y -= a_unidades(26) * 1.3
         Entity(parent=self.panel, model="quad", scale=(ancho_texto, 0.002), position=(0, y, -0.001),
                color=rgb(estilo.COLOR_BARRA_FONDO))
         y -= 0.012
+        prefijo, titulo_mision = _separar_mision(vista.linea_mision)
+        if prefijo:                      # «Misión:» en el color del destino, con su icono
+            lado_mision = a_unidades(20)
+            _icono(self.panel, "mision", lado_mision, (izquierda + lado_mision / 2, y - a_unidades(10), -0.001))
+            Text(prefijo, parent=self.panel, origin=(-0.5, 0.5),
+                 position=(izquierda + lado_mision + 0.006, y, -0.001),
+                 scale=escala_fuente(17), color=rgb(COLOR_DESTINO))
+            y -= a_unidades(17) * 1.35
         mision, alto_mision = _texto_envuelto(
-            self.panel, vista.linea_mision, ancho_texto, 19, estilo.COLOR_TEXTO, (izquierda, y, -0.001))
+            self.panel, titulo_mision, ancho_texto, 19, estilo.COLOR_TEXTO, (izquierda, y, -0.001))
         y -= alto_mision
         if vista.linea_destino:
             _texto_envuelto(self.panel, vista.linea_destino, ancho_texto, 17,
@@ -240,11 +275,11 @@ class TelefonoUI(Entity):
             y -= a_unidades(17) * 1.25
         y -= 0.014
         Text("Mensajes", parent=self.panel, origin=(-0.5, 0.5), position=(izquierda, y, -0.001),
-             scale=escala_fuente(15), color=rgb(estilo.COLOR_TEXTO_TENUE))
-        y -= a_unidades(15) * 1.5
+             scale=escala_fuente(17), color=rgb(estilo.COLOR_TEXTO_TENUE))
+        y -= a_unidades(17) * 1.5
         Text("Tab para cerrar", parent=self.panel, origin=(0.5, -0.5),
              position=(ancho / 2 - relleno, -alto / 2 + 0.008, -0.001),
-             scale=escala_fuente(14), color=rgb(estilo.COLOR_TEXTO_TENUE))
+             scale=escala_fuente(16), color=rgb(estilo.COLOR_TEXTO_TENUE))
 
         limite_inferior = -alto / 2 + 0.034      # deja sitio a la ayuda de la base
         for fila in vista.filas:                 # los más recientes primero
@@ -273,6 +308,8 @@ class Minimapa(Entity):
     COLOR_CASAS = color.rgba32(88, 92, 108, 200)    # casas: algo transparentes
     COLOR_ESCALERAS = color.rgba32(200, 190, 160, 255)
     ANCHO_MIN_ESCALERA = 0.003       # grosor mínimo de una escalera en camera.ui (unidades)
+    COLOR_CALLES = (140, 146, 164)   # antes (112, 116, 132): más contraste sobre el fondo oscuro
+    COLOR_LUGAR_SIN_IDENTIDAD = (150, 152, 164)   # lugar que no está en estilo.COLORES_LUGAR
 
     # rotacion_libre (mundo 3D): el yaw se cambia cada frame con fijar_yaw() y la escala no depende de él.
     def __init__(self, mapa, yaw_grados=None, rotacion_libre=False, **opciones):
@@ -302,9 +339,11 @@ class Minimapa(Entity):
         self.segmentos_ruta = []      # cuadros reutilizados para dibujar la ruta
         self.puntos = {}              # nombre -> (aro, punto) de cada jugador
         self.lugares = {}             # lugar -> círculo de la plaza
+        self.contornos_lugar = {}     # lugar -> círculo de tinta detrás de la plaza
         self.calles = []              # [(cuadro, a, b)] para recolocarlas al girar
         self.marcas_edificios = {}    # lugar -> cuadrito en la puerta (solo mundo con edificios)
         self._firma_ruta = None
+        self._destino_etiqueta = None
         self.malla_casas = Entity(parent=self.capa_casas, enabled=False, color=self.COLOR_CASAS)
         self.malla_escaleras = Entity(parent=self.capa_casas, z=-0.0003, enabled=False,
                                       color=self.COLOR_ESCALERAS)
@@ -314,6 +353,11 @@ class Minimapa(Entity):
         self._reconstruir_casas()
         self.marcador_destino = Entity(parent=self.capa_lugares, model="circle", z=0.0005,
                                        color=rgb(COLOR_DESTINO), enabled=False)
+        # Etiqueta corta del destino, bajo el minimapa (chip oscuro con el nombre en amarillo).
+        self.etiqueta_destino = Text("", parent=self, origin=(0.5, 0.5), scale=escala_fuente(16),
+                                     position=(self.ANCHO / 2 - 0.008, -self.ALTO / 2 - 0.012, -0.007),
+                                     color=rgb(COLOR_DESTINO), enabled=False)
+        self.fondo_etiqueta = _fondo(self, 0.1, 0.03, COLOR_FONDO_HUD, 6, z=-0.0065, enabled=False)
 
     def _construir_mapa(self):
         g = self.geometria
@@ -321,8 +365,12 @@ class Minimapa(Entity):
             cuadro = Entity(parent=self.capa_calles, model="quad")
             self.calles.append((cuadro, a, b))
         for lugar in self._mapa.lugares():
+            # contorno de tinta: separa el color del lugar del aro amarillo del destino
+            self.contornos_lugar[lugar] = Entity(parent=self.capa_lugares, model="circle", z=0.0002,
+                                                 scale=g.diametro_plaza() * 1.22, color=rgb(estilo.TINTA))
             self.lugares[lugar] = Entity(parent=self.capa_lugares, model="circle",
-                                         scale=g.diametro_plaza(), color=rgb((150, 152, 164)))
+                                         scale=g.diametro_plaza(),
+                                         color=rgb(self.color_de_lugar(lugar)))
         for lugar in self._mapa.lugares():
             try:
                 self._mapa.edificio_de(lugar)
@@ -333,13 +381,26 @@ class Minimapa(Entity):
                 color=rgb((60, 64, 84)))
         self._colocar_mapa()
 
+    # Color de identidad del lugar (estilo.COLORES_LUGAR). Los nombres del mapa son más largos
+    # («Universidad de Ciudad Nova», «Parque Municipal»): se busca el nombre exacto y, si no,
+    # la clave con la que empieza. Lugar desconocido: gris neutro.
+    @classmethod
+    def color_de_lugar(cls, lugar):
+        if lugar in estilo.COLORES_LUGAR:
+            return estilo.COLORES_LUGAR[lugar]
+        for clave, tono in estilo.COLORES_LUGAR.items():
+            if lugar.startswith(clave):
+                return tono
+        return cls.COLOR_LUGAR_SIN_IDENTIDAD
+
     # Posiciona calles, plazas y marcas según el yaw actual de la geometría.
     def _colocar_mapa(self):
         g = self.geometria
         for cuadro, a, b in self.calles:
-            self._poner_segmento(cuadro, g.lugar(a), g.lugar(b), g.ancho_calle(), rgb((112, 116, 132)))
+            self._poner_segmento(cuadro, g.lugar(a), g.lugar(b), g.ancho_calle(), rgb(self.COLOR_CALLES))
         for lugar, circulo in self.lugares.items():
             circulo.position = g.lugar(lugar)
+            self.contornos_lugar[lugar].position = (*g.lugar(lugar)[:2], 0.0002)
         for lugar, marca in self.marcas_edificios.items():
             marca.position = g.punto(*self._mapa.edificio_de(lugar).puerta())
 
@@ -414,18 +475,36 @@ class Minimapa(Entity):
             punto.color = rgb(rgb_rol) if es_activo else color.rgba32(*rgb_rol, 130)
             punto.z = -0.0005 if es_activo else 0.001     # los demás, detrás del activo
 
+        self._poner_etiqueta_destino(destino)
         if destino is None:
             self.marcador_destino.enabled = False
         else:
             self.marcador_destino.enabled = True
             self.marcador_destino.position = g.lugar(destino)
-            self.marcador_destino.scale = g.diametro_plaza() * 1.35
+            self.marcador_destino.scale = g.diametro_plaza() * 1.6
 
         for nombre, rgb_rol, x, z in posiciones:
             if nombre == activo:
                 self._dibujar_ruta(x, z, ruta)
                 return
         self._dibujar_ruta(0, 0, [])
+
+    # Chip «Destino: <lugar>» bajo el minimapa, alineado a su borde derecho. Sin destino se oculta.
+    def _poner_etiqueta_destino(self, destino):
+        if destino == self._destino_etiqueta:
+            return
+        self._destino_etiqueta = destino
+        self.etiqueta_destino.enabled = self.fondo_etiqueta.enabled = destino is not None
+        if destino is None:
+            return
+        self.etiqueta_destino.text = _seguro(destino)
+        ancho = _medidor(self.etiqueta_destino)(self.etiqueta_destino.text)
+        relleno, alto = 0.012, a_unidades(16) * 1.5
+        self.fondo_etiqueta.model = modelo_redondeado(ancho + 2 * relleno, alto, 6)
+        self.fondo_etiqueta.scale = (ancho + 2 * relleno, alto)
+        derecha = self.ANCHO / 2
+        self.fondo_etiqueta.position = (derecha - (ancho + 2 * relleno) / 2, -self.ALTO / 2 - 0.012 - alto / 2 + 0.002, -0.0065)
+        self.etiqueta_destino.position = (derecha - relleno, -self.ALTO / 2 - 0.012 + 0.002 - (alto - a_unidades(16)) / 2, -0.007)
 
     def _dibujar_ruta(self, x, z, ruta):
         firma = (tuple(ruta), round(x, 3), round(z, 3))
@@ -467,33 +546,72 @@ class AvisoInteraccion(Entity):
     TEXTO = "Presiona E para acceder"
     ANCHO_MIN, ANCHO_MAX, ALTO = 0.44, 0.66, 0.07    # el máximo deja libre el banner del teléfono
     RELLENO = 0.05
+    LADO_TECLA = 0.05                 # la tecla E dibujada (icono 'interactuar')
+    SEPARACION_TECLA = 0.012
+    DURACION_APARICION = 0.12         # segundos: alfa 0 -> 1 y sube 6 px (ease_out_quad)
+    SUBIDA_PX = 6
 
     def __init__(self, **opciones):
         super().__init__(**opciones)
-        self.position = (0, -0.5 + MARGEN + 0.04)
+        self.y_base = -0.5 + MARGEN + 0.04
+        self.position = (0, self.y_base)
         self.fondo = _fondo(self, self.ANCHO_MIN, self.ALTO, COLOR_FONDO_HUD, 12, z=0.001)
-        self.texto = Text(self.TEXTO, parent=self, origin=(0, 0), position=(0, 0, -0.001),
+        self.tecla = _icono(self, "interactuar", self.LADO_TECLA, (0, 0, -0.001))
+        self.texto = Text(self.TEXTO, parent=self, origin=(-0.5, 0), position=(0, 0, -0.001),
                           scale=escala_fuente(22), color=rgb(estilo.COLOR_TEXTO))
         self._ancho = self.ANCHO_MIN
+        self._ancho_texto = 0.0
+        self.aparicion = 0.0          # segundos desde que apareció (0 .. DURACION_APARICION)
+        self.nivel = 0.0              # avance eased 0..1 de la aparición (1 = ya a la vista)
         self.enabled = False
+        self._colocar()
+
+    # Tecla + texto como un grupo centrado dentro del fondo.
+    def _colocar(self):
+        grupo = self.LADO_TECLA + self.SEPARACION_TECLA + self._ancho_texto
+        izquierda = -grupo / 2
+        self.tecla.x = izquierda + self.LADO_TECLA / 2
+        self.texto.x = izquierda + self.LADO_TECLA + self.SEPARACION_TECLA
 
     # `texto`: otro mensaje (p. ej. "Presiona E para entrar a la Alcaldía"); None = el de siempre.
-    # El fondo se ajusta al ancho del texto (entre ANCHO_MIN y ANCHO_MAX; si aun así no cabe,
-    # el texto se achica).
+    # El fondo se ajusta al ancho de tecla + texto (entre ANCHO_MIN y ANCHO_MAX; si aun así no
+    # cabe, el texto se achica).
     def actualizar(self, estado_mision, estado_telefono, texto=None):
         cadena = _seguro(texto if texto is not None else self.TEXTO)
         if cadena != self.texto.text:
             self.texto.text = cadena
             self.texto.scale = escala_fuente(22)
             ancho_texto = _medidor(self.texto)(cadena)
-            maximo = self.ANCHO_MAX - self.RELLENO
+            maximo = self.ANCHO_MAX - self.RELLENO - self.LADO_TECLA - self.SEPARACION_TECLA
             if ancho_texto > maximo:
                 self.texto.scale = escala_fuente(22) * maximo / ancho_texto
                 ancho_texto = maximo
-            self._ancho = max(self.ANCHO_MIN, ancho_texto + self.RELLENO)
+            self._ancho_texto = ancho_texto
+            self._ancho = max(self.ANCHO_MIN,
+                              ancho_texto + self.LADO_TECLA + self.SEPARACION_TECLA + self.RELLENO)
             self.fondo.model = modelo_redondeado(self._ancho, self.ALTO, 12)
             self.fondo.scale = (self._ancho, self.ALTO)
-        self.enabled = hud_calculos.aviso_visible(estado_mision, estado_telefono)
+            self._colocar()
+        visible = hud_calculos.aviso_visible(estado_mision, estado_telefono)
+        if visible and not self.enabled:      # acaba de aparecer: la animación empieza de cero
+            self.aparicion = 0.0
+            self._aplicar_aparicion()
+        self.enabled = visible
+
+    # Avanza `dt` segundos la aparición (llamado desde HudMundo.actualizar; determinista).
+    def avanzar(self, dt):
+        if not self.enabled:
+            return
+        self.aparicion = min(self.DURACION_APARICION, self.aparicion + dt)
+        self._aplicar_aparicion()
+
+    def _aplicar_aparicion(self):
+        self.nivel = _ease_out_quad(self.aparicion / self.DURACION_APARICION)
+        self.y = self.y_base - a_unidades(self.SUBIDA_PX) * (1 - self.nivel)
+        alfa = int(round(255 * self.nivel))
+        self.fondo.color = color.rgba32(12, 14, 24, int(round(240 * self.nivel)))
+        self.tecla.color = color.rgba32(255, 255, 255, alfa)
+        self.texto.color = color.rgba32(*estilo.COLOR_TEXTO, alfa)
 
 
 # -- Panel de turno ----------------------------------------------------------------
@@ -508,23 +626,32 @@ class PanelTurno(Entity):
         self.fondo = _fondo(self, 0.1, 0.1, COLOR_FONDO_HUD, 8, z=0.001)
         self.texto_turno = Text("", parent=self, origin=(-0.5, 0.5), scale=escala_fuente(22),
                                 color=rgb(estilo.COLOR_TEXTO))
+        # «Misión:» va aparte, en el color del destino; texto_mision lleva el título.
+        self.texto_prefijo = Text("", parent=self, origin=(-0.5, 0.5), scale=escala_fuente(17),
+                                  color=rgb(COLOR_DESTINO))
         self.texto_mision = Text("", parent=self, origin=(-0.5, 0.5), scale=escala_fuente(17),
                                  color=rgb(estilo.COLOR_TEXTO_TENUE))
         self.position = (-window.aspect_ratio / 2 + MARGEN, 0.5 - MARGEN)
 
     # Fija los textos y ajusta el fondo al más ancho.
     def fijar(self, turno, mision):
+        prefijo, titulo = _separar_mision(mision)
         self.texto_turno.text = _seguro(turno)
-        self.texto_mision.text = _seguro(mision)
+        self.texto_prefijo.text = prefijo
+        self.texto_prefijo.enabled = bool(prefijo)
+        self.texto_mision.text = _seguro(titulo)
+        # El título arranca tras «Misión: » (el espacio se mide con el mismo TextNode).
+        avance = _medidor(self.texto_prefijo)(prefijo + " ") if prefijo else 0.0
         ancho = max(_medidor(self.texto_turno)(self.texto_turno.text),
-                    _medidor(self.texto_mision)(self.texto_mision.text))
+                    avance + _medidor(self.texto_mision)(self.texto_mision.text))
         alto_turno, alto_mision = a_unidades(22) * 1.2, a_unidades(17) * 1.2
         r = self.RELLENO
         self.fondo.model = modelo_redondeado(ancho + 2 * r, alto_turno + alto_mision + 2 * r, 8)
         self.fondo.scale = (ancho + 2 * r, alto_turno + alto_mision + 2 * r)
         self.fondo.position = ((ancho + 2 * r) / 2, -(alto_turno + alto_mision + 2 * r) / 2)
         self.texto_turno.position = (r, -r, -0.001)
-        self.texto_mision.position = (r, -r - alto_turno, -0.001)
+        self.texto_prefijo.position = (r, -r - alto_turno, -0.001)
+        self.texto_mision.position = (r + avance, -r - alto_turno, -0.001)
 
 
 # -- Fin de la partida ---------------------------------------------------------------
@@ -535,34 +662,82 @@ class PanelTurno(Entity):
 class PanelFinPartida(Entity):
 
     TITULO = "Partida terminada"
-    ANCHO, ALTO = 0.62, 0.56
+    ANCHO, ALTO = 0.62, 0.70
+    ANCHO_BARRA = 0.44
+    LADO_ICONO = 0.07
+    SEPARACION_FILA = 0.12
+    DURACION_BARRAS = 0.8             # segundos que tardan las barras en crecer de 0 al valor
+    INDICADORES = ("convivencia", "confianza", "desinformacion")
 
     def __init__(self, al_menu, **opciones):
         super().__init__(**opciones)
-        _fondo(self, self.ANCHO, self.ALTO, COLOR_FONDO_HUD, 14, z=0.002)
+        self.panel = panel_tinta(self, self.ANCHO, self.ALTO, tono=estilo.COLOR_FONDO)
         Text(self.TITULO, parent=self, origin=(0, 0), position=(0, self.ALTO / 2 - 0.07, -0.001),
              scale=escala_fuente(32), color=rgb(estilo.COLOR_TEXTO))
         Text("Indicadores finales de Ciudad Nova", parent=self, origin=(0, 0),
              position=(0, self.ALTO / 2 - 0.13, -0.001), scale=escala_fuente(17),
              color=rgb(estilo.COLOR_TEXTO_TENUE))
-        self.textos = {}
-        for i, nombre in enumerate(("convivencia", "confianza", "desinformacion")):
-            self.textos[nombre] = Text(
-                "", parent=self, origin=(0, 0), position=(0, 0.06 - i * 0.075, -0.001),
-                scale=escala_fuente(24), color=rgb(estilo.COLOR_TEXTO))
-        self.boton_menu = BotonAccion(
+        self.barras = {}
+        self.textos = {}                  # nombre -> Text «Etiqueta: valor» de cada barra
+        self.valores = {}
+        izquierda = -self.ANCHO / 2 + 0.05
+        for i, nombre in enumerate(self.INDICADORES):
+            arriba = 0.16 - i * self.SEPARACION_FILA
+            _icono(self, nombre, self.LADO_ICONO,
+                   (izquierda + self.LADO_ICONO / 2, arriba - 0.05, -0.001))
+            barra = BarraIndicador(estilo.ETIQUETAS_INDICADORES[nombre], self.ANCHO_BARRA, 0,
+                                   parent=self, position=(izquierda + self.LADO_ICONO + 0.02, arriba, -0.001))
+            self.barras[nombre] = barra
+            self.textos[nombre] = barra.texto_etiqueta
+        self.boton_menu = BotonPrimario(
             "Volver al menú", al_clic=al_menu, ancho=0.36, alto=a_unidades(56),
             parent=self, position=(0, -self.ALTO / 2 + 0.09, -0.001))
+        self.tiempo = self.DURACION_BARRAS          # animación terminada
         self.enabled = False
 
-    # Muestra el panel con los valores de `indicadores` (dict nombre -> 0..100).
+    # Muestra el panel con los valores de `indicadores` (dict nombre -> 0..100). Las
+    # etiquetas muestran ya el valor final; las barras crecen en DURACION_BARRAS (avanzar).
+    # Llamarlo otra vez con el panel ya visible no reinicia la animación.
     def mostrar(self, indicadores):
-        for nombre, texto in self.textos.items():
-            texto.text = f"{estilo.ETIQUETAS_INDICADORES[nombre]}: {indicadores[nombre]}"
+        ya_visible = self.enabled
+        for nombre, barra in self.barras.items():
+            self.valores[nombre] = indicadores[nombre]
+            barra.actualizar(indicadores[nombre])
+        if not ya_visible:
+            self.tiempo = 0.0
+            self._dibujar_barras()
         self.enabled = True
 
     def ocultar(self):
         self.enabled = False
+
+    # Un paso de `dt` segundos de la animación de las barras (lo llama HudMundo.actualizar).
+    def avanzar(self, dt):
+        if not self.enabled or self.tiempo >= self.DURACION_BARRAS:
+            return
+        self.tiempo = min(self.DURACION_BARRAS, self.tiempo + dt)
+        self._dibujar_barras()
+
+    # Proporción del valor final alcanzada (0..1, ease_out_quad).
+    def avance(self):
+        return _ease_out_quad(self.tiempo / self.DURACION_BARRAS)
+
+    def _dibujar_barras(self):
+        for nombre, barra in self.barras.items():
+            ancho = barra.ancho_barra * max(0.0, min(1.0, self.valores[nombre] / 100)) * self.avance()
+            if ancho <= 0:
+                barra.relleno.enabled = False
+                continue
+            barra.relleno.enabled = True
+            barra.relleno.scale_x = ancho
+            barra.relleno.x = ancho / 2
+            barra.relleno.model = modelo_redondeado(ancho, barra.alto_barra, 4)
+            barra.relleno.color = rgb(self._color_de(nombre))
+
+    # Color por tercio del valor final; en «desinformacion» un valor alto es MALO (se invierte).
+    def _color_de(self, nombre):
+        valor = self.valores[nombre]
+        return estilo.rgb_por_valor(100 - valor if nombre == "desinformacion" else valor)
 
 
 # -- HUD completo -------------------------------------------------------------------
@@ -613,8 +788,10 @@ class HudMundo(Entity):
             [(j.nombre, ROLES[j.rol].color, j.x, j.z) for j in sesion.jugadores()],
             activo.nombre, destino, self.guia.ruta)
         self.telefono_ui.avanzar(dt)
+        self.panel_fin.avanzar(dt)
         self.aviso.actualizar(flujo.estado_mision(), activo.telefono.estado(),
                               self._texto_aviso(destino))
+        self.aviso.avanzar(dt)
         return cambio
 
     # "Presiona E para entrar a <edificio>" si el mapa tiene edificios (mundo 3D); None = el de siempre.

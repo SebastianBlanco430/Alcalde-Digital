@@ -4,12 +4,16 @@
 #   BarraIndicador  etiqueta + barra con relleno proporcional y color por rango.
 #   TarjetaNoticia  recuadro con el texto de la noticia envuelto y centrado.
 #   BotonAccion     botón con estados normal / hover / deshabilitado.
+#   panel_tinta     panel con borde de tinta y sombra plana (estilo del juego).
+#   BotonPrimario / BotonSecundario  botones con borde de tinta, hover, pulsado, foco.
+
+import sys
 
 from panda3d.core import TextNode
 from ursina import Button, Entity, Text, color, destroy
 from ursina.models.procedural.quad import Quad
 
-from frontend import estilo
+from frontend import estilo, tipografia
 from frontend.texto import envolver_texto
 
 # La versión pygame usaba una ventana de 800x600; sus medidas en píxeles se
@@ -44,6 +48,17 @@ def escala_fuente(pixeles):
 MARGEN_TEXTURA_FUENTE = 4
 
 
+_AVISADO_FUENTE = False
+
+
+# Fuente de títulos ausente: se avisa una sola vez por stderr y se sigue con la de texto.
+def _avisar_fuente_ausente(error):
+    global _AVISADO_FUENTE
+    if not _AVISADO_FUENTE:
+        _AVISADO_FUENTE = True
+        print(f"[ui] no se pudo cargar la fuente de títulos ({error}). Se usa la de texto.", file=sys.stderr)
+
+
 # Ajusta la fuente compartida de Text para evitar un borde fantasma en los glifos:
 # el atlas de Panda3D deja un margen de 2 texels que el filtrado alcanza al dibujar
 # texto pequeño; con 4 texels desaparece. Llamar una vez tras crear la aplicación
@@ -52,6 +67,13 @@ def preparar_fuente():
     muestra = Text("", add_to_scene_entities=False)   # carga la fuente compartida
     muestra.font.setTextureMargin(MARGEN_TEXTURA_FUENTE)
     destroy(muestra)
+    # Segunda fuente (títulos, negrita): mismo margen. Si no está disponible no es un error.
+    try:
+        titulo = Text("", font=tipografia.FUENTE_TITULO, add_to_scene_entities=False)
+        titulo.font.setTextureMargin(MARGEN_TEXTURA_FUENTE)
+        destroy(titulo)
+    except Exception as error:   # pragma: no cover - fuente ausente: se usa la de texto
+        _avisar_fuente_ausente(error)
 
 
 # Malla de rectángulo con esquinas de `radio_px` (px de la versión pygame).
@@ -224,3 +246,179 @@ class BotonAccion(Button):
         if not self._habilitado or self.accion is None:
             return
         self.accion()
+
+
+# ---------------------------------------------------------------------------
+# Estilo «tinta» (T5, docs/DISENO.md sección 4). Todo lo de abajo es AÑADIDO:
+# BotonAccion y el resto no cambian.
+# ---------------------------------------------------------------------------
+
+# Malla de un rectángulo de `ancho` x `alto` (unidades) para una capa decorativa.
+def _capa(padre, ancho, alto, radio_px, rgb_o_color, z, posicion=(0, 0)):
+    colorear = rgb_o_color if not isinstance(rgb_o_color, tuple) or len(rgb_o_color) != 3 else rgb(rgb_o_color)
+    return Entity(
+        parent=padre, position=(posicion[0], posicion[1], z), scale=(ancho, alto),
+        model=modelo_redondeado(ancho, alto, radio_px), color=colorear,
+    )
+
+
+# Medidas (unidades de camera.ui) del borde y la sombra plana de `estilo`.
+def medidas_tinta(borde_px=None):
+    borde = a_unidades(estilo.GROSOR_BORDE_PX if borde_px is None else borde_px)
+    dx, dy = estilo.DESPLAZAMIENTO_SOMBRA_PX
+    return borde, (a_unidades(dx), a_unidades(dy))
+
+
+# Panel con borde de tinta y sombra plana desplazada, sin desenfoque.
+# Devuelve un Entity contenedor centrado en su `position`, con los hijos
+# `.sombra` (o None), `.borde` y `.fondo`. `tono` es una tupla RGB (por defecto
+# COLOR_PANEL); el contenido que se ponga dentro usa z = 0 (las capas están detrás); `radio_px` es el radio de la cara (6 chip, 10 tarjeta, 14 panel).
+def panel_tinta(padre, ancho, alto, tono=None, radio_px=estilo.RADIO_PANEL_PX, sombra=True,
+                borde_px=None, **opciones):
+    tono = estilo.COLOR_PANEL if tono is None else tono
+    borde, (sx, sy) = medidas_tinta(borde_px)
+    contenedor = Entity(parent=padre, **opciones)
+    contenedor.sombra = None
+    if sombra:
+        contenedor.sombra = _capa(
+            contenedor, ancho + 2 * borde, alto + 2 * borde, radio_px + estilo.GROSOR_BORDE_PX,
+            color.rgba32(*estilo.TINTA, estilo.ALFA_SOMBRA), 0.005, (sx, sy),
+        )
+    contenedor.borde = _capa(
+        contenedor, ancho + 2 * borde, alto + 2 * borde, radio_px + estilo.GROSOR_BORDE_PX,
+        rgb(estilo.TINTA), 0.004,
+    )
+    contenedor.fondo = _capa(contenedor, ancho, alto, radio_px, rgb(tono), 0.003)
+    return contenedor
+
+
+# Datos puros de cada variante de botón (colores RGB), para probarlos sin ventana.
+ESTILOS_BOTON = {
+    "primario": {
+        "normal": estilo.COLOR_ACENTO, "hover": (255, 232, 110), "presionado": (226, 192, 36),
+        "texto": estilo.COLOR_ACENTO_TEXTO,
+    },
+    "secundario": {
+        "normal": estilo.COLOR_BOTON, "hover": estilo.COLOR_BOTON_RESALTADO, "presionado": (55, 72, 125),
+        "texto": estilo.COLOR_BOTON_TEXTO,
+    },
+}
+ESCALA_HOVER = 1.04
+ESCALA_PRESIONADO = 0.96
+DURACION_HOVER = 0.08
+DURACION_PRESIONADO = 0.06
+
+
+# Botón con borde de tinta y sombra plana. Hereda BotonAccion (misma API:
+# `accion`, fijar_habilitado, esta_habilitado). Estados: normal, hover (escala
+# 1,04), presionado (0,96 y la sombra se hunde), deshabilitado (sin sombra) y
+# foco (anillo cian, para teclado). Las subclases fijan `VARIANTE`.
+class BotonTinta(BotonAccion):
+
+    VARIANTE = "secundario"
+    ALTO_FOCO_PX = 3
+
+    def __init__(self, texto, al_clic=None, ancho=a_unidades(220), alto=a_unidades(56),
+                 habilitado=True, tamano_fuente_px=22, **opciones):
+        self._paleta = ESTILOS_BOTON[self.VARIANTE]
+        super().__init__(texto, al_clic=al_clic, ancho=ancho, alto=alto, habilitado=habilitado,
+                         tamano_fuente_px=tamano_fuente_px, **opciones)
+        self.radius = a_unidades(estilo.RADIO_TARJETA_PX) / alto
+        self.base_scale = (ancho, alto)
+        self.highlight_color = rgb(self._paleta["hover"])
+        self.pressed_color = rgb(self._paleta["presionado"])
+        self.highlight_text_color = rgb(self._paleta["texto"])
+        if self.text_entity is not None and self.VARIANTE == "primario":
+            self.text_entity.font = tipografia.FUENTE_TITULO
+        # Capas hijas: las escalas son relativas a las del botón.
+        borde, (sx, sy) = medidas_tinta()
+        rel = (1 + 2 * borde / ancho, 1 + 2 * borde / alto)
+        radio = estilo.RADIO_TARJETA_PX + estilo.GROSOR_BORDE_PX
+        self.foco = _capa(self, ancho + 2 * (borde + a_unidades(self.ALTO_FOCO_PX)),
+                          alto + 2 * (borde + a_unidades(self.ALTO_FOCO_PX)), radio + self.ALTO_FOCO_PX,
+                          rgb(estilo.ESTADO_INFO), 0.0005)
+        self.foco.scale = (rel[0] + 2 * a_unidades(self.ALTO_FOCO_PX) / ancho,
+                           rel[1] + 2 * a_unidades(self.ALTO_FOCO_PX) / alto)
+        self.foco.enabled = False
+        self.sombra = _capa(self, ancho + 2 * borde, alto + 2 * borde, radio,
+                            color.rgba32(*estilo.TINTA, estilo.ALFA_SOMBRA), 0.002)
+        self.sombra.scale = rel
+        self._sombra_pos = (sx / ancho, sy / alto)
+        self.sombra.position = (*self._sombra_pos, 0.002)
+        self.borde = _capa(self, ancho + 2 * borde, alto + 2 * borde, radio, rgb(estilo.TINTA), 0.001)
+        self.borde.scale = rel
+        self._presionado = False
+        self._foco = False
+        self.fijar_habilitado(habilitado)
+
+    def fijar_habilitado(self, valor):
+        self._habilitado = bool(valor)
+        self.disabled = not self._habilitado
+        if self._habilitado:
+            self.color = rgb(self._paleta["normal"])
+            self.text_color = rgb(self._paleta["texto"])
+            if self.hovered:
+                self.model.setColorScale(self.highlight_color)
+        else:
+            self.color = rgb(estilo.COLOR_BOTON_DESHABILITADO)
+            self.text_color = rgb(estilo.COLOR_TEXTO_TENUE)
+        sombra = getattr(self, "sombra", None)
+        if sombra is not None:
+            sombra.enabled = self._habilitado
+
+    def _escalar(self, factor, duracion):
+        ancho, alto = self.base_scale
+        self.animate_scale((ancho * factor, alto * factor, 1), duration=duracion, curve=_curva_salida())
+
+    def on_mouse_enter(self):
+        super().on_mouse_enter()
+        if self._habilitado and not self._presionado:
+            self._escalar(ESCALA_HOVER, DURACION_HOVER)
+
+    def on_mouse_exit(self):
+        super().on_mouse_exit()
+        self._presionado = False
+        self._hundir(False)
+        self._escalar(1.0, DURACION_HOVER)
+
+    def input(self, key):
+        super().input(key)
+        if not self._habilitado:
+            return
+        if key == "left mouse down" and self.hovered:
+            self._presionado = True
+            self._hundir(True)
+            self._escalar(ESCALA_PRESIONADO, DURACION_PRESIONADO)
+        elif key == "left mouse up" and self._presionado:
+            self._presionado = False
+            self._hundir(False)
+            self._escalar(ESCALA_HOVER if self.hovered else 1.0, DURACION_PRESIONADO)
+
+    # La sombra se acerca al botón mientras está presionado.
+    def _hundir(self, hundido):
+        x, y = self._sombra_pos
+        self.sombra.position = (x * 0.25, y * 0.25, 0.002) if hundido else (x, y, 0.002)
+
+    def esta_presionado(self):
+        return self._presionado
+
+    # Foco de teclado: anillo cian alrededor del botón.
+    def fijar_foco(self, valor):
+        self._foco = bool(valor)
+        self.foco.enabled = self._foco and self._habilitado
+
+    def tiene_foco(self):
+        return self._foco
+
+
+class BotonPrimario(BotonTinta):
+    VARIANTE = "primario"   # amarillo con texto de tinta: la acción principal
+
+
+class BotonSecundario(BotonTinta):
+    VARIANTE = "secundario"
+
+
+def _curva_salida():
+    from ursina import curve
+    return curve.out_quad

@@ -3,30 +3,28 @@
 # no tienen colisión con los jugadores ni afectan al modelo de la partida. Cuelgan de EscenaMundo,
 # así que solo se mueven mientras el mundo está activo.
 
-import random
-
 from ursina import Entity, time
 
-from frontend.peatones_calculos import crear_caminantes
+from frontend.peatones_calculos import aspecto_peaton, crear_peatones
 from frontend import poses
 from frontend.personaje import Personaje
 
-CANTIDAD = 6
+CANTIDAD = 12
 SEMILLA = 2026
 # Tonos de ropa apagados: se distinguen de los colores vivos de los roles jugables.
-ROPA = ((150, 150, 158), (170, 140, 120), (120, 150, 140), (160, 120, 140), (130, 130, 160), (150, 160, 120))
+ROPA = ((150, 150, 158), (170, 140, 120), (120, 150, 140), (160, 120, 140), (130, 130, 160), (150, 160, 120),
+        (176, 96, 84), (92, 124, 150), (140, 110, 160), (190, 170, 110), (104, 140, 104), (170, 170, 176))
 
 
 class Peatones(Entity):
 
     def __init__(self, mundo, cantidad=CANTIDAD, **opciones):
         super().__init__(**opciones)
-        azar = random.Random(SEMILLA)
-        self.caminantes = crear_caminantes(mundo, cantidad, azar)
+        self.caminantes = crear_peatones(mundo, cantidad, SEMILLA)
         self.personajes = []
         self._quietos = set()
         for i, caminante in enumerate(self.caminantes):
-            personaje = Personaje("", ROPA[i % len(ROPA)], parent=self)
+            personaje = Personaje("", ROPA[i % len(ROPA)], apariencia=aspecto_peaton(i, SEMILLA), parent=self)
             personaje.etiqueta.enabled = False
             personaje.aro.enabled = False
             personaje.automatico = False              # se anima aquí, y solo mientras camina (rendimiento)

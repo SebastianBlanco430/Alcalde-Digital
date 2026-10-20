@@ -18,6 +18,8 @@ from ursina import Entity, color, time
 
 from frontend import estilo, geometria_mundo, poses
 from frontend.componentes import rgb
+from frontend import sombra_calculos as sc
+from frontend.sombra_contacto import SombraContacto, crear_aro
 from frontend.piezas import COLOR_MARCADOR, COLOR_PIEL, etiqueta, malla_unida, silenciar
 
 VELOCIDAD_CARRERA = 8.5          # m/s con intensidad 1 (ver poses.pose_caminar)
@@ -35,9 +37,10 @@ class Personaje(Entity):
 
     VELOCIDAD_GIRO = 12
 
-    def __init__(self, nombre, color_rol, **opciones):
+    def __init__(self, nombre, color_rol, apariencia=None, **opciones):
         super().__init__(**opciones)
         self.nombre = nombre
+        self._apariencia = apariencia or {}   # opcional: tuplas RGB de pantalon, piel y pelo (peatones)
         self.rumbo = 0.0              # rotation_y del cuerpo (grados)
         self.rumbo_objetivo = 0.0
         self.velocidad = 0.0          # m/s reales; la fija el controlador
@@ -47,14 +50,16 @@ class Personaje(Entity):
         self._intensidad = 0.0
         self._activo = False
 
-        self.aro = Entity(parent=self, model="circle", rotation_x=90, y=0.03, scale=1.7,
-                          color=COLOR_MARCADOR, enabled=False)
+        self.aro = crear_aro(self)                 # translúcido y sobre las capas del suelo (y = 0.30)
         self.cuerpo = Entity(parent=self)          # gira hacia donde camina; la etiqueta no
+        self._elevacion = None                     # elevación de los pies ya aplicada (ver _elevar)
         self.pivotes = {}
         self._construir(rgb(color_rol))
         self.etiqueta = etiqueta(nombre, parent=self, y=2.25, scale=8)
         for parte in (self.aro, self.cuerpo, self.etiqueta):
             silenciar(parte)               # solo el Personaje (la raíz) necesita update()
+        self.sombra = SombraContacto(self.cuerpo, sc.SESGO_SOMBRA)   # disco bajo los pies (cuelga de cuerpo)
+        self._elevar()
         self.aplicar_pose(poses.POSE_PARADO)
 
     # -- Construcción --
@@ -65,16 +70,19 @@ class Personaje(Entity):
         return pivote
 
     def _construir(self, tono):
+        pantalon, piel, pelo = (rgb(self._apariencia[c]) if c in self._apariencia else por_defecto
+                                for c, por_defecto in (("pantalon", COLOR_PANTALON), ("piel", COLOR_PIEL),
+                                                       ("pelo", COLOR_PELO)))
         manga = color.rgb32(int(tono.r * 255 * 0.85), int(tono.g * 255 * 0.85), int(tono.b * 255 * 0.85))
         self.pelvis = self._pivote("pelvis", self.cuerpo, y=poses.ALTURA_PELVIS_PARADO)
-        malla_unida(self.pelvis, [dict(model="cube", color=COLOR_PANTALON, scale=(0.36, 0.2, 0.2))])
+        malla_unida(self.pelvis, [dict(model="cube", color=pantalon, scale=(0.36, 0.2, 0.2))])
 
         torso = self._pivote("torso", self.pelvis, y=0.1)
         malla_unida(torso, [dict(model="cube", color=tono, position=(0, 0.25, 0), scale=(0.42, 0.5, 0.24))])
         cabeza = self._pivote("cabeza", torso, y=0.5)
         malla_unida(cabeza, [
-            dict(model="sphere", color=COLOR_PIEL, position=(0, 0.15, 0), scale=0.27),
-            dict(model="cube", color=COLOR_PELO, position=(0, 0.25, -0.02), scale=(0.25, 0.1, 0.25)),
+            dict(model="sphere", color=piel, position=(0, 0.15, 0), scale=0.27),
+            dict(model="cube", color=pelo, position=(0, 0.25, -0.02), scale=(0.25, 0.1, 0.25)),
             dict(model="cube", color=color.rgb32(30, 30, 40), position=(0, 0.17, 0.12),
                  scale=(0.2, 0.05, 0.05)),                   # visor: marca hacia dónde mira
         ])
@@ -84,16 +92,16 @@ class Personaje(Entity):
             malla_unida(hombro, [dict(model="cube", color=manga, position=(0, -0.15, 0), scale=(0.12, 0.3, 0.12))])
             codo = self._pivote(f"codo_{lado}", hombro, y=-0.3)
             malla_unida(codo, [
-                dict(model="cube", color=COLOR_PIEL, position=(0, -0.13, 0), scale=(0.1, 0.26, 0.1)),
-                dict(model="sphere", color=COLOR_PIEL, position=(0, -0.28, 0), scale=0.11),
+                dict(model="cube", color=piel, position=(0, -0.13, 0), scale=(0.1, 0.26, 0.1)),
+                dict(model="sphere", color=piel, position=(0, -0.28, 0), scale=0.11),
             ])
 
             cadera = self._pivote(f"muslo_{lado}", self.pelvis, position=(signo * 0.1, -0.05, 0))
-            malla_unida(cadera, [dict(model="cube", color=COLOR_PANTALON, position=(0, -0.225, 0),
+            malla_unida(cadera, [dict(model="cube", color=pantalon, position=(0, -0.225, 0),
                                       scale=(0.17, 0.45, 0.17))])
             rodilla = self._pivote(f"rodilla_{lado}", cadera, y=-0.45)
             malla_unida(rodilla, [
-                dict(model="cube", color=COLOR_PANTALON, position=(0, -0.2, 0), scale=(0.14, 0.4, 0.14)),
+                dict(model="cube", color=pantalon, position=(0, -0.2, 0), scale=(0.14, 0.4, 0.14)),
                 dict(model="cube", color=COLOR_ZAPATO, position=(0, -0.41, 0.05), scale=(0.14, 0.08, 0.28)),
             ])
 
@@ -121,6 +129,23 @@ class Personaje(Entity):
 
     def colocar(self, x, z):
         self.position = (x, self.y if self.suelo is None else self.suelo(x, z), z)
+        self._elevar()
+
+    # Sube los pies sobre las capas planas del suelo (ver «Pies enterrados»): en el mundo ELEVACION_PIES
+    # y en el interior 0 (el piso está en y = 0). cuerpo.y es libre: aplicar_pose mueve `pelvis`, no `cuerpo`.
+    # El aro conserva su altura sobre los pies y la etiqueta su altura relativa (la sombra cuelga de cuerpo).
+    def _elevar(self):
+        hay_suelo = self.suelo is not None
+        elevacion = sc.ELEVACION_PIES if hay_suelo else 0.0
+        if elevacion == self._elevacion:
+            return
+        self._elevacion = elevacion
+        self.cuerpo.y = elevacion
+        self.aro.y = sc.altura_aro(hay_suelo)
+        self.etiqueta.y = self._y_etiqueta()
+
+    def _y_etiqueta(self):
+        return (2.45 if self._activo else 2.25) + self._elevacion
 
     # Rumbo al que debe girar el cuerpo (giro suave en update()).
     def mirar_hacia(self, rumbo):
@@ -145,7 +170,7 @@ class Personaje(Entity):
         self._activo = activo
         self.aro.enabled = activo
         self.etiqueta.color = COLOR_MARCADOR if activo else rgb(estilo.COLOR_TEXTO)
-        self.etiqueta.y = 2.45 if activo else 2.25
+        self.etiqueta.y = self._y_etiqueta()
 
     def esta_resaltado(self):
         return self._activo
