@@ -89,6 +89,9 @@ class CasaDecorativa(Obstaculo):
     escala: float = 1.0
     variante: int = 0
     pisos: int = 1              # copias del modelo apiladas (favela: 1 o 2)
+    # Factor sobre la PROFUNDIDAD del modelo (su eje z), sin tocar el ancho ni el alto: deja ajustar
+    # la huella a un lote del barrio denso sin agrandar la casa. 1.0 = proporciones del modelo.
+    estiramiento: float = 1.0
 
     def __post_init__(self):
         super().__post_init__()
@@ -98,6 +101,8 @@ class CasaDecorativa(Obstaculo):
             raise ValueError(f"Casa decorativa: el rumbo {self.rumbo} no es múltiplo de 90.")
         if self.pisos < 1:
             raise ValueError("Casa decorativa: necesita al menos un piso.")
+        if self.estiramiento <= 0:
+            raise ValueError("Casa decorativa: el estiramiento debe ser positivo.")
 
     @property
     def alto_piso(self):
@@ -136,6 +141,38 @@ class Escalera:
 
     def contiene(self, x, z):
         return _distancia_punto_segmento((x, z), (self.ax, self.az), (self.bx, self.bz)) <= self.ancho / 2
+
+
+@dataclass(frozen=True)
+class Callejon:
+    """Pasillo peatonal entre dos casas de la favela: eje (ax, az) -> (bx, bz) y `ancho` libre en m.
+    Es un dato de DECORADO y de pruebas (el movimiento lo resuelven las casas como obstáculos)."""
+
+    ax: float
+    az: float
+    bx: float
+    bz: float
+    ancho: float
+
+    @property
+    def largo(self):
+        return math.hypot(self.bx - self.ax, self.bz - self.az)
+
+
+@dataclass(frozen=True)
+class Zona:
+    """Rectángulo abierto reservado (sin casas) con un uso: 'cancha' de fútbol, 'mercado'...
+    Caja alineada (cx, cz, ancho en x, fondo en z); se camina libremente por ella."""
+
+    tipo: str
+    cx: float
+    cz: float
+    ancho: float
+    fondo: float
+
+    def caja(self):
+        return (self.cx - self.ancho / 2, self.cx + self.ancho / 2,
+                self.cz - self.fondo / 2, self.cz + self.fondo / 2)
 
 
 @dataclass(frozen=True)
@@ -205,7 +242,8 @@ class MundoCiudad:
     # ValueError si un edificio es de un lugar inexistente o repetido, tapa una plaza o una
     # calle, o si alguna puerta, punto de entrada o spawn no es transitable.
     def __init__(self, mapa, edificios, obstaculos, radio_jugador=RADIO_JUGADOR,
-                 spawns=None, margen_edificios=0.0, terreno=None, escaleras=(), muros=()):
+                 spawns=None, margen_edificios=0.0, terreno=None, escaleras=(), muros=(),
+                 callejones=(), zonas=()):
         if radio_jugador <= 0:
             raise ValueError("radio_jugador debe ser positivo.")
         self._mapa = mapa
@@ -223,6 +261,8 @@ class MundoCiudad:
         self.terreno = terreno           # objeto con altura(x, z); None = mundo plano
         self._escaleras = list(escaleras)
         self._muros = list(muros)        # losas de contención (backend/datos/muros.py): solo se dibujan
+        self._callejones = list(callejones)   # pasillos entre casas (decorado y pruebas)
+        self._zonas = list(zonas)             # canchas y otras áreas abiertas (decorado)
         self._limites = self._calcular_limites(margen_edificios)
 
         for edificio in self._edificios:
@@ -242,6 +282,14 @@ class MundoCiudad:
     # Muros de contención de los taludes (la colisión no los usa: el talud ya bloquea el paso).
     def muros(self):
         return list(self._muros)
+
+    # Pasillos peatonales entre las casas de la favela (Callejon).
+    def callejones(self):
+        return list(self._callejones)
+
+    # Áreas abiertas reservadas (Zona): cancha de fútbol, mercadito...
+    def zonas(self):
+        return list(self._zonas)
 
     # Altura del suelo en (x, z).
     def altura(self, x, z):

@@ -19,7 +19,9 @@ MASCARA_LUZ = BitMask32.bit(0)
 # capas planas del piso (calle/plaza/aro) no se auto-sombreen, y una sombra neutra (la de
 # Ursina es azulada).
 lit_with_shadows_shader.default_input["shadow_bias"] = -0.0008
-lit_with_shadows_shader.default_input["shadow_color"] = color.rgba(0.22, 0.24, 0.40, 0.50)
+# Sombra azul-violeta y algo más suave (antes rgba(0.22, 0.24, 0.40, 0.50)): resta menos luz de la
+# cuenta, sobre todo en el azul, así los colores vivos se ven aun a la sombra.
+lit_with_shadows_shader.default_input["shadow_color"] = color.rgba(0.36, 0.30, 0.62, 0.36)
 lit_with_shadows_shader.default_input["shadow_blur"] = 0.002
 
 

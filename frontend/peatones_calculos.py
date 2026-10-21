@@ -105,3 +105,30 @@ def crear_peatones(mundo, cantidad, semilla):
 def aspecto_peaton(indice, semilla):
     azar = random.Random(semilla * 1000 + indice)
     return {"pantalon": azar.choice(PANTALONES), "piel": azar.choice(PIELES), "pelo": azar.choice(PELOS)}
+
+
+# Rasgos de la cara del peatón `indice` (peinado, ojos, cejas, gafas, gorra, bigote, barba, arrugas): determinista por
+# semilla e índice con su propio generador, así ni el recorrido ni el aspecto (pantalón, piel, pelo) cambian.
+PEINADOS = ("corto", "corto", "largo", "afro", "mono", "calvo", "atras")
+IRIS = ((0.20, 0.13, 0.07), (0.10, 0.30, 0.45), (0.12, 0.40, 0.25), (0.35, 0.22, 0.10), (0.06, 0.05, 0.05))
+GORRAS = ((204, 70, 52), (52, 108, 186), (240, 190, 50), (70, 70, 80), (60, 150, 100))
+BARBAS = ("incipiente", "chivo", "completa")
+
+
+def rasgos_peaton(indice, semilla):
+    azar = random.Random(semilla * 1000 + indice + 7919)
+    gorra = azar.choice(GORRAS) if azar.random() < 0.3 else None
+    peinado = azar.choice(PEINADOS)
+    if gorra is not None and peinado in ("afro", "mono"):
+        peinado = "corto"
+    return {
+        "peinado": peinado,
+        "iris": azar.choice(IRIS),
+        "cejas": (azar.uniform(0.022, 0.028), azar.uniform(0.005, 0.0075), 0.006),
+        "inclinacion": azar.uniform(2.0, 11.0),
+        "gorra": gorra,
+        "gafas": azar.random() < 0.28,
+        "bigote": azar.random() < 0.22,
+        "barba": azar.choice(BARBAS) if azar.random() < 0.25 else None,
+        "arrugas": azar.random() < 0.3,
+    }

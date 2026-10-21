@@ -5,7 +5,7 @@
 #   TarjetaNoticia  recuadro con el texto de la noticia envuelto y centrado.
 #   BotonAccion     botón con estados normal / hover / deshabilitado.
 #   panel_tinta     panel con borde de tinta y sombra plana (estilo del juego).
-#   BotonPrimario / BotonSecundario  botones con borde de tinta, hover, pulsado, foco.
+#   BotonPrimario / BotonSecundario / BotonPeligro  botones con borde de tinta, hover, pulsado, foco.
 
 import sys
 
@@ -303,6 +303,12 @@ ESTILOS_BOTON = {
         "texto": estilo.COLOR_BOTON_TEXTO,
     },
 }
+# Variante roja para acciones de denuncia (la usa la red social de la escena de juego). Se añade
+# aquí, aparte de los dos estilos de arriba, que no cambian.
+ESTILOS_BOTON["peligro"] = {
+    "normal": estilo.ESTADO_ERROR, "hover": (232, 88, 88), "presionado": (170, 44, 44),
+    "texto": (250, 244, 228),
+}
 ESCALA_HOVER = 1.04
 ESCALA_PRESIONADO = 0.96
 DURACION_HOVER = 0.08
@@ -417,6 +423,10 @@ class BotonPrimario(BotonTinta):
 
 class BotonSecundario(BotonTinta):
     VARIANTE = "secundario"
+
+
+class BotonPeligro(BotonTinta):
+    VARIANTE = "peligro"    # rojo con texto claro: denunciar / reportar
 
 
 def _curva_salida():

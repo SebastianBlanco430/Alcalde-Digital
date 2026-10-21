@@ -8,10 +8,15 @@
 
 import math
 
-MODELOS_POR_ROL = {"periodista": "periodista.glb", "candidato": "smoking.glb"}
+MODELOS_POR_ROL = {"periodista": "periodista.glb", "candidato": "smoking.glb",
+                   "influencer": "brasilena.glb", "ciudadano": "ciudadano.glb"}
 
 ALTURA_MODELO = 2.0              # m: alto del .glb sin escalar (pies en y = 0)
 ESCALA_MODELO = 0.92             # 1.84 m (reales 1.994 y 2.006 m sin escalar), como el muñeco procedural (1.83 m)
+
+# Escala propia de un rol cuyo modelo mide distinto (la brasileña con el afro llega a 2.14 m sin escalar).
+# Los roles que no están aquí usan ESCALA_MODELO.
+ESCALA_POR_ROL = {"influencer": 0.86}
 
 IDLE, CAMINAR, CORRER, SALUDAR, HABLAR = "Idle", "Caminar", "Correr", "Saludar", "Hablar"
 
@@ -34,6 +39,11 @@ INTENSIDAD_CORRER = 0.6
 
 def altura_efectiva():
     return ALTURA_MODELO * ESCALA_MODELO
+
+
+# Escala del modelo de un rol: la de ESCALA_POR_ROL o, si no tiene, ESCALA_MODELO.
+def escala_para_rol(rol):
+    return ESCALA_POR_ROL.get(rol, ESCALA_MODELO)
 
 
 def _limitar(valor, minimo, maximo):

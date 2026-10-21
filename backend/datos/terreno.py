@@ -37,6 +37,7 @@ BORDE_PLAZA = 1.5               # m planos alrededor de la plaza (aro y un poco 
 BORDE_CALLE = 2.0               # m planos a cada lado del asfalto (aceras)
 BORDE_LOTE = 1.5                # m planos alrededor de un edificio
 SEMIANCHO_ACCESO = 2.5          # m: medio ancho del camino plaza -> puerta
+BORDE_ZONA = 1.0                # m planos alrededor de una zona plana (cancha, mercadito)
 PASO_GRILLA = 1.0               # m
 _EPS2 = 0.05 ** 2               # suaviza el peso en distancia 0 (sin saltos entre piezas)
 _ITERACIONES_AJUSTE = 500
@@ -107,7 +108,10 @@ class _Rectangulo:
 class Terreno:
 
     # limites: (xmin, xmax, zmin, zmax) del mapa; la ladera y la grilla los cubren con MARGEN_LADERA.
-    def __init__(self, mapa, edificios, limites, desnivel=DESNIVEL, pendiente_maxima=PENDIENTE_MAXIMA):
+    # zonas_planas: rectángulos (cx, cz, ancho, fondo) que se aplanan a la altura natural de su centro
+    # (la cancha y el mercadito de la favela); opcional: sin ellas el terreno es el de siempre.
+    def __init__(self, mapa, edificios, limites, desnivel=DESNIVEL, pendiente_maxima=PENDIENTE_MAXIMA,
+                 zonas_planas=()):
         self.pendiente_maxima = pendiente_maxima
         xmin, xmax, zmin, zmax = limites
         self.extension = (xmin - MARGEN_LADERA, xmax + MARGEN_LADERA, zmin - MARGEN_LADERA, zmax + MARGEN_LADERA)
@@ -139,6 +143,10 @@ class Terreno:
             self._piezas.append(_Rectangulo(e.cx - e.ancho / 2 - BORDE_LOTE, e.cx + e.ancho / 2 + BORDE_LOTE,
                                             e.cz - e.fondo / 2 - BORDE_LOTE, e.cz + e.fondo / 2 + BORDE_LOTE, h))
             self._piezas.append(_Franja(mapa.coordenada(e.lugar), e.puerta(), SEMIANCHO_ACCESO, h, h))
+        for cx, cz, ancho, fondo in zonas_planas:
+            self._piezas.append(_Rectangulo(cx - ancho / 2 - BORDE_ZONA, cx + ancho / 2 + BORDE_ZONA,
+                                            cz - fondo / 2 - BORDE_ZONA, cz + fondo / 2 + BORDE_ZONA,
+                                            self.altura_natural(cx, cz)))
         self._grilla = None
 
     # -- Consultas --

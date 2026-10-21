@@ -14,19 +14,57 @@
 # caminar/correr/reposo. Durante una cinemática se pone `automatico = False` y el director
 # aplica poses a mano con aplicar_pose().
 
-from ursina import Entity, color, time
+from panda3d.core import CullFaceAttrib
+from ursina import Entity, color, destroy, time
 
+from frontend import contorno_calculos as cc
 from frontend import estilo, geometria_mundo, poses
+from frontend import rostro_animacion_calculos as ra
+from frontend import rostro_calculos as rc
 from frontend.componentes import rgb
 from frontend import sombra_calculos as sc
+from frontend.rostro_modelo import colocar_rostro_procedural
 from frontend.sombra_contacto import SombraContacto, crear_aro
-from frontend.piezas import COLOR_MARCADOR, COLOR_PIEL, etiqueta, malla_unida, silenciar
+from frontend.piezas import COLOR_MARCADOR, COLOR_PIEL, etiqueta, silenciar
+from frontend.piezas import malla_unida as _malla_unida_base
+
+CONTORNO_ACTIVO = True            # contorno de tinta (casco invertido) en cada pieza del muñeco
 
 VELOCIDAD_CARRERA = 8.5          # m/s con intensidad 1 (ver poses.pose_caminar)
 RESPIRACION = 1.6                # rad/s de la fase en reposo
 COLOR_PANTALON = color.rgb32(52, 58, 82)
 COLOR_PELO = color.rgb32(48, 36, 30)
 COLOR_ZAPATO = color.rgb32(30, 30, 36)
+
+
+# Contorno de tinta de cada pieza: copia inflada, de color tinta y dibujada solo por sus caras traseras (sin
+# shader), colgada del mismo pivote para que siga la animación. `_construir` llama a esta función con el mismo
+# nombre y firma que piezas.malla_unida, así no hizo falta tocarlo.
+def malla_unida(padre, piezas, **opciones):
+    soporte = _malla_unida_base(padre, piezas, **opciones)
+    if CONTORNO_ACTIVO:
+        try:
+            casco_piezas = []
+            for datos in piezas:
+                casco = cc.especificacion_contorno(datos)
+                casco["color"] = color.rgb32(*cc.TINTA)
+                casco_piezas.append(casco)
+            casco = _malla_unida_base(padre, casco_piezas, **opciones)
+            casco.shader = None
+            casco.clearShader()             # malla_unida ya le puso el shader con luz: el casco va plano
+            casco.setAttrib(CullFaceAttrib.make(CullFaceAttrib.MCullCounterClockwise))
+            casco.setLightOff(1)
+            casco.setTextureOff(1)
+        except Exception as error:          # el contorno es adorno: nunca debe impedir crear al personaje
+            print(f"[assets] contorno de tinta no disponible ({error})")
+    return soporte
+
+
+# Realce de la ropa: más saturación y contraste (estilo cómic) sobre un color de Ursina.
+def _realzado(c):
+    r, g, b = cc.realzar_color((round(c.r * 255), round(c.g * 255), round(c.b * 255)))
+    return color.rgb32(r, g, b)
+
 
 # Articulaciones de miembros (se les invierte el signo) y de columna (signo directo).
 _MIEMBROS = ("brazo_i", "brazo_d", "codo_i", "codo_d", "muslo_i", "muslo_d", "rodilla_i", "rodilla_d")
@@ -54,7 +92,10 @@ class Personaje(Entity):
         self.cuerpo = Entity(parent=self)          # gira hacia donde camina; la etiqueta no
         self._elevacion = None                     # elevación de los pies ya aplicada (ver _elevar)
         self.pivotes = {}
-        self._construir(rgb(color_rol))
+        self._construir(_realzado(rgb(color_rol)))
+        self.rostro = None                         # RostroAnimado del muñeco (solo con rasgos de rol)
+        self._t_rostro = 0.0
+        self._estilizar(nombre)
         self.etiqueta = etiqueta(nombre, parent=self, y=2.25, scale=8)
         for parte in (self.aro, self.cuerpo, self.etiqueta):
             silenciar(parte)               # solo el Personaje (la raíz) necesita update()
@@ -104,6 +145,61 @@ class Personaje(Entity):
                 dict(model="cube", color=pantalon, position=(0, -0.2, 0), scale=(0.14, 0.4, 0.14)),
                 dict(model="cube", color=COLOR_ZAPATO, position=(0, -0.41, 0.05), scale=(0.14, 0.08, 0.28)),
             ])
+
+    # Cabeza de cómic: cambia la cabeza de primitivas (esfera + visor) por la del estilo Borderlands (cráneo con
+    # contorno, ojos, cejas, nariz, boca, pelo y accesorios) cuando `apariencia` trae "rasgos" (el nombre de un rol
+    # o los rasgos de un peatón). Sin rasgos conserva la cabeza de siempre. NUNCA lanza.
+    def _estilizar(self, nombre):
+        rasgos = self._apariencia.get("rasgos")
+        if rasgos is None:
+            return
+        try:
+            if isinstance(rasgos, str):
+                piezas = rc.ROSTRO_PROCEDURAL_POR_ROL[rasgos]
+                animado = True
+            else:
+                piel = self._apariencia.get("piel_rgb", (235, 200, 170))
+                pelo = self._apariencia.get("pelo_rgb", (48, 36, 30))
+                piezas = rc.piezas_peaton(rasgos, piel, pelo)
+                animado = False
+            cabeza = self.pivotes["cabeza"]
+            viejos = list(cabeza.children)
+            semilla = sum(ord(c) * (i + 1) for i, c in enumerate(nombre))
+            raiz, self.rostro = colocar_rostro_procedural(cabeza, piezas, animado, str(rasgos)[:12], semilla)
+            if raiz is not None:
+                for hijo in viejos:
+                    destroy(hijo)
+                self._detalles(rasgos)
+        except Exception as error:
+            self.rostro = None
+            print(f"[assets] {nombre}: no se pudo estilizar la cabeza ({error})")
+
+    # Detalles de ropa que dan carácter al muñeco (cinturón con hebilla, puños, suelas; raya o emblema en el pecho
+    # según el rol). Cada uno cuelga de su pivote, con su contorno: siguen la animación.
+    def _detalles(self, rasgos):
+        puno = color.rgb32(235, 232, 220)
+        oscuro = color.rgb32(38, 32, 34)
+        # sin casco propio: el contorno de la pieza grande que los lleva ya los rodea (y son menos dibujos)
+        _malla_unida_base(self.pivotes["pelvis"], [
+            dict(model="cube", color=oscuro, position=(0, 0.072, 0), scale=(0.375, 0.05, 0.215)),
+            dict(model="cube", color=color.rgb32(250, 205, 70), position=(0, 0.072, 0.108), scale=(0.07, 0.042, 0.02)),
+        ])
+        if rasgos == "ciudadano":     # raya blanca en el pecho
+            _malla_unida_base(self.pivotes["torso"], [
+                dict(model="cube", color=puno, position=(0, 0.32, 0), scale=(0.43, 0.055, 0.25))])
+        elif rasgos == "influencer":  # emblema de corazón en el pecho: dos lóbulos y una punta
+            rosa = color.rgb32(255, 245, 250)
+            _malla_unida_base(self.pivotes["torso"], [
+                dict(model="sphere", color=rosa, position=(-0.032, 0.33, 0.121), scale=0.06),
+                dict(model="sphere", color=rosa, position=(0.032, 0.33, 0.121), scale=0.06),
+                dict(model="cube", color=rosa, position=(0, 0.305, 0.121), scale=(0.05, 0.05, 0.012)),
+            ])
+
+    # Clip equivalente a la velocidad (para los gestos de la cara): Idle, Caminar o Correr.
+    def _clip_rostro(self):
+        if self.velocidad < 0.1:
+            return ra.IDLE
+        return ra.CORRER if self.velocidad > 6.5 else ra.CAMINAR
 
     # -- Pose --
 
@@ -177,6 +273,9 @@ class Personaje(Entity):
 
     # Solo corre con la escena activa (Ursina salta update() con un ancestro desactivado).
     def update(self):
+        if self.rostro is not None:   # parpadeo, mirada, boca y cejas (también durante las cinemáticas)
+            self._t_rostro += time.dt
+            self.rostro.actualizar(self._t_rostro, self._clip_rostro(), self.rumbo, time.dt)
         if not self.automatico:
             return
         self.girar(time.dt)

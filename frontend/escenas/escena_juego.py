@@ -22,6 +22,8 @@ from frontend.componentes import (
 from frontend.escenas.escena_base import Escena
 from frontend.marco_pc import ESCALA_JUEGO, MarcoPC
 from frontend.panel_propagacion import PanelPropagacion
+from frontend.panel_resultado_grafo import PanelResultadoGrafo
+from frontend.red_social_vista import VistaRedSocial
 
 ASPECTO = 16 / 9   # la ventana se fija en 16:9 (ver main.py)
 ANCHO_INTERFAZ = ASPECTO  # ancho total de camera.ui (alto = 1)
@@ -37,12 +39,23 @@ ANCHO_INTERFAZ = ASPECTO  # ancho total de camera.ui (alto = 1)
 # PanelPropagacion (abajo a la izquierda) lo anima por saltos. Solo se MUESTRA el
 # alcance: no toca los indicadores. El resultado de la misión suma "propagaciones" y
 # "alcance_total". La animación corre en update() y nunca retrasa el fin de la misión.
+# Resultado de la misión: con `grafo_social` y misión, al terminar el lote se ve ~1 s "Misión
+# completada" y luego un panel grande (PanelResultadoGrafo) con el grafo social coloreado por el
+# estado final acumulado y el resumen; al_terminar(resultado) se llama RECIÉN al pulsar
+# «Continuar» (clic o Enter/Espacio), una sola vez. Sin grafo o sin misión: cierre automático
+# tras DEMORA_COMPLETADA, exactamente como antes.
 # La regla del lote (contador, deltas, propagaciones, fin y resultado) vive en
 # backend/logica/lote_mision.LoteMision; esta escena solo la llama y pinta.
 # Marco de monitor (mundo 3D): `al_entrar(marco=True, lugar=...)` dibuja el bisel y la barra
 # "Civitas · <Rol> · <Lugar>" detrás del juego y lo reduce para que quepa dentro. Por defecto
 # marco=False: la escena es exactamente la de siempre (también sin misión).
+# Red social (2026-10-21): con ESTILO_RED_SOCIAL = True la escena se dibuja como un cliente tipo X
+# («Civitas»: barra de navegación, feed con la publicación activa y su hilo, tendencias y panel de
+# alcance; ver frontend/red_social_vista.py). Con False vuelve EXACTAMENTE al diseño anterior
+# (tarjeta de noticia + dos botones), que sigue intacto debajo. Misma API en ambos modos.
 class EscenaJuego(Escena):
+
+    ESTILO_RED_SOCIAL = True
 
     # --- Layout (unidades de camera.ui; medidas pygame / 600) ---
     ALTO_PANEL = a_unidades(100)
@@ -73,6 +86,9 @@ class EscenaJuego(Escena):
         self.jugador = {}
         self.marco = MarcoPC(parent=self.parent)    # hermano (detrás), no hijo: no se reduce con el juego
         self._reiniciar_mision(None, None)
+        if self.ESTILO_RED_SOCIAL:
+            self._construir_red_social()
+            return
 
         # Panel superior con las tres barras.
         self.panel = Entity(
@@ -122,6 +138,9 @@ class EscenaJuego(Escena):
                 -ANCHO_INTERFAZ / 2 + self.MARGEN_PANEL_PROPAGACION + PanelPropagacion.ANCHO / 2,
                 -0.5 + self.MARGEN_PANEL_PROPAGACION + PanelPropagacion.ALTO / 2))
 
+        # Pantalla de resultado de la misión (oculta hasta terminar el lote con grafo social).
+        self.panel_resultado = PanelResultadoGrafo(parent=self, z=-0.3)
+
         # Modo misión: progreso arriba de la tarjeta y aviso de fin abajo.
         self.texto_mision = Text(
             "", parent=self, origin=(0, 0), position=(0, self.Y_MISION),
@@ -132,6 +151,22 @@ class EscenaJuego(Escena):
             scale=escala_fuente(28), color=rgb(estilo.COLOR_BARRA_ALTO),
         )
 
+    # Construye la vista de red social con los MISMOS nombres de atributos que el diseño anterior
+    # (barras, boton_compartir, boton_reportar, texto_mision, ...), así el resto de la escena no cambia.
+    def _construir_red_social(self):
+        self.red = VistaRedSocial(NOMBRES_INDICADORES, self.compartir, self.reportar, parent=self)
+        self.panel = self.red
+        self.barras = self.red.barras
+        self.tarjeta = self.red.tarjeta
+        self.boton_compartir = self.red.boton_compartir
+        self.boton_reportar = self.red.boton_reportar
+        self.texto_mision = self.red.texto_mision
+        self.texto_completada = self.red.sello.texto
+        self.texto_jugador = Text("", parent=self, enabled=False)   # el perfil visible vive en la barra lateral
+        self.grafo_social = None
+        self.panel_propagacion = self.red.panel_propagacion
+        self.panel_resultado = PanelResultadoGrafo(parent=self, z=-0.3)
+
     # -- Ciclo de vida --
 
     # `jugador`: dict {"nombre", "rol"} u objeto con .nombre/.rol. `mision` y
@@ -141,6 +176,8 @@ class EscenaJuego(Escena):
                   grafo_social=None, marco=False, lugar="", **datos):
         self.jugador = jugador or {}
         self._poner_marco(marco, lugar)
+        if self.ESTILO_RED_SOCIAL:
+            self.red.reiniciar()
         if estado is None:
             arbol_noticias, arbol_stats = construir_arboles()
             estado = EstadoPartida(arbol_noticias, arbol_stats)
@@ -158,6 +195,9 @@ class EscenaJuego(Escena):
     # (ni completar la misión) si la escena ya no está activa.
     def al_salir(self):
         self._intento += 1
+        self.panel_resultado.ocultar()
+        if self.ESTILO_RED_SOCIAL:
+            self.red.reiniciar()
         self._poner_marco(False, "")
 
     # Con marco el contenido se reduce y se centra dentro del bisel; sin él, escala normal.
@@ -177,6 +217,9 @@ class EscenaJuego(Escena):
         self.mision_terminada = False
         if hasattr(self, "panel_propagacion"):
             self.panel_propagacion.ocultar()
+        if hasattr(self, "panel_resultado"):
+            self.panel_resultado.ocultar()
+        self._resultado_entregado = False
         self._intento = getattr(self, "_intento", 0) + 1   # invalida invoke pendientes
 
     # Contadores del lote en curso (solo lectura); sin misión valen 0 / vacío.
@@ -206,13 +249,18 @@ class EscenaJuego(Escena):
         if self.estado is None or not self.estado.hay_noticia() or self.mision_terminada:
             return
         deltas = self.estado.decidir(tipo)
+        if self.ESTILO_RED_SOCIAL and deltas is not None:
+            self.red.iniciar_decision(tipo)     # iconos que se llenan, contadores que suben, aviso
         if self.lote is not None:
             self._registrar_decision(tipo, deltas)
         self.refrescar()
 
     # Avanza la animación del panel (Ursina llama update() solo con la escena activa).
     def update(self):
+        if self.ESTILO_RED_SOCIAL:
+            self.red.avanzar(time.dt)
         self.panel_propagacion.avanzar(time.dt)
+        self.panel_resultado.avanzar(time.dt)
 
     # Modo misión: el lote acumula y propaga; aquí solo se anima el panel (un clic nuevo
     # reinicia la animación) y, si el lote terminó (también con el mazo agotado, para no
@@ -221,9 +269,33 @@ class EscenaJuego(Escena):
         propagacion = self.lote.registrar(tipo, deltas, self.estado.hay_noticia())
         if self.lote.terminada():
             self.mision_terminada = True
-            invoke(self._finalizar_mision, self._intento, delay=self.DEMORA_COMPLETADA)
+            if self._usa_pantalla_resultado():
+                invoke(self._mostrar_resultado, self._intento, delay=self.DEMORA_COMPLETADA)
+            else:
+                invoke(self._finalizar_mision, self._intento, delay=self.DEMORA_COMPLETADA)
         if propagacion is not None:
             self.panel_propagacion.mostrar(propagacion)
+
+    # La pantalla de resultado solo existe en modo misión con grafo social inyectado.
+    def _usa_pantalla_resultado(self):
+        return self.lote is not None and self.grafo_social is not None
+
+    # Tras "Misión completada": muestra el grafo final; «Continuar» entrega el resultado.
+    def _mostrar_resultado(self, intento):
+        if intento != self._intento or self._al_terminar is None:
+            return   # la escena se reinició o se abandonó antes de tiempo
+        self.panel_propagacion.ocultar()
+        self.panel_resultado.mostrar(
+            self.grafo_social, self.lote.propagaciones_con_niveles(), self.lote.deltas_acumulados,
+            titulo=self.mision.titulo, indicadores=self.estado.indicadores(),
+            al_continuar=lambda: self._continuar_resultado(intento))
+
+    # «Continuar»: entrega el resultado una sola vez (y solo si la escena sigue vigente).
+    def _continuar_resultado(self, intento):
+        if self._resultado_entregado or intento != self._intento:
+            return
+        self._resultado_entregado = True
+        self._finalizar_mision(intento)
 
     def _finalizar_mision(self, intento):
         if intento != self._intento or self._al_terminar is None:
@@ -235,6 +307,9 @@ class EscenaJuego(Escena):
     def refrescar(self):
         # vuelca el estado actual a barras, tarjeta, botones e info del jugador
         if self.estado is None:
+            return
+        if self.ESTILO_RED_SOCIAL:
+            self._refrescar_red_social()
             return
 
         indicadores = self.estado.indicadores()
@@ -259,6 +334,32 @@ class EscenaJuego(Escena):
                 f"Misión: {self.mision.titulo} ({self.decisiones}/{self.mision.cantidad_noticias})"
             )
             self.texto_completada.text = self.TEXTO_COMPLETADA if self.mision_terminada else ""
+
+    # Vuelca el estado a la vista de red social (misma información que refrescar() del diseño anterior).
+    def _refrescar_red_social(self):
+        indicadores = self.estado.indicadores()
+        for nombre in NOMBRES_INDICADORES:
+            self.barras[nombre].actualizar(indicadores[nombre])
+
+        noticia = self.estado.noticia_actual()
+        if not self.mision_terminada:    # al terminar el lote se queda a la vista la última decisión
+            self.red.poner_publicacion(None if noticia is None else noticia.texto)
+
+        hay_noticia = self.estado.hay_noticia() and not self.mision_terminada
+        self.boton_compartir.fijar_habilitado(hay_noticia)
+        self.boton_reportar.fijar_habilitado(hay_noticia)
+
+        nombre, rol = self._nombre_y_rol()
+        self.texto_jugador.text = f"{nombre} ({rol})"
+        self.red.fijar_jugador(nombre, rol)
+
+        if self.mision is None:
+            self.red.fijar_mision("")
+            self.red.fijar_completada("")
+        else:
+            self.red.fijar_mision(
+                f"Misión: {self.mision.titulo} ({self.decisiones}/{self.mision.cantidad_noticias})")
+            self.red.fijar_completada(self.TEXTO_COMPLETADA if self.mision_terminada else "")
 
     # Id del rol del jugador ("influencer", ...) sea dict u objeto.
     def _rol_id(self):

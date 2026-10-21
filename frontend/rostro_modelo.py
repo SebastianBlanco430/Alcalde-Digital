@@ -16,6 +16,7 @@ from panda3d.core import (CS_zup_right, CullFaceAttrib, Geom, GeomNode, GeomTria
                           getDefaultCoordinateSystem)
 
 from frontend import rostro_animacion_calculos as ra
+from frontend import malla_calculos as ml
 from frontend import rostro_calculos as rc
 
 SEGMENTOS = 10                   # meridianos de cada esfera (low-poly, como el modelo)
@@ -91,10 +92,10 @@ FORMAS = {"esfera": _esfera, "caja": _caja}
 
 # -- Construcción --
 
-def _matriz_cabeza():
+def _matriz_cabeza(rol=None):
     # Ejes del glb crudo -> sistema del juego, con el origen en el hueso de la cabeza en bind pose.
     conversion = Mat4.convertMat(CS_zup_right, getDefaultCoordinateSystem())
-    reposo = Mat4.translateMat(Vec3(*rc.REPOSO_CABEZA))
+    reposo = Mat4.translateMat(Vec3(*rc.reposo_cabeza(rol)))
     return reposo * conversion
 
 
@@ -117,26 +118,96 @@ def _pieza(padre, datos, orden):
         casco.setTwoSided(False, 1)
 
 
-def construir_rostro(actor, rol):
-    # Cuelga del hueso de la cabeza un nodo con todas las piezas del rol. Devuelve ese nodo.
-    hueso = actor.exposeJoint(None, "modelRoot", rc.HUESO_CABEZA)
-    if hueso is None:
-        raise ValueError(f"no existe el hueso {rc.HUESO_CABEZA}")
-    raiz = actor.attachNewNode("rostro")          # provisional: fija la pose en el espacio del modelo
-    raiz.setMat(_matriz_cabeza())
-    for orden, datos in enumerate(rc.ROSTRO_POR_ROL[rol]):
-        _pieza(raiz, datos, 10 + 2 * orden)
+def _geom_fusionada(nombre, vertices, colores, triangulos):
+    # Un solo GeomNode con color por vértice (las bandas de luz ya vienen horneadas en el color).
+    datos = GeomVertexData(nombre, GeomVertexFormat.getV3c4(), Geom.UHStatic)
+    datos.setNumRows(len(vertices))
+    escribir_v = GeomVertexWriter(datos, "vertex")
+    escribir_c = GeomVertexWriter(datos, "color")
+    for v, c in zip(vertices, colores):
+        escribir_v.addData3(*v)
+        escribir_c.addData4(c[0], c[1], c[2], 1.0)
+    prims = GeomTriangles(Geom.UHStatic)
+    for a, b, c in triangulos:
+        prims.addVertices(a, b, c)
+    geom = Geom(datos)
+    geom.addPrimitive(prims)
+    nodo = GeomNode(nombre)
+    nodo.addGeom(geom)
+    return nodo
+
+
+def _colgar_estaticas(raiz, piezas):
+    # Todas las piezas sin animación (pelo, gafas, barba, nariz...) en UN nodo con bandas de luz horneadas, y
+    # sus cascos de tinta (los que llevan `contorno`) en otro con las caras traseras: dos llamadas de dibujo.
+    if not piezas:
+        return
+    vertices, colores, triangulos = ml.unir_piezas(piezas)
+    nodo = raiz.attachNewNode(_geom_fusionada("estaticas", vertices, colores, triangulos))
+    nodo.setBin("fixed", 10)
+    por_grosor = {}
+    for datos in piezas:
+        if datos.get("contorno"):
+            por_grosor.setdefault(datos["contorno"], []).append(datos)
+    cv, cc, ct = [], [], []
+    for grosor, grupo in por_grosor.items():
+        v, c, t = ml.unir_piezas(grupo, bandas=False, color_fijo=rc.CONTORNO_COLOR, grosor_extra=grosor)
+        base = len(cv)
+        cv += v
+        cc += c
+        ct += [(a + base, b + base, d + base) for a, b, d in t]
+    if cv:
+        casco = raiz.attachNewNode(_geom_fusionada("contorno", cv, cc, ct))
+        casco.setAttrib(CullFaceAttrib.make(CullFaceAttrib.MCullCounterClockwise))
+        casco.setBin("fixed", 8)
+        casco.setLightOff(1)
+        casco.setTwoSided(False, 1)
+
+
+# Piezas que solo existen para la animación (párpados cerrados, interior de la boca): un rostro sin animación las omite.
+SOLO_ANIMACION = frozenset({"parpado_-1", "parpado_1", "boca_interior", "labio_inf"})
+
+
+def _armar(raiz, piezas, animar=True):
+    # Con `animar`: las piezas animadas, cada una en su nodo (se mueven por su nombre) y el resto fusionadas. Sin
+    # `animar` (peatones): todo en un solo nodo fusionado, sin las piezas que solo sirven para animar (menos dibujos).
+    estaticas = []
+    for orden, datos in enumerate(piezas):
+        if animar and datos["nombre"] in rc.ANIMADAS:
+            _pieza(raiz, datos, 10 + 2 * orden)
+        elif animar or datos["nombre"] not in SOLO_ANIMACION:
+            estaticas.append(datos)
+    _colgar_estaticas(raiz, estaticas)
     raiz.setLightOff(1)
     raiz.setTextureOff(1)
     raiz.setTwoSided(True)
+
+
+def construir_rostro(actor, rol):
+    # Cuelga del hueso de la cabeza un nodo con todas las piezas del rol. Devuelve ese nodo.
+    hueso = actor.exposeJoint(None, "modelRoot", rc.hueso_cabeza(rol))
+    if hueso is None:
+        raise ValueError(f"no existe el hueso {rc.hueso_cabeza(rol)}")
+    raiz = actor.attachNewNode("rostro")          # provisional: fija la pose en el espacio del modelo
+    raiz.setMat(_matriz_cabeza(rol))
+    _armar(raiz, rc.rostro_del_modelo(rol))
     raiz.wrtReparentTo(hueso)                     # conserva la posición actual (bind pose) y desde ahora sigue al hueso
+    return raiz
+
+
+def construir_rostro_procedural(cabeza, piezas, animar=True):
+    # Cabeza del muñeco procedural (`cabeza`: NodePath del pivote de la cabeza, y arriba, la cara a +z): coloca las
+    # mismas piezas con una matriz que lleva los ejes del glb a los del muñeco. Devuelve el nodo del rostro.
+    raiz = cabeza.attachNewNode("rostro")
+    raiz.setMat(Mat4(*(valor for fila in ml.matriz_procedural(rc.ESCALA_PROCEDURAL, rc.CENTRO_CABEZA) for valor in fila)))
+    _armar(raiz, piezas, animar)
     return raiz
 
 
 def colocar_rostro(actor, rol):
     # Nunca lanza: si falla, avisa una vez y el modelo queda como estaba.
     try:
-        if rol not in rc.ROSTRO_POR_ROL:
+        if rc.rostro_del_modelo(rol) is None:
             return None
         return construir_rostro(actor, rol)
     except Exception as error:
@@ -290,6 +361,49 @@ def colocar_rostro_animado(actor, rol, semilla=0):
     # queda con el rostro estático y se avisa una sola vez).
     raiz = colocar_rostro(actor, rol)
     if raiz is None:
+        return None
+    try:
+        return RostroAnimado(raiz, rol, semilla)
+    except Exception as error:
+        _avisar(rol, f"{AVISO_ANIMACION}: {error}")
+        for pieza in ("parpado_-1", "parpado_1", "boca_interior", "labio_inf"):
+            nodo = raiz.find(pieza)
+            if not nodo.isEmpty():
+                nodo.hide()
+        return None
+
+
+def colocar_rostro_procedural(cabeza, piezas, animado=False, rol="procedural", semilla=0):
+    # Rostro del muñeco procedural. Devuelve (nodo, RostroAnimado o None); NUNCA lanza: si algo falla avisa una vez
+    # y devuelve (None, None) (el muñeco queda con su cabeza de siempre).
+    try:
+        raiz = construir_rostro_procedural(cabeza, piezas, animado)
+    except Exception as error:
+        _avisar(rol, error)
+        return None, None
+    if not animado:
+        return raiz, None
+    try:
+        return raiz, RostroAnimado(raiz, rol, semilla)
+    except Exception as error:
+        _avisar(rol, f"{AVISO_ANIMACION}: {error}")
+        return raiz, None
+
+
+# Como colocar_rostro_animado, pero con las piezas dadas (los NPC arman una cara distinta cada uno con
+# rostro_calculos.piezas_rostro). Nunca lanza: devuelve (nodo, RostroAnimado o None); si algo falla avisa una
+# sola vez y el modelo queda como estaba.
+def colocar_rostro_animado_piezas(actor, rol, piezas, semilla=0):
+    try:
+        hueso = actor.exposeJoint(None, "modelRoot", rc.hueso_cabeza(rol))
+        if hueso is None:
+            raise ValueError(f"no existe el hueso {rc.hueso_cabeza(rol)}")
+        raiz = actor.attachNewNode("rostro")
+        raiz.setMat(_matriz_cabeza(rol))
+        _armar(raiz, piezas)
+        raiz.wrtReparentTo(hueso)
+    except Exception as error:
+        _avisar(rol, error)
         return None
     try:
         return RostroAnimado(raiz, rol, semilla)

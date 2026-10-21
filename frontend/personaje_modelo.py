@@ -29,6 +29,7 @@ from frontend import estilo, geometria_mundo, modelo_calculos as mc
 from frontend.componentes import rgb
 from frontend.personaje import Personaje
 from frontend.piezas import COLOR_MARCADOR, etiqueta, silenciar
+from frontend import rostro_calculos as rc
 from frontend.rostro_modelo import colocar_rostro_animado
 from frontend import sombra_calculos as sc
 from frontend.sombra_contacto import SombraContacto, crear_aro
@@ -66,7 +67,7 @@ class PersonajeModelo(Entity):
     VELOCIDAD_GIRO = 12
 
     def __init__(self, nombre, rol, **opciones):
-        actor = _cargar_actor(rol)      # antes de crear nada: si falla, no queda una Entity a medias
+        actor = self._crear_actor(rol)  # antes de crear nada: si falla, no queda una Entity a medias
         super().__init__(**opciones)
         self.nombre = nombre
         self.rumbo = 0.0
@@ -88,11 +89,11 @@ class PersonajeModelo(Entity):
         self.actor = actor
         self.actor.reparent_to(self.cuerpo)
         self.actor.show()
-        self.actor.setScale(mc.ESCALA_MODELO)
+        self.actor.setScale(self._escala_modelo(rol))
         self.actor.setH(180)          # en Blender mira a -Z; así mira hacia +z del cuerpo
         self.actor.enableBlend()
         # ojos, cejas, nariz, boca, orejas y pelo colgados del hueso de la cabeza, con sus gestos
-        self.rostro = colocar_rostro_animado(self.actor, rol, zlib.crc32(nombre.encode()))
+        self.rostro = self._poner_rostro(rol, nombre)
         self._t_rostro = 0.0
         self.etiqueta = etiqueta(nombre, parent=self, y=2.25, scale=8)
         for parte in (self.aro, self.cuerpo, self.etiqueta):
@@ -102,12 +103,31 @@ class PersonajeModelo(Entity):
         self._pesos[mc.IDLE] = 1.0    # arranca ya en Idle, sin pasar 0.2 s en la pose base
         self.actor.setControlEffect(mc.IDLE, 1.0)
 
+    # -- Ganchos que las variantes (frontend/npc_modelo.py) sustituyen; por defecto, el comportamiento de siempre --
+
+    def _crear_actor(self, rol):
+        return _cargar_actor(rol)
+
+    def _escala_modelo(self, rol):
+        return mc.escala_para_rol(rol)
+
+    def _poner_rostro(self, rol, nombre):
+        return colocar_rostro_animado(self.actor, rol, zlib.crc32(nombre.encode()))
+
+    # ¿Se anima la cara este frame? Siempre; los NPC la apagan cuando están lejos (rendimiento).
+    def _animar_rostro(self):
+        return True
+
+    # Arranca el loop del clip (una variante puede desfasarlo para que no vayan todos sincronizados).
+    def _iniciar_loop(self, clip):
+        self.actor.loop(clip)
+
     # -- Clips --
 
     def _poner_clip(self, clip, rate):
         if clip != self._clip:
             self._pesos.setdefault(clip, 0.0)
-            self.actor.loop(clip)
+            self._iniciar_loop(clip)
             self._clip = clip
             self._rate = None
         if self._rate is None or abs(rate - self._rate) > 0.02:
@@ -192,7 +212,7 @@ class PersonajeModelo(Entity):
 
     def update(self):
         self._mezclar(time.dt)        # la mezcla corre también durante las cinemáticas
-        if self.rostro is not None:   # gestos de la cara: parpadeo, mirada, boca y cejas según el clip
+        if self.rostro is not None and self._animar_rostro():   # gestos de la cara: parpadeo, mirada, boca y cejas según el clip
             self._t_rostro += time.dt
             self.rostro.actualizar(self._t_rostro, self._clip, self.rumbo, time.dt)
         if not self.automatico:
@@ -222,4 +242,8 @@ def crear_personaje(nombre, rol, color_rol, **opciones):
             return PersonajeModelo(nombre, rol, **opciones)
         except Exception as error:
             _avisar(rol, f"no se pudo cargar {mc.MODELOS_POR_ROL[rol]} ({error})")
-    return Personaje(nombre, color_rol, **opciones)
+    opciones = dict(opciones)
+    apariencia = dict(opciones.pop("apariencia", None) or {})
+    if rol in rc.ROSTRO_PROCEDURAL_POR_ROL:
+        apariencia.setdefault("rasgos", rol)       # cabeza de cómic propia del rol (gorra, gafas de sol...)
+    return Personaje(nombre, color_rol, apariencia=apariencia or None, **opciones)

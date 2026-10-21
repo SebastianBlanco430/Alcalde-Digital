@@ -5,6 +5,7 @@
 # Convención: el largo del muro corre a lo largo de su `rumbo` (rotation_y, "adelante" = (sin ψ, cos ψ)),
 # como las escaleras; el grosor va a lo ancho.
 
+from frontend.azar_fijo import azar_de
 from frontend.componentes import rgb
 from frontend.piezas import pieza
 
@@ -16,10 +17,14 @@ OSCURECER_ALTERNO = 8               # puntos de color menos en los muros pares, 
 ACLARAR_TAPA = 14                   # puntos de color más en la tapa
 
 
-# Un cubo por muro (colores alternados) y su tapa, colgados de `grupo`.
-def construir_muros(grupo, muros):
+# Un cubo por muro (colores alternados) y su tapa, colgados de `grupo`. Con `paleta` (lista de RGB) cada muro se
+# pinta con un color de ella en vez del concreto gris (la favela pinta sus muros de contención).
+def construir_muros(grupo, muros, paleta=None):
     for i, muro in enumerate(muros):
-        tono = COLOR_MURO if i % 2 == 0 else tuple(c - OSCURECER_ALTERNO for c in COLOR_MURO)
+        if paleta:
+            tono = paleta[int(azar_de(muro.cx * 0.37, muro.cz * 0.61) * len(paleta)) % len(paleta)]
+        else:
+            tono = COLOR_MURO if i % 2 == 0 else tuple(c - OSCURECER_ALTERNO for c in COLOR_MURO)
         alto = muro.y_tope - muro.y_base
         pieza(parent=grupo, model="cube", color=rgb(tono), rotation_y=muro.rumbo,
               position=(muro.cx, (muro.y_base + muro.y_tope) / 2, muro.cz),

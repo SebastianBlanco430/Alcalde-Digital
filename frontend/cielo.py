@@ -16,25 +16,38 @@ from ursina.shaders import unlit_shader
 
 from frontend.azar_fijo import azar_de
 
-COLOR_HORIZONTE = (238, 224, 204)        # RGB 0-255: crema cálido; también el de la niebla
+# Atardecer cálido tipo Río (ver MODELOS_3D.md, sección «Cielo»): horizonte dorado-anaranjado que sube a rosa,
+# violeta y azul profundo. Para volver al cielo de antes, los valores de la mañana son:
+#   COLOR_HORIZONTE (238, 224, 204); paradas (206, 220, 232), (146, 190, 232), (100, 156, 224), (74, 128, 210).
+COLOR_HORIZONTE = (252, 208, 160)        # RGB 0-255: dorado cálido; también el de la niebla
 # (elevación = seno del ángulo sobre el horizonte, color): el degradado se interpola entre paradas.
 PARADAS_CIELO = (
     (0.00, COLOR_HORIZONTE),
-    (0.10, (206, 220, 232)),
-    (0.30, (146, 190, 232)),
-    (0.65, (100, 156, 224)),
-    (1.00, (74, 128, 210)),
+    (0.08, (250, 176, 140)),             # salmón
+    (0.22, (232, 140, 160)),             # rosa
+    (0.45, (168, 122, 196)),             # violeta
+    (0.75, (104, 112, 212)),             # azul violáceo
+    (1.00, (70, 100, 206)),              # azul profundo del cenit
 )
-COLOR_RESPLANDOR = (255, 238, 198)
-DIRECCION_SOL = (1.0, -1.1, 0.8)          # hacia donde apunta la luz; el resplandor sale del lado opuesto
-FUERZA_RESPLANDOR = 0.45
-ELEVACIONES_ANILLOS = (-0.35, 0.0, 0.025, 0.06, 0.11, 0.18, 0.28, 0.42, 0.6, 0.8, 1.0)   # senos
+COLOR_RESPLANDOR = (255, 232, 176)
+DIRECCION_SOL = (1.0, -1.1, 0.8)          # hacia donde apunta la luz; el resplandor sale del lado opuesto (la de siempre: ~43° de altura;
+                                          # más baja aparece acné de sombra en los techos con el shadow_bias actual)
+FUERZA_RESPLANDOR = 0.75
+POTENCIA_RESPLANDOR = 5                   # menor = el resplandor se abre más por el cielo
+ELEVACIONES_ANILLOS = (-1.0, -0.65, -0.35, 0.0, 0.025, 0.06, 0.11, 0.18, 0.28, 0.42, 0.6, 0.8, 1.0)   # senos
 SEGMENTOS = 28
 RADIO_NUBES = 0.955                       # dentro del domo (radio 1), para ganarle en profundidad
 CANTIDAD_NUBES = 15
 VELOCIDAD_NUBES = 0.35                    # grados por segundo
-COLOR_NUBE_ARRIBA = (255, 252, 246)
-COLOR_NUBE_ABAJO = (190, 206, 230)
+COLOR_NUBE_ARRIBA = (255, 224, 196)       # el sol de tarde las enciende por encima
+COLOR_NUBE_ABAJO = (214, 132, 156)        # y por debajo se ven rosadas
+RADIO_SOL = 0.035                         # radio del disco del sol (el domo mide 1)
+COLOR_SOL = (255, 240, 190)
+# Mar al fondo (en el lado del sol): franja baja pegada al horizonte, azul lejos del sol y dorada bajo él.
+COLOR_MAR = (92, 124, 178)
+COLOR_REFLEJO_MAR = (255, 204, 138)
+SEMIARCO_MAR = math.radians(95)           # medio ancho angular del mar alrededor del azimut del sol
+ALTURA_MAR = 0.012                        # seno de la altura del borde superior del mar
 
 
 def _mezclar(a, b, t):
@@ -61,27 +74,36 @@ def direccion_hacia_el_sol(direccion_luz=DIRECCION_SOL):
 def color_en_direccion(d, sol):
     base = color_degradado(d[1])
     cos = max(0.0, d[0] * sol[0] + d[1] * sol[1] + d[2] * sol[2])
-    return _mezclar(base, COLOR_RESPLANDOR, FUERZA_RESPLANDOR * cos ** 6)
+    return _mezclar(base, COLOR_RESPLANDOR, FUERZA_RESPLANDOR * cos ** POTENCIA_RESPLANDOR)
 
 
 # Siluetas de cerros lejanos: dos filas de picos bajos (la lejana más clara y velada) pegadas al
 # horizonte, para que el fondo no sea una pared lisa. (vértices, triángulos, colores) como el domo.
 CAPAS_CERROS = (          # (radio, altura base, amplitud, color, desfase de azar)
-    (0.985, 0.020, 0.050, (186, 200, 214), 1.0),
-    (0.975, 0.010, 0.032, (160, 180, 190), 2.0),
+    (0.985, 0.020, 0.050, (196, 128, 160), 1.0),     # lejanos: rosados y velados
+    (0.975, 0.010, 0.032, (132, 92, 140), 2.0),      # cercanos: violetas
 )
-COLUMNAS_CERROS = 56
+COLUMNAS_CERROS = 72
+# Picos a la manera del Pan de Azúcar: (desfase angular respecto del sol en grados, semiancho en grados,
+# altura como seno), en la capa lejana. Dan al horizonte una silueta reconocible junto al mar.
+PICOS = ((38.0, 6.0, 0.115), (-52.0, 9.0, 0.085), (150.0, 12.0, 0.07))
 
 
 def geometria_cerros():
     vertices, triangulos, colores = [], [], []
-    for radio, base, amplitud, tono, fase in CAPAS_CERROS:
+    sol = direccion_hacia_el_sol()
+    azimut_sol = math.atan2(sol[2], sol[0])
+    for capa, (radio, base, amplitud, tono, fase) in enumerate(CAPAS_CERROS):
         inicio = len(vertices)
         for k in range(COLUMNAS_CERROS):
             azimut = 2 * math.pi * k / COLUMNAS_CERROS
             # Dos ondas lentas y un diente por columna: cerros redondeados con picos irregulares.
             altura = base + amplitud * (0.45 + 0.3 * math.sin(azimut * 3 + fase) + 0.2 * math.sin(azimut * 7 + 2 * fase)
                                         + 0.35 * azar_de(k, fase))
+            if capa == 0:
+                for grados, ancho, alto in PICOS:
+                    d = (azimut - azimut_sol - math.radians(grados) + math.pi) % (2 * math.pi) - math.pi
+                    altura += alto * math.exp(-(d / math.radians(ancho)) ** 2)
             for seno, tono_vertice in ((-0.06, COLOR_HORIZONTE), (max(0.004, altura), tono)):
                 coseno = math.sqrt(1 - seno * seno)
                 vertices.append((radio * coseno * math.cos(azimut), radio * seno, radio * coseno * math.sin(azimut)))
@@ -91,6 +113,42 @@ def geometria_cerros():
             b = inicio + 2 * ((k + 1) % COLUMNAS_CERROS)
             triangulos += [(a, b, b + 1), (a, b + 1, a + 1)]
     return vertices, triangulos, colores
+
+
+# El mar: una franja baja en el sector del sol, pegada al horizonte y por detrás de los cerros (radio 0.99).
+# Azul lejos del sol y dorada bajo él. (vértices, triángulos, colores) como el domo.
+COLUMNAS_MAR = 48
+
+
+def geometria_mar():
+    sol = direccion_hacia_el_sol()
+    azimut_sol = math.atan2(sol[2], sol[0])
+    vertices, triangulos, colores = [], [], []
+    for k in range(COLUMNAS_MAR + 1):
+        d = -SEMIARCO_MAR + 2 * SEMIARCO_MAR * k / COLUMNAS_MAR
+        azimut = azimut_sol + d
+        reflejo = max(0.0, math.cos(d * (math.pi / 2) / SEMIARCO_MAR)) ** 3        # 1 bajo el sol, 0 en los extremos
+        borde = max(0.0, 1 - abs(d) / SEMIARCO_MAR) ** 0.5                         # se funde al horizonte en los extremos
+        for seno, arriba in ((-0.06, 0.0), (ALTURA_MAR * borde, 1.0)):
+            coseno = math.sqrt(1 - seno * seno)
+            vertices.append((0.99 * coseno * math.cos(azimut), 0.99 * seno, 0.99 * coseno * math.sin(azimut)))
+            tono = _mezclar(COLOR_MAR, COLOR_REFLEJO_MAR, reflejo * (0.55 + 0.45 * arriba))
+            tono = _mezclar(tono, COLOR_HORIZONTE, (1 - borde) * 0.8)
+            colores.append((tono[0] / 255, tono[1] / 255, tono[2] / 255, 1.0))
+    for k in range(COLUMNAS_MAR):
+        a, b = 2 * k, 2 * (k + 1)
+        triangulos += [(a, b, b + 1), (a, b + 1, a + 1)]
+    return vertices, triangulos, colores
+
+
+# Disco del sol: una esfera pequeña (icosfera) en la dirección del sol, dentro del domo y delante del mar.
+def geometria_sol():
+    sol = direccion_hacia_el_sol()
+    base_v, base_t = icosfera()
+    centro = tuple(0.96 * c for c in sol)
+    vertices = [tuple(centro[i] + RADIO_SOL * v[i] for i in range(3)) for v in base_v]
+    colores = [(COLOR_SOL[0] / 255, COLOR_SOL[1] / 255, COLOR_SOL[2] / 255, 1.0)] * len(vertices)
+    return vertices, list(base_t), colores
 
 
 # Domo de radio 1: (vértices, triángulos, colores 0-1 RGBA). Los anillos van de bajo el horizonte
@@ -187,9 +245,10 @@ class CieloDegradado(Entity):
 
     def __init__(self, **opciones):
         vertices, triangulos, colores = geometria_domo()
-        cv, ct, cc = geometria_cerros()
-        ct = [(a + len(vertices), b + len(vertices), c + len(vertices)) for a, b, c in ct]
-        vertices, triangulos, colores = vertices + cv, triangulos + ct, colores + cc
+        for extra in (geometria_mar(), geometria_cerros(), geometria_sol()):
+            cv, ct, cc = extra
+            ct = [(a + len(vertices), b + len(vertices), c + len(vertices)) for a, b, c in ct]
+            vertices, triangulos, colores = vertices + cv, triangulos + ct, colores + cc
         opciones.setdefault("scale", 400)
         super().__init__(model=Mesh(vertices=vertices, triangles=triangulos, colors=colores),
                          shader=unlit_shader, unlit=True, double_sided=True, name="cielo", **opciones)
