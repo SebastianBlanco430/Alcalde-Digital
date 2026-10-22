@@ -9,7 +9,7 @@
 
 from ursina import Entity, Text, camera
 
-from frontend import estilo
+from frontend import diseno_adaptable, diseno_adaptable_calculos, estilo
 from frontend.componentes import escala_fuente, modelo_redondeado, rgb
 
 ESCALA_JUEGO = 0.92              # tamaño del contenido de EscenaJuego dentro del marco
@@ -30,20 +30,40 @@ class MarcoPC(Entity):
         Entity(parent=self, model="quad", color=rgb(COLOR_BISEL), scale=(4, 4), z=Z_ATRAS)
         alto_pantalla = ESCALA_JUEGO + 0.02
         ancho_pantalla = ancho * ESCALA_JUEGO + 0.02
-        Entity(parent=self, model=modelo_redondeado(ancho_pantalla, alto_pantalla, 12),
-               scale=(ancho_pantalla, alto_pantalla), color=rgb(estilo.COLOR_FONDO), z=Z_ATRAS - 0.1)
+        self.pantalla = Entity(parent=self, model=modelo_redondeado(ancho_pantalla, alto_pantalla, 12),
+                               scale=(ancho_pantalla, alto_pantalla), color=rgb(estilo.COLOR_FONDO), z=Z_ATRAS - 0.1)
         # Barra superior con el título y tres botones de ventana.
         y_barra = 0.5 - ALTO_BARRA / 2
-        Entity(parent=self, model="quad", color=rgb(COLOR_BARRA), scale=(ancho, ALTO_BARRA),
-               position=(0, y_barra), z=Z_ATRAS - 0.2)
+        self.barra = Entity(parent=self, model="quad", color=rgb(COLOR_BARRA), scale=(ancho, ALTO_BARRA),
+                            position=(0, y_barra), z=Z_ATRAS - 0.2)
         self.titulo = Text("", parent=self, origin=(-0.5, 0), position=(-ancho / 2 + 0.02, y_barra, Z_ATRAS - 0.3),
                            scale=escala_fuente(16), color=rgb(estilo.COLOR_TEXTO_TENUE))
+        self.botones_ventana = []
         for i, tono in enumerate(((236, 96, 88), (240, 190, 70), (90, 200, 100))):
-            Entity(parent=self, model="circle", color=rgb(tono), scale=0.014,
-                   position=(ancho / 2 - 0.03 - i * 0.026, y_barra), z=Z_ATRAS - 0.3)
+            self.botones_ventana.append(Entity(
+                parent=self, model="circle", color=rgb(tono), scale=0.014,
+                position=(ancho / 2 - 0.03 - i * 0.026, y_barra), z=Z_ATRAS - 0.3))
         # LED de encendido en el mentón del monitor.
         Entity(parent=self, model="circle", color=rgb(COLOR_LED), scale=0.01,
                position=(0, -0.5 + 0.018), z=Z_ATRAS - 0.2)
+        # Diseño adaptable: la barra y la pantalla siguen al ancho real de la ventana (no-op sin gestor).
+        diseno_adaptable.suscribir(self.reanclar)
+
+    # Reajusta el marco a una ventana de `aspecto` (la barra ocupa todo el ancho; la pantalla del
+    # monitor mide lo que el contenido reducido de EscenaJuego: ESCALA_JUEGO * factor «caber»).
+    # En 16:9 queda exactamente como se construyó.
+    def reanclar(self, aspecto, factor=None):
+        if factor is None:
+            factor = diseno_adaptable_calculos.factor_ajuste(aspecto)
+        self.barra.scale = (aspecto, ALTO_BARRA)
+        self.titulo.x = -aspecto / 2 + 0.02
+        for i, boton in enumerate(self.botones_ventana):
+            boton.x = aspecto / 2 - 0.03 - i * 0.026
+        ancho_contenido = min(aspecto, diseno_adaptable_calculos.ASPECTO_DISENO) * ESCALA_JUEGO
+        ancho_pantalla = ancho_contenido + 0.02
+        alto_pantalla = ESCALA_JUEGO * factor + 0.02
+        self.pantalla.model = modelo_redondeado(ancho_pantalla, alto_pantalla, 12)
+        self.pantalla.scale = (ancho_pantalla, alto_pantalla)
 
     # Texto de la barra: "Civitas · <Rol> · <Lugar>".
     def fijar(self, rol, lugar):

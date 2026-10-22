@@ -151,8 +151,11 @@ class Rejilla:
 # Rejilla del mundo jugable: los límites de `mundo` y, ocupadas, las zonas que bloquea (cajas de
 # edificios y casas, círculos de árboles y farolas) inflada por el radio del jugador. Con
 # `pendiente=True` también se bloquea el talud no caminable (salvo escaleras): es lo más lento.
-def rejilla_del_mundo(mundo, resolucion=RESOLUCION, pendiente=False, radio=RADIO_JUGADOR):
-    rejilla = Rejilla(mundo.limites(), resolucion)
+# `recorrible=True` usa limites_recorribles() (toda la ladera dibujada, donde de verdad se camina) en lugar
+# de limites() (el rectángulo de la ciudad); por defecto, como siempre.
+def rejilla_del_mundo(mundo, resolucion=RESOLUCION, pendiente=False, radio=RADIO_JUGADOR, recorrible=False):
+    limites = mundo.limites_recorribles() if recorrible and hasattr(mundo, "limites_recorribles") else mundo.limites()
+    rejilla = Rejilla(limites, resolucion)
     for e in mundo.edificios():
         rejilla.bloquear_caja(e.caja(), radio)
     for o in mundo.obstaculos():

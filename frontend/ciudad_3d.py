@@ -41,6 +41,7 @@ from ursina.lights import AmbientLight, DirectionalLight
 from ursina.shaders import lit_with_shadows_shader, unlit_shader
 
 from backend.datos.modelos_edificios import CARPETA_MODELOS, escala_de, modelo_de
+from backend.logica import escaleras_calculos
 from frontend.azar_fijo import azar_de, ruido_suave
 from frontend.banderas import crear_banderas
 from frontend.casas_decorativas import (casco_de_modelo, color_base_como_color, construir_casas,
@@ -544,8 +545,13 @@ class Ciudad3D(Entity):
     # Peldaños a lo largo de cada escalera: tantos como pide su desnivel (ALTO_PELDANO), cada uno
     # con la tapa sobre el suelo en su centro y el cuerpo hasta por debajo del suelo, así siguen
     # la ladera sin flotar. Una baranda de un lado.
+    # Con ESCALERAS_PELDANOS (escaleras_calculos) se dibujan los peldaños discretos que también pisa el jugador
+    # (_construir_escaleras_peldanos); con la bandera apagada, los de siempre (los de abajo).
     def _construir_escaleras(self):
         g = self._grupos["escaleras"]
+        if escaleras_calculos.ESCALERAS_PELDANOS and hasattr(self._mundo, "perfiles_escaleras"):
+            self._construir_escaleras_peldanos(g)
+            return
         for numero, e in enumerate(self._mundo.escaleras()):
             a, b = (e.ax, e.az), (e.bx, e.bz)
             ux, uz = (b[0] - a[0]) / e.largo, (b[1] - a[1]) / e.largo
@@ -573,6 +579,51 @@ class Ciudad3D(Entity):
                 s = e.largo * k / (postes - 1)
                 x, z = a[0] + ux * s + dx, a[1] + uz * s + dz
                 y = self._suelo(x, z) + 0.12
+                puntos.append((x, y + 0.9, z))
+                pieza(parent=g, model="cube", color=rgb(COLOR_BARANDA), position=(x, y + 0.45, z),
+                      scale=(0.06, 0.9, 0.06))
+            for p, q in zip(puntos, puntos[1:]):
+                horizontal = math.dist((p[0], p[2]), (q[0], q[2]))
+                pieza(parent=g, model="cube", color=rgb(COLOR_BARANDA), position=tuple((p[i] + q[i]) / 2 for i in range(3)),
+                      rotation=(-math.degrees(math.atan2(q[1] - p[1], horizontal)), rumbo, 0),
+                      scale=(0.05, 0.05, math.hypot(horizontal, q[1] - p[1])))
+
+    # Escaleras con peldaños de verdad: cada tramo del perfil (backend/logica/escaleras_calculos.PerfilEscalera) es una
+    # huella plana a su altura, con la misma subida entre una y otra (CONTRAHUELLA): cortas donde la ladera
+    # es empinada y largas donde es suave. Cada peldaño baja hasta por debajo del terreno, así no flota.
+    # Los peldaños se pintan a franjas alternas; la baranda del lado derecho sigue la altura de los peldaños.
+    def _construir_escaleras_peldanos(self, g):
+        for numero, perfil in enumerate(self._mundo.perfiles_escaleras()):
+            e = perfil.escalera
+            a = (e.ax, e.az)
+            ux, uz = (e.bx - e.ax) / e.largo, (e.bz - e.az) / e.largo
+            rumbo = math.degrees(math.atan2(ux, uz))
+            par = PALETAS_ESCALERA[numero % len(PALETAS_ESCALERA)] if SUELO_FAVELA else None
+            for k, (s0, s1, altura) in enumerate(perfil.tramos):
+                if s1 - s0 < 1e-3:
+                    continue
+                s = (s0 + s1) / 2
+                x, z = a[0] + ux * s, a[1] + uz * s
+                tapa = altura + escaleras_calculos.TAPA_SOBRE_SUELO
+                muestras = max(2, int((s1 - s0) / 0.5) + 1)
+                fondo = min(self._suelo(a[0] + ux * (s0 + (s1 - s0) * i / (muestras - 1)),
+                                        a[1] + uz * (s0 + (s1 - s0) * i / (muestras - 1)))
+                            for i in range(muestras)) - 0.3
+                fondo = min(fondo, tapa - 0.15)
+                if par is not None:
+                    tono = par[k % 2]
+                else:
+                    tono = COLOR_ESCALERA if k % 2 else tuple(c - 10 for c in COLOR_ESCALERA)
+                pieza(parent=g, model="cube", color=rgb(tono), rotation_y=rumbo,
+                      position=(x, (tapa + fondo) / 2, z), scale=(e.ancho, tapa - fondo, (s1 - s0) + 0.02))
+            # Baranda: postes cada ~2 m (parados sobre el peldaño que les toca) y un pasamanos entre poste y poste.
+            dx, dz = uz * (e.ancho / 2 - 0.05), -ux * (e.ancho / 2 - 0.05)
+            postes = max(2, math.ceil(e.largo / 2) + 1)
+            puntos = []
+            for k in range(postes):
+                s = e.largo * k / (postes - 1)
+                x, z = a[0] + ux * s + dx, a[1] + uz * s + dz
+                y = perfil.altura_en_s(s) + escaleras_calculos.TAPA_SOBRE_SUELO
                 puntos.append((x, y + 0.9, z))
                 pieza(parent=g, model="cube", color=rgb(COLOR_BARANDA), position=(x, y + 0.45, z),
                       scale=(0.06, 0.9, 0.06))

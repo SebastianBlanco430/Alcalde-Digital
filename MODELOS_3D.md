@@ -610,3 +610,17 @@ sueltas de antes) y, en `frontend/ciudad_3d.py`, `SUELO_FAVELA`, `PLAZAS_PINTADA
 - **Contorno de tinta**: casco invertido (`GROSOR_CONTORNO` 0,12 m, solo caras traseras, sin luz, fuera del mapa de sombras) en casas,
   edificios jugables y árboles. Los geoms de techo se excluyen (`CLASES_SIN_CASCO`): su copia casi pegada al plano real parpadeaba.
 - Sombra azul-violeta y más suave (`piezas.py`); sol dorado; cielo de atardecer con mar, picos y disco solar (`cielo.py`).
+
+## Vehículos montables (bicicleta y moto) — Ronda 3, fase 1
+- **Módulos nuevos** (nada existente se tocó): `frontend/vehiculo_calculos.py` (dinámica pura), `vehiculo_piezas.py` (geometría pura),
+  `vehiculo_modelo.py` (Entity/Panda3D) y `vehiculo_mundo.py` (aparcados, aviso y controlador). Pruebas en
+  `tests/frontend_3d/test_vehiculo_calculos.py` y `test_vehiculo_piezas.py`.
+- **Modelos procedurales**: cada grupo (cuadro, manubrio con rueda delantera, rueda trasera, biela, pedales, pata de cabra, halo) son dos Geom
+  con color por vértice (bandas de luz horneadas, sin luces) y casco de tinta (caras traseras, método de `contorno_calculos`). Sin shader:
+  no reciben la niebla del mundo (igual que los Actor). `INVERTIR_CARAS = False` en `vehiculo_modelo.py` (comprobado con captura: las
+  mallas de `malla_calculos` usadas sin espejo se ven bien con el orden normal).
+- **Signos de Ursina** (medidos): `rotation_x > 0` baja el morro y hace avanzar una rueda; `rotation_z > 0` inclina a la derecha.
+- **Piloto**: un `Personaje` procedural articulado (cuerpo/cara de cómic) con cinemática inversa: pies a los pedales/estribos y manos al
+  manubrio. Los avatares `.glb` no se pueden articular, así que se les crea un maniquí con el color del rol y se oculta el avatar.
+- **Controles**: relativos al vehículo (W/S, A/D, Shift turbo, Espacio freno de mano/derrape, sin salto); la cámara se recoloca detrás.
+- **Pendiente de la fase 2**: integrar con `controlador_jugador.py`, `escena_mundo.py`, HUD y los atributos aditivos de la cámara.

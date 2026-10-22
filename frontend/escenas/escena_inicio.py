@@ -29,7 +29,7 @@ class EscenaInicio(Escena):
     ANCHO_BOTON = a_unidades(260)
     ALTO_BOTON = a_unidades(60)
 
-    def __init__(self, al_comenzar, al_salir=None, **opciones):
+    def __init__(self, al_comenzar, al_salir=None, al_ajustes=None, **opciones):
         super().__init__(**opciones)
         self.fondo = FondoMenu(parent=self)
         self.wordmark = crear_wordmark(self, position=(0, self.Y_TITULO))
@@ -49,11 +49,23 @@ class EscenaInicio(Escena):
             "Empezar", al_clic=al_comenzar, ancho=self.ANCHO_BOTON, alto=self.ALTO_BOTON,
             tamano_fuente_px=26, parent=self, position=(0, self.Y_BOTON),
         )
+        # Botón «Ajustes» (opcional: solo si main.py pasa `al_ajustes`): va entre Empezar y Salir y Salir baja
+        # un puesto. Sin `al_ajustes` el menú queda exactamente como siempre.
+        self.boton_ajustes = None
+        y_salir = self.Y_BOTON_SALIR
+        if al_ajustes is not None:
+            self.boton_ajustes = BotonSecundario(
+                "Ajustes", al_clic=al_ajustes, ancho=self.ANCHO_BOTON, alto=self.ALTO_BOTON,
+                tamano_fuente_px=24, parent=self, position=(0, self.Y_BOTON_SALIR),
+            )
+            y_salir = self.Y_BOTON_SALIR - a_unidades(80)
         self.boton_salir = BotonSecundario(
             "Salir", al_clic=al_salir, ancho=self.ANCHO_BOTON, alto=self.ALTO_BOTON,
-            tamano_fuente_px=24, parent=self, position=(0, self.Y_BOTON_SALIR),
+            tamano_fuente_px=24, parent=self, position=(0, y_salir),
         )
         self.botones = (self.boton_comenzar, self.boton_salir)
+        if self.boton_ajustes is not None:
+            self.botones = (self.boton_comenzar, self.boton_ajustes, self.boton_salir)
         self.foco = FocoTeclado(lambda: self.botones, parent=self)
 
     def al_entrar(self, **datos):

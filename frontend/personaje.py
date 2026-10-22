@@ -260,6 +260,13 @@ class Personaje(Entity):
     def fijar_velocidad(self, velocidad):
         self.velocidad = velocidad
 
+    # Ganchos de salto y escaleras: el muñeco procedural no los usa (no-op).
+    def fijar_estado_aire(self, en_aire, vel_vertical=0.0):
+        pass
+
+    def fijar_subiendo_escalera(self, subiendo):
+        pass
+
     # -- Resaltado del jugador activo --
 
     def resaltar(self, activo):

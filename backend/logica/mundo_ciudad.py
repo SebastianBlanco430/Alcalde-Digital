@@ -27,8 +27,14 @@ from dataclasses import dataclass
 
 from backend.datos.modelos_edificios import modelo_de
 from backend.grafos.mapa_ciudad import _distancia_punto_segmento
+from backend.logica import escaleras_calculos as esc
 
 RADIO_JUGADOR = 0.35
+# Se puede recorrer TODO el terreno dibujado (la ladera y la favela que se ven más allá de la ciudad), no
+# solo el rectángulo de las plazas: con True `es_transitable` usa limites_recorribles(); con False, los
+# límites de siempre (limites()). El minimapa y los tests de la ciudad siguen usando limites().
+RECORRER_TODO_EL_TERRENO = True
+MARGEN_BORDE_TERRENO = 3.0       # m que se dejan sin pisar antes de que termine el terreno dibujado
 DISTANCIA_ENTRADA = 1.2          # m delante de la puerta donde se para el personaje
 LADOS_PUERTA = ("n", "s", "e", "o")
 # Rumbo (rotation_y, grados) con el que se ENTRA por cada cara: hacia dentro del edificio.
@@ -264,6 +270,8 @@ class MundoCiudad:
         self._callejones = list(callejones)   # pasillos entre casas (decorado y pruebas)
         self._zonas = list(zonas)             # canchas y otras áreas abiertas (decorado)
         self._limites = self._calcular_limites(margen_edificios)
+        self._limites_recorribles = self._calcular_limites_recorribles()
+        self._perfiles_escalera = None   # perfiles de peldaños (se arman al primer uso, ver perfiles_escaleras)
 
         for edificio in self._edificios:
             if not self._puerta_libre(edificio):
@@ -294,6 +302,35 @@ class MundoCiudad:
     # Altura del suelo en (x, z).
     def altura(self, x, z):
         return self.terreno.altura(x, z) if self.terreno is not None else 0.0
+
+    # Altura que pisa el jugador: la del terreno, salvo sobre una Escalera, donde se cuantiza en peldaños
+    # (backend/logica/escaleras_calculos.py). Solo la usan el controlador y el avatar; `altura()` sigue
+    # siendo la malla suave del terreno (cámara, casas, props). Con ESCALERAS_PELDANOS = False es igual a altura().
+    def altura_con_escaleras(self, x, z):
+        base = self.altura(x, z)
+        if not esc.ESCALERAS_PELDANOS or not self._escaleras:
+            return base
+        h = esc.altura_sobre_escaleras(self.perfiles_escaleras(), x, z)
+        return base if h is None else h
+
+    # Perfiles de peldaños de cada escalera (mismo orden que escaleras()); el renderizador dibuja
+    # exactamente estos peldaños. Sin terreno (mundo plano) no hay peldaños y la lista sale vacía.
+    def perfiles_escaleras(self):
+        if self._perfiles_escalera is None:
+            if self.terreno is None:
+                self._perfiles_escalera = []
+            else:
+                self._perfiles_escalera = [esc.PerfilEscalera(e, self.terreno.altura) for e in self._escaleras]
+        return self._perfiles_escalera
+
+    # Perfil de la escalera bajo (x, z) o None.
+    def perfil_escalera_en(self, x, z):
+        if self.terreno is None:
+            return None
+        for perfil in self.perfiles_escaleras():
+            if perfil.escalera.contiene(x, z):
+                return perfil
+        return None
 
     # -- Delegación al mapa (lo que usa el GPS) --
 
@@ -358,9 +395,14 @@ class MundoCiudad:
     def limites(self):
         return self._limites
 
+    # (xmin, xmax, zmin, zmax) donde se puede caminar: con terreno son los de la ladera dibujada
+    # (menos MARGEN_BORDE_TERRENO); sin terreno o con RECORRER_TODO_EL_TERRENO = False, los de siempre.
+    def limites_recorribles(self):
+        return self._limites_recorribles
+
     # Transitable <=> dentro de los límites y el círculo del jugador no toca ningún obstáculo.
     def es_transitable(self, x, z):
-        xmin, xmax, zmin, zmax = self._limites
+        xmin, xmax, zmin, zmax = self._limites_recorribles
         if not (xmin <= x <= xmax and zmin <= z <= zmax):
             return False
         if (self.terreno is not None and not self.terreno.caminable(x, z)
@@ -377,6 +419,16 @@ class MundoCiudad:
             xmin, xmax = min(xmin, ex0 - margen), max(xmax, ex1 + margen)
             zmin, zmax = min(zmin, ez0 - margen), max(zmax, ez1 + margen)
         return (xmin, xmax, zmin, zmax)
+
+    # Los límites de siempre ampliados a la ladera dibujada (Terreno.extension), si hay terreno.
+    def _calcular_limites_recorribles(self):
+        xmin, xmax, zmin, zmax = self._limites
+        extension = getattr(self.terreno, "extension", None)
+        if not RECORRER_TODO_EL_TERRENO or extension is None:
+            return self._limites
+        ex0, ex1, ez0, ez1 = extension
+        m = MARGEN_BORDE_TERRENO
+        return (min(xmin, ex0 + m), max(xmax, ex1 - m), min(zmin, ez0 + m), max(zmax, ez1 - m))
 
     def _validar_edificio(self, edificio):
         mapa = self._mapa

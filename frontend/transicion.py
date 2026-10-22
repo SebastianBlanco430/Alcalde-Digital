@@ -14,7 +14,7 @@
 from panda3d.core import TransparencyAttrib
 from ursina import Entity, Text, camera, color, time
 
-from frontend import estilo
+from frontend import diseno_adaptable, estilo
 from frontend.componentes import escala_fuente, rgb
 from frontend.fundido import Fundido
 
@@ -75,3 +75,17 @@ class Transicion(Entity):
         self.texto.enabled = texto is not None
         if texto is not None:
             self.texto.text = texto
+            self._ajustar_texto(texto)
+
+    _texto_ajustado = None
+
+    # El nombre del lugar nunca se sale de la ventana: se encoge (hasta la mitad) o se parte en
+    # líneas según el aspecto actual. Solo se recalcula si cambia el texto; sin gestor no hace nada.
+    def _ajustar_texto(self, texto):
+        firma = (texto, round(diseno_adaptable.aspecto(), 3))
+        if firma == self._texto_ajustado:
+            return
+        self._texto_ajustado = firma
+        diseno_adaptable.ajustar_texto(self.texto, diseno_adaptable.aspecto() - 0.12,
+                                       escala_base=escala_fuente(40), escala_min=0.5, max_lineas=3,
+                                       cadena=texto)

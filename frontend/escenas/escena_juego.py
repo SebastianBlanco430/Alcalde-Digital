@@ -20,6 +20,7 @@ from frontend.componentes import (
     rgb,
 )
 from frontend.escenas.escena_base import Escena
+from frontend import diseno_adaptable
 from frontend.marco_pc import ESCALA_JUEGO, MarcoPC
 from frontend.panel_propagacion import PanelPropagacion
 from frontend.panel_resultado_grafo import PanelResultadoGrafo
@@ -85,6 +86,8 @@ class EscenaJuego(Escena):
         self.estado = None
         self.jugador = {}
         self.marco = MarcoPC(parent=self.parent)    # hermano (detrás), no hijo: no se reduce con el juego
+        # Diseño adaptable: en ventanas más estrechas que 16:9 la escena entera se reduce para caber.
+        diseno_adaptable.suscribir(self._al_cambiar_aspecto)
         self._reiniciar_mision(None, None)
         if self.ESTILO_RED_SOCIAL:
             self._construir_red_social()
@@ -205,10 +208,20 @@ class EscenaJuego(Escena):
         if activo:
             nombre, rol = self._nombre_y_rol()
             self.marco.mostrar(rol, lugar)
-            self.scale = ESCALA_JUEGO
+            self._escala_base = ESCALA_JUEGO
         else:
             self.marco.ocultar()
-            self.scale = 1
+            self._escala_base = 1
+        self.scale = self._escala_base * self._ajuste
+
+    # Escala propia de la escena (ESCALA_JUEGO con marco, 1 sin él) y factor «caber» de la ventana
+    # (1 en 16:9 o más ancha; < 1 en ventanas más estrechas, p. ej. pantalla completa del Mac 16:10).
+    _escala_base = 1
+    _ajuste = 1.0
+
+    def _al_cambiar_aspecto(self, aspecto, factor):
+        self._ajuste = factor
+        self.scale = self._escala_base * self._ajuste
 
     def _reiniciar_mision(self, mision, al_terminar):
         self.mision = mision

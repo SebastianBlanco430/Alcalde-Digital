@@ -84,3 +84,21 @@ def clip_para_pose(pose):
     if intensidad < INTENSIDAD_CORRER:
         return CAMINAR, 1.0
     return CORRER, 1.0
+
+
+# Velocidad (m/s) equivalente a una pose de poses.py, para guiar el ciclo de marcha de la animación humana: la
+# intensidad (codo y balanceo del muslo) por la velocidad de carrera del muñeco (8.5 m/s). Total; reposo -> 0.
+def velocidad_de_pose(pose):
+    def valor(clave, defecto=0.0):
+        try:
+            v = float(pose.get(clave, defecto))
+        except (TypeError, ValueError, AttributeError):
+            return defecto
+        return defecto if math.isnan(v) else v
+
+    if valor("pelvis_y", 1.0) < ALTURA_PELVIS_SENTADO_MAX:
+        return 0.0
+    intensidad = max((valor("codo_i") - 8) / 25, max(abs(valor("muslo_i")), abs(valor("muslo_d"))) / 40)
+    if intensidad < INTENSIDAD_QUIETO:
+        return 0.0
+    return min(1.0, intensidad) * 8.5

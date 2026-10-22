@@ -86,6 +86,10 @@ class PersonajeNPC(PersonajeModelo):
             control.pose(int(self._plan["fase"] * control.getNumFrames()) % control.getNumFrames())
             control.loop(False)
 
+    # Fase (0..1) con la que arranca el ciclo de marcha de la animación humana (distinta por NPC).
+    def _fase_marcha_inicial(self):
+        return self._plan["fase"]
+
     # Cada INTERVALO_LOD s mira la distancia a la cámara: lejos se apaga la cara y se congela el cuerpo.
     # Devuelve si la cara se anima este frame.
     def _animar_rostro(self):
@@ -104,6 +108,10 @@ class PersonajeNPC(PersonajeModelo):
     # congelado se repite cada revisión por si un cambio de clip la reanudó.
     def _ajustar_cuerpo(self, congelar):
         if self.actor is None or (not congelar and not self._congelado):
+            return
+        if self._humano is not None:      # animación humana: el animador lleva las tasas de sus clips
+            self._humano.congelar(congelar)
+            self._congelado = congelar
             return
         try:
             for clip in list(self._pesos):

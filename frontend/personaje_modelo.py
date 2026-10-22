@@ -30,6 +30,7 @@ from frontend.componentes import rgb
 from frontend.personaje import Personaje
 from frontend.piezas import COLOR_MARCADOR, etiqueta, silenciar
 from frontend import rostro_calculos as rc
+from frontend import animacion_humana as ah
 from frontend.rostro_modelo import colocar_rostro_animado
 from frontend import sombra_calculos as sc
 from frontend.sombra_contacto import SombraContacto, crear_aro
@@ -37,6 +38,8 @@ from frontend.sombra_contacto import SombraContacto, crear_aro
 CARPETA_MODELOS = Path(__file__).resolve().parent.parent / "assets" / "modelos" / "personajes"
 TIEMPO_MEZCLA = 0.2              # s para pasar de un clip a otro
 OFFSET_SENTADO = (0.0, 0.0, -0.7)   # (x, y, z) del cuerpo sin sentarse: detrás de la silla (ASIENTO)
+
+ANIMACION_HUMANA = True          # clips horneados con cinemática humana (frontend/animacion_humana.py); False = clips del .glb
 
 _bases = {}                      # rol -> Actor ya cargado (se copia por jugador)
 _avisados = set()
@@ -53,7 +56,10 @@ def _cargar_actor(rol):
     if base is None:
         ruta = CARPETA_MODELOS / mc.MODELOS_POR_ROL[rol]
         # Actor(ruta) carga el glb con la altura en Z (tumbado); gltf.load_model la deja en Y.
-        base = Actor(NodePath(gltf.load_model(str(ruta), gltf_settings=gltf.GltfSettings())))
+        modelo = gltf.load_model(str(ruta), gltf_settings=gltf.GltfSettings())
+        if ANIMACION_HUMANA:      # añade al nodo los clips de marcha/escalón/salto antes de crear el Actor
+            ah.hornear_clips(NodePath(modelo), rol)
+        base = Actor(NodePath(modelo))
         faltan = [c for c in (mc.IDLE, mc.CAMINAR, mc.CORRER, mc.HABLAR) if c not in base.getAnimNames()]
         if faltan:
             raise ValueError(f"faltan clips {faltan}")
@@ -82,6 +88,11 @@ class PersonajeModelo(Entity):
         self._clip_vel = None         # último clip elegido por velocidad (histéresis)
         self._rate = 1.0
         self._pesos = {}              # clip -> peso de la mezcla
+        self._humano = None           # AnimadorHumano (si el modelo trae los clips horneados)
+        self._v_anim = 0.0            # velocidad (m/s) que guía el ciclo de marcha
+        self._en_aire = False         # estado de salto (lo fija el controlador con fijar_estado_aire)
+        self._vel_vertical = 0.0
+        self._subiendo = False        # subiendo escalones (fijar_subiendo_escalera)
 
         self.aro = crear_aro(self, sc.altura_aro(False))   # translúcido, sobre las capas del suelo
         self.cuerpo = Entity(parent=self)
@@ -102,6 +113,8 @@ class PersonajeModelo(Entity):
         self._poner_clip(mc.IDLE, 1.0)
         self._pesos[mc.IDLE] = 1.0    # arranca ya en Idle, sin pasar 0.2 s en la pose base
         self.actor.setControlEffect(mc.IDLE, 1.0)
+        if ANIMACION_HUMANA:
+            self._humano = ah.crear_animador(self)
 
     # -- Ganchos que las variantes (frontend/npc_modelo.py) sustituyen; por defecto, el comportamiento de siempre --
 
@@ -125,6 +138,9 @@ class PersonajeModelo(Entity):
     # -- Clips --
 
     def _poner_clip(self, clip, rate):
+        if self._humano is not None:      # con animación humana el clip es solo LÓGICO; el animador elige los reales
+            self._clip = clip
+            return
         if clip != self._clip:
             self._pesos.setdefault(clip, 0.0)
             self._iniciar_loop(clip)
@@ -135,6 +151,9 @@ class PersonajeModelo(Entity):
             self._rate = rate
 
     def _mezclar(self, dt):
+        if self._humano is not None:
+            self._humano.mezclar(dt)
+            return
         paso = dt / TIEMPO_MEZCLA
         for clip, peso in list(self._pesos.items()):
             destino = 1.0 if clip == self._clip else 0.0
@@ -150,6 +169,7 @@ class PersonajeModelo(Entity):
     # Traduce una pose de poses.py a un clip. Se llama varias veces por frame: es idempotente.
     def aplicar_pose(self, pose):
         clip, rate = mc.clip_para_pose(pose)
+        self._v_anim = mc.velocidad_de_pose(pose)
         self._poner_clip(clip, rate)
         sentado = clip == mc.HABLAR
         self.cuerpo.position = OFFSET_SENTADO if sentado else (0, 0, 0)
@@ -157,6 +177,7 @@ class PersonajeModelo(Entity):
     # Un paso de la animación automática: el clip sale de la velocidad real.
     def animar_caminar(self, velocidad, dt):
         clip, rate = mc.clip_para_velocidad(velocidad, self._clip_vel)
+        self._v_anim = velocidad
         self._clip_vel = clip
         self._poner_clip(clip, rate)
         self.cuerpo.position = (0, 0, 0)
@@ -195,6 +216,18 @@ class PersonajeModelo(Entity):
 
     def fijar_velocidad(self, velocidad):
         self.velocidad = velocidad
+
+    # Ganchos de movimiento (los activa el controlador): salto y subir escalones. Con animación humana cambian
+    # la pose; sin ella son inofensivos (se guardan y no hacen nada).
+    def fijar_estado_aire(self, en_aire, vel_vertical=0.0):
+        self._en_aire = bool(en_aire)
+        try:
+            self._vel_vertical = float(vel_vertical)
+        except (TypeError, ValueError):
+            self._vel_vertical = 0.0
+
+    def fijar_subiendo_escalera(self, subiendo):
+        self._subiendo = bool(subiendo)
 
     # -- Resaltado del jugador activo --
 
