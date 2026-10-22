@@ -413,8 +413,24 @@ class Minimapa(Entity):
         self._colocar_mapa()
         self._firma_ruta = None            # la ruta y la flecha se redibujan con el nuevo yaw
         if (self._yaw_casas is not None
-                and hud_calculos.diferencia_yaw(yaw_grados, self._yaw_casas) > self.YAW_MIN_CASAS):
+                and hud_calculos.diferencia_yaw(yaw_grados, self._yaw_casas) > self._umbral_casas()):
             self._reconstruir_casas()
+        self._girar_capa_casas()
+
+    # Rendimiento (GIRO_SUAVE_CASAS): rehacer las mallas costaba varios ms y, al girar la cámara, pasaba casi
+    # cada frame. Entre reconstrucciones se gira la capa entera lo que falta (exacto: el giro del minimapa es
+    # alrededor de su centro) y solo se rehace cada YAW_MIN_CASAS_SUAVE grados. False = lo de siempre.
+    GIRO_SUAVE_CASAS = True
+    YAW_MIN_CASAS_SUAVE = 6.0
+
+    def _umbral_casas(self):
+        return self.YAW_MIN_CASAS_SUAVE if self.GIRO_SUAVE_CASAS else self.YAW_MIN_CASAS
+
+    def _girar_capa_casas(self):
+        if not self.GIRO_SUAVE_CASAS or self._yaw_casas is None:
+            return
+        delta = (self.geometria.yaw - self._yaw_casas + 180) % 360 - 180
+        self.capa_casas.rotation_z = -delta     # rotation_z gira en sentido horario; el yaw, antihorario
 
     # Rehace las dos mallas (casas y escaleras) con el yaw actual. Mundo sin obstaculos() o
     # escaleras() (mapa 2D): no hay nada que dibujar y las mallas quedan apagadas.

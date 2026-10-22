@@ -1,2 +1,3 @@
 ursina==8.3.0
 pytest
+psutil>=6,<8

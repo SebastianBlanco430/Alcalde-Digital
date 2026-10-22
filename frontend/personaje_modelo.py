@@ -31,6 +31,7 @@ from frontend.personaje import Personaje
 from frontend.piezas import COLOR_MARCADOR, etiqueta, silenciar
 from frontend import rostro_calculos as rc
 from frontend import animacion_humana as ah
+from frontend import skinning_gpu
 from frontend.rostro_modelo import colocar_rostro_animado
 from frontend import sombra_calculos as sc
 from frontend.sombra_contacto import SombraContacto, crear_aro
@@ -115,6 +116,7 @@ class PersonajeModelo(Entity):
         self.actor.setControlEffect(mc.IDLE, 1.0)
         if ANIMACION_HUMANA:
             self._humano = ah.crear_animador(self)
+        skinning_gpu.aplicar(self.actor)    # deforma en la GPU (frontend/skinning_gpu.py); si falla, sigue por CPU
 
     # -- Ganchos que las variantes (frontend/npc_modelo.py) sustituyen; por defecto, el comportamiento de siempre --
 

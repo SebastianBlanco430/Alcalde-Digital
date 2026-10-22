@@ -45,7 +45,7 @@ from backend.logica import escaleras_calculos
 from frontend.azar_fijo import azar_de, ruido_suave
 from frontend.banderas import crear_banderas
 from frontend.casas_decorativas import (casco_de_modelo, color_base_como_color, construir_casas,
-                                        construir_casas_favela, modelo_pintado)
+                                        construir_casas_favela, modelo_pintado, relieve_de_edificio)
 from frontend.cielo import DIRECCION_SOL, CieloDegradado
 from frontend import estilo
 from frontend.componentes import rgb
@@ -471,7 +471,8 @@ class Ciudad3D(Entity):
         if CASAS_VIVAS:
             # Pintado con el color de su lugar (estilo.COLORES_LUGAR) y con contorno de tinta; copia propia del modelo.
             tono = color_del_lugar(e.lugar)
-            pintado = modelo_pintado(e.modelo, tono, PUERTAS_EDIFICIOS[indice % len(PUERTAS_EDIFICIOS)], COLOR_TECHO_EDIFICIO)
+            pintado = modelo_pintado(e.modelo, tono, PUERTAS_EDIFICIOS[indice % len(PUERTAS_EDIFICIOS)], COLOR_TECHO_EDIFICIO,
+                                     relieve=relieve_de_edificio(indice), escala_relieve=s)
             modelo = pieza(parent=self._modelos, model=pintado, position=(e.cx, e.y, e.cz),
                            rotation_y=e.rumbo_puerta() + GIRO_MODELO, scale=s, color=rgb((255, 255, 255)))
             if CONTORNO_TINTA:

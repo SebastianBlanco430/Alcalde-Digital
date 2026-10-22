@@ -13,6 +13,9 @@
 # Pisos: una casa con `pisos` > 1 es el mismo modelo repetido hacia arriba (cada piso, el alto del
 # modelo escalado) con el tinte siguiente, como las casas que crecen por encima en una favela.
 
+import os
+import sys
+
 from panda3d.core import ColorAttrib, MaterialAttrib, NodePath
 from ursina import Entity, load_model
 from ursina.shaders import lit_with_shadows_shader
@@ -88,8 +91,10 @@ def color_base_como_color(nodo):
 # dibuja las caras traseras y por eso asoma como línea oscura alrededor de la silueta.
 # ==================================================================================================
 
-from panda3d.core import CullFaceAttrib, Texture, TextureAttrib
+from panda3d.core import CullFaceAttrib, GeomVertexReader, GeomVertexWriter, Texture, TextureAttrib
 from PIL import Image, ImageStat
+
+from frontend.texturas_ladrillo import textura_relieve_ladrillo
 
 TINTA = (18, 20, 32)                 # RGB del contorno (el mismo de docs/DISENO.md §7)
 TINTA_CASCO = (0, 0, 0)             # lo que se pinta en el casco: el shader sin luz lo aclara (gamma) y sale ~TINTA
@@ -114,6 +119,16 @@ CONTRASTE_PARED = 0.7                # fracción de la mugre original que se con
 POTENCIA_TECHO = 0.55                # <1 aclara el zinc
 POTENCIA_LADRILLO = 0.62             # <1 aclara el ladrillo
 POTENCIA_LATERAL = 0.80              # <1 aclara puertas y ventanas (no se aplanan)
+# Relieve de ladrillo en paredes PINTADAS (frontend/texturas_ladrillo.py): la pared conserva su color plano y su
+# brillo medio (BRILLO_PARED), solo cambia el dibujo de concreto por juntas y ladrillos. RELIEVE_LADRILLO = False
+# (o ALCALDE_SIN_LADRILLOS=1) lo quita del todo; las proporciones eligen a qué edificios y pisos se aplica (siempre los mismos).
+RELIEVE_LADRILLO = True
+PROPORCION_RELIEVE_FAVELA = 0.35     # pisos pintados de la favela (no los de ladrillo visto) con relieve
+EDIFICIOS_CON_RELIEVE = 2            # 1 de cada N edificios jugables (por su índice) lleva relieve
+# Los UV de las fachadas de los modelos apenas varían (por eso el concreto ya se veía liso): para el relieve se
+# proyectan UV propios desde la posición de cada vértice, por el eje de su cara (paredes: horizontal y alto).
+METROS_TEXTURA_RELIEVE = 2.6         # m de pared por repetición (10 hiladas: ~26 cm por hilada)
+ESCALA_RELIEVE_FAVELA = 2.5          # escala típica de las casas del barrio (ESCALA_BARRIO de barrio_favela.py)
 
 
 # Clase de un geom según el nombre de su textura (None = sin textura).
@@ -187,6 +202,105 @@ class _Texturas:
     def ladrillo_vivo(self):
         return self.de(_textura_ladrillo_de_referencia(), "ladrillo")
 
+    # Relieve de ladrillo (gris) para paredes pintadas: multiplica el color sin cambiarlo. `media` (0-255) es el
+    # brillo medio que debe tener; uno por valor (redondeado), así las paredes que comparten brillo comparten textura.
+    def relieve_ladrillo(self, media=BRILLO_PARED):
+        clave = ("relieve_ladrillo", int(round(media)))
+        if clave not in self._cache:
+            self._cache[clave] = _textura_de_imagen(f"relieve_ladrillo_{clave[1]}", textura_relieve_ladrillo(clave[1]))
+        return self._cache[clave]
+
+    # Brillo (0-255) con que se VE hoy una pared pintada con la textura `tex` corregida: la etapa por defecto no
+    # encuentra los UV (ver pintar_modelo) y toda la pared toma el texel de la esquina (0, 0), que con filtrado
+    # lineal y repetición es la media de las cuatro esquinas. El relieve se lleva a ese brillo: mismo color medio.
+    def brillo_visible(self, tex, clase):
+        corregida = self.de(tex, clase)
+        ancho, alto = corregida.get_x_size(), corregida.get_y_size()
+        imagen = Image.frombytes("RGB", (ancho, alto), bytes(corregida.get_ram_image_as("RGB")))
+        esquinas = [imagen.getpixel(p) for p in ((0, 0), (ancho - 1, 0), (0, alto - 1), (ancho - 1, alto - 1))]
+        return sum(sum(px) for px in esquinas) / (3 * len(esquinas))
+
+
+# Texture de Panda (RGB, repetible, con mipmaps) a partir de una imagen PIL en escala de grises o RGB.
+def _textura_de_imagen(nombre, imagen):
+    imagen = imagen.convert("RGB")
+    ancho, alto = imagen.size
+    nueva = Texture(nombre)
+    nueva.setup_2d_texture(ancho, alto, Texture.T_unsigned_byte, Texture.F_rgb)
+    nueva.set_ram_image_as(imagen.tobytes(), "RGB")
+    nueva.set_wrap_u(Texture.WM_repeat)
+    nueva.set_wrap_v(Texture.WM_repeat)
+    nueva.set_minfilter(Texture.FT_linear_mipmap_linear)
+    nueva.set_magfilter(Texture.FT_linear)
+    nueva.set_anisotropic_degree(4)
+    return nueva
+
+
+# Reescribe el texcoord del geom `i` de `geom_node` con una proyección de caja: cada vértice toma las dos
+# coordenadas del modelo perpendiculares al eje dominante de su normal (en las paredes, la horizontal y la
+# altura z), en metros reales (`escala` = metros por unidad del modelo) / METROS_TEXTURA_RELIEVE. Solo cambia
+# los UV de esa copia del geom (modify_geom la separa del modelo cacheado); posiciones y normales no se tocan.
+def proyectar_uv_relieve(geom_node, i, escala):
+    geom = geom_node.modify_geom(i)
+    datos = geom.modify_vertex_data()
+    formato = datos.get_format()
+    columnas = [formato.get_column(k).get_name().get_name() for k in range(formato.get_num_columns())]
+    texcoord = next((c for c in columnas if c.startswith("texcoord")), None)
+    if texcoord is None or "normal" not in columnas:
+        return False
+    k = escala / METROS_TEXTURA_RELIEVE
+    posiciones, normales = GeomVertexReader(datos, "vertex"), GeomVertexReader(datos, "normal")
+    escritor = GeomVertexWriter(datos, texcoord)
+    while not posiciones.is_at_end():
+        x, y, z = posiciones.get_data3()
+        nx, ny, nz = (abs(c) for c in normales.get_data3())
+        if nz >= nx and nz >= ny:            # suelo o techo plano
+            u, v = x, y
+        elif nx >= ny:                       # pared mirando a ±x
+            u, v = y, z
+        else:                                # pared mirando a ±y
+            u, v = x, z
+        escritor.set_data2(u * k, v * k)
+    return True
+
+
+_AVISO_RELIEVE = []
+
+
+# Pinta el geom `i` con el relieve de ladrillo. True si lo hizo; ante cualquier error avisa una vez y devuelve
+# False, y pintar_modelo sigue con el pintado de siempre (los UV proyectados no afectan a ese camino: la etapa
+# por defecto no lee texcoord.0).
+def _pintar_relieve(nodo, i, estado, atributo, tex, clase, pared, texturas, escala):
+    try:
+        proyectar_uv_relieve(nodo, i, escala)
+        # Misma etapa del modelo ("Base Color", que lee la columna texcoord.0): con TextureAttrib.make() la
+        # etapa por defecto lee "texcoord", que estos .glb no tienen, y toda la pared tomaría un solo texel.
+        relieve_tex = texturas.relieve_ladrillo(texturas.brillo_visible(tex, clase))
+        estado = estado.set_attrib(atributo.add_on_stage(atributo.get_on_stage(0), relieve_tex))
+        nodo.set_geom_state(i, estado.set_attrib(ColorAttrib.make_flat(pared)))
+        return True
+    except Exception as error:      # noqa: BLE001 — sin relieve la pared queda como siempre
+        if not _AVISO_RELIEVE:
+            _AVISO_RELIEVE.append(True)
+            print(f"[ladrillo] relieve desactivado en una pared ({error}).", file=sys.stderr)
+        return False
+
+
+def relieve_activo():
+    return RELIEVE_LADRILLO and os.environ.get("ALCALDE_SIN_LADRILLOS", "").strip() != "1"
+
+
+# ¿El piso pintado lleva relieve de ladrillo? Solo pisos pintados (no ladrillo visto), elegidos por posición.
+def relieve_del_piso(casa, piso, ladrillo):
+    if not relieve_activo() or ladrillo:
+        return False
+    return azar_de(casa.cx * 1.7 + 11.3, casa.cz * 0.6 + piso * 2.9) < PROPORCION_RELIEVE_FAVELA
+
+
+# ¿El edificio jugable de índice `indice` lleva relieve de ladrillo?
+def relieve_de_edificio(indice):
+    return relieve_activo() and indice % EDIFICIOS_CON_RELIEVE == 0
+
 
 # Estilo de pintura de un piso: (índice de pintura, ¿ladrillo visto?, índice de techo). Depende solo de la
 # posición de la casa y del piso: siempre sale igual.
@@ -208,7 +322,7 @@ def estilo_del_piso(casa, piso):
 # Pinta una copia de un modelo (`fuente`, ya independiente del caché de Ursina): texturas corregidas y color
 # plano por geom según su clase. `pared`, `puerta` y `techo` son colores de Ursina; `ladrillo` deja la pared
 # de ladrillo visto en vez de pintada.
-def pintar_modelo(fuente, pared, puerta, techo, ladrillo, texturas):
+def pintar_modelo(fuente, pared, puerta, techo, ladrillo, texturas, relieve=False, escala_relieve=ESCALA_RELIEVE_FAVELA):
     color_base_como_color(fuente)
     tonos = {"pared": pared, "puerta": puerta, "techo": techo}
     blanco = rgb((255, 255, 255))
@@ -226,16 +340,20 @@ def pintar_modelo(fuente, pared, puerta, techo, ladrillo, texturas):
                 estado = estado.set_attrib(TextureAttrib.make(texturas.ladrillo_vivo()))
                 nodo.set_geom_state(i, estado.set_attrib(ColorAttrib.make_flat(rgb(TINTE_LADRILLO_VIVO))))
                 continue
+            if clase == "pared" and relieve and _pintar_relieve(nodo, i, estado, atributo, tex, clase, pared,
+                                                                texturas, escala_relieve):
+                continue                                 # pared pintada con relieve de ladrillo: mismo color
             estado = estado.set_attrib(TextureAttrib.make(texturas.de(tex, clase)))
             nodo.set_geom_state(i, estado.set_attrib(ColorAttrib.make_flat(tonos.get(clase, blanco))))
     return fuente
 
 
 # Fuente tinteada de un modelo para las casas del barrio (según el estilo de un piso).
-def _fuente_viva(nombre, pintura, ladrillo, techo, texturas):
-    fuente = load_model(modelo_de(nombre).archivo).copy_to(NodePath(f"{nombre}_{pintura}_{int(ladrillo)}_{techo}"))
+def _fuente_viva(nombre, pintura, ladrillo, techo, texturas, relieve=False):
+    fuente = load_model(modelo_de(nombre).archivo).copy_to(
+        NodePath(f"{nombre}_{pintura}_{int(ladrillo)}_{techo}" + ("_relieve" if relieve else "")))
     return pintar_modelo(fuente, rgb(PINTURAS[pintura]), rgb(PUERTAS[(pintura * 3 + 1) % len(PUERTAS)]),
-                         rgb(TECHOS[techo][0]), ladrillo, texturas)
+                         rgb(TECHOS[techo][0]), ladrillo, texturas, relieve)
 
 
 _TEXTURAS_COMPARTIDAS = []
@@ -243,11 +361,12 @@ _TEXTURAS_COMPARTIDAS = []
 
 # Copia independiente y pintada del modelo `nombre` para un edificio jugable (`pared`, `puerta`, `techo`: RGB
 # 0-255): no toca el modelo que cachea Ursina, así las casas del barrio no se contagian.
-def modelo_pintado(nombre, pared, puerta, techo):
+def modelo_pintado(nombre, pared, puerta, techo, relieve=False, escala_relieve=1.0):
     if not _TEXTURAS_COMPARTIDAS:
         _TEXTURAS_COMPARTIDAS.append(_Texturas())
     fuente = load_model(modelo_de(nombre).archivo).copy_to(NodePath(f"{nombre}_pintado"))
-    return pintar_modelo(fuente, rgb(pared), rgb(puerta), rgb(techo), False, _TEXTURAS_COMPARTIDAS[0])
+    return pintar_modelo(fuente, rgb(pared), rgb(puerta), rgb(techo), False, _TEXTURAS_COMPARTIDAS[0], relieve,
+                         escala_relieve)
 
 
 # Pone y escala `casco` (copia de _casco) sobre una casa: engrosado GROSOR_CONTORNO a cada lado en planta, con el fondo
@@ -309,9 +428,10 @@ def construir_casas_favela(padre, casas, alturas=None, contorno=True):
         est = getattr(casa, "estiramiento", 1.0)
         for piso in range(getattr(casa, "pisos", 1)):
             estilo = estilo_del_piso(casa, piso)
-            clave = (casa.modelo,) + estilo
+            relieve = relieve_del_piso(casa, piso, estilo[1])
+            clave = (casa.modelo,) + estilo + (relieve,)
             if clave not in fuentes:
-                fuentes[clave] = _fuente_viva(casa.modelo, *estilo, texturas)
+                fuentes[clave] = _fuente_viva(casa.modelo, *estilo, texturas, relieve)
             copia = fuentes[clave].copy_to(raiz)
             copia.set_pos(casa.cx, y + piso * alto_piso, casa.cz)
             copia.set_hpr(-casa.rumbo, 0, 0)

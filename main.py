@@ -15,11 +15,13 @@ from backend.datos.misiones_semilla import CATALOGO_MISIONES
 from backend.datos.noticias_semilla import construir_arboles
 from backend.grafos.grafo_social import construir_grafo_social_ejemplo
 from backend.datos.ciudad_3d import ESCALA_MUNDO, SEMILLA_CASAS, construir_mundo_3d
+
 from backend.logica.estado_partida import EstadoPartida
 from backend.logica.flujo_partida import FlujoPartida
 from backend.logica.misiones import SistemaMisiones
 from backend.logica.sesion import SesionJuego
 from frontend import compat_macos, daltonismo, diseno_adaptable, estilo, medidor_fps, tipografia
+from frontend import gpu_dedicada, rendimiento, telemetria
 from frontend import audio_enganches      # sonido: observa el juego y dispara efectos/música (frontend/audio.py)
 from frontend.componentes import preparar_fuente, rgb
 from frontend.conexion_flujo import INICIO, INTERIOR, JUEGO, MUNDO, SELECCION_ROL, ConexionFlujo
@@ -144,6 +146,7 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     # development_mode=False oculta el panel de desarrollo, pero en Ursina 8.3.0
     # activaría fullscreen por defecto, así que se pide ventana explícita.
     compat_macos.aplicar()
+    rendimiento.configurar_panda()   # opciones de Panda que deben ir antes de abrir la ventana
     # El icono por defecto ('textures/ursina.ico') es relativo y Panda no lo encuentra (un error por
     # cada cambio de propiedades de la ventana): se pasa la ruta absoluta del que trae Ursina.
     icono = Path(ursina_paquete.__file__).resolve().parent / "textures" / "ursina.ico"
@@ -167,9 +170,12 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     registrar_escenas(gestor, construir_mundo_3d(semilla=leer_semilla()), duracion_transicion, duracion_cinematica)
     audio_enganches.instalar(gestor)       # AUDIO = False (frontend/audio.py) o ALCALDE_SIN_AUDIO=1 lo dejan mudo
     gestor.cambiar_a(INICIO)
+    rendimiento.instalar()                 # silencia en el bucle de Ursina las entidades pasivas (frontend/rendimiento.py)
+    telemetria.instalar()                  # F3: FPS y uso de CPU/RAM/GPU (frontend/telemetria.py)
     return aplicacion, gestor
 
 
 if __name__ == "__main__":
+    gpu_dedicada.asegurar()                # portátiles con dos GPU: pide a Windows la dedicada (frontend/gpu_dedicada.py)
     aplicacion, _ = crear_aplicacion()
     aplicacion.run()
