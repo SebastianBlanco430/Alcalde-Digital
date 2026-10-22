@@ -261,6 +261,17 @@ class EnganchesAudio:
 
 # Crea el observador, lo engancha al bucle de Ursina (una Entity que llama a actualizar() cada frame y recibe
 # las teclas) y suscribe los ajustes. Devuelve el EnganchesAudio (con `.reloj` = la Entity). Nunca lanza.
+# Entrega a la pantalla de Ajustes la lista de salidas de audio y el botón «Probar sonido».
+# Falla en silencio: sin pantalla de Ajustes o sin dispositivos, el audio sigue funcionando.
+def _conectar_ajustes(audio):
+    try:
+        from frontend.escenas import escena_ajustes
+        escena_ajustes.registrar_dispositivos(list(audio.listar_dispositivos()))
+        escena_ajustes.registrar_prueba_sonido(lambda: audio.efecto("mision_exito", 0.8))
+    except Exception as error:
+        audio_modulo._avisar_una_vez("ajustes", f"no se pudo conectar Ajustes con el audio ({error}).")
+
+
 def instalar(gestor, audio=None, suscribir_ajustes=True):
     from ursina import Entity, mouse, time
 
@@ -278,6 +289,7 @@ def instalar(gestor, audio=None, suscribir_ajustes=True):
         if suscribir_ajustes:
             motor.suscribir_ajustes()
         motor.audio.precargar()
+        _conectar_ajustes(motor.audio)
     except Exception as error:
         audio_modulo._avisar_una_vez("instalar", f"no se pudo instalar el audio ({error}).")
     return motor
