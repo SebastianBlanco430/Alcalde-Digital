@@ -291,6 +291,10 @@ TIPOS_OBJETO = ("bidon", "maceta", "moto", "bici", "caja", "perro")
 SEPARACION_OBJETO = 0.40        # m de la pared al borde de un objeto del piso
 HUECO_OBJETO_MIN = 2.2          # m: en pasillos más estrechos que esto no se ponen objetos en el piso
 PROBABILIDAD_OBJETO = 0.50      # fracción de las caras abiertas o anchas con un objeto
+# Tipos que NO se colocan (se ven mal): motos de adorno (no se pueden usar; las motos y bicis montables son otro
+# sistema, frontend/vehiculo_mundo.py) y perros. Se omiten DESPUÉS de elegir el tipo, así el resto de objetos
+# queda exactamente donde estaba. Quitar un tipo de esta tupla lo devuelve.
+TIPOS_OCULTOS = ("moto", "perro")
 
 
 @dataclass(frozen=True)
@@ -316,6 +320,8 @@ def objetos_de_calle(casas, caras):
         if _u(s0, 1.7) >= PROBABILIDAD_OBJETO:
             continue
         tipo = TIPOS_OBJETO[int(_u(s0, 2.9) * len(TIPOS_OBJETO)) % len(TIPOS_OBJETO)]
+        if tipo in TIPOS_OCULTOS:
+            continue
         radio = {"bidon": 0.35, "maceta": 0.3, "moto": 0.55, "bici": 0.5, "caja": 0.4, "perro": 0.4}[tipo]
         t = cara.t0 + 0.5 + (cara.largo - 1.0) * _u(s0, 3.3)
         dist = SEPARACION_OBJETO + radio
