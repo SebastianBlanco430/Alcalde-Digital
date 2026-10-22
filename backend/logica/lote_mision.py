@@ -25,6 +25,9 @@ class LoteMision:
         self.decisiones = 0
         self.deltas_acumulados = {nombre: 0 for nombre in NOMBRES_INDICADORES}
         self.propagaciones = []
+        # Las mismas propagaciones pero COMPLETAS (con "niveles"), en orden. Aditivo: sirve a
+        # la pantalla de resultado para colorear el grafo; resultado() no la incluye.
+        self.propagaciones_completas = []
         self._sin_noticias = False
 
     # Anota una decisión ("compartir" / "reportar") con los `deltas` que aplicó el estado
@@ -55,6 +58,10 @@ class LoteMision:
             "alcance_total": sum(p["alcance"] for p in self.propagaciones),
         }
 
+    # Copia de las propagaciones con "niveles" (para pintar el estado final del grafo).
+    def propagaciones_con_niveles(self):
+        return [dict(p, niveles=[list(n) for n in p["niveles"]]) for p in self.propagaciones_completas]
+
     # Sin grafo no hay propagación. Un rol sin ciudadano (u otra entrada inválida) no
     # propaga, pero ya no se oculta: queda en el registro como advertencia.
     def _propagar(self, decision):
@@ -71,6 +78,12 @@ class LoteMision:
         self.propagaciones.append({
             "origen": propagacion["origen"],
             "accion": propagacion["accion"],
+            "alcance": propagacion["alcance"],
+        })
+        self.propagaciones_completas.append({
+            "origen": propagacion["origen"],
+            "accion": propagacion["accion"],
+            "niveles": [list(nivel) for nivel in propagacion["niveles"]],
             "alcance": propagacion["alcance"],
         })
         return propagacion

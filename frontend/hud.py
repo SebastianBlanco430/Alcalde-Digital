@@ -15,7 +15,7 @@ from panda3d.core import TextNode
 from ursina import Entity, Mesh, Text, camera, color, window
 
 from backend.logica.roles import ROLES
-from frontend import estilo, hud_calculos, iconos
+from frontend import diseno_adaptable, diseno_adaptable_calculos, estilo, hud_calculos, iconos
 from frontend.componentes import (
     BarraIndicador, BotonAccion, BotonPrimario, a_unidades, destruir_arbol, escala_fuente,
     modelo_redondeado, panel_tinta, rgb)
@@ -466,7 +466,7 @@ class Minimapa(Entity):
                 self.puntos[nombre] = (aro, punto)
             aro, punto = self.puntos[nombre]
             es_activo = nombre == activo
-            u, v = g.punto(x, z)
+            u, v = g.acotar(*g.punto(x, z), margen=0.014)    # fuera del mapa: pegado al borde
             aro.position = punto.position = (u, v)
             aro.enabled = es_activo
             punto.enabled = True                 # reaparece si el nombre vuelve a estar
@@ -480,7 +480,7 @@ class Minimapa(Entity):
             self.marcador_destino.enabled = False
         else:
             self.marcador_destino.enabled = True
-            self.marcador_destino.position = g.lugar(destino)
+            self.marcador_destino.position = g.acotar(*g.lugar(destino), margen=0.014)
             self.marcador_destino.scale = g.diametro_plaza() * 1.6
 
         for nombre, rgb_rol, x, z in posiciones:
@@ -512,7 +512,8 @@ class Minimapa(Entity):
             return
         self._firma_ruta = firma
         g = self.geometria
-        segmentos = g.segmentos_ruta(x, z, ruta)
+        segmentos = [r for r in (g.recortar_segmento(p0, p1) for p0, p1 in g.segmentos_ruta(x, z, ruta))
+                     if r is not None]        # lo que queda fuera del recuadro no se dibuja
         while len(self.segmentos_ruta) < len(segmentos):
             self.segmentos_ruta.append(Entity(parent=self.capa_ruta, model="quad"))
         for cuadro, (p0, p1) in zip(self.segmentos_ruta, segmentos):
@@ -524,7 +525,7 @@ class Minimapa(Entity):
         flecha = g.flecha(x, z, ruta)
         self.flecha.enabled = flecha is not None
         if flecha is not None:
-            self.flecha.position = (flecha[0], flecha[1])
+            self.flecha.position = g.acotar(flecha[0], flecha[1], margen=self.LARGO_FLECHA)
             self.flecha.rotation_z = flecha[2]       # horario desde arriba = rotation_z de Ursina
 
     def entidades_dibujadas(self):
@@ -582,7 +583,9 @@ class AvisoInteraccion(Entity):
             self.texto.text = cadena
             self.texto.scale = escala_fuente(22)
             ancho_texto = _medidor(self.texto)(cadena)
-            maximo = self.ANCHO_MAX - self.RELLENO - self.LADO_TECLA - self.SEPARACION_TECLA
+            # El máximo nunca pasa del ancho real de la ventana (en 16:9 sigue siendo ANCHO_MAX).
+            ancho_max = min(self.ANCHO_MAX, diseno_adaptable.aspecto() - 4 * MARGEN)
+            maximo = ancho_max - self.RELLENO - self.LADO_TECLA - self.SEPARACION_TECLA
             if ancho_texto > maximo:
                 self.texto.scale = escala_fuente(22) * maximo / ancho_texto
                 ancho_texto = maximo
@@ -611,6 +614,112 @@ class AvisoInteraccion(Entity):
         alfa = int(round(255 * self.nivel))
         self.fondo.color = color.rgba32(12, 14, 24, int(round(240 * self.nivel)))
         self.tecla.color = color.rgba32(255, 255, 255, alfa)
+        self.texto.color = color.rgba32(*estilo.COLOR_TEXTO, alfa)
+
+
+# -- Aviso genérico adaptable --------------------------------------------------------
+
+
+# Chip de texto en la parte baja de la pantalla para avisos sueltos («E: montar bici», «Espacio:
+# saltar»...). A diferencia de AvisoInteraccion no lleva la tecla E dibujada ni depende del estado
+# de la misión: lo controla quien llama con mostrar()/ocultar(). El ancho se adapta a la ventana:
+# el texto se encoge hasta el 75 %, luego se parte en hasta dos líneas y solo si ni así cabe
+# se recorta con elipsis. Si el aviso de «E» está visible, se apila encima de él.
+class AvisoGenerico(Entity):
+
+    ANCHO_MIN, ALTO = 0.30, 0.07
+    ANCHO_MAX = 0.66                  # como AvisoInteraccion: deja libre el banner del teléfono; en ventanas estrechas manda el ancho de la ventana
+    RELLENO = 0.05
+    PX = 22
+    ESCALA_MIN = 0.75
+    MAX_LINEAS = 2
+    LINEA = 1.25                      # interlineado
+    DURACION_APARICION = 0.12
+    SUBIDA_PX = 6
+
+    def __init__(self, referencia=None, **opciones):
+        super().__init__(**opciones)
+        self._referencia = referencia          # AvisoInteraccion sobre el que se apila (opcional)
+        self.y_base = -0.5 + MARGEN + 0.04
+        self.position = (0, self.y_base)
+        self.fondo = _fondo(self, self.ANCHO_MIN, self.ALTO, COLOR_FONDO_HUD, 12, z=0.001)
+        self.texto = Text("", parent=self, origin=(0, 0), position=(0, 0, -0.001),
+                          scale=escala_fuente(self.PX), color=rgb(estilo.COLOR_TEXTO))
+        self.texto.line_height = self.LINEA
+        self.cadena = ""              # texto pedido (sin partir)
+        self.lineas = []              # líneas que se dibujan
+        self.plan = None              # último plan de ajuste (escala, lineas, recortado)
+        self.aparicion = 0.0
+        self.nivel = 0.0
+        self.deseado = False          # True entre mostrar() y ocultar()
+        self.enabled = False
+        diseno_adaptable.suscribir(lambda aspecto, factor: self._componer())
+
+    # Ancho máximo del chip para la ventana actual.
+    def ancho_maximo(self):
+        return min(self.ANCHO_MAX, diseno_adaptable.aspecto() - 4 * MARGEN)
+
+    # Muestra `texto`. Si ya se muestra el mismo no reinicia la animación.
+    def mostrar(self, texto):
+        cadena = _seguro(str(texto))
+        if not cadena.strip():
+            self.ocultar()
+            return
+        cambio = cadena != self.cadena
+        self.cadena = cadena
+        if cambio:
+            self._componer()
+        if not self.deseado:
+            self.deseado = True
+            self.aparicion = 0.0
+            self.enabled = True
+            self._aplicar_aparicion()
+
+    def ocultar(self):
+        self.deseado = False
+        self.enabled = False
+        self.aparicion = 0.0
+
+    # Reparte el texto en líneas dentro del ancho de la ventana y ajusta el fondo.
+    def _componer(self):
+        if not self.cadena:
+            return
+        self.texto.scale = escala_fuente(self.PX)
+        medir = _medidor(self.texto)
+        maximo = self.ancho_maximo() - self.RELLENO
+        plan = diseno_adaptable_calculos.plan_texto_en_ancho(
+            self.cadena, medir, maximo, self.ESCALA_MIN, self.MAX_LINEAS)
+        self.plan = plan
+        self.lineas = plan["lineas"]
+        self.texto.text = "\n".join(self.lineas)
+        self.texto.scale = escala_fuente(self.PX) * plan["escala"]
+        ancho_texto = max((medir(linea) for linea in self.lineas), default=0.0) * plan["escala"]
+        self._ancho = max(self.ANCHO_MIN, ancho_texto + self.RELLENO)
+        self._alto = max(self.ALTO, len(self.lineas) * a_unidades(self.PX) * self.LINEA * plan["escala"]
+                         + 0.03)
+        self.fondo.model = modelo_redondeado(self._ancho, self._alto, 12)
+        self.fondo.scale = (self._ancho, self._alto)
+
+    _ancho = ANCHO_MIN
+    _alto = ALTO
+
+    # Avanza `dt` segundos la aparición (llamado desde HudMundo.actualizar; determinista).
+    def avanzar(self, dt):
+        if not self.enabled:
+            return
+        self.aparicion = min(self.DURACION_APARICION, self.aparicion + dt)
+        self._aplicar_aparicion()
+
+    def _aplicar_aparicion(self):
+        self.nivel = _ease_out_quad(self.aparicion / self.DURACION_APARICION)
+        # Sube sobre el aviso de «E» si éste está a la vista (su alto + un hueco).
+        apilado = 0.0
+        ref = self._referencia
+        if ref is not None and ref.enabled:
+            apilado = ref.ALTO / 2 + self._alto / 2 + 0.012
+        self.y = self.y_base + (self._alto - self.ALTO) / 2 + apilado - a_unidades(self.SUBIDA_PX) * (1 - self.nivel)
+        alfa = int(round(255 * self.nivel))
+        self.fondo.color = color.rgba32(12, 14, 24, int(round(240 * self.nivel)))
         self.texto.color = color.rgba32(*estilo.COLOR_TEXTO, alfa)
 
 
@@ -652,6 +761,20 @@ class PanelTurno(Entity):
         self.texto_turno.position = (r, -r, -0.001)
         self.texto_prefijo.position = (r, -r - alto_turno, -0.001)
         self.texto_mision.position = (r + avance, -r - alto_turno, -0.001)
+        self._ancho_total = ancho + 2 * r
+        self.ajustar_ancho()
+
+    _ancho_total = 0.0
+
+    # Ancho máximo del panel de turno: lo que queda entre el borde izquierdo y el minimapa. Si el
+    # panel no cabe (ventana estrecha) se escala entero, anclado a su esquina superior izquierda.
+    # En 16:9 el máximo es de sobra y la escala se queda en 1 (comportamiento de siempre).
+    def ajustar_ancho(self, aspecto=None, factor=None):
+        if aspecto is None:
+            aspecto = diseno_adaptable.aspecto()
+        maximo = aspecto - 2 * MARGEN - Minimapa.ANCHO - 0.03
+        escala = diseno_adaptable_calculos.factor_para_ancho(self._ancho_total, maximo, minimo=0.4)
+        self.scale = escala
 
 
 # -- Fin de la partida ---------------------------------------------------------------
@@ -761,6 +884,24 @@ class HudMundo(Entity):
         self.panel_fin = PanelFinPartida(
             lambda: al_menu() if al_menu is not None else None, parent=self)
         self.guia = hud_calculos.GuiaRuta(mapa)
+        # Aviso genérico (API pública: mostrar_aviso / ocultar_aviso), apilado sobre el de «E».
+        self.aviso_generico = AvisoGenerico(parent=self, referencia=self.aviso)
+        # Diseño adaptable: lo anclado a un borde sigue al borde cuando cambia la ventana (no-op
+        # si el gestor no está instalado o UI_ADAPTABLE es False).
+        diseno_adaptable.anclar(self.panel_turno, "izquierda")
+        diseno_adaptable.anclar(self.minimapa, "derecha")
+        diseno_adaptable.anclar(self.telefono_ui, "derecha")
+        diseno_adaptable.suscribir(self.panel_turno.ajustar_ancho)
+
+    # Aviso adaptable en la parte baja de la pantalla, sobre «Presiona E...» si éste está visible.
+    # `texto` se encoge o se parte en dos líneas para caber en la ventana (elipsis solo si ni así).
+    # Lo usa EscenaMundo para avisos como «E: montar bici» o «Espacio: saltar».
+    def mostrar_aviso(self, texto):
+        self.aviso_generico.mostrar(texto)
+
+    # Oculta el aviso genérico (con fundido corto).
+    def ocultar_aviso(self):
+        self.aviso_generico.ocultar()
 
     def _telefono_activo(self):
         flujo = self._obtener_flujo()
@@ -774,6 +915,7 @@ class HudMundo(Entity):
     # modelo. Devuelve True si la ruta cambió (EscenaMundo redibuja la del mundo).
     # yaw_grados (mundo 3D): yaw de la cámara; el minimapa gira con él (arriba = adelante).
     def actualizar(self, dt, sesion, yaw_grados=None):
+        self.aviso_generico.avanzar(dt)
         flujo = self._obtener_flujo()
         if flujo is None or sesion is None:
             return False

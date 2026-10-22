@@ -15,6 +15,7 @@ import math
 import random
 from dataclasses import replace
 
+from backend.datos import barrio_favela
 from backend.datos.modelos_edificios import MODELOS, modelo_de
 from backend.datos.muros import muros_de_contencion
 from backend.datos.terreno import Terreno
@@ -57,6 +58,10 @@ PISOS_CASA = (1, 1, 1, 2)
 LARGO_ESCALERA = 14.0       # m desde el borde de la acera
 ANCHO_ESCALERA = 1.6
 DESNIVEL_ESCALERA = 1.5     # m mínimos que tiene que salvar una escalera
+# Barrio denso (ver backend/datos/barrio_favela.py): el modo por defecto de construir_mundo_3d.
+ESCALERAS_CALLEJON = 22           # tope de escaleras que se pintan en los callejones que suben
+DESNIVEL_ESCALERA_CALLEJON = 0.4  # m mínimos de subida a lo largo de un callejón para ponerle escalera
+CANTIDAD_VEGETACION_BARRIO = 90   # palmeras, bananeros y matas que se reparten por los patios
 # Vegetación suelta en la ladera (ver _vegetacion).
 CANTIDAD_VEGETACION = 70
 SEPARACION_VEGETACION = 0.8 # m entre una planta y cualquier otra cosa
@@ -326,6 +331,40 @@ def _distancia_entre_segmentos(p1, p2, q1, q2):
                _distancia_punto_segmento(q1, p1, p2), _distancia_punto_segmento(q2, p1, p2))
 
 
+# -- Escaleras de los callejones -------------------------------------------------------------------------
+
+
+def _escaleras_de_callejones(callejones, escaleras, terreno, maximo=ESCALERAS_CALLEJON):
+    """Escaleras pintadas en los callejones que suben (más de DESNIVEL_ESCALERA_CALLEJON m a lo largo),
+    centradas en el callejón, de ancho (ancho libre - 0.6 m, tope 1.4 m) y sin acercarse a otras escaleras.
+    Son decorado que además deja caminar sobre la cuesta (Escalera.contiene). Las más empinadas primero."""
+    candidatas = []
+    for c in callejones:
+        if c.largo < 5.0 or c.ancho > 3.0:
+            continue
+        desnivel = abs(terreno.altura(c.bx, c.bz) - terreno.altura(c.ax, c.az))
+        if desnivel >= DESNIVEL_ESCALERA_CALLEJON:
+            candidatas.append((desnivel, c))
+    candidatas.sort(key=lambda t: -t[0])
+    nuevas = []
+    for _, c in candidatas:
+        ux, uz = (c.bx - c.ax) / c.largo, (c.bz - c.az) / c.largo
+        mx, mz = (c.ax + c.bx) / 2, (c.az + c.bz) / 2
+        largo = min(c.largo - 1.0, 7.0)
+        # sube hacia donde sube el terreno
+        if terreno.altura(c.bx, c.bz) < terreno.altura(c.ax, c.az):
+            ux, uz = -ux, -uz
+        a = (round(mx - ux * largo / 2, 2), round(mz - uz * largo / 2, 2))
+        b = (round(mx + ux * largo / 2, 2), round(mz + uz * largo / 2, 2))
+        ancho = round(max(0.9, min(1.4, c.ancho - 0.6)), 2)
+        if any(_distancia_entre_segmentos(a, b, (e.ax, e.az), (e.bx, e.bz)) < 2.5 for e in list(escaleras) + nuevas):
+            continue
+        nuevas.append(Escalera(a[0], a[1], b[0], b[1], ancho))
+        if len(nuevas) >= maximo:
+            break
+    return nuevas
+
+
 # -- Favela ---------------------------------------------------------------------------------------
 
 
@@ -448,15 +487,61 @@ def _vegetacion(mapa, despeje, ocupados, terreno, cantidad=CANTIDAD_VEGETACION, 
     return plantas
 
 
+# Palmeras, bananeros, árboles y arbustos en los patios y bordes del barrio denso: mismas reglas que
+# _vegetacion, pero con más tipos de planta (los que se ven en una favela brasileña) y repartidos a
+# lo largo de toda la ladera. Un obstáculo de círculo por planta (con colisión).
+TIPOS_VEGETACION_BARRIO = (("palmera", 0.30, 0.45), ("bananero", 0.28, 0.5), ("arbol", 0.17, 0.6),
+                           ("arbusto", 0.25, 0.45))      # (tipo, proporción, radio de colisión en m)
+
+
+def _vegetacion_barrio(mapa, despeje, ocupados, terreno, cantidad=CANTIDAD_VEGETACION_BARRIO, semilla=SEMILLA_CASAS + 1,
+                       zonas=()):
+    azar = random.Random(semilla)
+    calles = [(mapa.coordenada(a), mapa.coordenada(b)) for a, b in mapa.segmentos()]
+    plazas = [mapa.coordenada(lugar) for lugar in mapa.lugares()]
+    x0, x1, z0, z1 = terreno.extension
+    plantas = []
+    for _ in range(cantidad * 60):
+        if len(plantas) >= cantidad:
+            break
+        x = round(azar.uniform(x0 + BORDE_LADERA, x1 - BORDE_LADERA), 2)
+        z = round(azar.uniform(z0 + BORDE_LADERA, z1 - BORDE_LADERA), 2)
+        u, acumulado = azar.random(), 0.0
+        tipo, radio = TIPOS_VEGETACION_BARRIO[-1][0], TIPOS_VEGETACION_BARRIO[-1][2]
+        for nombre, proporcion, r in TIPOS_VEGETACION_BARRIO:
+            acumulado += proporcion
+            if u < acumulado:
+                tipo, radio = nombre, r
+                break
+        planta = Obstaculo(tipo, x, z, radio=radio)
+        if any(math.dist((x, z), p) < mapa.radio_plaza + 0.9 + 1.0 + planta.radio for p in plazas):
+            continue
+        if any(_distancia_punto_segmento((x, z), a, b) < mapa.ancho_calle / 2 + 2.0 + 0.5 + planta.radio
+               for a, b in calles):
+            continue
+        if not despeje.permite(planta):
+            continue
+        if any(_distancia_punto_caja(x, z, zona.caja()) < planta.radio + 1.0 for zona in zonas):
+            continue                       # nada de plantas sobre la cancha ni el mercadito
+        # 1,6 m de cualquier otra cosa: en un callejón de 1,5-3 m no queda hueco para una planta
+        if any(_separacion(planta, o) < 1.6 for o in ocupados + plantas):
+            continue
+        plantas.append(planta)
+    return plantas
+
+
 # -- Fábrica ------------------------------------------------------------------------------------------
 
 
 # ladera=False: el mundo plano de antes (y = 0 en todas partes, sin casas decorativas).
-# casas: cuántas casas decorativas generar en la ladera (0 = ninguna).
+# casas: cuántas casas decorativas generar en la ladera (0 = ninguna; None = las de cada modo: el tope
+# de barrio_favela.CANTIDAD_BARRIO en el barrio denso, CANTIDAD_CASAS en el modo de siempre).
 # semilla: azar de la favela; las casas usan `semilla` y la vegetación `semilla + 1`. Con la de
 # por defecto sale la favela de siempre. Los muros de contención se calculan al FINAL, sobre lo
 # ya colocado, y no consumen azar.
-def construir_mundo_3d(ladera=True, casas=CANTIDAD_CASAS, semilla=SEMILLA_CASAS):
+# denso: True = barrio denso (filas de casas apretadas con callejones de 1,5-3 m, cancha y mercadito:
+# backend/datos/barrio_favela.py); False = las 150 casas sueltas de antes (comportamiento anterior).
+def construir_mundo_3d(ladera=True, casas=None, semilla=SEMILLA_CASAS, denso=True):
     mapa = _construir_mapa()
     edificios = _construir_edificios()
     spawns = _spawns()
@@ -465,15 +550,39 @@ def construir_mundo_3d(ladera=True, casas=CANTIDAD_CASAS, semilla=SEMILLA_CASAS)
     plano = MundoCiudad(mapa, edificios, obstaculos, spawns=spawns, margen_edificios=MARGEN_EDIFICIOS)
     if not ladera:
         return plano
+    zonas = []
+    if denso:
+        # Las zonas abiertas se buscan sobre la ladera natural (barata de evaluar) y luego se aplanan.
+        previo = Terreno(mapa, edificios, plano.limites())
+        zonas = barrio_favela.zonas_abiertas(mapa, edificios, previo.altura_natural, plano.limites())
     # La ladera necesita los límites del mundo; luego cada edificio toma la altura de su plaza.
-    terreno = Terreno(mapa, edificios, plano.limites())
+    terreno = Terreno(mapa, edificios, plano.limites(),
+                      zonas_planas=[(z.cx, z.cz, z.ancho, z.fondo) for z in zonas])
     edificios = [replace(e, y=round(terreno.altura_plaza(e.lugar), 3)) for e in edificios]
     escaleras = _escaleras(mapa, edificios, obstaculos, terreno)
     for e in escaleras:
         despeje.agregar_linea((e.ax, e.az), (e.bx, e.bz))
-    obstaculos = obstaculos + _casas_favela(mapa, despeje, obstaculos, terreno, cantidad=casas, semilla=semilla)
-    obstaculos = obstaculos + _vegetacion(mapa, despeje, obstaculos, terreno, semilla=semilla + 1)
+    callejones = []
+    if denso:
+        x0, x1, z0, z1 = terreno.extension
+        region = (x0 + barrio_favela.BORDE_BARRIO, x1 - barrio_favela.BORDE_BARRIO,
+                  z0 + barrio_favela.BORDE_BARRIO, z1 - barrio_favela.BORDE_BARRIO)
+        tope = barrio_favela.CANTIDAD_BARRIO if casas is None else casas
+        nuevas = barrio_favela.generar_casas(mapa, edificios, despeje, obstaculos, terreno, zonas, region,
+                                             semilla, cantidad=tope)
+        # Red de seguridad: sin bolsas de suelo libre aisladas de las calles dentro del mundo jugable.
+        fijos = [e.caja() for e in edificios] + [_caja(o) for o in obstaculos if o.es_caja]
+        fijos += [(o.cx - o.radio, o.cx + o.radio, o.cz - o.radio, o.cz + o.radio) for o in obstaculos if o.es_circulo]
+        nuevas = barrio_favela.quitar_bolsas(nuevas, fijos, mapa.coordenada("Plaza Central"), plano.limites())
+        obstaculos = obstaculos + nuevas
+        callejones = barrio_favela.callejones_entre(nuevas)
+        escaleras = escaleras + _escaleras_de_callejones(callejones, escaleras, terreno)
+        obstaculos = obstaculos + _vegetacion_barrio(mapa, despeje, obstaculos, terreno, semilla=semilla + 1, zonas=zonas)
+    else:
+        obstaculos = obstaculos + _casas_favela(mapa, despeje, obstaculos, terreno,
+                                                cantidad=CANTIDAD_CASAS if casas is None else casas, semilla=semilla)
+        obstaculos = obstaculos + _vegetacion(mapa, despeje, obstaculos, terreno, semilla=semilla + 1)
     cajas = [e.caja() for e in edificios] + [_caja(o) for o in obstaculos if isinstance(o, CasaDecorativa)]
     muros = muros_de_contencion(terreno, escaleras, cajas, lineas_libres=despeje.lineas())
     return MundoCiudad(mapa, edificios, obstaculos, spawns=spawns, margen_edificios=MARGEN_EDIFICIOS,
-                       terreno=terreno, escaleras=escaleras, muros=muros)
+                       terreno=terreno, escaleras=escaleras, muros=muros, callejones=callejones, zonas=zonas)

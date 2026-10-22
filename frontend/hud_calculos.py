@@ -267,6 +267,37 @@ class GeometriaMinimapa:
     def contiene(self, u, v, holgura=1e-9):
         return abs(u) <= self.tamano[0] / 2 + holgura and abs(v) <= self.tamano[1] / 2 + holgura
 
+    # Acota (u, v) al recuadro del minimapa dejando `margen` libre en el borde: así el punto del
+    # jugador, el destino y la flecha nunca se salen aunque el jugador recorra fuera de limites().
+    # Un punto que ya está dentro queda idéntico.
+    def acotar(self, u, v, margen=0.0):
+        mu = max(0.0, self.tamano[0] / 2 - margen)
+        mv = max(0.0, self.tamano[1] / 2 - margen)
+        return (max(-mu, min(mu, u)), max(-mv, min(mv, v)))
+
+    # Recorta el segmento p0-p1 (u, v) al recuadro del minimapa (Liang-Barsky). Devuelve (q0, q1) o
+    # None si queda por completo fuera. Un segmento ya dentro vuelve idéntico. Lo usa la ruta del GPS:
+    # al recorrer fuera de limites() su primer tramo parte del jugador, que puede estar fuera.
+    def recortar_segmento(self, p0, p1):
+        hx, hy = self.tamano[0] / 2, self.tamano[1] / 2
+        dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+        t0, t1 = 0.0, 1.0
+        for p, q in ((-dx, p0[0] + hx), (dx, hx - p0[0]), (-dy, p0[1] + hy), (dy, hy - p0[1])):
+            if p == 0:
+                if q < 0:
+                    return None
+                continue
+            t = q / p
+            if p < 0:
+                t0 = max(t0, t)
+            else:
+                t1 = min(t1, t)
+            if t0 > t1:
+                return None
+        if t0 == 0.0 and t1 == 1.0:
+            return (p0, p1)
+        return ((p0[0] + t0 * dx, p0[1] + t0 * dy), (p0[0] + t1 * dx, p0[1] + t1 * dy))
+
     # [(c0, c1, c2, c3)] con las esquinas (u, v) de cada casa (obstáculo de tipo "casa", caja
     # alineada a los ejes) rotadas con el yaw actual. Se descartan las casas con alguna esquina
     # fuera del minimapa: así el dibujo nunca se sale de su rectángulo. Orden de esquinas: el

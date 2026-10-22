@@ -14,6 +14,7 @@ from frontend.componentes import (
 from frontend.fondo_menu import FocoTeclado, anadir_filo
 
 ANCHO, ALTO = 0.60, 0.70
+ALTO_CON_AJUSTES = 0.80      # con el botón «Ajustes» el panel crece (4 botones en vez de 3)
 Z_FRENTE = -50
 ALFA_VELO = 170
 ANCHO_BOTON = 0.42
@@ -35,30 +36,50 @@ def _tecla(padre, texto, x, y, ancho):
 
 class MenuPausa(Entity):
 
-    def __init__(self, al_reanudar, al_menu, al_salir, **opciones):
+    # con_ajustes: añade el botón «Ajustes» (por defecto, el de la bandera AJUSTES); False = menú de siempre.
+    def __init__(self, al_reanudar, al_menu, al_salir, con_ajustes=None, **opciones):
         opciones.setdefault("parent", camera.ui)
         super().__init__(z=Z_FRENTE, enabled=False, **opciones)
+        if con_ajustes is None:
+            from backend.logica.ajustes import AJUSTES
+            con_ajustes = AJUSTES
+        self.con_ajustes = bool(con_ajustes)
+        alto = ALTO_CON_AJUSTES if self.con_ajustes else ALTO
         self.velo = Entity(parent=self, model="quad", color=color.rgba32(*estilo.TINTA, ALFA_VELO),
                            scale=(4, 4), z=0.01)
-        self.panel = panel_tinta(self, ANCHO, ALTO, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
-        anadir_filo(self.panel, ANCHO, ALTO, estilo.RADIO_PANEL_PX)
+        self.panel = panel_tinta(self, ANCHO, alto, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
+        anadir_filo(self.panel, ANCHO, alto, estilo.RADIO_PANEL_PX)
         self.texto_titulo = Text(
-            "Pausa", parent=self, origin=(0, 0), position=(0, ALTO / 2 - 0.075, -0.001),
+            "Pausa", parent=self, origin=(0, 0), position=(0, alto / 2 - 0.075, -0.001),
             scale=escala_fuente(40), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
 
+        # Posiciones de los botones: 3 de siempre, o 4 (con «Ajustes» tras «Reanudar») un poco más juntos.
+        if self.con_ajustes:
+            ys = (0.19, 0.19 - 0.108, 0.19 - 0.216, 0.19 - 0.324)
+        else:
+            ys = (0.125, 0.125 - 0.115, None, 0.125 - 0.23)
         self.boton_reanudar = BotonPrimario(
             "Reanudar", al_clic=al_reanudar, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=24,
-            parent=self, position=(0, 0.125, -0.001))
+            parent=self, position=(0, ys[0], -0.001))
+        self.boton_ajustes = None
+        if self.con_ajustes:
+            self.boton_ajustes = BotonSecundario(
+                "Ajustes", al_clic=self.abrir_ajustes, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=22,
+                parent=self, position=(0, ys[1], -0.001))
         self.boton_menu = BotonSecundario(
             "Volver al menú", al_clic=al_menu, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=22,
-            parent=self, position=(0, 0.125 - 0.115, -0.001))
+            parent=self, position=(0, ys[2] if self.con_ajustes else ys[1], -0.001))
         self.boton_salir = BotonSecundario(
             "Salir", al_clic=al_salir, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=22,
-            parent=self, position=(0, 0.125 - 0.23, -0.001))
+            parent=self, position=(0, ys[3], -0.001))
         self.botones = (self.boton_reanudar, self.boton_menu, self.boton_salir)
+        if self.con_ajustes:
+            self.botones = (self.boton_reanudar, self.boton_ajustes, self.boton_menu, self.boton_salir)
+        self.pantalla_ajustes = None      # se crea al abrir «Ajustes» por primera vez
+        self._ocultos_por_ajustes = []
 
         # Guía de teclas: 2 columnas x 2 filas, con una línea fina encima.
-        y0 = -0.235
+        y0 = -0.255 if self.con_ajustes else -0.235
         self.teclas = []
         for i, (tecla, accion) in enumerate(TECLAS):
             columna, fila = i % 2, i // 2
@@ -73,6 +94,29 @@ class MenuPausa(Entity):
 
     # Al abrir, el foco vuelve al primer botón (Reanudar) y el anillo se oculta hasta usar el teclado.
     def on_enable(self):
+        foco = getattr(self, "foco", None)
+        if foco is not None:
+            foco.reiniciar()
+
+    # «Ajustes»: superpone la pantalla de ajustes (se crea la primera vez) y esconde lo demás del menú.
+    def abrir_ajustes(self):
+        from frontend.escenas.escena_ajustes import PantallaAjustes
+        if self.pantalla_ajustes is None:
+            self.pantalla_ajustes = PantallaAjustes(al_cerrar=lambda guardado: self.cerrar_ajustes(), parent=self,
+                                                    z=-0.5)
+        self._ocultos_por_ajustes = [e for e in self.children
+                                     if e is not self.velo and e is not self.pantalla_ajustes and e.enabled]
+        for entidad in self._ocultos_por_ajustes:
+            entidad.enabled = False
+        self.pantalla_ajustes.abrir()
+
+    # Vuelve del submenú de ajustes al menú de pausa.
+    def cerrar_ajustes(self):
+        if self.pantalla_ajustes is not None:
+            self.pantalla_ajustes.enabled = False
+        for entidad in self._ocultos_por_ajustes:
+            entidad.enabled = True
+        self._ocultos_por_ajustes = []
         foco = getattr(self, "foco", None)
         if foco is not None:
             foco.reiniciar()

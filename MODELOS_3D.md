@@ -524,3 +524,103 @@ detalles, cables con la ropa), escaleras, muros, `combine()`, `silenciar()`, ban
 - Texturizar en Blender las caras que quedaron grises y reexportar.
 - Pasar a quien lo necesite `buildings/textures/`, que no se sube al repo.
 - Hacer los commits.
+
+### Personajes con modelo: brasileña (influencer) y ciudadano (2026-10-21)
+- **Autoría**: modelados y animados por el dueño en Blender; licencia propia del dueño. Origen: `Brasilena_Ursina.zip` y
+  `Ciudadano_Ursina.zip` (cada uno con `LEEME.md`, clase demo, `blender/*.blend`, `modelos/*.glb`). Solo se copiaron los .glb a
+  `assets/modelos/personajes/brasilena.glb` (2,1 MB) y `ciudadano.glb` (2,2 MB); los `.blend` quedan en los zips.
+- **Brasileña** (`influencer`): 37 huesos (armadura `metarig`, hueso de la cabeza `Head`), piel oscura, pelo afro, camiseta verde con
+  bandera, short de jean, joyería dorada. Mide 2,14 m con el afro (cuerpo 1,94 m): escala propia `ESCALA_POR_ROL["influencer"] = 0.86`
+  (`modelo_calculos.escala_para_rol`), así el conjunto mide 1,84 m como los demás.
+- **Ciudadano** (`ciudadano`): 160 huesos, misma armadura y misma cabeza que el periodista (`DEF-spine.006`), sin camisa y con pantalón
+  corto azul. Mide 2,0 m; escala 0,92.
+- Ambos traen los clips `Idle, Caminar, Correr, Saludar, Hablar` y ya miran a `forward` (con `setH(180)` igual que los otros).
+  Contorno de tinta ya incluido como casco geométrico: no se añade otro.
+- **Cara por código**: los dos llegan con la cabeza lisa, así que reciben ojos, cejas, nariz, boca y orejas animados con la misma API
+  (`rostro_modelo.colocar_rostro_animado`). Datos nuevos en `rostro_calculos.py`: `DESCRIPTOR_MODELO_POR_ROL`, `ROSTRO_MODELO_POR_ROL`,
+  `hueso_cabeza(rol)`, `reposo_cabeza(rol)`, `AJUSTE_ROSTRO_POR_ROL` (la cabeza de la brasileña es algo menor y más atrás: factor 0,93,
+  dy +0,065, dz -0,045 respecto al periodista) y `ajustar_piezas`. El ciudadano lleva pelo corto negro; la brasileña no lleva pelo
+  por código (el afro ya viene en el modelo). `ROSTRO_POR_ROL` y `DESCRIPTOR_POR_ROL` no cambiaron.
+- Pies: iguales que los otros (bind pose a -0,005 m); con `ELEVACION_PIES` quedan sobre la ruta GPS sin flotar ni enterrarse.
+- Limitaciones: sigue sin haber clip de sentado/teclear (en interiores, Hablar de pie); el Actor no recibe niebla ni sombras del juego;
+  el retrato 2D de la selección de rol (`iconos.py`) no representa a los modelos nuevos.
+
+### NPC (peatones) con los 4 modelos .glb (2026-10-21, ronda 2)
+Los 12 peatones de `frontend/peatones.py` ya no son muñecos de cubos: cada uno es una **copia de uno de los 4 .glb** (periodista, smoking,
+brasileña, ciudadano) con otra ropa. Bandera `peatones.USAR_MODELOS = True` (False vuelve a los muñecos de siempre); si un NPC no se puede
+crear, `crear_npc` devuelve el `Personaje` procedural y avisa una vez por stderr.
+- **Sin Blender**: no está instalado (`/Applications`, `which blender`), así que la ropa se cambia en Panda3D. Los .glb no tienen texturas:
+  el color está en los vértices, un Geom por pieza (periodista `Camisa/Mangas/Pantalon/Cuerpo`, smoking `Saco/Pantalon/Cuerpo`, brasileña
+  `Top/Short/TrajeBano/Pelo/Cuerpo`, ciudadano `Pantalon/Cuerpo/Ciudadano_Detalles`). `npc_color.recolorear_actor` reescribe el color de esas
+  piezas **en la copia** (el .glb y los personajes principales no cambian; hay prueba): el tono más claro pasa a ser el color pedido y los
+  demás conservan su proporción, así siguen las bandas de luz horneadas. Los Geoms casi negros son el casco de tinta y no se tocan.
+- **Ciudadano sin camisa**: `npc_color.agregar_camiseta` añade a la copia un Geom nuevo con los triángulos del torso (elegidos por el peso de
+  los huesos de la espalda/pecho/hombros, con manga o de tirantes), inflados 1,6 cm; sigue al esqueleto. El 20 % queda con el torso al aire.
+- **Qué decide cada NPC** (`npc_calculos.plan_npc`, determinista, con su propio `Random`, no toca el azar de `crear_peatones`): modelo (de
+  cada bloque de 4 NPC sale uno de cada modelo, barajado por semilla: 12 NPC = 3 de cada), tono de piel y pelo (los de `aspecto_peaton`),
+  camiseta/pantalón/extra (paletas vivas), traje de una pieza en el smoking, escala 0,94-1,06 sobre la del modelo, fase de animación
+  (`control.pose(f); loop(False)`: no van sincronizados) y mochila (40 %) colgada del hueso de la espalda con contorno de tinta.
+- **Cara por código** con los rasgos del peatón (`rostro_calculos.descriptor_peaton` + `rostro_modelo.colocar_rostro_animado_piezas`),
+  ajustada a la cabeza de cada modelo. La brasileña conserva su afro (sin peinado, gorra, bigote ni barba por código).
+- **Código**: `npc_calculos.py` (puro), `npc_color.py`, `npc_modelo.py` (`PersonajeNPC(PersonajeModelo)`, `crear_npc`). En `personaje_modelo.py`
+  solo se añadieron 5 ganchos (`_crear_actor`, `_escala_modelo`, `_poner_rostro`, `_iniciar_loop`, `_animar_rostro`) con el comportamiento
+  de siempre por defecto. Cada .glb se carga UNA vez (caché `_bases`, compartida con los roles) y cada NPC es una copia (`Actor(base)`).
+- **Rendimiento** (esta Mac, `ALCALDE_FPS=libre`, ventana real): juego normal 205-250 FPS con muñecos vs 200-230 con modelos; peor caso (los
+  12 caminando a 3-8 m de la cámara) 145 vs 91-97 FPS. El coste es el esqueleto en CPU (≈0,4 ms por NPC con 160 huesos), no la cara.
+  LOD cada 0,3 s: a más de 22 m se apaga la cara, a más de 45 m se congela el cuerpo (velocidad 0). Se mantuvieron los 4 modelos (no hizo falta
+  limitarlos a los de menos huesos). No medido: GPU integrada de otro equipo.
+- **Pruebas**: `tests/frontend_3d/test_npc_calculos.py` (14, puras) y `test_npc_modelo_offscreen.py` (subproceso: 12 NPC, caché, base intacta,
+  caminar/parar, LOD, limpieza, respaldo). Capturas: scratchpad `npc/` (`b_quieto_*`, `b_camina_*`, `r*.png`).
+- Limitaciones: la camiseta del ciudadano tiene bordes de triángulo y alguna costura de piel visible de cerca; el Actor sigue sin niebla ni
+  sombras del juego; los NPC no se sientan ni saludan (solo Idle/Caminar).
+
+---
+
+## 5. Favela viva y de cómic (2026-10-21, rama favela-borderlands)
+
+Todo es reversible con banderas y constantes con nombre. Para volver atrás: `construir_mundo_3d(denso=False)` (las 150 casas
+sueltas de antes) y, en `frontend/ciudad_3d.py`, `SUELO_FAVELA`, `PLAZAS_PINTADAS`, `CASAS_VIVAS`, `CONTORNO_TINTA` y
+`FAVELA_DETALLES` en `False`.
+
+### Suelo (`frontend/suelo_calculos.py`, `suelo_favela.py`, `texturas_favela.py`)
+- **Calles de arena**: solo la avenida `CALLES_ASFALTADAS` (Alcaldía - Plaza Central - Universidad) sigue en asfalto; ahora gastado,
+  con parches de arena y baches (`cinta_asfalto_gastado`) y aceras cálidas. El resto son cintas de arena de 11 m de ancho con
+  bordes irregulares (`IRREGULAR_BORDE`), color por vértice (`ARENA_CLARA/MEDIA/ROJIZA`) que se funde con la ladera, y una textura
+  procedural (PIL, sin archivos) con rodadas, huellas, piedras y grietas. Una sola malla con textura (`calles_arena`).
+- **Ladera**: el pasto pasa a tierra roja junto a casas y calles (`MapaTierra`, `TIERRA_JUNTO_A_CASAS/CALLES`) con textura de grano.
+  `_malla_terreno(terreno)` sin `color_en` produce la malla de siempre.
+- **Plazas**: discos pintados de franjas ondulantes y bordillo a rayas, una paleta por plaza (`PALETAS_PLAZA`).
+- Escaleras con peldaños pintados (`PALETAS_ESCALERA`) y muros de contención de colores (`PALETA_MUROS`).
+
+### Favela (`backend/datos/barrio_favela.py`, `conectividad.py`; `frontend/favela_*.py`)
+- **Barrio denso**: filas de casas que serpentean (como curvas de nivel), 1-3 pisos, `estiramiento` en profundidad (campo nuevo
+  de `CasaDecorativa`), huecos de 1,6-2,8 m (`HUECO_CASA`), patios ocasionales, y mínimo duro de `CALLEJON_MIN` = 1,5 m entre casas.
+  263 casas (antes 150) y ~300 callejones (`Callejon`, derivados de las casas). Filtros: fuera de plazas, calles, accesos, escaleras,
+  spawns, edificios y zonas; `quitar_bolsas` elimina casas que encierren suelo aislado (BFS en rejilla de 0,5 m).
+- **Zonas abiertas** (`Zona`): cancha de fútbol (el terreno se aplana: `Terreno(zonas_planas=...)`) y mercadito de toldos.
+- **Detalle** (mallas combinadas, sin Entity por pieza): murales (sol, bandera, estrella, corazón, ola, ojo), carteles con letras,
+  remiendos, grietas, manchas de humedad translúcidas, balcones, banderines que cruzan callejones, pasadizos (cuartos sobre el
+  callejón), bidones, macetas, motos, bicis, cajas de fruta, perros, palmeras y bananeros, cancha y mercadito. Más cables
+  enredados (`CABLES_POR_TRAMO`) y tendederos (`MAXIMO_TENDEDEROS` = 150).
+- Callejón mínimo 1,5 m: el jugador (radio 0,35) cabe; la cámara en tercera persona se acerca por su raycast (mín. 1,2 m).
+
+### Estilo de cómic (`frontend/casas_decorativas.py`, `props_mundo.py`)
+- Texturas de los modelos aclaradas y aplanadas, pintura viva por piso (`PINTURAS`), ladrillo visto (~20-40 %), techos de zinc/teja.
+  Edificios jugables pintados con el color de su lugar.
+- **Contorno de tinta**: casco invertido (`GROSOR_CONTORNO` 0,12 m, solo caras traseras, sin luz, fuera del mapa de sombras) en casas,
+  edificios jugables y árboles. Los geoms de techo se excluyen (`CLASES_SIN_CASCO`): su copia casi pegada al plano real parpadeaba.
+- Sombra azul-violeta y más suave (`piezas.py`); sol dorado; cielo de atardecer con mar, picos y disco solar (`cielo.py`).
+
+## Vehículos montables (bicicleta y moto) — Ronda 3, fase 1
+- **Módulos nuevos** (nada existente se tocó): `frontend/vehiculo_calculos.py` (dinámica pura), `vehiculo_piezas.py` (geometría pura),
+  `vehiculo_modelo.py` (Entity/Panda3D) y `vehiculo_mundo.py` (aparcados, aviso y controlador). Pruebas en
+  `tests/frontend_3d/test_vehiculo_calculos.py` y `test_vehiculo_piezas.py`.
+- **Modelos procedurales**: cada grupo (cuadro, manubrio con rueda delantera, rueda trasera, biela, pedales, pata de cabra, halo) son dos Geom
+  con color por vértice (bandas de luz horneadas, sin luces) y casco de tinta (caras traseras, método de `contorno_calculos`). Sin shader:
+  no reciben la niebla del mundo (igual que los Actor). `INVERTIR_CARAS = False` en `vehiculo_modelo.py` (comprobado con captura: las
+  mallas de `malla_calculos` usadas sin espejo se ven bien con el orden normal).
+- **Signos de Ursina** (medidos): `rotation_x > 0` baja el morro y hace avanzar una rueda; `rotation_z > 0` inclina a la derecha.
+- **Piloto**: un `Personaje` procedural articulado (cuerpo/cara de cómic) con cinemática inversa: pies a los pedales/estribos y manos al
+  manubrio. Los avatares `.glb` no se pueden articular, así que se les crea un maniquí con el color del rol y se oculta el avatar.
+- **Controles**: relativos al vehículo (W/S, A/D, Shift turbo, Espacio freno de mano/derrape, sin salto); la cámara se recoloca detrás.
+- **Pendiente de la fase 2**: integrar con `controlador_jugador.py`, `escena_mundo.py`, HUD y los atributos aditivos de la cámara.

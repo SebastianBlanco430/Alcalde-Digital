@@ -5,11 +5,13 @@
 
 from ursina import Entity, time
 
-from frontend.peatones_calculos import aspecto_peaton, crear_peatones
+from frontend.peatones_calculos import aspecto_peaton, crear_peatones, rasgos_peaton
 from frontend import poses
 from frontend.personaje import Personaje
+from frontend.npc_modelo import crear_npc
 
 CANTIDAD = 12
+USAR_MODELOS = True      # peatones con los .glb de los personajes principales (npc_modelo.py); False = muñecos de cubos
 SEMILLA = 2026
 # Tonos de ropa apagados: se distinguen de los colores vivos de los roles jugables.
 ROPA = ((150, 150, 158), (170, 140, 120), (120, 150, 140), (160, 120, 140), (130, 130, 160), (150, 160, 120),
@@ -24,7 +26,13 @@ class Peatones(Entity):
         self.personajes = []
         self._quietos = set()
         for i, caminante in enumerate(self.caminantes):
-            personaje = Personaje("", ROPA[i % len(ROPA)], apariencia=aspecto_peaton(i, SEMILLA), parent=self)
+            aspecto = aspecto_peaton(i, SEMILLA)
+            if USAR_MODELOS:     # copia de uno de los 4 .glb con otra ropa; si falla, el muñeco de siempre
+                personaje = crear_npc(i, SEMILLA, aspecto, rasgos_peaton(i, SEMILLA), ROPA[i % len(ROPA)], parent=self)
+            else:
+                aspecto = dict(aspecto, rasgos=rasgos_peaton(i, SEMILLA), piel_rgb=aspecto["piel"],
+                               pelo_rgb=aspecto["pelo"])
+                personaje = Personaje("", ROPA[i % len(ROPA)], apariencia=aspecto, parent=self)
             personaje.etiqueta.enabled = False
             personaje.aro.enabled = False
             personaje.automatico = False              # se anima aquí, y solo mientras camina (rendimiento)

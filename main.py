@@ -19,9 +19,12 @@ from backend.logica.estado_partida import EstadoPartida
 from backend.logica.flujo_partida import FlujoPartida
 from backend.logica.misiones import SistemaMisiones
 from backend.logica.sesion import SesionJuego
-from frontend import compat_macos, estilo, medidor_fps, tipografia
+from frontend import compat_macos, daltonismo, diseno_adaptable, estilo, medidor_fps, tipografia
+from frontend import audio_enganches      # sonido: observa el juego y dispara efectos/música (frontend/audio.py)
 from frontend.componentes import preparar_fuente, rgb
 from frontend.conexion_flujo import INICIO, INTERIOR, JUEGO, MUNDO, SELECCION_ROL, ConexionFlujo
+from backend.logica import ajustes as ajustes_jugador
+from frontend.escenas.escena_ajustes import AJUSTES_ESCENA, EscenaAjustes
 from frontend.escenas.escena_inicio import EscenaInicio
 from frontend.escenas.escena_interior import EscenaInterior
 from frontend.escenas.escena_juego import EscenaJuego
@@ -95,8 +98,13 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
     conexion = ConexionFlujo(gestor, mundo, crear_flujo, transicion=transicion,
                              grafo_social=construir_grafo_social_ejemplo(),
                              transicion_lugar=transicion_lugar, con_interior=True)
+    # Ajustes (bandera AJUSTES): escena aparte accesible desde el inicio; «Atrás/Guardar» vuelven al inicio.
+    al_ajustes = None
+    if ajustes_jugador.AJUSTES:
+        gestor.registrar(AJUSTES_ESCENA, EscenaAjustes(al_volver=lambda: gestor.cambiar_a(INICIO)))
+        al_ajustes = lambda: gestor.cambiar_a(AJUSTES_ESCENA)
     gestor.registrar(INICIO, EscenaInicio(
-        al_comenzar=conexion.ir_a_seleccion, al_salir=application.quit))
+        al_comenzar=conexion.ir_a_seleccion, al_salir=application.quit, al_ajustes=al_ajustes))
     gestor.registrar(SELECCION_ROL, EscenaSeleccionRol(
         fabrica_sesion=crear_sesion, al_comenzar=conexion.comenzar_partida))
     escena_mundo = EscenaMundo(
@@ -149,11 +157,15 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     application.asset_folder = Path(__file__).resolve().parent / "assets"
     window.color = rgb(estilo.COLOR_FONDO)
     fijar_tamano_ventana()
+    diseno_adaptable.instalar()      # reancla/reescala la UI al cambiar la ventana (UI_ADAPTABLE)
     tipografia.aplicar()
     preparar_fuente()
+    if ajustes_jugador.AJUSTES:
+        daltonismo.instalar(ajustes_jugador.obtener())    # filtro de daltonismo según lo guardado, y en vivo
 
     gestor = GestorEscenas()
     registrar_escenas(gestor, construir_mundo_3d(semilla=leer_semilla()), duracion_transicion, duracion_cinematica)
+    audio_enganches.instalar(gestor)       # AUDIO = False (frontend/audio.py) o ALCALDE_SIN_AUDIO=1 lo dejan mudo
     gestor.cambiar_a(INICIO)
     return aplicacion, gestor
 

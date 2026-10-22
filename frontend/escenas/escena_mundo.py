@@ -53,6 +53,7 @@ from frontend.personaje_modelo import crear_personaje
 
 VELOCIDAD_CAMINAR = 4.8     # m/s: ~25 s de punta a punta de la ciudad
 VELOCIDAD_CORRER = 8.5      # m/s con Shift: ~14 s
+VEHICULOS = True            # bicicletas y motos montables (frontend/vehiculo_mundo.py); False = el mundo de siempre
 
 
 class EscenaMundo(Escena):
@@ -75,7 +76,7 @@ class EscenaMundo(Escena):
         self._cinematica = False                 # ¿hay una cinemática en curso?
 
         self.ciudad = Ciudad3D(mundo, sombras=sombras, parent=self)
-        self.camara = CamaraTerceraPersona(self.ciudad.raiz_colisiones, suelo=mundo.altura, parent=self)
+        self.camara = CamaraTerceraPersona(self.ciudad.raiz_colisiones, suelo=mundo.altura, obstaculos=mundo, parent=self)
         self.camara.objetivo = self._posicion_del_activo
         self.controlador = ControladorJugador(
             self, mundo, al_interactuar, velocidad=VELOCIDAD_CAMINAR, velocidad_correr=VELOCIDAD_CORRER,
@@ -92,6 +93,10 @@ class EscenaMundo(Escena):
         self.menu_pausa = MenuPausa(
             al_reanudar=lambda: self.alternar_pausa(False), al_menu=self._ir_al_menu,
             al_salir=application.quit, parent=self.hud)
+        self.vehiculos = None
+        if VEHICULOS:
+            from frontend.vehiculo_mundo import IntegracionVehiculos
+            self.vehiculos = IntegracionVehiculos(self)
 
     # -- Ciclo de vida --
 
@@ -126,6 +131,8 @@ class EscenaMundo(Escena):
             self._reproducir_salida(salida["jugador"], salida["lugar"])
 
     def al_salir(self):
+        if self.vehiculos is not None:
+            self.vehiculos.bajar()
         self.director.cancelar()
         self._cinematica = False
         self.alternar_pausa(False)
@@ -141,6 +148,8 @@ class EscenaMundo(Escena):
         if self.flujo is None or self._sesion is None:
             return
         self._sincronizar_raton()
+        if self.vehiculos is not None:
+            self.vehiculos.actualizar(time.dt)
         self.avanzar_hud(time.dt)
 
     # Un paso del HUD con `dt` segundos (los tests lo llaman a mano con dt fijos): ruta del GPS,
@@ -290,6 +299,8 @@ class EscenaMundo(Escena):
     # Entrada: encuadre -> acercarse -> abrir_puerta -> entrar. `al_terminar()` se llama al final
     # (el personaje ya desapareció tras la puerta abierta; los controles siguen congelados).
     def reproducir_entrada(self, jugador, lugar, al_terminar):
+        if self.vehiculos is not None:
+            self.vehiculos.bajar()                     # no se entra a un edificio montado
         edificio = self._mundo.edificio_de(lugar)
         puerta = self.ciudad.puertas[lugar]
         avatar = self.avatar_de(jugador)

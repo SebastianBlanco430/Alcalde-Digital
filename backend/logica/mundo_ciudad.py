@@ -27,8 +27,14 @@ from dataclasses import dataclass
 
 from backend.datos.modelos_edificios import modelo_de
 from backend.grafos.mapa_ciudad import _distancia_punto_segmento
+from backend.logica import escaleras_calculos as esc
 
 RADIO_JUGADOR = 0.35
+# Se puede recorrer TODO el terreno dibujado (la ladera y la favela que se ven más allá de la ciudad), no
+# solo el rectángulo de las plazas: con True `es_transitable` usa limites_recorribles(); con False, los
+# límites de siempre (limites()). El minimapa y los tests de la ciudad siguen usando limites().
+RECORRER_TODO_EL_TERRENO = True
+MARGEN_BORDE_TERRENO = 3.0       # m que se dejan sin pisar antes de que termine el terreno dibujado
 DISTANCIA_ENTRADA = 1.2          # m delante de la puerta donde se para el personaje
 LADOS_PUERTA = ("n", "s", "e", "o")
 # Rumbo (rotation_y, grados) con el que se ENTRA por cada cara: hacia dentro del edificio.
@@ -89,6 +95,9 @@ class CasaDecorativa(Obstaculo):
     escala: float = 1.0
     variante: int = 0
     pisos: int = 1              # copias del modelo apiladas (favela: 1 o 2)
+    # Factor sobre la PROFUNDIDAD del modelo (su eje z), sin tocar el ancho ni el alto: deja ajustar
+    # la huella a un lote del barrio denso sin agrandar la casa. 1.0 = proporciones del modelo.
+    estiramiento: float = 1.0
 
     def __post_init__(self):
         super().__post_init__()
@@ -98,6 +107,8 @@ class CasaDecorativa(Obstaculo):
             raise ValueError(f"Casa decorativa: el rumbo {self.rumbo} no es múltiplo de 90.")
         if self.pisos < 1:
             raise ValueError("Casa decorativa: necesita al menos un piso.")
+        if self.estiramiento <= 0:
+            raise ValueError("Casa decorativa: el estiramiento debe ser positivo.")
 
     @property
     def alto_piso(self):
@@ -136,6 +147,38 @@ class Escalera:
 
     def contiene(self, x, z):
         return _distancia_punto_segmento((x, z), (self.ax, self.az), (self.bx, self.bz)) <= self.ancho / 2
+
+
+@dataclass(frozen=True)
+class Callejon:
+    """Pasillo peatonal entre dos casas de la favela: eje (ax, az) -> (bx, bz) y `ancho` libre en m.
+    Es un dato de DECORADO y de pruebas (el movimiento lo resuelven las casas como obstáculos)."""
+
+    ax: float
+    az: float
+    bx: float
+    bz: float
+    ancho: float
+
+    @property
+    def largo(self):
+        return math.hypot(self.bx - self.ax, self.bz - self.az)
+
+
+@dataclass(frozen=True)
+class Zona:
+    """Rectángulo abierto reservado (sin casas) con un uso: 'cancha' de fútbol, 'mercado'...
+    Caja alineada (cx, cz, ancho en x, fondo en z); se camina libremente por ella."""
+
+    tipo: str
+    cx: float
+    cz: float
+    ancho: float
+    fondo: float
+
+    def caja(self):
+        return (self.cx - self.ancho / 2, self.cx + self.ancho / 2,
+                self.cz - self.fondo / 2, self.cz + self.fondo / 2)
 
 
 @dataclass(frozen=True)
@@ -205,7 +248,8 @@ class MundoCiudad:
     # ValueError si un edificio es de un lugar inexistente o repetido, tapa una plaza o una
     # calle, o si alguna puerta, punto de entrada o spawn no es transitable.
     def __init__(self, mapa, edificios, obstaculos, radio_jugador=RADIO_JUGADOR,
-                 spawns=None, margen_edificios=0.0, terreno=None, escaleras=(), muros=()):
+                 spawns=None, margen_edificios=0.0, terreno=None, escaleras=(), muros=(),
+                 callejones=(), zonas=()):
         if radio_jugador <= 0:
             raise ValueError("radio_jugador debe ser positivo.")
         self._mapa = mapa
@@ -223,7 +267,11 @@ class MundoCiudad:
         self.terreno = terreno           # objeto con altura(x, z); None = mundo plano
         self._escaleras = list(escaleras)
         self._muros = list(muros)        # losas de contención (backend/datos/muros.py): solo se dibujan
+        self._callejones = list(callejones)   # pasillos entre casas (decorado y pruebas)
+        self._zonas = list(zonas)             # canchas y otras áreas abiertas (decorado)
         self._limites = self._calcular_limites(margen_edificios)
+        self._limites_recorribles = self._calcular_limites_recorribles()
+        self._perfiles_escalera = None   # perfiles de peldaños (se arman al primer uso, ver perfiles_escaleras)
 
         for edificio in self._edificios:
             if not self._puerta_libre(edificio):
@@ -243,9 +291,46 @@ class MundoCiudad:
     def muros(self):
         return list(self._muros)
 
+    # Pasillos peatonales entre las casas de la favela (Callejon).
+    def callejones(self):
+        return list(self._callejones)
+
+    # Áreas abiertas reservadas (Zona): cancha de fútbol, mercadito...
+    def zonas(self):
+        return list(self._zonas)
+
     # Altura del suelo en (x, z).
     def altura(self, x, z):
         return self.terreno.altura(x, z) if self.terreno is not None else 0.0
+
+    # Altura que pisa el jugador: la del terreno, salvo sobre una Escalera, donde se cuantiza en peldaños
+    # (backend/logica/escaleras_calculos.py). Solo la usan el controlador y el avatar; `altura()` sigue
+    # siendo la malla suave del terreno (cámara, casas, props). Con ESCALERAS_PELDANOS = False es igual a altura().
+    def altura_con_escaleras(self, x, z):
+        base = self.altura(x, z)
+        if not esc.ESCALERAS_PELDANOS or not self._escaleras:
+            return base
+        h = esc.altura_sobre_escaleras(self.perfiles_escaleras(), x, z)
+        return base if h is None else h
+
+    # Perfiles de peldaños de cada escalera (mismo orden que escaleras()); el renderizador dibuja
+    # exactamente estos peldaños. Sin terreno (mundo plano) no hay peldaños y la lista sale vacía.
+    def perfiles_escaleras(self):
+        if self._perfiles_escalera is None:
+            if self.terreno is None:
+                self._perfiles_escalera = []
+            else:
+                self._perfiles_escalera = [esc.PerfilEscalera(e, self.terreno.altura) for e in self._escaleras]
+        return self._perfiles_escalera
+
+    # Perfil de la escalera bajo (x, z) o None.
+    def perfil_escalera_en(self, x, z):
+        if self.terreno is None:
+            return None
+        for perfil in self.perfiles_escaleras():
+            if perfil.escalera.contiene(x, z):
+                return perfil
+        return None
 
     # -- Delegación al mapa (lo que usa el GPS) --
 
@@ -310,9 +395,14 @@ class MundoCiudad:
     def limites(self):
         return self._limites
 
+    # (xmin, xmax, zmin, zmax) donde se puede caminar: con terreno son los de la ladera dibujada
+    # (menos MARGEN_BORDE_TERRENO); sin terreno o con RECORRER_TODO_EL_TERRENO = False, los de siempre.
+    def limites_recorribles(self):
+        return self._limites_recorribles
+
     # Transitable <=> dentro de los límites y el círculo del jugador no toca ningún obstáculo.
     def es_transitable(self, x, z):
-        xmin, xmax, zmin, zmax = self._limites
+        xmin, xmax, zmin, zmax = self._limites_recorribles
         if not (xmin <= x <= xmax and zmin <= z <= zmax):
             return False
         if (self.terreno is not None and not self.terreno.caminable(x, z)
@@ -329,6 +419,16 @@ class MundoCiudad:
             xmin, xmax = min(xmin, ex0 - margen), max(xmax, ex1 + margen)
             zmin, zmax = min(zmin, ez0 - margen), max(zmax, ez1 + margen)
         return (xmin, xmax, zmin, zmax)
+
+    # Los límites de siempre ampliados a la ladera dibujada (Terreno.extension), si hay terreno.
+    def _calcular_limites_recorribles(self):
+        xmin, xmax, zmin, zmax = self._limites
+        extension = getattr(self.terreno, "extension", None)
+        if not RECORRER_TODO_EL_TERRENO or extension is None:
+            return self._limites
+        ex0, ex1, ez0, ez1 = extension
+        m = MARGEN_BORDE_TERRENO
+        return (min(xmin, ex0 + m), max(xmax, ex1 - m), min(zmin, ez0 + m), max(zmax, ez1 - m))
 
     def _validar_edificio(self, edificio):
         mapa = self._mapa

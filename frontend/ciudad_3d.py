@@ -35,23 +35,31 @@
 import math
 
 from panda3d.core import (Geom, GeomNode, GeomTriangles, GeomVertexData, GeomVertexFormat,
-                          GeomVertexWriter, NodePath)
+                          GeomVertexWriter, NodePath, TransparencyAttrib, CullFaceAttrib)
 from ursina import Cylinder, Entity, Mesh, Text, application, color, scene, time
 from ursina.lights import AmbientLight, DirectionalLight
-from ursina.shaders import lit_with_shadows_shader
+from ursina.shaders import lit_with_shadows_shader, unlit_shader
 
 from backend.datos.modelos_edificios import CARPETA_MODELOS, escala_de, modelo_de
+from backend.logica import escaleras_calculos
 from frontend.azar_fijo import azar_de, ruido_suave
 from frontend.banderas import crear_banderas
-from frontend.casas_decorativas import color_base_como_color, construir_casas
+from frontend.casas_decorativas import (casco_de_modelo, color_base_como_color, construir_casas,
+                                        construir_casas_favela, modelo_pintado)
 from frontend.cielo import DIRECCION_SOL, CieloDegradado
+from frontend import estilo
 from frontend.componentes import rgb
 from frontend.detalles_calculos import esquina_del_tanque, franjas_prohibidas
 from frontend.detalles_techos import construir_detalles
+from frontend.favela_detalles import LETRAS_CARTEL, construir_favela_detalles
 from frontend.geometria_mundo import ENTIERRO_BASE, apoyo_de_caja, medidas_losa, medidas_zocalo
 from frontend.muros_contencion import construir_muros
 from frontend.piezas import MASCARA_LUZ, encender_luz, lineas_sueltas, pieza, silenciar
-from frontend.props_mundo import cinta_con_tono, construir_props_mundo
+from frontend.props_mundo import cinta_con_tono, construir_props_mundo, construir_props_y_contorno
+from frontend import suelo_calculos as sc
+from frontend.suelo_favela import (cinta_asfalto_gastado, malla_calles_arena, malla_plaza_pintada,
+                                   textura_del_camino, textura_del_grano)
+from frontend.texturas_favela import METROS_GRANO
 
 # combine() sin normales deja al shader sin `normal`: el atributo queda con lo que dejó el dibujo anterior
 # y la luz de las piezas combinadas cambia según el encuadre (plazas ora blancas, ora apagadas). Con
@@ -60,9 +68,55 @@ COMBINAR_CON_NORMALES = True
 SOMBRAS = True                       # horneadas: el mapa se redibuja solo si algo de la ciudad se mueve
 RESOLUCION_SOMBRAS = (4096, 4096)
 
+# -- Suelo de la favela (ver MODELOS_3D.md, sección «Suelo») --
+# SUELO_FAVELA = False devuelve el suelo de antes: asfalto gris en todas las calles, plazas de cemento y
+# ladera verde sin tierra ni textura. PLAZAS_PINTADAS = False deja solo las plazas como antes.
+SUELO_FAVELA = True
+PLAZAS_PINTADAS = True
+# Calles que siguen siendo de asfalto (la avenida principal que une las plazas del centro); el resto son
+# de arena y tierra compactada. Pares de lugares, en cualquier orden.
+CALLES_ASFALTADAS = (("Alcaldía", "Plaza Central"), ("Plaza Central", "Universidad de Ciudad Nova"))
+ALTO_ARENA = 0.06                    # m de la cinta de arena sobre el suelo (el asfalto va a 0.10)
+COLOR_ACERA_AVENIDA = (176, 150, 128)   # aceras de la avenida: cemento cálido, no gris
+
+# -- Casas de la favela (ver MODELOS_3D.md, sección «Estilo de cómic») --
+# CASAS_VIVAS = False vuelve a las casas de antes (textura sucia, tinte pastel). CONTORNO_TINTA = False
+# quita el contorno de tinta (casco invertido) de casas y edificios jugables.
+CASAS_VIVAS = True
+FAVELA_DETALLES = True      # murales, carteles, banderines, objetos de la calle, palmeras, cancha y mercadito
+CONTORNO_TINTA = True
+
+# Luz de la tarde: sol dorado y ambiente violeta suave (solo lo usan los que no llevan el shader de sombras:
+# personajes y peatones; las sombras del mundo se tiñen en piezas.py). Antes: (255, 244, 225) y (122, 126, 140).
+COLOR_LUZ_SOL = (255, 232, 192)
+COLOR_LUZ_AMBIENTE = (134, 124, 150)
+
+# Edificios jugables pintados: el color de la pared es el de su lugar en el minimapa (estilo.COLORES_LUGAR).
+PUERTAS_EDIFICIOS = ((236, 64, 64), (252, 204, 44), (44, 112, 226), (34, 166, 112), (252, 124, 32), (146, 66, 204),
+                     (240, 240, 240))
+COLOR_TECHO_EDIFICIO = (150, 164, 184)
+
+
+# Color de pared del edificio de `lugar`: el del primer lugar de estilo.COLORES_LUGAR cuyo nombre lo contiene.
+def color_del_lugar(lugar):
+    for nombre, tono in estilo.COLORES_LUGAR.items():
+        if nombre.lower() in lugar.lower():
+            return tuple(min(255, int(c * 1.0)) for c in tono)
+    return (240, 232, 210)
+
+
+# Carteles pintados a mano: el color de las letras sale de favela_detalles.LETRAS_CARTEL (misma semilla que el fondo).
+NORMAL_CARA = {"n": (0, 1), "s": (0, -1), "e": (1, 0), "o": (-1, 0)}
+TAMANO_TEXTO_CARTEL = 7.0
+
 COLOR_PASTO = (92, 158, 70)
 COLOR_TIERRA = (138, 106, 78)        # taludes empinados de la ladera
 COLOR_ESCALERA = (168, 164, 154)
+# Peldaños pintados de las escaleras de la favela: un par de colores por escalera (alternan peldaño a peldaño).
+PALETAS_ESCALERA = (((250, 200, 60), (70, 190, 200)), ((240, 110, 150), (250, 240, 220)), ((120, 200, 90), (250, 160, 60)),
+                    ((90, 140, 240), (250, 230, 110)), ((200, 110, 220), (250, 240, 220)))
+# Muros de contención pintados (se alternan de muro a muro).
+PALETA_MUROS = ((236, 170, 90), (230, 120, 150), (92, 192, 190), (240, 220, 160), (150, 200, 100), (120, 150, 230))
 COLOR_BARANDA = (60, 62, 70)
 # La malla de la ladera tiene normales y el shader le SUMA la luz (el plano de antes no tenía): se
 # oscurece el color de los vértices para que el pasto se vea como antes.
@@ -116,8 +170,10 @@ COLOR_TANQUE = (40, 96, 190)
 COLOR_CABLE = (22, 22, 26)
 PROPORCION_TANQUES = 0.45         # casas con tanque de agua en el techo
 ALTURA_CABLE = 4.0                # m sobre el suelo donde los cables se atan a las farolas
-DISTANCIA_CABLE = 15.0            # m máximos entre dos farolas unidas por un cable
-DISTANCIA_CABLE_CASA = 9.0        # m máximos de una farola a la casa a la que le tira un cable
+DISTANCIA_CABLE = 20.0            # m máximos entre dos farolas unidas por un cable
+DISTANCIA_CABLE_CASA = 15.0       # m máximos de una farola a la casa a la que le tira un cable
+ALTURA_CABLE_CASA_MAX = 9.0       # m sobre la planta baja a los que se ata un cable en una casa alta (no sube a la azotea)
+CABLES_POR_TRAMO = 3              # cables enredados: cada tramo se dibuja con varias líneas algo distintas
 PROPORCION_CABLE_CASA = 0.8       # fracción del alto TOTAL de la casa a la que llega el cable
 COLOR_ZOCALO = (150, 146, 138)    # zócalo / pilotes bajo las casas en pendiente
 DESNIVEL_MINIMO_BASE = 0.05       # m: con menos desnivel bajo la huella no hace falta base
@@ -159,6 +215,11 @@ class PuertaEdificio(Entity):
         return self.bisagra.rotation_y / ANGULO_PUERTA_ABIERTA
 
 
+# Color de luz de Ursina desde una tupla RGB 0-255.
+def rgb_luz(tupla):
+    return color.rgba32(tupla[0], tupla[1], tupla[2], 255)
+
+
 class Ciudad3D(Entity):
 
     def __init__(self, mundo, sombras=SOMBRAS, **opciones):
@@ -173,6 +234,7 @@ class Ciudad3D(Entity):
         self.letreros = {}             # lugar -> Text
         self.banderas = {}             # lugar -> BanderaTecho (se llena al final del __init__)
         self.apoyos_casas = []         # (bajo, alto) del suelo bajo cada casa, alineada con las casas
+        self._contornos = []           # cascos de tinta (contorno de cómic): fuera del mapa de sombras
         self.raiz_colisiones = Entity(parent=self)
         self._grupos = {nombre: Entity(parent=self, shader=lit_with_shadows_shader) for nombre in (
             "suelo", "calles", "plazas", "edificios", "muros", "vegetacion", "mobiliario", "escaleras")}
@@ -189,9 +251,9 @@ class Ciudad3D(Entity):
         # El cielo cuelga de la ciudad (no se ve en los menús 2D) y sigue a la cámara en su update().
         self.cielo = CieloDegradado(parent=self)
         self.luz = DirectionalLight(parent=self, shadows=False, shadow_map_resolution=RESOLUCION_SOMBRAS,
-                                    color=color.rgba32(255, 244, 225, 255))
+                                    color=rgb_luz(COLOR_LUZ_SOL))
         self.luz.look_at(DIRECCION_SOL)
-        self.ambiente = AmbientLight(parent=self, color=color.rgba32(122, 126, 140, 255))
+        self.ambiente = AmbientLight(parent=self, color=rgb_luz(COLOR_LUZ_AMBIENTE))
 
         self._construir_suelo()
         self._construir_calles()
@@ -201,7 +263,7 @@ class Ciudad3D(Entity):
         self._construir_obstaculos()
         self._construir_decorado()
         self._construir_escaleras()
-        construir_muros(self._grupos["muros"], mundo.muros())
+        construir_muros(self._grupos["muros"], mundo.muros(), paleta=PALETA_MUROS if SUELO_FAVELA else None)
         for grupo in self._grupos.values():
             if grupo.children:             # p. ej. "edificios" queda vacío si todos tienen modelo
                 grupo.combine(include_normals=COMBINAR_CON_NORMALES)
@@ -217,8 +279,11 @@ class Ciudad3D(Entity):
             # edificios cae fuera del rango de profundidad); en plano, solo los edificios.
             self.luz.update_bounds(self if mundo.terreno is not None else self._raiz_edificios)
             self.luz._light.set_scene(self)          # solo la ciudad (sin personajes) va al mapa
-        for nombre in ("suelo", "calles", "plazas"):
-            self._grupos[nombre].hide(MASCARA_LUZ)    # reciben sombra, no la proyectan
+        for contorno in self._contornos:
+            contorno.hide(MASCARA_LUZ)                  # la tinta ni proyecta ni recibe sombra
+        for nombre in ("suelo", "calles", "plazas", "calles_arena"):
+            if nombre in self._grupos:
+                self._grupos[nombre].hide(MASCARA_LUZ)    # reciben sombra, no la proyectan
         self.encender_luces(False)           # EscenaMundo la enciende en al_entrar
 
     # La ciudad enciende su luz al entrar a la escena y la apaga al salir (ver piezas.encender_luz).
@@ -251,14 +316,40 @@ class Ciudad3D(Entity):
     # -- Suelo, calles y plazas --
 
     def _construir_suelo(self):
+        self._tierra = self._mapa_de_tierra() if SUELO_FAVELA else None
         if self._mundo.terreno is not None:
             # Hija directa de la ciudad (no del grupo): combine() sería lento con ~40 000 vértices.
-            self._grupos["suelo"] = pieza(parent=self, model=_malla_terreno(self._mundo.terreno))
+            if SUELO_FAVELA:
+                suelo = pieza(parent=self, model=_malla_terreno(self._mundo.terreno, color_en=self._color_de_ladera,
+                                                               metros_uv=METROS_GRANO))
+                suelo.texture = textura_del_grano()
+            else:
+                suelo = pieza(parent=self, model=_malla_terreno(self._mundo.terreno))
+            self._grupos["suelo"] = suelo
             return
         xmin, xmax, zmin, zmax = self._mundo.limites()
         pieza(parent=self._grupos["suelo"], model="plane", color=rgb(COLOR_PASTO),
               position=((xmin + xmax) / 2, 0, (zmin + zmax) / 2),
               scale=(xmax - xmin + 80, 1, zmax - zmin + 80))
+
+    # Dónde hay casas y calles, para teñir de tierra la ladera (suelo_calculos.MapaTierra).
+    def _mapa_de_tierra(self):
+        mundo = self._mundo
+        cajas = [e.caja() for e in mundo.edificios()]
+        cajas += [(o.cx - o.ancho / 2, o.cx + o.ancho / 2, o.cz - o.fondo / 2, o.cz + o.fondo / 2)
+                  for o in mundo.obstaculos() if o.tipo == "casa"]
+        calles = [(mundo.coordenada(a), mundo.coordenada(b)) for a, b in mundo.segmentos()]
+        plazas = [mundo.coordenada(lugar) for lugar in mundo.lugares()]
+        return sc.MapaTierra(cajas, calles, plazas, mundo.radio_plaza + 0.9)
+
+    # Color (RGBA 0-1) de la ladera en un vértice: pasto, tierra junto a casas y calles y talud.
+    def _color_de_ladera(self, x, z, talud):
+        r, g, b = sc.color_ladera(x, z, self._tierra.peso_tierra(x, z), talud)
+        return (r, g, b, 1.0)
+
+    # ¿La calle a-b es de la avenida de asfalto? (si no, es de arena).
+    def _es_asfalto(self, a, b):
+        return not SUELO_FAVELA or (a, b) in CALLES_ASFALTADAS or (b, a) in CALLES_ASFALTADAS
 
     # Calles como cintas que siguen el suelo: asfalto de plaza a plaza, aceras con bordillo entre
     # las plazas y la línea central discontinua.
@@ -266,21 +357,30 @@ class Ciudad3D(Entity):
         mundo = self._mundo
         calles = self._grupos["calles"]
         semiancho = mundo.ancho_calle / 2
+        arena = []
         for a, b in mundo.segmentos():
             pa, pb = mundo.coordenada(a), mundo.coordenada(b)
             largo = math.dist(pa, pb)
             if largo < 1e-9:
                 continue
-            pieza(parent=calles, model=cinta_con_tono(self._suelo, pa, pb, 0, largo, -semiancho, semiancho, 0.10,
-                                                      COLOR_ASFALTO, AMPLITUD_RUIDO_ASFALTO, columnas=4, lados=0.10),
-                  color=color.white)
+            if not self._es_asfalto(a, b):
+                arena.append((pa, pb))              # las de arena van en una sola malla con textura (abajo)
+                continue
+            if SUELO_FAVELA:
+                asfalto = cinta_asfalto_gastado(self._suelo, pa, pb, 0, largo, -semiancho, semiancho, 0.10,
+                                                columnas=8, lados=0.10)
+            else:
+                asfalto = cinta_con_tono(self._suelo, pa, pb, 0, largo, -semiancho, semiancho, 0.10,
+                                         COLOR_ASFALTO, AMPLITUD_RUIDO_ASFALTO, columnas=4, lados=0.10)
+            pieza(parent=calles, model=asfalto, color=color.white)
             # Aceras: a cada lado, entre las plazas (el aro de la plaza las recibe).
             borde = mundo.radio_plaza + 0.9
             if largo - 2 * borde > 0:
                 for lado in (-1, 1):
                     d0, d1 = sorted((lado * semiancho, lado * (semiancho + 2.0)))
                     pieza(parent=calles, model=cinta_con_tono(self._suelo, pa, pb, borde, largo - borde, d0, d1, 0.20,
-                                                              COLOR_ACERA, AMPLITUD_RUIDO_ACERA, columnas=2, lados=0.20),
+                                                              COLOR_ACERA_AVENIDA if SUELO_FAVELA else COLOR_ACERA,
+                                                              AMPLITUD_RUIDO_ACERA, columnas=2, lados=0.20),
                           color=color.white)
             # Línea central discontinua.
             s = mundo.radio_plaza + 2.0
@@ -288,6 +388,15 @@ class Ciudad3D(Entity):
                 pieza(parent=calles, model=_cinta(self._suelo, pa, pb, s, s + 2.0, -0.11, 0.11, 0.12),
                       color=rgb(COLOR_LINEA))
                 s += SEPARACION_LINEAS
+        if arena:
+            malla = malla_calles_arena(self._suelo, arena, self._ladera_para_cintas, alto=ALTO_ARENA)
+            calles_arena = pieza(parent=self, model=malla, texture=textura_del_camino(), color=color.white,
+                                 name="calles_arena", double_sided=True)
+            self._grupos["calles_arena"] = calles_arena
+
+    # Color de la ladera (RGB 0-1) en (x, z) para fundir el borde de las cintas de arena con el suelo.
+    def _ladera_para_cintas(self, x, z):
+        return sc.color_ladera(x, z, self._tierra.peso_tierra(x, z), 0.0)
 
     # Marcas viales sobre el asfalto (capa 0.12, como la línea central; el asfalto está en 0.10): líneas
     # de borde continuas y una cebra en cada entrada a una plaza. Por tramos pegados al suelo.
@@ -299,7 +408,7 @@ class Ciudad3D(Entity):
         for a, b in mundo.segmentos():
             pa, pb = mundo.coordenada(a), mundo.coordenada(b)
             largo = math.dist(pa, pb)
-            if largo < 1e-9 or largo - 2 * borde <= 0:
+            if largo < 1e-9 or largo - 2 * borde <= 0 or not self._es_asfalto(a, b):
                 continue
             for lado in (-1, 1):             # líneas de borde, un poco hacia adentro del asfalto
                 d = lado * (semiancho - 0.45)
@@ -321,9 +430,14 @@ class Ciudad3D(Entity):
     def _construir_plazas(self):
         plazas = self._grupos["plazas"]
         radio = self._mundo.radio_plaza
-        for lugar in self._mundo.lugares():
+        for numero, lugar in enumerate(self._mundo.lugares()):
             cx, cz = self._mundo.coordenada(lugar)
             h = self._suelo(cx, cz)           # las plazas son terrazas planas
+            if SUELO_FAVELA and PLAZAS_PINTADAS:
+                # disco de cemento pintado de colores (suelo_calculos.PALETAS_PLAZA) con bordillo a rayas
+                pieza(parent=plazas, model=malla_plaza_pintada(cx, cz, h + Y_PLAZA, radio, numero),
+                      color=color.white)
+                continue
             for y, r, tono in ((Y_ANILLO, radio + 0.9, COLOR_ANILLO_PLAZA), (Y_PLAZA, radio, COLOR_PLAZA),
                                (Y_PLAZA_CENTRO, radio * 0.68, COLOR_PLAZA_CENTRO), (Y_EMBLEMA, 1.6, COLOR_EMBLEMA)):
                 pieza(parent=plazas, model="circle", rotation_x=90, position=(cx, h + y, cz),
@@ -354,12 +468,29 @@ class Ciudad3D(Entity):
     def _modelo_del_edificio(self, e, indice):
         m = modelo_de(e.modelo)
         s = escala_de(e)
-        modelo = pieza(parent=self._modelos, model=m.archivo, position=(e.cx, e.y, e.cz),
-                       rotation_y=e.rumbo_puerta() + GIRO_MODELO, scale=s,
-                       color=rgb(TINTES_MODELOS[indice % len(TINTES_MODELOS)]))
-        color_base_como_color(modelo.model)
+        if CASAS_VIVAS:
+            # Pintado con el color de su lugar (estilo.COLORES_LUGAR) y con contorno de tinta; copia propia del modelo.
+            tono = color_del_lugar(e.lugar)
+            pintado = modelo_pintado(e.modelo, tono, PUERTAS_EDIFICIOS[indice % len(PUERTAS_EDIFICIOS)], COLOR_TECHO_EDIFICIO)
+            modelo = pieza(parent=self._modelos, model=pintado, position=(e.cx, e.y, e.cz),
+                           rotation_y=e.rumbo_puerta() + GIRO_MODELO, scale=s, color=rgb((255, 255, 255)))
+            if CONTORNO_TINTA:
+                self._contorno_de_edificio(e, s)
+        else:
+            modelo = pieza(parent=self._modelos, model=m.archivo, position=(e.cx, e.y, e.cz),
+                           rotation_y=e.rumbo_puerta() + GIRO_MODELO, scale=s,
+                           color=rgb(TINTES_MODELOS[indice % len(TINTES_MODELOS)]))
+            color_base_como_color(modelo.model)
         return PuertaEdificio(e, ancho=m.puerta_ancho * s, alto=m.puerta_alto * s,
                               textura=f"{CARPETA_MODELOS}/{m.textura_puerta}", parent=self)
+
+    # Casco de tinta de un edificio jugable: hijo de un Entity sin sombreado ni sombra, como el de las casas.
+    def _contorno_de_edificio(self, e, escala):
+        tinta = Entity(parent=self, shader=None, name=f"contorno_{e.lugar}")
+        casco = casco_de_modelo(e.modelo, escala, (e.cx, e.y, e.cz), e.rumbo_puerta() + GIRO_MODELO)
+        casco.reparent_to(tinta)
+        tinta.set_light_off()
+        self._contornos.append(tinta)
 
     def _cuerpo_del_edificio(self, e, tono):
         g = self._grupos["edificios"]
@@ -414,21 +545,30 @@ class Ciudad3D(Entity):
     # Peldaños a lo largo de cada escalera: tantos como pide su desnivel (ALTO_PELDANO), cada uno
     # con la tapa sobre el suelo en su centro y el cuerpo hasta por debajo del suelo, así siguen
     # la ladera sin flotar. Una baranda de un lado.
+    # Con ESCALERAS_PELDANOS (escaleras_calculos) se dibujan los peldaños discretos que también pisa el jugador
+    # (_construir_escaleras_peldanos); con la bandera apagada, los de siempre (los de abajo).
     def _construir_escaleras(self):
         g = self._grupos["escaleras"]
-        for e in self._mundo.escaleras():
+        if escaleras_calculos.ESCALERAS_PELDANOS and hasattr(self._mundo, "perfiles_escaleras"):
+            self._construir_escaleras_peldanos(g)
+            return
+        for numero, e in enumerate(self._mundo.escaleras()):
             a, b = (e.ax, e.az), (e.bx, e.bz)
             ux, uz = (b[0] - a[0]) / e.largo, (b[1] - a[1]) / e.largo
             rumbo = math.degrees(math.atan2(ux, uz))
             desnivel = abs(self._suelo(*b) - self._suelo(*a))
             peldanos = max(4, math.ceil(desnivel / ALTO_PELDANO))
             huella = e.largo / peldanos
+            par = PALETAS_ESCALERA[numero % len(PALETAS_ESCALERA)] if SUELO_FAVELA else None
             for k in range(peldanos):
                 s = (k + 0.5) * huella
                 x, z = a[0] + ux * s, a[1] + uz * s
                 tapa = self._suelo(x, z) + 0.12
                 fondo = min(self._suelo(a[0] + ux * t, a[1] + uz * t) for t in (s - huella / 2, s + huella / 2)) - 0.3
-                tono = COLOR_ESCALERA if k % 2 else tuple(c - 10 for c in COLOR_ESCALERA)
+                if par is not None:
+                    tono = par[k % 2]               # peldaños pintados a franjas, como las escaleras de las favelas
+                else:
+                    tono = COLOR_ESCALERA if k % 2 else tuple(c - 10 for c in COLOR_ESCALERA)
                 pieza(parent=g, model="cube", color=rgb(tono), rotation_y=rumbo,
                       position=(x, (tapa + fondo) / 2, z), scale=(e.ancho, tapa - fondo, huella + 0.02))
             # Baranda: postes cada ~2 m y un pasamanos entre poste y poste, del lado derecho.
@@ -448,13 +588,64 @@ class Ciudad3D(Entity):
                       rotation=(-math.degrees(math.atan2(q[1] - p[1], horizontal)), rumbo, 0),
                       scale=(0.05, 0.05, math.hypot(horizontal, q[1] - p[1])))
 
+    # Escaleras con peldaños de verdad: cada tramo del perfil (backend/logica/escaleras_calculos.PerfilEscalera) es una
+    # huella plana a su altura, con la misma subida entre una y otra (CONTRAHUELLA): cortas donde la ladera
+    # es empinada y largas donde es suave. Cada peldaño baja hasta por debajo del terreno, así no flota.
+    # Los peldaños se pintan a franjas alternas; la baranda del lado derecho sigue la altura de los peldaños.
+    def _construir_escaleras_peldanos(self, g):
+        for numero, perfil in enumerate(self._mundo.perfiles_escaleras()):
+            e = perfil.escalera
+            a = (e.ax, e.az)
+            ux, uz = (e.bx - e.ax) / e.largo, (e.bz - e.az) / e.largo
+            rumbo = math.degrees(math.atan2(ux, uz))
+            par = PALETAS_ESCALERA[numero % len(PALETAS_ESCALERA)] if SUELO_FAVELA else None
+            for k, (s0, s1, altura) in enumerate(perfil.tramos):
+                if s1 - s0 < 1e-3:
+                    continue
+                s = (s0 + s1) / 2
+                x, z = a[0] + ux * s, a[1] + uz * s
+                tapa = altura + escaleras_calculos.TAPA_SOBRE_SUELO
+                muestras = max(2, int((s1 - s0) / 0.5) + 1)
+                fondo = min(self._suelo(a[0] + ux * (s0 + (s1 - s0) * i / (muestras - 1)),
+                                        a[1] + uz * (s0 + (s1 - s0) * i / (muestras - 1)))
+                            for i in range(muestras)) - 0.3
+                fondo = min(fondo, tapa - 0.15)
+                if par is not None:
+                    tono = par[k % 2]
+                else:
+                    tono = COLOR_ESCALERA if k % 2 else tuple(c - 10 for c in COLOR_ESCALERA)
+                pieza(parent=g, model="cube", color=rgb(tono), rotation_y=rumbo,
+                      position=(x, (tapa + fondo) / 2, z), scale=(e.ancho, tapa - fondo, (s1 - s0) + 0.02))
+            # Baranda: postes cada ~2 m (parados sobre el peldaño que les toca) y un pasamanos entre poste y poste.
+            dx, dz = uz * (e.ancho / 2 - 0.05), -ux * (e.ancho / 2 - 0.05)
+            postes = max(2, math.ceil(e.largo / 2) + 1)
+            puntos = []
+            for k in range(postes):
+                s = e.largo * k / (postes - 1)
+                x, z = a[0] + ux * s + dx, a[1] + uz * s + dz
+                y = perfil.altura_en_s(s) + escaleras_calculos.TAPA_SOBRE_SUELO
+                puntos.append((x, y + 0.9, z))
+                pieza(parent=g, model="cube", color=rgb(COLOR_BARANDA), position=(x, y + 0.45, z),
+                      scale=(0.06, 0.9, 0.06))
+            for p, q in zip(puntos, puntos[1:]):
+                horizontal = math.dist((p[0], p[2]), (q[0], q[2]))
+                pieza(parent=g, model="cube", color=rgb(COLOR_BARANDA), position=tuple((p[i] + q[i]) / 2 for i in range(3)),
+                      rotation=(-math.degrees(math.atan2(q[1] - p[1], horizontal)), rumbo, 0),
+                      scale=(0.05, 0.05, math.hypot(horizontal, q[1] - p[1])))
+
     # Decorado nuevo (árboles variados, arbustos, farolas, bancos, vallas, carteles, jardineras y la
     # fuente de la Plaza Central): dos mallas únicas hechas en props_mundo, sin colisión. La de luces
     # (focos de las farolas) va sin sombreado y fuera del mapa de sombras.
     def _construir_decorado(self):
-        opaca, luces = construir_props_mundo(self._mundo)
+        opaca, luces, contorno = construir_props_y_contorno(self._mundo)
         if opaca is not None:
             pieza(parent=self, model=opaca, name="decorado")
+        if contorno is not None and CONTORNO_TINTA and CASAS_VIVAS:
+            # casco de tinta de árboles y fuente: sin luz y solo caras traseras (como el de las casas)
+            tinta = Entity(parent=self, model=contorno, shader=None, name="contorno_decorado")
+            tinta.setAttrib(CullFaceAttrib.make(CullFaceAttrib.MCullCounterClockwise))
+            tinta.set_light_off()
+            self._contornos.append(tinta)
         if luces is not None:
             focos = Entity(parent=self, model=luces, shader=None, name="focos_decorado")
             focos.hide(MASCARA_LUZ)
@@ -483,13 +674,48 @@ class Ciudad3D(Entity):
                 self._collider_camara(c.cx, c.cz, c.ancho, c.fondo, alto - bajo + c.alto_total, bajo)
                 self._base_de_casa(c, bajo, alto)
             # Bajo la raíz de los edificios: entran en el volumen de sombra.
-            construir_casas(self._raiz_edificios, casas, TINTES_FAVELA, alturas=altos)
+            if CASAS_VIVAS:
+                _, tinta = construir_casas_favela(self._raiz_edificios, casas, alturas=altos, contorno=CONTORNO_TINTA)
+                if tinta is not None:
+                    self._contornos.append(tinta)
+            else:
+                construir_casas(self._raiz_edificios, casas, TINTES_FAVELA, alturas=altos)
             self._tanques(casas, altos)
             # Antenas, prendas y cuerdas de ropa; las cuerdas se suman a la malla de los cables.
             vertices_extra = construir_detalles(self._grupos["mobiliario"], casas, self.apoyos_casas,
                                                 prohibidos=franjas_prohibidas(self._mundo), suelo=self._suelo)
         self._cables([o for o in self._mundo.obstaculos() if o.tipo == "farola"], casas,
                      [alto for _, alto in self.apoyos_casas], vertices_extra)
+        if FAVELA_DETALLES:
+            self._construir_favela(casas, [alto for _, alto in self.apoyos_casas])
+
+    # Detalle de la favela (frontend/favela_detalles.py): murales y carteles, banderines, objetos de la calle, plantas,
+    # cancha y mercadito. Cuatro mallas sueltas (sin Entity por pieza) y un Text por cartel con letras.
+    def _construir_favela(self, casas, altos):
+        objetos, pintura, tinta, banderines, textos = construir_favela_detalles(self._mundo, casas, altos)
+        if objetos is not None:
+            pieza(parent=self._raiz_edificios, model=objetos, name="favela_objetos")      # con sombra
+        if pintura is not None:
+            pieza(parent=self, model=pintura, name="favela_pintura").hide(MASCARA_LUZ)
+        if tinta is not None:
+            manchas = Entity(parent=self, model=tinta, shader=unlit_shader, double_sided=True, name="favela_manchas")
+            manchas.setTransparency(TransparencyAttrib.M_alpha)
+            manchas.set_depth_write(False)
+            manchas.hide(MASCARA_LUZ)
+            silenciar(manchas)
+        if banderines is not None:
+            tiras = Entity(parent=self, model=banderines, shader=unlit_shader, double_sided=True, name="favela_banderines")
+            tiras.hide(MASCARA_LUZ)
+            silenciar(tiras)
+        for cal in textos:
+            cx, cz = cal.centro()
+            nx, nz = NORMAL_CARA[cal.lado]
+            y = altos[cal.casa] + cal.y + cal.alto / 2
+            letras = LETRAS_CARTEL[int(cal.semilla * len(LETRAS_CARTEL)) % len(LETRAS_CARTEL)]
+            texto = Text(cal.texto, parent=self, origin=(0, 0), position=(cx + nx * 0.03, y, cz + nz * 0.03),
+                         rotation_y=math.degrees(math.atan2(-nx, -nz)), scale=TAMANO_TEXTO_CARTEL if len(cal.texto) <= 6 else TAMANO_TEXTO_CARTEL * 0.8,
+                         color=rgb(letras))
+            silenciar(texto)
 
     # Base que llena el hueco entre el suelo y la planta baja (que se apoya en `alto`) y TAPA el plinto
     # que el modelo trae bajo su umbral (`hondo_umbral`): zócalo macizo si el desnivel es pequeño,
@@ -569,14 +795,19 @@ class Ciudad3D(Entity):
                      if math.dist((f.cx, f.cz), (c.cx, c.cz)) <= DISTANCIA_CABLE_CASA]
             if cerca:
                 c, y = min(cerca, key=lambda cy: math.dist((f.cx, f.cz), (cy[0].cx, cy[0].cz)))
-                tramos.append((self._punta_farola(f), (c.cx, y + c.alto_total * PROPORCION_CABLE_CASA, c.cz)))
+                tramos.append((self._punta_farola(f), (c.cx, y + min(c.alto_total * PROPORCION_CABLE_CASA, ALTURA_CABLE_CASA_MAX), c.cz)))
         vertices = []
         for p, q in tramos:
-            caida = 0.25 + 0.04 * math.dist(p, q)
-            puntos = [tuple(p[i] + (q[i] - p[i]) * k / 10 for i in range(3)) for k in range(11)]
-            puntos = [(x, y - caida * 4 * (k / 10) * (1 - k / 10), z) for k, (x, y, z) in enumerate(puntos)]
-            for a, b in zip(puntos, puntos[1:]):
-                vertices += [a, b]
+            for k in range(CABLES_POR_TRAMO):
+                # cada cable del manojo cuelga un poco más, sale unos cm más abajo y a un lado (enredados)
+                caida = (0.25 + 0.04 * math.dist(p, q)) * (1 + 0.3 * k)
+                desvio = 0.14 * k * (1 if k % 2 else -1)
+                a = (p[0] + desvio, p[1] - 0.12 * k, p[2] - desvio)
+                b = (q[0] - desvio, q[1] - 0.1 * k, q[2] + desvio)
+                puntos = [tuple(a[i] + (b[i] - a[i]) * j / 10 for i in range(3)) for j in range(11)]
+                puntos = [(x, y - caida * 4 * (j / 10) * (1 - j / 10), z) for j, (x, y, z) in enumerate(puntos)]
+                for u, v in zip(puntos, puntos[1:]):
+                    vertices += [u, v]
         vertices += list(vertices_extra)       # cuerdas de ropa (bloque de detalles de techos)
         if vertices:
             cables = Entity(parent=self, model=lineas_sueltas(vertices), color=rgb(COLOR_CABLE), shader=None)
@@ -660,12 +891,17 @@ def _variar_pasto(x, z, rgb_, pasto):
 
 
 # Malla del suelo con la grilla del Terreno: pasto, que pasa a tierra en los taludes empinados.
-def _malla_terreno(terreno):
+# `color_en(x, z, talud)` (opcional) devuelve el color RGBA 0-1 de un vértice (talud: 0 llano ... 1 muy
+# empinado) y reemplaza al pasto/tierra de siempre; `metros_uv` (opcional) agrega coordenadas de textura
+# que repiten cada tantos metros. Sin ellos la malla es idéntica a la de antes.
+def _malla_terreno(terreno, color_en=None, metros_uv=None):
     x0, z0, paso, filas = terreno.grilla()
     nz_, nx_ = len(filas), len(filas[0])
-    datos = GeomVertexData("terreno", GeomVertexFormat.get_v3n3c4(), Geom.UH_static)
+    formato = GeomVertexFormat.get_v3n3c4t2() if metros_uv else GeomVertexFormat.get_v3n3c4()
+    datos = GeomVertexData("terreno", formato, Geom.UH_static)
     datos.set_num_rows(nx_ * nz_)
     vertice, normal, tono = (GeomVertexWriter(datos, c) for c in ("vertex", "normal", "color"))
+    coordenada = GeomVertexWriter(datos, "texcoord") if metros_uv else None
     pasto, tierra = (tuple(c / 255 * BRILLO_LADERA for c in rgb_) for rgb_ in (COLOR_PASTO, COLOR_TIERRA))
     tan_desde, tan_hasta = (math.tan(math.radians(g)) for g in PENDIENTE_TIERRA)
     for j in range(nz_):
@@ -677,7 +913,12 @@ def _malla_terreno(terreno):
             vertice.add_data3(x0 + i * paso, h, z0 + j * paso)
             normal.add_data3(-gx / largo, 1 / largo, -gz / largo)
             t = min(1.0, max(0.0, (math.hypot(gx, gz) - tan_desde) / (tan_hasta - tan_desde)))
-            tono.add_data4(*_variar_pasto(x0 + i * paso, z0 + j * paso, tuple(p + (q - p) * t for p, q in zip(pasto, tierra)), 1 - t), 1)
+            if color_en is not None:
+                tono.add_data4(*color_en(x0 + i * paso, z0 + j * paso, t))
+            else:
+                tono.add_data4(*_variar_pasto(x0 + i * paso, z0 + j * paso, tuple(p + (q - p) * t for p, q in zip(pasto, tierra)), 1 - t), 1)
+            if coordenada is not None:
+                coordenada.add_data2((x0 + i * paso) / metros_uv, (z0 + j * paso) / metros_uv)
     triangulos = GeomTriangles(Geom.UH_static)
     for j in range(nz_ - 1):
         for i in range(nx_ - 1):

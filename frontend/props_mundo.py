@@ -181,18 +181,24 @@ class Malla:
     # Copia `solido` ((vértices, triángulos)) en `posicion` con `escala` (x, y, z o un número) y
     # giro_y grados (convención de Ursina). El color (RGB 0-255) va de `degradado[0]` abajo a
     # `degradado[1]` arriba (multiplicadores) y `ruido` lo varía por vértice.
+    # `inclinacion` (grados, opcional): inclina el sólido sobre su eje x (positivo = la parte alta va hacia +z local,
+    # o sea hacia donde mira `giro`) DESPUÉS de escalarlo y ANTES de girarlo `giro` sobre y: sirve para hojas de palma, toldos y colas. Con 0 todo sale
+    # exactamente como antes.
     def agregar(self, solido, posicion, escala=1.0, giro=0.0, color=(255, 255, 255), degradado=(0.8, 1.05),
-                ruido=0.0):
+                ruido=0.0, inclinacion=0.0):
         sv, st = solido
         if isinstance(escala, (int, float)):
             escala = (escala, escala, escala)
         seno, coseno = math.sin(math.radians(giro)), math.cos(math.radians(giro))
+        sp, cp = math.sin(math.radians(inclinacion)), math.cos(math.radians(inclinacion))
         ys = [v[1] for v in sv]
         alto = max(ys) - min(ys) or 1.0
         base = min(ys)
         puestos = []
         for x, y, z in sv:
             x, y, z = x * escala[0], y * escala[1], z * escala[2]
+            if inclinacion:
+                y, z = y * cp - z * sp, y * sp + z * cp
             puestos.append((posicion[0] + x * coseno + z * seno, posicion[1] + y,
                             posicion[2] - x * seno + z * coseno))
         tonos = []
@@ -366,6 +372,7 @@ class Reserva:
     def __init__(self, mundo):
         self.obstaculos = list(mundo.obstaculos())
         self.cajas = [(e.caja(), 1.2) for e in mundo.edificios()]
+        self.cajas += [(z.caja(), 1.5) for z in getattr(mundo, "zonas", lambda: [])()]    # cancha y mercadito
         self.circulos = [(m.cx, m.cz, m.largo / 2 + 0.8) for m in mundo.muros()]
         self.pasos = []                  # caminos que se recorren a pie: plaza -> puerta y escaleras
         for e in mundo.edificios():
@@ -569,6 +576,40 @@ def construir_props_mundo(mundo):
     for prop in colocar_props(mundo):
         dibujar(prop, opaca, luz, mundo.altura)
     return opaca.mesh(), luz.mesh()
+
+
+# -- Contorno de tinta de los props grandes (estilo cómic) --------------------------------------------
+
+GROSOR_CONTORNO_PROPS = 0.09     # m que el casco asoma por cada lado de un árbol
+CONTORNO_PROPS = ("arbol",)      # tipos de prop que llevan contorno de tinta (la fuente no: sus piezas apiladas dejan huecos negros)
+TINTA_PROPS = (0, 0, 0)          # el shader sin luz aclara el casco (gamma): en pantalla sale ~ la tinta (18, 20, 32)
+
+
+class MallaContorno(Malla):
+    """Casco de tinta: cada sólido que se le agrega sale unos cm más grande (en cada eje) y de color tinta. Se dibuja
+    con las caras delanteras ocultas, así solo asoma el borde por detrás de la silueta (ver docs/DISENO.md §7)."""
+
+    def __init__(self, grosor=GROSOR_CONTORNO_PROPS):
+        super().__init__()
+        self.grosor = grosor
+
+    def agregar(self, solido, posicion, escala=1.0, giro=0.0, color=(255, 255, 255), degradado=(0.8, 1.05),
+                ruido=0.0, inclinacion=0.0):
+        if isinstance(escala, (int, float)):
+            escala = (escala, escala, escala)
+        super().agregar(solido, posicion, tuple(e + 2 * self.grosor for e in escala), giro, TINTA_PROPS, (1.0, 1.0), 0.0,
+                        inclinacion)
+
+
+# Las tres mallas del decorado: (opaca, luces, contorno) como Mesh (None si no hay nada). La de contorno lleva el casco
+# de tinta de los árboles; va en una Entity aparte que solo dibuja caras traseras.
+def construir_props_y_contorno(mundo):
+    opaca, luz, contorno = Malla(), Malla(), MallaContorno()
+    for prop in colocar_props(mundo):
+        dibujar(prop, opaca, luz, mundo.altura)
+        if prop.tipo in CONTORNO_PROPS:
+            dibujar(prop, contorno, Malla(), mundo.altura)
+    return opaca.mesh(), luz.mesh(), contorno.mesh()
 
 
 # -- Cintas de calle con ruido de color -----------------------------------------------------------

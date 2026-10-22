@@ -21,6 +21,7 @@ import math
 from ursina import Entity, Vec3, camera, mouse, raycast, scene, time
 
 from frontend import camara_calculos as cc
+from frontend.geometria_mundo import apoyo_de_caja
 
 SENSIBILIDAD = 130.0          # grados por unidad de mouse.velocity
 PITCH_MIN, PITCH_MAX = 5.0, 60.0
@@ -29,6 +30,12 @@ DISTANCIA_INICIAL = 7.0
 PITCH_INICIAL = 22.0
 MARGEN_COLISION = 0.4
 DISTANCIA_MIN_COLISION = 1.2  # la cámara nunca se mete más cerca del pivote que esto
+# COLISIÓN ANALÍTICA (aditivo): además del raycast, la cámara no entra en las casas y edificios del
+# mundo (cajas 2D con altura, camara_calculos). Las ~263 casas decorativas sí tienen collider, pero
+# el raycast no basta: DISTANCIA_MIN_COLISION (1.2 m) dejaba la cámara DENTRO del muro cuando el jugador
+# estaba a menos de ~1.6 m de él. False = comportamiento de antes.
+CAMARA_ANALITICA = True
+MINIMO_ANALITICO = 0.3        # m: lo más cerca del pivote que la colisión analítica deja la cámara
 FOV = 65
 PLANO_CERCANO = 0.1
 PLANO_LEJANO = 500
@@ -41,9 +48,12 @@ VELOCIDAD_VIAJE = 32.0        # m/s máximos del pivote al viajar (sin tirón in
 class CamaraTerceraPersona(Entity):
 
     # raiz_colisiones: Entity cuyos hijos con collider bloquean la cámara (los edificios).
-    def __init__(self, raiz_colisiones=None, suelo=None, **opciones):
+    # obstaculos (opcional): lista de obstáculos de camara_calculos, o el mundo (MundoCiudad), del que
+    # se leen casas y edificios (solo lectura). None = solo el raycast de siempre.
+    def __init__(self, raiz_colisiones=None, suelo=None, obstaculos=None, **opciones):
         super().__init__(**opciones)
         self.raiz_colisiones = raiz_colisiones
+        self.obstaculos = obstaculos_de_camara(obstaculos) if hasattr(obstaculos, "obstaculos") else list(obstaculos or [])
         self.suelo = suelo or (lambda x, z: 0.0)
         self.yaw = 0.0
         self.pitch = PITCH_INICIAL
@@ -52,6 +62,9 @@ class CamaraTerceraPersona(Entity):
         self.objetivo = None                     # callable -> (x, z) del jugador al que sigue
         self.ignorar = []                        # entidades que el raycast atraviesa (personajes)
         self.bloqueada = False
+        self.distancia_extra = 0.0               # VEHÍCULOS (aditivo): m extra de distancia, grados de FOV y m de altura del pivote
+        self.fov_extra = 0.0                     # (los fija vehiculo_mundo con la velocidad; 0 = comportamiento de siempre)
+        self.altura_extra = 0.0
         self.controlada = False
         self._pivote = None                      # (x, z) suavizado
         self._guardada = None
@@ -122,13 +135,19 @@ class CamaraTerceraPersona(Entity):
 
         px, pz = self._pivote
         pivote = cc.pivote_del_jugador(px, pz, suelo=self.suelo(px, pz))
+        if self.altura_extra:
+            pivote = (pivote[0], pivote[1] + self.altura_extra, pivote[2])
+        pedida = self.distancia + self.distancia_extra
         impacto = self._distancia_hasta_obstaculo(pivote)
-        deseada = cc.posicion_orbital(pivote, self.yaw, self.pitch, self.distancia)
+        deseada = cc.posicion_orbital(pivote, self.yaw, self.pitch, pedida)
         impacto_suelo = cc.distancia_libre_de_suelo(pivote, deseada, self.suelo)
         if impacto_suelo is not None:
             impacto = impacto_suelo if impacto is None else min(impacto, impacto_suelo)
         objetivo = cc.distancia_con_colision(
-            self.distancia, impacto, MARGEN_COLISION, DISTANCIA_MIN_COLISION)
+            pedida, impacto, MARGEN_COLISION, DISTANCIA_MIN_COLISION)
+        if CAMARA_ANALITICA and self.obstaculos:
+            objetivo = min(objetivo, cc.distancia_libre_analitica(
+                pivote, deseada, self.obstaculos, MARGEN_COLISION, MINIMO_ANALITICO))
         suave = cc.suavizar_distancia(self.distancia_real, objetivo, dt)
         # Hacia adentro nunca por detrás de la pared: el suavizado solo afloja el alejarse.
         self.distancia_real = min(suave, objetivo)
@@ -145,17 +164,18 @@ class CamaraTerceraPersona(Entity):
         corre = cc.corriendo_por_velocidad(cc.velocidad_del_objetivo(self._meta_previa, meta, dt))
         self._meta_previa = tuple(meta)
         self._fov = cc.fov_al_correr(self._fov, FOV, corre, dt, FOV_EXTRA_CORRER)
-        camera.fov = self._fov
+        camera.fov = self._fov + self.fov_extra
 
     # Distancia del pivote al primer obstáculo en dirección a la cámara deseada (None si
     # no hay). El raycast no toca personajes (`ignorar`) ni nada sin collider.
     def _distancia_hasta_obstaculo(self, pivote):
         if self.raiz_colisiones is None:
             return None
-        deseada = Vec3(*cc.posicion_orbital(pivote, self.yaw, self.pitch, self.distancia))
+        pedida = self.distancia + self.distancia_extra
+        deseada = Vec3(*cc.posicion_orbital(pivote, self.yaw, self.pitch, pedida))
         origen = Vec3(*pivote)
         direccion = (deseada - origen).normalized()
-        golpe = raycast(origen, direccion, distance=self.distancia,
+        golpe = raycast(origen, direccion, distance=pedida,
                         traverse_target=self.raiz_colisiones, ignore=list(self.ignorar))
         return golpe.distance if golpe.hit else None
 
@@ -190,3 +210,17 @@ class CamaraTerceraPersona(Entity):
         camera.position = guardada["position"]
         camera.rotation = guardada["rotation"]
         self._guardada = None
+
+
+# Obstáculos de cámara (camara_calculos) de un MundoCiudad, solo lectura: las casas decorativas y los
+# edificios, con el mismo tramo vertical que sus colliders (ciudad_3d). Árboles, farolas y bancos no
+# cuentan: son finos y la cámara los atraviesa sin taparse la pantalla.
+def obstaculos_de_camara(mundo):
+    lista = []
+    for o in mundo.obstaculos():
+        if o.tipo == "casa" and o.es_caja:
+            bajo, alto = apoyo_de_caja(mundo.altura, o.cx, o.cz, o.ancho, o.fondo)
+            lista.append(cc.obstaculo_caja(o.cx, o.cz, o.ancho, o.fondo, bajo, alto + o.alto_total))
+    for e in mundo.edificios():
+        lista.append(cc.obstaculo_caja(e.cx, e.cz, e.ancho, e.fondo, e.y, e.y + e.alto))
+    return lista

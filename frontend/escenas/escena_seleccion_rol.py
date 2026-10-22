@@ -7,6 +7,9 @@
 # Visual (T8): fondo de menú en capas, una tarjeta por rol con su retrato (iconos.py), nombre,
 # descripción y lugar de inicio; hover (sube y se aclara), foco de teclado (anillo cian, flechas +
 # Enter) y rol tomado en gris con el nombre del jugador.
+# Confirmación (T-selección): clic/Enter en una tarjeta solo la RESALTA como candidata (anillo amarillo +
+# insignia «Elegido»); el botón «Seleccionar» la confirma. «Cambiar» deshace la última confirmación y
+# «Atrás» vuelve a «¿Cuántos jugadores?». `elegir_rol(rol)` sigue confirmando de inmediato (API previa).
 
 from panda3d.core import TextNode
 from ursina import Button, Entity, Text, color, window
@@ -26,7 +29,7 @@ ALTO_TARJETA = 0.56
 SEPARACION_TARJETAS = 0.045
 LADO_RETRATO = 0.22
 ALFA_VELO = 105
-RECORTE_RETRATO = 0.95    # el borde superior del retrato queda fuera (línea de tinta cortada)
+RECORTE_RETRATO = 1.0     # los retratos nuevos traen margen transparente arriba: sin recorte
 
 
 # Tarjeta pulsable de un rol. Misma API que un botón: `accion`, fijar_habilitado,
@@ -52,6 +55,13 @@ class TarjetaRol(Entity):
             parent=self, model=modelo_redondeado(w + 2 * (borde + g), h + 2 * (borde + g), radio + 7),
             scale=(w + 2 * (borde + g), h + 2 * (borde + g)), color=rgb(estilo.ESTADO_INFO), z=0.006)
         self.anillo.enabled = False
+        # Anillo de candidata (amarillo) más ancho que el de foco: queda como un segundo contorno.
+        gc = a_unidades(9)
+        self._candidata = False
+        self.anillo_candidata = Entity(
+            parent=self, model=modelo_redondeado(w + 2 * (borde + gc), h + 2 * (borde + gc), radio + 10),
+            scale=(w + 2 * (borde + gc), h + 2 * (borde + gc)), color=rgb(estilo.ACENTO_PRIMARIO), z=0.0065)
+        self.anillo_candidata.enabled = False
         self.panel = panel_tinta(self, w, h, estilo.COLOR_TARJETA, radio)
         anadir_filo(self.panel, w, h, radio)
 
@@ -79,6 +89,15 @@ class TarjetaRol(Entity):
             "", parent=self, origin=(0, 0), position=(0, -h / 2 + 0.05, -0.001),
             scale=escala_fuente(16), color=rgb(estilo.ACENTO_SECUNDARIO))
         self.texto_lugar.line_height = 1.2
+
+        # Insignia «Elegido» (candidata): píldora amarilla con borde de tinta sobre el borde superior.
+        self.insignia = panel_tinta(
+            self, 0.17, 0.05, estilo.ACENTO_PRIMARIO, estilo.RADIO_CHIP_PX, sombra=False,
+            position=(0, h / 2 + 0.004, -0.004))
+        self.texto_insignia = Text(
+            "Elegido", parent=self.insignia, origin=(0, 0), position=(0, 0, -0.003),
+            scale=escala_fuente(20), font=tipografia.FUENTE_TITULO, color=rgb(estilo.TINTA))
+        self.insignia.enabled = False
 
         # Zona de ratón transparente sobre toda la tarjeta.
         self.zona = Button(
@@ -135,6 +154,16 @@ class TarjetaRol(Entity):
         self._tomado_por = jugador
         self._pintar()
 
+    # Resalta (True) o quita (False) la marca de candidata: anillo amarillo, insignia y fondo claro.
+    def marcar_candidata(self, valor):
+        self._candidata = bool(valor) and self._tomado_por is None
+        self.anillo_candidata.enabled = self._candidata
+        self.insignia.enabled = self._candidata
+        self._pintar()
+
+    def es_candidata(self):
+        return self._candidata
+
     # -- Vista --
 
     def _al_entrar_raton(self):
@@ -166,6 +195,8 @@ class TarjetaRol(Entity):
         self.caja_retrato.fondo.color = rgb(
             _apagar(ROLES[self.rol].color) if gris else ROLES[self.rol].color)
         self.anillo.enabled = self._foco and self._habilitado
+        if self._candidata and self._tomado_por is None:
+            self.panel.fondo.color = rgb(estilo.COLOR_SUPERFICIE_ALTA)
 
     # Entrada: la tarjeta sube desde 3 cm con ease_out (retrasada por su posición).
     def entrar(self, indice):
@@ -202,6 +233,8 @@ class EscenaSeleccionRol(Escena):
     Y_TARJETAS = -0.03
     Y_RESUMEN = -0.345
     Y_COMENZAR = -0.43
+    ANCHO_SELECCIONAR = a_unidades(360)
+    X_LATERAL = 0.62           # centro de «Atrás» (izquierda) y «Cambiar» (derecha)
 
     def __init__(self, fabrica_sesion, al_comenzar, **opciones):
         super().__init__(**opciones)
@@ -211,6 +244,8 @@ class EscenaSeleccionRol(Escena):
         self.total_jugadores = 0
         self._paso_previo = None
         self._aspecto = None
+        self._candidata = None      # rol resaltado a la espera de «Seleccionar»
+        self._elecciones = []       # roles ya confirmados, en orden (para «Cambiar»)
 
         self.fondo = FondoMenu(velo=ALFA_VELO, parent=self)
 
@@ -250,7 +285,7 @@ class EscenaSeleccionRol(Escena):
         paso = ANCHO_TARJETA + SEPARACION_TARJETAS
         for indice, rol in enumerate(ORDEN_ROLES):
             x = (indice - (total - 1) / 2) * paso
-            tarjeta = TarjetaRol(rol, al_clic=lambda rol=rol: self.elegir_rol(rol),
+            tarjeta = TarjetaRol(rol, al_clic=lambda rol=rol: self.previsualizar_rol(rol),
                                  parent=self.grupo_roles, position=(x, self.Y_TARJETAS))
             self.botones_rol[rol] = tarjeta
             self.muestras_rol[rol] = tarjeta.retrato   # la muestra de cada rol es su retrato
@@ -258,6 +293,19 @@ class EscenaSeleccionRol(Escena):
         self.boton_comenzar = BotonPrimario(
             "Comenzar", al_clic=self.comenzar, ancho=a_unidades(260), alto=a_unidades(60),
             tamano_fuente_px=26, parent=self, position=(0, self.Y_COMENZAR),
+        )
+        # «Seleccionar» confirma la candidata; queda deshabilitado mientras no haya ninguna.
+        self.boton_seleccionar = BotonPrimario(
+            "Seleccionar", al_clic=self.confirmar_candidata, ancho=self.ANCHO_SELECCIONAR,
+            alto=a_unidades(60), tamano_fuente_px=26, parent=self, position=(0, self.Y_COMENZAR),
+        )
+        self.boton_cambiar = BotonSecundario(
+            "Cambiar", al_clic=self.deshacer_ultima_eleccion, ancho=a_unidades(170), alto=a_unidades(48),
+            tamano_fuente_px=20, parent=self, position=(self.X_LATERAL, self.Y_COMENZAR),
+        )
+        self.boton_atras = BotonSecundario(
+            "Atrás", al_clic=self.volver_a_cantidad, ancho=a_unidades(170), alto=a_unidades(48),
+            tamano_fuente_px=20, parent=self, position=(-self.X_LATERAL, self.Y_COMENZAR),
         )
         self.foco = FocoTeclado(self._controles_activos, parent=self)
         self._reiniciar()
@@ -270,14 +318,19 @@ class EscenaSeleccionRol(Escena):
             escala = escala_para_ancho(aspecto)
             self.grupo_roles.scale = escala
             self.grupo_cantidad.scale = escala
+            # Los botones laterales no deben salirse por los lados en ventanas estrechas.
+            x = max(0.42, min(self.X_LATERAL, aspecto / 2 - a_unidades(170) / 2 - 0.02))
+            self.boton_cambiar.x = x
+            self.boton_atras.x = -x
 
     # Controles que el teclado puede recorrer según el paso.
     def _controles_activos(self):
         if self.total_jugadores == 0:
             return list(self.botones_cantidad.values())
+        laterales = [self.boton_atras] if not self._elecciones else [self.boton_cambiar, self.boton_atras]
         if self.todos_eligieron():
-            return [self.boton_comenzar]
-        return list(self.botones_rol.values())
+            return [self.boton_comenzar] + laterales
+        return list(self.botones_rol.values()) + [self.boton_seleccionar] + laterales
 
     # -- Ciclo de vida --
 
@@ -289,6 +342,8 @@ class EscenaSeleccionRol(Escena):
         self.sesion = self._fabrica_sesion() if self._fabrica_sesion else None
         self.total_jugadores = 0
         self._paso_previo = None
+        self._candidata = None
+        self._elecciones = []
         self.refrescar()
 
     # -- Pasos --
@@ -308,7 +363,48 @@ class EscenaSeleccionRol(Escena):
             return
         numero = len(self.sesion.jugadores()) + 1
         self.sesion.agregar_jugador(f"Jugador {numero}", rol)
+        self._elecciones.append(rol)
+        self._candidata = None
         self.refrescar()
+
+    # Resalta `rol` como candidata sin tomarlo (se puede cambiar de candidata cuantas veces se quiera).
+    def previsualizar_rol(self, rol):
+        if not self.total_jugadores or self.todos_eligieron() or self.sesion is None:
+            return
+        if rol not in self.sesion.roles_disponibles():
+            return
+        self._candidata = rol
+        self._actualizar_candidata()
+        # Con el teclado, el foco salta a «Seleccionar» para confirmar con Enter.
+        if self.foco.visible:
+            lista = self.foco.controles()
+            if self.boton_seleccionar in lista:
+                self.foco.indice = lista.index(self.boton_seleccionar)
+                self.foco._aplicar()
+
+    # Confirma la candidata como rol del jugador actual (no hace nada si no hay candidata).
+    def confirmar_candidata(self):
+        if self._candidata is not None:
+            self.elegir_rol(self._candidata)
+
+    # Quita la última confirmación (la sesión se reconstruye con los jugadores anteriores: el backend
+    # no tiene operación de quitar). El jugador deshecho vuelve a elegir; sin candidata.
+    def deshacer_ultima_eleccion(self):
+        if not self._elecciones or self.sesion is None:
+            return
+        previas = self._elecciones[:-1]
+        self.sesion = self._fabrica_sesion()
+        for numero, rol in enumerate(previas, start=1):
+            self.sesion.agregar_jugador(f"Jugador {numero}", rol)
+        self._elecciones = previas
+        self._candidata = None
+        self._paso_previo = None
+        self.refrescar()
+
+    # Vuelve a «¿Cuántos jugadores?» y reinicia la sesión.
+    def volver_a_cantidad(self):
+        if self.total_jugadores:
+            self._reiniciar()
 
     def todos_eligieron(self):
         return self.total_jugadores > 0 and len(self.sesion.jugadores()) >= self.total_jugadores
@@ -323,12 +419,45 @@ class EscenaSeleccionRol(Escena):
         self.texto_instruccion.text = texto
         self.sombra_instruccion.text = texto
 
+    # Reduce la letra de «Seleccionar: <rol>» hasta que quepa dentro del botón (nombres largos).
+    def _ajustar_texto_seleccionar(self):
+        boton = self.boton_seleccionar
+        base = escala_fuente(26)
+        boton.text_size = base
+        entidad = boton.text_entity
+        if entidad is None:
+            return
+        nodo = TextNode("medida")
+        nodo.setFont(entidad.font)
+        medido = nodo.calcWidth(boton.text) * entidad.size * base
+        util = self.ANCHO_SELECCIONAR * 0.86
+        if medido > util:
+            boton.text_size = base * util / medido
+
+    # Pinta la candidata y habilita «Seleccionar» (con su nombre) solo si hay una.
+    def _actualizar_candidata(self):
+        for rol, tarjeta in self.botones_rol.items():
+            tarjeta.marcar_candidata(rol == self._candidata)
+        hay = self._candidata is not None
+        self.boton_seleccionar.text = f"Seleccionar: {ROLES[self._candidata].nombre}" if hay else "Seleccionar"
+        self.boton_seleccionar.fijar_habilitado(hay)
+        self._ajustar_texto_seleccionar()
+        if self.total_jugadores and not self.todos_eligieron():
+            numero = len(self.sesion.jugadores()) + 1
+            self.texto_subtitulo.text = (
+                f"Jugador {numero} de {self.total_jugadores}"
+                + (f"  ·  pulsa Seleccionar para confirmar a {ROLES[self._candidata].nombre}" if hay else
+                   "  ·  haz clic en un rol para resaltarlo"))
+
     def refrescar(self):
         eligiendo_cantidad = self.total_jugadores == 0
         listo = self.todos_eligieron()
         self.grupo_cantidad.enabled = eligiendo_cantidad
         self.grupo_roles.enabled = not eligiendo_cantidad
         self.boton_comenzar.enabled = listo
+        self.boton_seleccionar.enabled = not eligiendo_cantidad and not listo
+        self.boton_cambiar.enabled = bool(self._elecciones)
+        self.boton_atras.enabled = not eligiendo_cantidad
 
         if eligiendo_cantidad:
             self._fijar_instruccion("¿Cuántos jugadores?")
@@ -348,6 +477,7 @@ class EscenaSeleccionRol(Escena):
             boton.marcar_tomado(dueno.get(rol))
             boton.fijar_habilitado(rol in libres and not listo)
 
+        self._actualizar_candidata()
         self.texto_resumen.text = "   ·   ".join(
             f"{j.nombre}: {ROLES[j.rol].nombre}" for j in elegidos
         )
