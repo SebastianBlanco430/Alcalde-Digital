@@ -235,6 +235,10 @@ class ControladorJugador(Entity):
         jugador = flujo.jugador_activo()
         # Pausa y saltar cinemática las ofrece la escena 3D .
         if key == "escape" and hasattr(self._escena, "alternar_pausa"):
+            menu = getattr(self._escena, "menu_pausa", None)
+            es_de_ajustes = getattr(menu, "escape_es_de_ajustes", None)
+            if callable(es_de_ajustes) and es_de_ajustes():
+                return        # Escape cerró «Ajustes» (desde la pausa): no cierra también la pausa
             self._escena.alternar_pausa()
             return
         # Durante el fundido hacia/desde el minijuego nadie interactúa (igual que el movimiento).

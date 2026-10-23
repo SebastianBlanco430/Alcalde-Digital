@@ -59,6 +59,11 @@ BANDERAS_VALIDAS = BANDERA_EN_AIRE | BANDERA_ESCALERA | BANDERA_DENTRO | BANDERA
 UMBRAL_DESCONEXION = 25.0               # puntos de infracción acumulados que desconectan
 FUGA_POR_SEGUNDO = 0.5                  # puntos que se perdonan por segundo
 
+# T9: sin control de vehículo (el anfitrión no gestiona montura: se fía de `veh` como siempre). Con
+# `autorizar_vehiculo(tipo|None)` el anfitrión pasa a ser la autoridad: el vehículo válido es el que él dice.
+SIN_CONTROL_VEHICULO = object()
+GRACIA_BAJADA = 1.0            # s: tras bajar, un `pos` en vuelo (o el latido) aún puede declarar el vehículo: se ignora
+
 CLAVES_OBLIGATORIAS = ("n", "x", "z", "y", "r", "v", "f")
 CLAVES_PERMITIDAS = frozenset(CLAVES_OBLIGATORIAS + ("veh",))
 
@@ -110,6 +115,8 @@ class ValidadorMovimiento:
         self.v = 0.0
         self.f = 0
         self.veh = None
+        self.veh_autorizado = SIN_CONTROL_VEHICULO
+        self._t_bajada = -1e9
         self.tiene_posicion = False
         self.fichas = 0.0                 # metros de presupuesto disponibles
         self._t_ultimo = None             # reloj del último pos aceptado (o de colocar)
@@ -133,6 +140,17 @@ class ValidadorMovimiento:
     @property
     def debe_desconectar(self):
         return self.puntos >= self.umbral_desconexion
+
+    # T9: el anfitrión fija qué vehículo (tipo) monta este jugador según SU reserva de monturas, o None si va a pie.
+    # Desde entonces `veh` y la bandera de vehículo del cliente solo se comprueban contra esto, y la velocidad
+    # máxima es la del vehículo autorizado (no la que el cliente diga). `olvidar_vehiculo()` vuelve al modo previo.
+    def autorizar_vehiculo(self, tipo):
+        if tipo is None and self.veh_autorizado not in (None, SIN_CONTROL_VEHICULO):
+            self._t_bajada = self.reloj()
+        self.veh_autorizado = tipo
+
+    def olvidar_vehiculo(self):
+        self.veh_autorizado = SIN_CONTROL_VEHICULO
 
     # Estado que el anfitrión publica en los snapshots de este jugador.
     def estado(self):
@@ -163,6 +181,16 @@ class ValidadorMovimiento:
         r, v, f, veh = float(pos["r"]), float(pos["v"]), pos["f"], pos.get("veh")
         if veh is not None and veh not in self.vturbo:
             return self._rechazar("vehiculo", n)
+        autoridad = self.veh_autorizado is not SIN_CONTROL_VEHICULO
+        if autoridad:
+            # Reclamar un vehículo que el anfitrión no ha concedido (o uno distinto) es trampa o un error grave.
+            if veh is not None and veh != self.veh_autorizado:
+                if self.veh_autorizado is None and t - self._t_bajada <= GRACIA_BAJADA:
+                    veh = None                   # recién bajado: el latido de 2 Hz repite la última posición
+                else:
+                    return self._rechazar("vehiculo", n)
+            veh = self.veh_autorizado            # lo concedido manda, aunque el cliente aún no lo declare
+            f = (f | BANDERA_VEHICULO) if veh else (f & ~BANDERA_VEHICULO)
         # Interior local: el anfitrión solo anota banderas (los demás ven «dentro»), no valida ni mueve.
         if f & BANDERA_DENTRO:
             self.f = f
@@ -171,7 +199,7 @@ class ValidadorMovimiento:
         # Primera posición: se acepta si es transitable (la aparición normal usa colocar()).
         primera = not self.tiene_posicion
         dt = DT_MIN if primera else min(DT_MAX, max(DT_MIN, t - self._t_ultimo))
-        vmax = self._vmax(veh)
+        vmax = (VELOCIDAD_MAX_A_PIE if veh is None else self._vmax(veh)) if autoridad else self._vmax(veh)
         if primera:
             self.fichas = vmax * RESERVA_S
         else:

@@ -110,9 +110,18 @@ def insertar(tipo, actual, cursor, fragmento, limite=None, pegado=False):
     limite = limite_de(tipo) if limite is None else int(limite)
     actual = sanear_entrada(tipo, actual, limite)
     cursor = max(0, min(len(actual), int(cursor)))
-    trozo = sanear_pegado(tipo, fragmento, limite) if pegado else sanear_entrada(tipo, fragmento, limite)
-    if tipo == TIPO_ALIAS and trozo.startswith(" ") and (cursor == 0 or actual[cursor - 1:cursor] == " "):
-        trozo = trozo.lstrip(" ")
+    if pegado:
+        trozo = sanear_pegado(tipo, fragmento, limite)
+    else:
+        trozo = sanear_entrada(tipo, fragmento, limite)
+    if tipo == TIPO_ALIAS:
+        # un fragmento que es solo un espacio (o empieza por uno) NO se recorta aquí: el saneado del
+        # conjunto ya quita el espacio inicial y los dobles
+        if pegado:
+            linea = next((l for l in str(fragmento)[:MAX_PEGADO * 4].replace("\r", "\n").split("\n") if l.strip()), "")
+            fragmento = linea[:MAX_PEGADO]
+        crudo = _limpiar_comun(fragmento)
+        trozo = "".join(c for c in crudo if saneado._caracter_permitido(c))[:limite]
     sitio = limite - len(actual)
     if sitio <= 0 or not trozo:
         return actual, cursor

@@ -5,6 +5,7 @@
 # el velo), botón primario («Reanudar») y secundarios, y una guía de teclas. Teclado: flechas o
 # Tab mueven el foco, Enter activa (Escape lo gestiona EscenaMundo).
 
+from panda3d.core import ClockObject
 from ursina import Entity, Text, camera, color
 
 from frontend import estilo, tipografia
@@ -76,6 +77,7 @@ class MenuPausa(Entity):
         if self.con_ajustes:
             self.botones = (self.boton_reanudar, self.boton_ajustes, self.boton_menu, self.boton_salir)
         self.pantalla_ajustes = None      # se crea al abrir «Ajustes» por primera vez
+        self._frame_cierre_ajustes = -1   # frame en que se cerró «Ajustes» (para el Escape compartido)
         self._ocultos_por_ajustes = []
 
         # Guía de teclas: 2 columnas x 2 filas, con una línea fina encima.
@@ -110,8 +112,16 @@ class MenuPausa(Entity):
             entidad.enabled = False
         self.pantalla_ajustes.abrir()
 
+    # ¿Escape pertenece a «Ajustes»? True si está abierta o se cerró en este mismo frame con ese Escape (el controlador
+    # del mundo también recibe la misma tecla y no debe cerrar además la pausa).
+    def escape_es_de_ajustes(self):
+        if self.pantalla_ajustes is not None and self.pantalla_ajustes.enabled:
+            return True
+        return self._frame_cierre_ajustes == ClockObject.get_global_clock().get_frame_count()
+
     # Vuelve del submenú de ajustes al menú de pausa.
     def cerrar_ajustes(self):
+        self._frame_cierre_ajustes = ClockObject.get_global_clock().get_frame_count()
         if self.pantalla_ajustes is not None:
             self.pantalla_ajustes.enabled = False
         for entidad in self._ocultos_por_ajustes:

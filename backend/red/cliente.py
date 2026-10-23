@@ -93,8 +93,16 @@ def _sanear_dic(dic):
     return salida
 
 
-def sanear_mensaje(msg, ids_misiones=None):
-    """Copia segura de un mensaje H2C ya validado por esquema; None si hay que descartarlo."""
+def _sanear_vehiculos(lista):
+    # T9: solo vehículos de tipo conocido; el resto del esquema ya está validado (rangos, ids 0..7).
+    from backend.red.vehiculos_coop import TIPOS_VEHICULO
+    return [dict(v) for v in lista if v.get("k") in TIPOS_VEHICULO]
+
+
+def sanear_mensaje(msg, ids_misiones=None, vehiculos=False):
+    """Copia segura de un mensaje H2C ya validado por esquema; None si hay que descartarlo.
+
+    `vehiculos`: True si este cliente soporta vehículos online (T9); si no, se descarta `veh` del snap."""
     t = msg["t"]
     salida = dict(msg)
     if t == "sala":
@@ -121,7 +129,10 @@ def sanear_mensaje(msg, ids_misiones=None):
     elif t == "snap":
         if "ind" in msg:
             salida["ind"] = _sanear_dic(msg["ind"])
-        salida.pop("veh", None)      # vehículos online: aún no soportados (VEHICULOS_ONLINE=False)
+        if vehiculos and "veh" in msg:
+            salida["veh"] = _sanear_vehiculos(msg["veh"])
+        else:
+            salida.pop("veh", None)  # sin VEHICULOS_ONLINE el cliente ignora los vehículos del anfitrión
     elif t == "mision":
         if ids_misiones is not None and msg["id"] not in ids_misiones:
             return None
@@ -146,7 +157,8 @@ class ClienteRed:
     def __init__(self, huella_mundo, huella_contenido, ids_misiones=None, reloj=time.monotonic,
                  tiempos=None, esperas_reconexion=ESPERAS_RECONEXION,
                  max_reconexion=protocolo.GRACIA_RECONEXION, intervalo_ping=INTERVALO_PING,
-                 reconectar=True):
+                 reconectar=True, vehiculos=False):
+        self._vehiculos = bool(vehiculos)      # T9: entender los vehículos online (VEHICULOS_ONLINE)
         self._huella_mundo = huella_mundo
         self._huella_contenido = huella_contenido
         self._ids_misiones = None if ids_misiones is None else frozenset(ids_misiones)
@@ -289,6 +301,13 @@ class ClienteRed:
     def enviar_iniciar(self):
         # T8: solo vale del anfitrión-jugador y con todos listos; si no, llega «error» (solo_anfitrion / faltan_listos).
         return self._enviar_critico({"t": "iniciar"})
+
+    # T9: pedir montar el vehículo número `veh` (0..7) / bajar. El anfitrión responde monta_ok o monta_no.
+    def enviar_montar(self, veh):
+        return self._enviar_critico({"t": "montar", "veh": int(veh)})
+
+    def enviar_bajar(self):
+        return self._enviar_critico({"t": "bajar"})
 
     def enviar_saludo(self, indice):
         return self._enviar_critico({"t": "saludo_rapido", "indice": indice})
@@ -496,7 +515,7 @@ class ClienteRed:
             if self._conn is not None and self._conn.limite is not None:
                 self._conn.limite.registrar_infraccion()
             return
-        seguro = sanear_mensaje(msg, self._ids_misiones)
+        seguro = sanear_mensaje(msg, self._ids_misiones, self._vehiculos)
         if seguro is None:
             if self._conn is not None and self._conn.limite is not None:
                 self._conn.limite.registrar_infraccion()

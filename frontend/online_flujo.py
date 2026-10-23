@@ -43,6 +43,11 @@ _registro = logging.getLogger("alcalde.online.flujo")
 
 DECISIONES_VALIDAS = ("compartir", "reportar")
 
+# El anfitrión limita «decision» a 2/s (ráfaga 2): el cliente nunca manda más de DECISIONES_POR_VENTANA en
+# VENTANA_DECISIONES s (con margen), y encola el resto.
+DECISIONES_POR_VENTANA = 2
+VENTANA_DECISIONES = 1.1
+
 # Texto (para el teléfono) de cada motivo con que el anfitrión puede rechazar una interacción.
 TEXTOS_RECHAZO = {
     "fuera_de_radio": "Civitas: aún estás lejos de la puerta. Acércate un poco más.",
@@ -238,6 +243,8 @@ class FlujoEnLinea:
         self._muestras = {}             # id remoto -> última Muestra
         self._teletransportes = set()
         self._correccion = None
+        self.vehiculos_snap = []        # T9: último `veh` del snapshot [{i,k,x,z,r,p?}] (vacío sin VEHICULOS_ONLINE)
+        self.eventos_vehiculo = []      # T9: monta_ok / monta_no / desmontado por consumir (IntegracionVehiculosOnline)
 
         # Estado de la partida / interacción
         self.en_juego = False           # llegó «inicio»
@@ -247,6 +254,9 @@ class FlujoEnLinea:
         self._confirmacion = None       # None | "pendiente" | "ok" | "rechazada"
         self.ultimo_rechazo = None
         self._suprimir_envio = False    # al revertir por rechazo no se avisa «salir_edificio»
+        self._decisiones_en_cola = []   # decisiones por enviar (espaciadas, ver _enviar_decision)
+        self._envios_decision = []      # instantes de los últimos envíos de decisión (ventana deslizante)
+        self._ultima_enviada = None     # (mision, noticia, tipo) por si el anfitrión avisa de un descarte
         self._cierre_pendiente = None   # {"id", "siguiente"}: el anfitrión cerró la misión; el espejo espera
         self._diferidos = []            # eventos «mision» retenidos hasta cerrar el espejo
         self._dentro = False            # el jugador está dentro de un edificio (bandera «dentro»)
@@ -404,6 +414,8 @@ class FlujoEnLinea:
 
     # Avanza a los jugadores remotos al instante de dibujo (interpolación); lo llama BucleRed cada frame.
     def avanzar(self, ahora=None):
+        if self._decisiones_en_cola:
+            self._vaciar_decisiones()
         for id_jugador, interpolador in self._interpoladores.items():
             jugador = self._jugadores.get(id_jugador)
             muestra = interpolador.muestrear(ahora)
@@ -435,8 +447,8 @@ class FlujoEnLinea:
             if jugador is None:
                 continue
             jugador.x, jugador.z, jugador.y = spawn["x"], spawn["z"], spawn["y"]
-            if spawn["id"] == self.tu_id:
-                self._sistema.actualizar_posicion(jugador.x, jugador.z) if self.hay_mision_activa() else None
+            if spawn["id"] == self.tu_id and self.hay_mision_activa():
+                self._sistema.actualizar_posicion(jugador.x, jugador.z)
 
     def _ev_jugador_sale(self, ev):
         id_jugador = ev["id"]
@@ -471,6 +483,26 @@ class FlujoEnLinea:
                                  entrada["v"], entrada["f"], recibido=recibido)
         if "ind" in ev:
             self.estado.fijar_indicadores(ev["ind"])
+        if "veh" in ev:
+            self.vehiculos_snap = ev["veh"]
+
+    # T9: respuestas del anfitrión a montar / bajada forzosa. Se encolan y las consume la integración de vehículos.
+    def _ev_monta_ok(self, ev):
+        self._encolar_vehiculo(ev)
+
+    def _ev_monta_no(self, ev):
+        self._encolar_vehiculo(ev)
+
+    def _ev_desmontado(self, ev):
+        self._encolar_vehiculo(ev)
+
+    def _encolar_vehiculo(self, ev):
+        self.eventos_vehiculo.append(dict(ev))
+        del self.eventos_vehiculo[:-16]       # tope: nadie debería acumular más
+
+    def tomar_eventos_vehiculo(self):
+        eventos, self.eventos_vehiculo = self.eventos_vehiculo, []
+        return eventos
 
     def _ev_corregir(self, ev):
         jugador = self.jugador
@@ -530,6 +562,13 @@ class FlujoEnLinea:
 
     def _ev_error(self, ev):
         self.ultimo_error = ev.get("motivo")
+        # El anfitrión descartó la última decisión por tasa: se reenvía (más espaciada) en vez de perderla.
+        if self.ultimo_error == "decision_limite_tasa" and self._ultima_enviada is not None \
+                and self._sistema.estado() == EN_MINIJUEGO and self._cierre_pendiente is None:
+            self._decisiones_en_cola.insert(0, self._ultima_enviada)
+            self._ultima_enviada = None
+            self._envios_decision.append(self._reloj())      # la ventana se llena: el reenvío espera
+            self._envios_decision.append(self._reloj())
 
     def _ev_reconectando(self, ev):
         self.reconectando = True
@@ -561,8 +600,26 @@ class FlujoEnLinea:
         mision = self._sistema.mision_actual()
         return mision.id if mision is not None else None
 
+    # Las decisiones se envían separadas al menos SEPARACION_DECISIONES s: el anfitrión admite ~2/s y descartaba
+    # el exceso. Si aún no toca, se encolan y avanzar() las manda a su hora (siempre en orden).
     def _enviar_decision(self, id_mision, id_noticia, tipo):
-        return self.cliente.enviar_decision(id_mision, id_noticia, tipo)
+        self._decisiones_en_cola.append((id_mision, id_noticia, tipo))
+        self._vaciar_decisiones()
+        return True
+
+    def _vaciar_decisiones(self):
+        while self._decisiones_en_cola:
+            ahora = self._reloj()
+            while self._envios_decision and ahora - self._envios_decision[0] >= VENTANA_DECISIONES:
+                self._envios_decision.pop(0)
+            if len(self._envios_decision) >= DECISIONES_POR_VENTANA:
+                return
+            id_mision, id_noticia, tipo = self._decisiones_en_cola[0]
+            if not self.cliente.enviar_decision(id_mision, id_noticia, tipo):
+                return                            # sin conexión: se reintenta en el siguiente frame
+            self._decisiones_en_cola.pop(0)
+            self._ultima_enviada = (id_mision, id_noticia, tipo)
+            self._envios_decision.append(ahora)
 
     def _avisar(self, texto):
         self.jugador.telefono.notificar(texto)
@@ -589,6 +646,7 @@ class FlujoEnLinea:
         finally:
             self._suprimir_envio = False
             self._dentro = False
+            self._decisiones_en_cola.clear()       # las decisiones sin enviar de un minijuego revertido ya no valen
             self.estado.restaurar_copia()
 
     def _hay_mision_diferida(self):

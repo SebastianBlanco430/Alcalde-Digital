@@ -57,6 +57,7 @@ class Conexion:
         self.direccion_entrante = direccion_entrante
         self.direccion_saliente = direccion_saliente
         self.limite = limite                     # LimiteConexion o None
+        self.al_descartar = None                 # callable(tipo) opcional: se llama al descartar un mensaje fuera de tasa
         self._max_cola = int(max_cola)
         self._umbral = int(umbral)
         self._t_escritura = float(t_escritura)
@@ -138,6 +139,11 @@ class Conexion:
                 if not self.limite.admitir(mensaje["t"]):
                     if self.limite.debe_cerrar():
                         raise LimiteExcedido("tasa")
+                    if self.al_descartar is not None:      # aviso explícito en vez de descarte silencioso
+                        try:
+                            self.al_descartar(mensaje["t"])
+                        except Exception:                  # noqa: BLE001 - un fallo del aviso no corta la lectura
+                            pass
                     continue
             self.recibidos += 1
             return mensaje

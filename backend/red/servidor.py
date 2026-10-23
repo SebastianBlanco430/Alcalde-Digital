@@ -53,7 +53,20 @@ def _leer_argumentos(argv):
                     help="el primero en entrar puede venir de otro equipo (por defecto debe ser local)")
     ap.add_argument("--sin-auto-iniciar", action="store_true",
                     help="no empezar sola al estar todos listos (usa la orden «iniciar»)")
+    ap.add_argument("--max-por-ip", type=int, default=None,
+                    help="conexiones simultáneas por IP (por defecto el valor del protocolo; sube para jugar de a 4 en un equipo)")
+    ap.add_argument("--sin-vehiculos", action="store_true",
+                    help="sin bicis ni motos online (por defecto las hay si VEHICULOS_ONLINE está activo)")
     return ap.parse_args(argv)
+
+
+def _vehiculos_online():
+    # La bandera vive en frontend/online_config.py (módulo mínimo, sin ursina): clientes y anfitrión la comparten.
+    try:
+        from frontend import online_config
+        return bool(online_config.VEHICULOS_ONLINE)
+    except Exception:
+        return False
 
 
 def _confirmar_abierto():
@@ -74,7 +87,9 @@ def main(argv=None):
     try:
         anfitrion = construir_anfitrion(
             puerto=args.puerto, ambito=args.ambito, semilla=args.semilla, abierto=abierto,
-            exigir_anfitrion_local=not args.primero_cualquiera, auto_iniciar=not args.sin_auto_iniciar)
+            exigir_anfitrion_local=not args.primero_cualquiera, auto_iniciar=not args.sin_auto_iniciar,
+            vehiculos=_vehiculos_online() and not args.sin_vehiculos,
+            **({"max_por_ip": args.max_por_ip} if args.max_por_ip else {}))
         host, puerto = anfitrion.iniciar()
     except (OSError, ValueError) as error:
         print(f"No se pudo abrir el servidor: {error}")

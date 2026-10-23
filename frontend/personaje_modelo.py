@@ -76,6 +76,7 @@ class PersonajeModelo(Entity):
         actor = self._crear_actor(rol)  # antes de crear nada: si falla, no queda una Entity a medias
         super().__init__(**opciones)
         self.nombre = nombre
+        self.rol = rol                # lo usa frontend/piloto_glb.py para sentar la misma skin en un vehículo
         self.rumbo = 0.0
         self.rumbo_objetivo = 0.0
         self.velocidad = 0.0

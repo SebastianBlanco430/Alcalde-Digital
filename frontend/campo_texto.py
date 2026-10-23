@@ -6,7 +6,7 @@
 # inserta un salto de línea con Intro y empareja corchetes. Aquí:
 #   - cada cambio pasa por `sanear_entrada` (se engancha en `text_field.render`, también con contenido oculto);
 #   - el pegado (Ctrl+V / Cmd+V / botón «Pegar») lo hace este módulo, no el TextField;
-#   - Intro no escribe nada: avanza al siguiente campo o envía (`al_enviar`);
+#   - Intro no escribe nada: FocoOnline (online_ui) avanza al siguiente campo o llama a `al_enviar`;
 #   - la fuente del campo es la monoespaciada de Ursina (Vera Mono): trae acentos y ñ (comprobado en ventana).
 #
 # NO PROBADO con un IME real (chino/japonés/coreano/teclas muertas del teclado) ni con Cmd+V en un teclado
@@ -77,7 +77,6 @@ class CampoTexto(Entity):
         tf = self.entrada.text_field
         tf.shortcuts['paste'] = ()           # el pegado lo gestiona este módulo (saneado y límite)
         tf.shortcuts['newline'] = ()         # Intro no escribe: avanza o envía
-        tf.shortcuts['newline_alt'] = () if 'newline_alt' in tf.shortcuts else ()
         original = tf.render
 
         def render():
@@ -199,8 +198,6 @@ class CampoTexto(Entity):
             return
         if key in TECLAS_PEGAR:
             self.pegar()
-        elif key in ("enter", "return", "keypad enter") and self.al_enviar is not None:
-            self.al_enviar()
 
     def update(self):
         activo = self.activo

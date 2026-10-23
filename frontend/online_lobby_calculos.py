@@ -39,6 +39,8 @@ EXPLICACION_AMBITO = {
     AMBITO_ABIERTO: ("Escucha en TODAS las interfaces: cualquiera que sepa tu IP pública y el código puede intentar "
                      "entrar. Hace falta abrir el puerto en el router. El tráfico va SIN cifrar."),
 }
+AVISO_PRIVACIDAD = ("Tu alias y el último anfitrión se guardan solo en este equipo (Ajustes > Online > Olvidar). "
+                    "Detalle en docs/PRIVACIDAD_ONLINE.md.")
 AVISO_SIN_CIFRAR = "El tráfico no va cifrado: usa red local o VPN (Tailscale, ZeroTier, WireGuard)."
 AVISO_ABIERTO = (f"Para abrir la sala a internet escribe {CONFIRMACION_ABIERTO}. Se creará un código largo "
                  f"({LARGO_CODIGO_ABIERTO} caracteres). Mejor usa una VPN y la opción «Red local».")
@@ -457,6 +459,9 @@ def info_error(motivo):
     clave = _SINONIMOS.get(motivo, motivo)
     if clave in _ERRORES:
         return _ERRORES[clave]
+    if motivo == "protocolo_invalido:esperaba_reto":
+        # El anfitrión rechaza con «lleno_de_conexiones» ANTES del reto y ClienteRed lo ve como protocolo roto.
+        return _ERRORES["lleno_de_conexiones"]
     if motivo.startswith("protocolo_invalido"):
         return InfoError("protocolo_invalido", "Respuesta inesperada",
                          "El otro extremo no habla el protocolo del juego (¿IP o puerto de otro programa?).")
