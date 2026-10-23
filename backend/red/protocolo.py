@@ -40,6 +40,11 @@ LIMITES_POR_TIPO = {"pos": 30, "decision": 2, "saludo_rapido": 1, "iniciar": 2} 
 CODIGOS_RECHAZO = ("version", "sala_llena", "rol_tomado", "codigo_malo", "mundo_distinto",
                    "nombre_invalido", "expulsado", "lleno_de_conexiones")
 
+# Vehículos online (T9): motivos admitidos en monta_no / desmontado (conjunto cerrado, nunca texto libre).
+MOTIVOS_VEHICULO = frozenset({"ocupado", "lejos", "ya_montado", "no_existe", "fase", "dentro",
+                              "desactivado", "desconectado", "bajada"})
+N_VEHICULOS_MAX = 8
+
 # Límites numéricos de coordenadas (el mundo es pequeño; evita valores absurdos)
 COORD_MAX = 100000.0
 ALTURA_MAX = 10000.0
@@ -125,7 +130,9 @@ _JUGADOR_SALA = {
     "conectado": _b(), "anfitrion": _b(),
 }
 _SPAWN = {"id": _ID, "x": _X, "z": _X, "y": _Y}
-_VEHICULO_SNAP = {"i": _ID, "k": _s(32), "x": _X, "z": _X, "r": _R}
+# i = índice del vehículo (0..7), k = tipo, p = jugador que lo conduce (ausente si está aparcado).
+_VEHICULO_SNAP = {"i": _i(0, N_VEHICULOS_MAX - 1), "k": _s(32), "x": _X, "z": _X, "r": _R,
+                  "p": _i(0, MAX_JUGADORES - 1, obligatorio=False)}
 
 # Cada entrada: (direcciones admitidas, {campo: Campo}). La clave «t» la pone el codec.
 ESQUEMAS = {
@@ -174,6 +181,12 @@ ESQUEMAS = {
         "hechas": Campo("lista_str", largo=16, largo_item=64),
     }),
     "interactuar": ((DIR_C2H,), {}),
+    # T9 (vehículos online): el cliente pide montar el vehículo `veh` / bajar; el anfitrión decide.
+    "montar": ((DIR_C2H,), {"veh": _i(0, N_VEHICULOS_MAX - 1)}),
+    "bajar": ((DIR_C2H,), {}),
+    "monta_ok": ((DIR_H2C,), {"veh": _i(0, N_VEHICULOS_MAX - 1)}),
+    "monta_no": ((DIR_H2C,), {"motivo": _s(24, opciones=MOTIVOS_VEHICULO)}),
+    "desmontado": ((DIR_H2C,), {"motivo": _s(24, opciones=MOTIVOS_VEHICULO)}),
     "ok": ((DIR_H2C,), {}),
     "rechazo_interactuar": ((DIR_H2C,), {"motivo": _s(120)}),
     "decision": ((DIR_C2H,), {

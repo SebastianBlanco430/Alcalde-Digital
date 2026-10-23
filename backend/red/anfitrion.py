@@ -39,6 +39,7 @@ from backend.red.limites import ConteoConexiones, LimiteConexion, VetoPorIP
 from backend.red.partida_coop import FASE_JUEGO, FASE_SALA
 from backend.red.sesion_en_linea import mascara_a_banderas
 from backend.red.transporte import Conexion, ConexionCerrada, LimiteExcedido, limite_lectura
+from backend.red import vehiculos_coop
 from backend.red.validacion_movimiento import BANDERA_DENTRO, ValidadorMovimiento
 
 registro = logging.getLogger("alcalde.red.anfitrion")
@@ -49,10 +50,12 @@ IP_PRUEBA_RUTA = "192.0.2.1"       # TEST-NET-1 (RFC 5737): connect() de UDP no 
 TICK_S = 1.0                        # cada cuánto se llama a partida.tick() (gracia de reconexión)
 CUENTA_INICIO = 3                   # s de cuenta atrás que se anuncian en «inicio» (solo cosmético)
 LIMPIEZA_VETO_S = 60.0
+ALTAS_POR_IP_MINUTO = 12
+_MAX_IP_EN_ALTAS = 64                 # desde aquí se poda `_altas_por_ip` (IP sin altas en los últimos 60 s)
 # Tasas por tipo (msg/s) además de las del protocolo: ningún tipo de acción debe poder usarse
 # como arma (p. ej. salir_edificio repetido para recargar el presupuesto de movimiento).
 LIMITES_POR_TIPO = dict(protocolo.LIMITES_POR_TIPO, salir_edificio=2, interactuar=5, rol=3, listo=5,
-                        adios=2, hola=1, iniciar=2)
+                        adios=2, hola=1, iniciar=2, montar=4, bajar=4)
 TIEMPOS_DEFECTO = {
     "handshake": protocolo.T_HANDSHAKE,
     "silencio": protocolo.T_SILENCIO_PING,
@@ -186,7 +189,7 @@ class Anfitrion:
                  ambito="lan", puerto=0, abierto=False, reloj=time.monotonic, hz_snap=protocolo.HZ_SNAP,
                  tiempos=None, exigir_anfitrion_local=True, auto_iniciar=False,
                  cuenta_inicio=CUENTA_INICIO, bloquear_loopback=False, max_por_ip=protocolo.MAX_CONEXIONES_POR_IP,
-                 max_infracciones=20, sndbuf=None):
+                 max_infracciones=20, sndbuf=None, altas_por_minuto=ALTAS_POR_IP_MINUTO, vehiculos=False):
         codigo = huellas.normalizar_codigo(codigo)
         if codigo is None:
             raise ValueError("Código de sala inválido.")
@@ -212,6 +215,8 @@ class Anfitrion:
         self._sndbuf = sndbuf
         self.conteo = ConteoConexiones(protocolo.MAX_CONEXIONES, max_por_ip)
         self.veto = VetoPorIP(reloj)
+        self._altas_max = int(altas_por_minuto)
+        self._altas_por_ip = {}                 # ip -> instantes de altas recientes (freno a la ráfaga de altas/bajas)
         self.sala_id = "sala-" + secrets.token_hex(3)
         self.host = None
         self.puerto = None
@@ -230,6 +235,10 @@ class Anfitrion:
         self._sala_cerrada = False
         self._snap_n = 0
         self._t0 = time.monotonic()
+        # T9: vehículos online. Con vehiculos=False el anfitrión es el de siempre (monta_no «desactivado»).
+        self.reserva_veh = None
+        if vehiculos:
+            self.reserva_veh = vehiculos_coop.ReservaVehiculos(vehiculos_coop.aparcados_deterministas(mundo))
 
     # ======================================================================
     # API pública (hilo del llamador)
@@ -418,6 +427,7 @@ class Anfitrion:
                 return
             conn.limite = LimiteConexion(max_infracciones=self._max_infracciones,
                                          por_tipo=LIMITES_POR_TIPO)
+            conn.al_descartar = lambda tipo, p=par: self._avisar_descarte(p, tipo)
             await self._bucle_par(par)
         except asyncio.CancelledError:
             raise
@@ -435,6 +445,20 @@ class Anfitrion:
                 await conn.cerrar(True, 1.0)
             self._tareas.discard(tarea)
 
+    def _alta_permitida(self, ip):
+        """Máximo ALTAS_POR_IP_MINUTO entradas autenticadas por IP en 60 s: evita que un invitado
+        inunde de `jugador_entra/sale` a los demás clientes (que cortan por `anfitrion_inundando`)."""
+        ahora = self._reloj()
+        if len(self._altas_por_ip) > _MAX_IP_EN_ALTAS:       # poda las IP sin altas recientes: el dict no crece sin límite
+            self._altas_por_ip = {k: v for k, v in self._altas_por_ip.items() if v and ahora - v[-1] < 60.0}
+        recientes = [t for t in self._altas_por_ip.get(ip, []) if ahora - t < 60.0]
+        if len(recientes) >= self._altas_max:
+            self._altas_por_ip[ip] = recientes
+            return False
+        recientes.append(ahora)
+        self._altas_por_ip[ip] = recientes
+        return True
+
     async def _rechazar(self, conn, codigo, texto):
         conn.enviar({"t": "rechazo", "codigo": codigo, "texto": _texto(texto, 200)})
         await conn.cerrar(True, 1.0)
@@ -451,7 +475,12 @@ class Anfitrion:
                 return None
             await self._rechazar(conn, "version", "Mensaje inicial no válido (¿versión distinta?).")
             return None
-        except (TimeoutError, ConexionCerrada, LimiteExcedido):
+        except TimeoutError:
+            # Slowloris: quien abre la conexión y no manda «hola» ocupa un puesto (8 en total) durante T_HANDSHAKE.
+            # Un cliente legítimo nunca llega a este punto; repetirlo acaba en veto de la IP (que ya no ocupa puesto).
+            self.veto.registrar_fallo(ip)
+            return None
+        except (ConexionCerrada, LimiteExcedido):
             return None
         if hola["t"] != "hola":
             await self._rechazar(conn, "version", "Se esperaba el saludo inicial.")
@@ -475,6 +504,9 @@ class Anfitrion:
         if hola["huella_mundo"] != self.huella_mundo or hola["huella_contenido"] != self.huella_contenido:
             await self._rechazar(conn, "mundo_distinto",
                                  f"Tu mundo es distinto. Reinicia con ALCALDE_SEMILLA={self.semilla}.")
+            return None
+        if not self._alta_permitida(ip):
+            await self._rechazar(conn, "lleno_de_conexiones", "Demasiadas entradas seguidas. Espera un momento.")
             return None
         resultado = self._admitir(hola, conn, ip)
         if isinstance(resultado, _Rechazo):
@@ -549,6 +581,11 @@ class Anfitrion:
     def _registrar(self, jugador, conn, ip, reconexion=False):
         validador = ValidadorMovimiento(self.mundo, reloj=self._reloj)
         validador.colocar(jugador.x, jugador.z, jugador.y if reconexion and jugador.y else None)
+        if self.reserva_veh is not None:
+            self.reserva_veh.liberar_jugador(jugador.id)      # al (re)entrar nadie va montado
+            validador.autorizar_vehiculo(None)
+        else:
+            validador.autorizar_vehiculo(None)    # sin vehículos online nadie puede declarar uno (velocidad de moto a pie)
         if reconexion:
             validador.ultimo_n = -1
         par = _Par(jugador.id, conn, ip, validador)
@@ -586,6 +623,7 @@ class Anfitrion:
 
     def _desregistrar(self, par):
         if self._pares.get(par.id) is par:
+            self._liberar_vehiculo(par)                  # T9: el vehículo queda aparcado donde estaba
             del self._pares[par.id]
         if par.reemplazado or par.cierre is not None:
             self._volcar_eventos()
@@ -594,6 +632,12 @@ class Anfitrion:
         if partida.sesion.por_id(par.id) is not None:
             partida.desconectar(par.id)                  # corte de red: gracia de reconexión
         self._volcar_eventos()
+
+    # Un mensaje que cuenta para la partida (decisión) se descartó por tasa: se avisa al cliente con un
+    # error explícito para que reenvíe, en vez de dejar la mano desincronizada en silencio.
+    def _avisar_descarte(self, par, tipo):
+        if tipo == "decision":
+            par.conn.enviar({"t": "error", "motivo": "decision_limite_tasa"})
 
     # ---- Despacho de mensajes C2H ----
     def _despachar(self, par, msg):
@@ -618,7 +662,14 @@ class Anfitrion:
             self._iniciar_por_cliente(par)
         elif t == "rol":
             self._cambiar_rol(par, msg["rol"])
+        elif t == "montar":
+            self._montar(par, msg["veh"])
+        elif t == "bajar":
+            self._bajar(par)
         elif t == "interactuar":
+            if self.reserva_veh is not None and self.reserva_veh.de_jugador(i) is not None:
+                par.conn.enviar({"t": "rechazo_interactuar", "motivo": "Baja del vehículo primero."})
+                return
             partida.interactuar(i)
         elif t == "decision":
             if msg["n"] <= par.ultimo_decision:          # repetida o atrasada
@@ -651,14 +702,54 @@ class Anfitrion:
         # El validador espera solo los campos de movimiento (sin la clave «t» del protocolo).
         res = par.validador.validar({k: v for k, v in msg.items() if k != "t"})
         if res.aceptado:
+            # La bandera de vehículo la normaliza el validador con lo que concedió la reserva (T9).
+            banderas = par.validador.f if self.reserva_veh is not None else msg["f"]
             partida.actualizar_posicion(par.id, res.x, res.z, res.y, msg["r"], msg["v"],
-                                        mascara_a_banderas(msg["f"]))
+                                        mascara_a_banderas(banderas))
+            if self.reserva_veh is not None:
+                self.reserva_veh.mover(par.id, res.x, res.z, msg["r"])
         elif res.ignorado:
             if msg["f"] & BANDERA_DENTRO:
+                self._liberar_vehiculo(par, avisar=True, motivo="dentro")     # entrar a un edificio = bajarse
                 partida.actualizar_posicion(par.id, res.x, res.z, res.y, msg["r"], msg["v"],
                                             mascara_a_banderas(msg["f"]))
         elif res.corregir:
             par.conn.enviar({"t": "corregir", "x": res.x, "z": res.z, "y": res.y, "seq": res.seq})
+
+    # ---- Vehículos (T9) ----
+    def _montar(self, par, veh):
+        reserva = self.reserva_veh
+        if reserva is None:
+            par.conn.enviar({"t": "monta_no", "motivo": vehiculos_coop.MOTIVO_DESACTIVADO})
+            return
+        partida = self.partida
+        jugador = partida.sesion.por_id(par.id)
+        if partida.fase != FASE_JUEGO or jugador is None or not jugador.conectado:
+            par.conn.enviar({"t": "monta_no", "motivo": vehiculos_coop.MOTIVO_FASE})
+            return
+        if "dentro" in jugador.banderas:
+            par.conn.enviar({"t": "monta_no", "motivo": vehiculos_coop.MOTIVO_DENTRO})
+            return
+        v = par.validador
+        ok, resultado = reserva.montar(par.id, veh, v.x, v.z)      # posición AUTORIZADA, no la que diga el cliente
+        if not ok:
+            par.conn.enviar({"t": "monta_no", "motivo": resultado})
+            return
+        v.autorizar_vehiculo(resultado.tipo)
+        par.conn.enviar({"t": "monta_ok", "veh": resultado.id})
+
+    def _bajar(self, par):
+        self._liberar_vehiculo(par)
+
+    # Libera la montura del jugador (baja, desconexión, entrada a un edificio). `avisar`: manda «desmontado» al cliente.
+    def _liberar_vehiculo(self, par, avisar=False, motivo="bajada"):
+        reserva = self.reserva_veh
+        if reserva is None:
+            return
+        liberado = reserva.bajar(par.id)
+        par.validador.autorizar_vehiculo(None)
+        if liberado is not None and avisar and not par.conn.cerrada:
+            par.conn.enviar({"t": "desmontado", "motivo": motivo})
 
     def _cambiar_rol(self, par, rol):
         partida = self.partida
@@ -696,6 +787,8 @@ class Anfitrion:
     def _iniciar(self, forzar):
         partida = self.partida
         partida.iniciar(forzar=forzar)
+        if self.reserva_veh is not None:
+            self.reserva_veh.reiniciar()
         # Posiciones iniciales autorizadas: spawns del rol, a la altura del suelo.
         for jugador in partida.sesion.jugadores():
             par = self._pares.get(jugador.id)
@@ -716,7 +809,9 @@ class Anfitrion:
             partida.salir(par.id, "expulsado")
         if self._bloquear_loopback or not es_ip_local(par.ip, par.conn.ip_local()):
             self._expulsadas.add(par.ip)
-        asyncio.get_running_loop().create_task(par.conn.cerrar(True, 1.0))
+        tarea = asyncio.get_running_loop().create_task(par.conn.cerrar(True, 1.0))
+        self._tareas.add(tarea)                       # referencia fuerte hasta que termine
+        tarea.add_done_callback(self._tareas.discard)
         self._volcar_eventos()
         return True
 
@@ -825,10 +920,12 @@ class Anfitrion:
                 jugadores.append({"i": e["i"], "x": round(e["x"], 3), "z": round(e["z"], 3),
                                   "y": round(e["y"], 3), "r": round(e["r"], 1),
                                   "v": round(e["v"], 2), "f": e["f"]})
+            snap = {"t": "snap", "n": self._snap_n, "tt": round(time.monotonic() - self._t0, 3),
+                    "jugadores": jugadores}
+            if self.reserva_veh is not None and len(self.reserva_veh):
+                snap["veh"] = self.reserva_veh.snapshot()
             try:
-                datos = protocolo.codificar(
-                    {"t": "snap", "n": self._snap_n, "tt": round(time.monotonic() - self._t0, 3),
-                     "jugadores": jugadores}, protocolo.DIR_H2C)
+                datos = protocolo.codificar(snap, protocolo.DIR_H2C)
             except protocolo.ErrorProtocolo as error:
                 registro.warning("Snapshot no codificable: %s", error.codigo)
                 continue

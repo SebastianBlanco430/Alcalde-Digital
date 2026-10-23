@@ -47,12 +47,14 @@ from frontend.escenas.escena_base import Escena
 from frontend.hud import HudMundo
 from frontend.marcadores_mundo import Baliza, RutaPiso
 from frontend.menu_pausa import MenuPausa
+from frontend import online_config
 from frontend.niebla import activar_niebla, desactivar_niebla
 from frontend.peatones import Peatones
 from frontend.personaje_modelo import crear_personaje
 
 VELOCIDAD_CAMINAR = 4.8     # m/s: ~25 s de punta a punta de la ciudad
 VELOCIDAD_CORRER = 8.5      # m/s con Shift: ~14 s
+ONLINE_MUNDO = online_config.ONLINE   # modo online: IntegracionOnline (frontend/online_mundo.py) si el flujo es FlujoEnLinea
 VEHICULOS = True            # bicicletas y motos montables (frontend/vehiculo_mundo.py); False = el mundo de siempre
 
 
@@ -93,6 +95,9 @@ class EscenaMundo(Escena):
         self.menu_pausa = MenuPausa(
             al_reanudar=lambda: self.alternar_pausa(False), al_menu=self._ir_al_menu,
             al_salir=application.quit, parent=self.hud)
+        self.online = None               # IntegracionOnline (solo con ONLINE y un FlujoEnLinea)
+        self.texto_turno_fn = None       # hook: callable(jugador) -> texto del panel de turno (None = «Turno de ...»)
+        self.sanear_nombre = None        # hook: callable(nombre) -> nombre visible (None = tal cual)
         self.vehiculos = None
         if VEHICULOS:
             from frontend.vehiculo_mundo import IntegracionVehiculos
@@ -106,6 +111,7 @@ class EscenaMundo(Escena):
     def al_entrar(self, flujo=None, salida=None, **datos):
         if flujo is not None:
             self.flujo = flujo
+        self._preparar_online()
         self.hud.enabled = True
         self.ciudad.encender_luces(True)
         activar_niebla()          # tras construir la ciudad: solo afecta a lo que ya existe
@@ -115,6 +121,8 @@ class EscenaMundo(Escena):
         if self.flujo is None:
             self._cinematica = False
             return
+        if self.online is not None:
+            self.online.sincronizar_roster()     # altas/bajas del roster sin reconstruir a todos
         nueva_partida = self.flujo.sesion is not self._sesion
         if nueva_partida:
             self._sesion = self.flujo.sesion
@@ -131,6 +139,8 @@ class EscenaMundo(Escena):
             self._reproducir_salida(salida["jugador"], salida["lugar"])
 
     def al_salir(self):
+        if self.online is not None:
+            self.online.al_salir()
         if self.vehiculos is not None:
             self.vehiculos.bajar()
         self.director.cancelar()
@@ -150,6 +160,8 @@ class EscenaMundo(Escena):
         self._sincronizar_raton()
         if self.vehiculos is not None:
             self.vehiculos.actualizar(time.dt)
+        if self.online is not None:
+            self.online.actualizar(time.dt)
         self.avanzar_hud(time.dt)
 
     # Un paso del HUD con `dt` segundos (los tests lo llaman a mano con dt fijos): ruta del GPS,
@@ -160,11 +172,25 @@ class EscenaMundo(Escena):
         self.hud.actualizar(dt, self._sesion, yaw_grados=self.camara.yaw)
         self._actualizar_ruta_piso()
 
+    # Modo online: crea la IntegracionOnline si el flujo es un FlujoEnLinea (y la quita si se vuelve al hot-seat o
+    # cambia la partida). Con ONLINE_MUNDO=False no se importa nada de la red.
+    def _preparar_online(self):
+        if not ONLINE_MUNDO:
+            return
+        from frontend.online_flujo import FlujoEnLinea
+        en_linea = isinstance(self.flujo, FlujoEnLinea)
+        if self.online is not None and (not en_linea or self.online.flujo is not self.flujo):
+            self.online.cerrar()
+            self.online = None
+        if en_linea and self.online is None:
+            from frontend.online_mundo import IntegracionOnline
+            self.online = IntegracionOnline(self)
+
     # -- Estado de controles --
 
     # Pausa y cinemáticas congelan al jugador (ver ControladorJugador).
     def controles_bloqueados(self):
-        return self.en_pausa or self._cinematica
+        return self.en_pausa or self._cinematica or (self.online is not None and self.online.bloquea_controles())
 
     def alternar_pausa(self, abierta=None):
         if self._cinematica:
@@ -187,6 +213,8 @@ class EscenaMundo(Escena):
     def raton_capturado(self):
         flujo = self.flujo
         if flujo is None or self.en_pausa or self._cinematica or flujo.partida_terminada():
+            return False
+        if self.online is not None and self.online.bloquea_controles():
             return False
         if flujo.estado_mision() in (EN_MINIJUEGO, COMPLETADA):
             return False
@@ -212,7 +240,8 @@ class EscenaMundo(Escena):
             destruir_arbol(avatar)
         self.avatares = {}
         for jugador in self._sesion.jugadores():
-            avatar = crear_personaje(jugador.nombre, jugador.rol, ROLES[jugador.rol].color, parent=self)
+            visible = jugador.nombre if self.sanear_nombre is None else self.sanear_nombre(jugador.nombre)
+            avatar = crear_personaje(visible, jugador.rol, ROLES[jugador.rol].color, parent=self)
             avatar.suelo = self._mundo.altura
             self.avatares[jugador.nombre] = avatar
         self.camara.ignorar = list(self.avatares.values())
@@ -236,7 +265,8 @@ class EscenaMundo(Escena):
 
         mision = self.flujo.mision_actual()
         self.hud.panel_turno.fijar(
-            f"Turno de {activo.nombre} ({ROLES[activo.rol].nombre})",
+            (f"Turno de {activo.nombre} ({ROLES[activo.rol].nombre})" if self.texto_turno_fn is None
+             else self.texto_turno_fn(activo)),
             f"Misión: {mision.titulo}" if mision is not None else self.TEXTO_SIN_MISION)
         # Baliza sobre la puerta del destino; sin misión se oculta.
         if mision is None:

@@ -18,7 +18,8 @@ from ursina import Entity, camera, color, held_keys, mouse, time
 from frontend import geometria_mundo
 from frontend import vehiculo_calculos as vc
 from frontend.piezas import silenciar
-from frontend.vehiculo_modelo import ELEVACION_SUELO, VehiculoModelo, crear_piloto
+from frontend.piloto_glb import crear_piloto_skin
+from frontend.vehiculo_modelo import ELEVACION_SUELO, VehiculoModelo
 
 TEXTO_MONTAR = "E: montar {nombre}"
 TEXTO_BAJAR = "E: bajar de la {nombre}"
@@ -113,8 +114,10 @@ class MundoVehiculos(Entity):
         return None if cercano is None else TEXTO_MONTAR.format(nombre=cercano.perfil.nombre)
 
     # Monta: `avatar` (Personaje procedural activo) pasa a ser el piloto; si es nulo o es un modelo .glb (sin
-    # pivotes) se crea un maniquí articulado con el color del rol. Devuelve el vehículo.
-    def montar(self, vehiculo, avatar=None, nombre="Piloto", color_rol=(120, 120, 120), rasgos="ciudadano", reutilizar=False):
+    # pivotes) se crea otra copia del MISMO modelo (piloto_glb.crear_piloto_skin; con SKIN_EN_VEHICULO = False o si
+    # falla, un maniquí articulado con el color del rol). El avatar solo se oculta. Devuelve el vehículo.
+    def montar(self, vehiculo, avatar=None, nombre="Piloto", color_rol=(120, 120, 120), rasgos="ciudadano", reutilizar=False,
+               rol=None):
         if self.conduciendo:
             return self.conducido
         self.avatar = avatar
@@ -122,7 +125,7 @@ class MundoVehiculos(Entity):
             self.piloto = avatar
             self._reutilizado = True
         else:
-            self.piloto = crear_piloto(nombre, color_rol, rasgos)
+            self.piloto = crear_piloto_skin(nombre, color_rol, rasgos, avatar, rol)
             self._reutilizado = False
             if avatar is not None:
                 avatar.hide()
@@ -144,8 +147,8 @@ class MundoVehiculos(Entity):
         piloto = v.modelo.bajar_piloto()
         if piloto is not None and not self._reutilizado:
             piloto.parent = None
-            from ursina import destroy
-            destroy(piloto)
+            from frontend.componentes import destruir_arbol      # con sus hijos (aro, sombra, etiqueta): sin fugas
+            destruir_arbol(piloto)
         elif piloto is not None:
             piloto.parent = self.parent
         if self.avatar is not None:
@@ -288,7 +291,7 @@ class IntegracionVehiculos:
         avatar = self.escena.avatar_de(jugador)
         rasgos = jugador.rol if jugador.rol in ROSTRO_PROCEDURAL_POR_ROL else "ciudadano"
         self.jugador = jugador
-        self.mundo.montar(vehiculo, avatar, jugador.nombre, ROLES[jugador.rol].color, rasgos)
+        self.mundo.montar(vehiculo, avatar, jugador.nombre, ROLES[jugador.rol].color, rasgos, rol=jugador.rol)
         # Se monta con el vehículo mirando al rumbo en que estaba aparcado; el avatar sigue donde está (oculto).
         jugador.x, jugador.z = vehiculo.estado.x, vehiculo.estado.z
         # Si se monta en pleno salto, el estado vertical y la sombra vuelven al suelo (sin destello al bajar).

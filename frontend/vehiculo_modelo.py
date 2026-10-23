@@ -201,8 +201,11 @@ class VehiculoModelo(Entity):
         if clave == self._pose_aplicada:
             return
         self._pose_aplicada = clave
-        pose, pelvis_z = vp.pose_piloto(self.piezas, fase)
-        piloto.aplicar_pose(pose)
+        if hasattr(piloto, "sentar_en"):                            # piloto con modelo .glb (frontend/piloto_glb.py)
+            pelvis_z = piloto.sentar_en(self.piezas, fase)
+        else:
+            pose, pelvis_z = vp.pose_piloto(self.piezas, fase)
+            piloto.aplicar_pose(pose)
         piloto.z = pelvis_z
         piloto.x = balanceo
         piloto.rotation_z = -math.degrees(balanceo) * 2.0           # el torso se contrapesa con la pedalada

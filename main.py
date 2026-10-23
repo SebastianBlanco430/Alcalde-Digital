@@ -20,6 +20,7 @@ from backend.logica.estado_partida import EstadoPartida
 from backend.logica.flujo_partida import FlujoPartida
 from backend.logica.misiones import SistemaMisiones
 from backend.logica.sesion import SesionJuego
+from frontend import online_config
 from frontend import compat_macos, daltonismo, diseno_adaptable, estilo, medidor_fps, tipografia
 from frontend import gpu_dedicada, rendimiento, telemetria
 from frontend import audio_enganches      # sonido: observa el juego y dispara efectos/música (frontend/audio.py)
@@ -56,6 +57,20 @@ class AtajosCinematica(Entity):
             self._conexion.saltar_cinematica()
 
 
+# Con ONLINE, las escenas del mundo llaman a la conexión ACTIVA: la del hot-seat de siempre, o la ConexionEnLinea
+# mientras dura una partida en línea. Delega cada atributo en el objeto que haya en `activa[0]`.
+class ConexionActiva:
+
+    def __init__(self, activa):
+        self._activa = activa
+
+    def __getattr__(self, nombre):
+        # Solo se llega aquí si `nombre` no existe: sin `_activa` (copia/pickle antes de __init__) no se recursa.
+        if nombre == "_activa":
+            raise AttributeError(nombre)
+        return getattr(self._activa[0], nombre)
+
+
 def limitar_fps(fps):
     # En la prueba del mundo el juego corria a ~180 fps (la tasa del monitor) usando ~50 %
     # de un nucleo. Se limita el reloj de Panda3D a `fps`: dt estable (movimiento y
@@ -82,7 +97,8 @@ def crear_sesion():
 
 
 def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
-                      duracion_cinematica=DURACION_CINEMATICA):
+                      duracion_cinematica=DURACION_CINEMATICA, semilla=SEMILLA_CASAS, al_empezar_online=None):
+    # Con ONLINE y sin `al_empezar_online`, la partida en línea real la arranca frontend/online_arranque.py.
     # Crea las escenas y las conecta por callbacks (ninguna recibe al gestor).
     # duracion_transicion: segundos de cada mitad del fundido a negro (0 = sin fundido).
     # duracion_cinematica: factor de las cinemáticas de entrar/salir de un edificio (0 = instantáneas)
@@ -105,12 +121,24 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
     if ajustes_jugador.AJUSTES:
         gestor.registrar(AJUSTES_ESCENA, EscenaAjustes(al_volver=lambda: gestor.cambiar_a(INICIO)))
         al_ajustes = lambda: gestor.cambiar_a(AJUSTES_ESCENA)
+    # Modo online (bandera ONLINE en frontend/online_config): registro PEREZOSO; con False no se importa backend.red.
+    al_online = None
+    arranque_online = [None]       # callback real de «Iniciar partida»; lo fija _conectar_online al final
+    if online_config.ONLINE:
+        from frontend import online_registro
+        al_online = online_registro.registrar(
+            gestor, mundo, semilla, al_inicio=lambda: gestor.cambiar_a(INICIO),
+            al_empezar=lambda cliente, info: arranque_online[0](cliente, info))
+    # Con ONLINE las escenas del mundo hablan con la conexión «activa» (hot-seat u online); sin ONLINE, con la de siempre.
+    activa = [conexion]
+    destino = ConexionActiva(activa) if online_config.ONLINE else conexion
     gestor.registrar(INICIO, EscenaInicio(
-        al_comenzar=conexion.ir_a_seleccion, al_salir=application.quit, al_ajustes=al_ajustes))
+        al_comenzar=conexion.ir_a_seleccion, al_salir=application.quit, al_ajustes=al_ajustes, al_online=al_online))
     gestor.registrar(SELECCION_ROL, EscenaSeleccionRol(
         fabrica_sesion=crear_sesion, al_comenzar=conexion.comenzar_partida))
     escena_mundo = EscenaMundo(
-        al_interactuar=conexion.interactuar, mundo=mundo, al_menu=conexion.volver_al_menu,
+        al_interactuar=(lambda: destino.interactuar()) if online_config.ONLINE else conexion.interactuar,
+        mundo=mundo, al_menu=(lambda: destino.volver_al_menu()) if online_config.ONLINE else conexion.volver_al_menu,
         escala_tiempo=duracion_cinematica)
     gestor.registrar(MUNDO, escena_mundo)
     conexion.cinematicas = escena_mundo          # reproduce la cinemática de entrada al pulsar E
@@ -120,8 +148,27 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
     # Orden de salto: primero los fundidos, luego las cinemáticas.
     conexion.saltadores = [transicion_lugar.saltar, transicion.saltar, escena_mundo.saltar_cinematica,
                            escena_interior.saltar_cinematica]
-    conexion.atajos = AtajosCinematica(conexion)
+    conexion.atajos = AtajosCinematica(destino)
+    if online_config.ONLINE:
+        _conectar_online(gestor, mundo, conexion, activa, escena_mundo, transicion, transicion_lugar,
+                         al_empezar_online, arranque_online)
     return conexion
+
+
+# Partida online real (solo con ONLINE): crea la ConexionEnLinea (misma cadena de escenas y fundidos que el hot-seat) y
+# el ArranqueOnline que recibe el callback de la sala. Si `al_empezar_online` ya vino dado (pruebas), no se crea.
+def _conectar_online(gestor, mundo, conexion, activa, escena_mundo, transicion, transicion_lugar, al_empezar_online,
+                     arranque_online):
+    from frontend.online_arranque import ArranqueOnline
+    from frontend.online_conexion import ConexionEnLinea
+    en_linea = ConexionEnLinea(gestor, mundo, transicion=transicion, grafo_social=conexion._grafo_social,
+                               transicion_lugar=transicion_lugar, con_interior=True)
+    en_linea.cinematicas = escena_mundo
+    en_linea.saltadores = conexion.saltadores
+    arranque = ArranqueOnline(gestor, mundo, en_linea, lambda on: activa.__setitem__(0, en_linea if on else conexion),
+                              escena_mundo=escena_mundo)
+    arranque_online[0] = arranque.al_empezar if al_empezar_online is None else al_empezar_online
+    conexion.arranque_online = arranque
 
 
 # Semilla de la favela: la variable de entorno ALCALDE_SEMILLA (entero) elige otra disposición de
@@ -167,7 +214,9 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
         daltonismo.instalar(ajustes_jugador.obtener())    # filtro de daltonismo según lo guardado, y en vivo
 
     gestor = GestorEscenas()
-    registrar_escenas(gestor, construir_mundo_3d(semilla=leer_semilla()), duracion_transicion, duracion_cinematica)
+    semilla = leer_semilla()
+    registrar_escenas(gestor, construir_mundo_3d(semilla=semilla), duracion_transicion, duracion_cinematica,
+                      semilla=semilla)
     audio_enganches.instalar(gestor)       # AUDIO = False (frontend/audio.py) o ALCALDE_SIN_AUDIO=1 lo dejan mudo
     gestor.cambiar_a(INICIO)
     rendimiento.instalar()                 # silencia en el bucle de Ursina las entidades pasivas (frontend/rendimiento.py)
