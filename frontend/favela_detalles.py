@@ -486,6 +486,96 @@ def _puesto(m, x, y, z, rumbo, toldo, variante):
             m.agregar(icosfera(0), p(-0.85 + k * 0.42, 0.98, 0.1 + 0.2 * j), 0.2, 0, fruta, (0.9, 1.1))
 
 
+# -- Rincones secretos (easter eggs) -----------------------------------------------------------------
+# Dos puestos de broma (backend/datos/barrio_favela.py, bandera EASTER_EGGS), de juguete y sin marcas: un
+# «expendio» de talco de bebé y dulces (brigadeiros y piruletas) y una «armería» de pistolas de agua de colores con
+# la punta naranja y globos de agua. Mesa de feria, cartel de cartón (las letras van aparte: letreros_secretos) y
+# todo dentro de la malla de objetos de la favela: 0 entidades nuevas salvo los dos Text del cartel.
+
+CARTON = (196, 160, 110)
+LETRAS_SECRETOS = {
+    "puesto_talco": ("TALCO SUSPEITO", "só pra bebê ;)"),
+    "armeria_juguete": ("ARSENAL DE BRINQUEDO", "só água!"),
+}
+COLORES_PISTOLA = ((120, 220, 60), (240, 70, 170), (40, 190, 230), (250, 210, 40))
+NARANJA_PUNTA = (255, 120, 20)
+
+
+# Rumbo (grados, múltiplo de 90) hacia donde mira el puesto: lo decide el backend (barrio_favela.orientar_secretos:
+# hacia el lado por el que se llega), que también pone la mesa que choca con esa misma orientación.
+def rumbo_secreto(zona, mundo=None):
+    return zona.rumbo
+
+
+# Punto local del puesto: (a lo largo de la mesa, altura, hacia el frente).
+def _local(zona, y, rumbo):
+    s, c = math.sin(math.radians(rumbo)), math.cos(math.radians(rumbo))
+    return lambda da, dy, df: (zona.cx + c * da + s * df, y + dy, zona.cz - s * da + c * df)
+
+
+def _mesa_de_feria(m, p, rumbo):
+    largo, fondo = 2.4, 0.9                            # backend/datos/barrio_favela.MESA_SECRETA
+    m.agregar(caja(), p(0, 0.78, 0), (largo, 0.06, fondo), rumbo, (232, 228, 214), (0.85, 1.0))      # tablero
+    m.agregar(caja(), p(0, 0.6, 0.44), (largo, 0.36, 0.03), rumbo, (226, 52, 60), (0.85, 1.0))       # faldón rojo
+    for da in (-1.1, 1.1):
+        for df in (-0.38, 0.38):
+            m.agregar(prisma(6, 0.5, 0.5), p(da, 0, df), (0.05, 0.76, 0.05), 0, (70, 70, 82), (0.8, 1.0))
+    # Cartel de cartón detrás de la mesa, sobre dos palos (las letras: letreros_secretos).
+    for da in (-0.85, 0.85):
+        m.agregar(prisma(6, 0.5, 0.5), p(da, 0, -0.6), (0.05, 1.95, 0.05), 0, (120, 90, 60), (0.8, 1.0))
+    m.agregar(caja(), p(0, 1.6, -0.6), (2.1, 0.8, 0.04), rumbo, CARTON, (0.9, 1.05), 0.08)
+
+
+def puesto_talco(m, zona, y, rumbo):
+    p = _local(zona, y, rumbo)
+    _mesa_de_feria(m, p, rumbo)
+    for k in range(6):                                 # frascos de talco: blancos con tapa rosa o celeste
+        da, df = -0.95 + k * 0.32, 0.12 * (k % 2)
+        m.agregar(prisma(10, 0.5, 0.42), p(da, 0.81, df), (0.14, 0.24, 0.14), 0, (246, 246, 240), (0.9, 1.05))
+        tapa = (240, 140, 170) if k % 2 else (140, 190, 240)
+        m.agregar(prisma(10, 0.5, 0.5), p(da, 1.05, df), (0.1, 0.05, 0.1), 0, tapa, (0.9, 1.05))
+    for k in range(9):                                 # bandeja de brigadeiros
+        m.agregar(icosfera(0), p(0.55 + (k % 3) * 0.1, 0.84, -0.15 + (k // 3) * 0.1), 0.08, 0, (88, 52, 34),
+                  (0.8, 1.1))
+    m.agregar(caja(), p(0.65, 0.81, -0.05), (0.42, 0.02, 0.38), rumbo, (210, 210, 220), (0.9, 1.0))
+    for k, tono in enumerate(((250, 70, 120), (250, 210, 40), (60, 180, 240))):      # piruletas en un vaso
+        m.agregar(prisma(6, 0.5, 0.5), p(-0.3 + k * 0.08, 0.81, -0.25), (0.015, 0.4, 0.015), 0, (245, 245, 245))
+        m.agregar(prisma(14, 0.5, 0.5), p(-0.3 + k * 0.08, 1.2, -0.25), (0.14, 0.03, 0.14), rumbo, tono, (0.9, 1.1),
+                  0.0, 90)
+
+
+def armeria_juguete(m, zona, y, rumbo):
+    p = _local(zona, y, rumbo)
+    _mesa_de_feria(m, p, rumbo)
+    for k in range(4):                                 # pistolas de agua tumbadas sobre la mesa
+        da = -0.95 + k * 0.5
+        tono = COLORES_PISTOLA[k % len(COLORES_PISTOLA)]
+        m.agregar(caja(), p(da, 0.85, 0.05), (0.32, 0.09, 0.07), rumbo, tono, (0.9, 1.1))               # cuerpo
+        m.agregar(caja(), p(da - 0.08, 0.83, -0.08), (0.08, 0.05, 0.16), rumbo, tono, (0.85, 1.05))      # mango
+        m.agregar(icosfera(0), p(da + 0.02, 0.93, 0.05), (0.14, 0.09, 0.09), rumbo, (200, 235, 255), (0.9, 1.1))  # tanque
+        m.agregar(caja(), p(da + 0.22, 0.85, 0.05), (0.12, 0.04, 0.04), rumbo, tono, (0.9, 1.1))         # cañón
+        m.agregar(caja(), p(da + 0.3, 0.85, 0.05), (0.04, 0.05, 0.05), rumbo, NARANJA_PUNTA, (1.0, 1.1))  # punta naranja
+    m.agregar(prisma(12, 0.5, 0.42), p(0.85, 0.81, -0.2), (0.34, 0.26, 0.34), 0, (60, 120, 220), (0.85, 1.05))   # balde
+    for k, tono in enumerate(((240, 70, 170), (250, 210, 40), (120, 220, 60), (40, 190, 230), (250, 120, 40))):
+        m.agregar(icosfera(0), p(0.78 + (k % 3) * 0.08, 1.08 + (k // 3) * 0.06, -0.24 + (k % 2) * 0.08), 0.12, 0,
+                  tono, (0.9, 1.15))                  # globos de agua
+
+
+# Letreros de los rincones secretos: [(texto, (x, y, z), rotation_y, escala)] (el primero grande, el segundo debajo).
+# Van como Text sobre la cara del cartel de cartón que mira al frente.
+def letreros_secretos(mundo):
+    letreros = []
+    for zona in mundo.zonas():
+        if zona.tipo not in LETRAS_SECRETOS:
+            continue
+        rumbo = rumbo_secreto(zona, mundo)
+        p = _local(zona, mundo.altura(zona.cx, zona.cz), rumbo)
+        titulo, nota = LETRAS_SECRETOS[zona.tipo]
+        letreros.append((titulo, p(0, 1.76, -0.57), rumbo + 180, 8.0 if len(titulo) <= 14 else 6.2))
+        letreros.append((nota, p(0, 1.42, -0.57), rumbo + 180, 6.0))
+    return letreros
+
+
 # -- Pasadizos --------------------------------------------------------------------------------------
 
 
@@ -591,6 +681,10 @@ def construir_favela_detalles(mundo, casas, bases):
             cancha(objetos, zona, h)
         elif zona.tipo == "mercado":
             mercadito(objetos, zona, h)
+        elif zona.tipo == "puesto_talco":
+            puesto_talco(objetos, zona, h, rumbo_secreto(zona, mundo))
+        elif zona.tipo == "armeria_juguete":
+            armeria_juguete(objetos, zona, h, rumbo_secreto(zona, mundo))
     bandera_v, bandera_t, bandera_c = datos_banderines(cuerdas)
     malla_b = Mesh(vertices=bandera_v, triangles=bandera_t, colors=bandera_c) if bandera_v else None
     return objetos.mesh(), pintura.mesh(), tinta.mesh(), malla_b, textos

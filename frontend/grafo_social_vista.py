@@ -16,22 +16,39 @@ ALCANZADO = "alcanzado"
 PENDIENTE = "pendiente"
 FRENADO = "frenado"
 
-# Posiciones fijas (x, y) en [-1, 1] (y arriba) de los 10 ciudadanos del grafo de
-# ejemplo: Ana al centro, sus cuatro contactos en las diagonales y los de segundo salto
-# en las filas extremas. Diseñadas para que ninguna arista se cruce; Diana (aislada)
-# queda sola abajo en el centro.
+# Posiciones fijas (x, y) en [-1, 1] (y arriba) de los 17 ciudadanos del grafo de ejemplo: la red de Ana a la
+# izquierda (el ciclo Ana-Fábio-Ivan-Hugo-Elena como un lazo y las cadenas cortas hacia Júlia-Kauã y Carlos-Luana),
+# la comunidad del Morro a la derecha y Diana (aislada) sola abajo a la derecha. Buscadas en una rejilla para que
+# ninguna arista se cruce, los nombres (bajo el nodo, o hacia afuera en los bordes: ver
+# resultado_grafo_calculos.lado_etiqueta) no pisen otros nodos ni nombres en el panel de resultado y los nodos no se
+# toquen en el panel pequeño de alcance (lo comprueban las pruebas, con escala_nodos aplicada).
 POSICIONES_EJEMPLO = {
-    "Ana": (0.0, 0.0),
-    "Elena": (-0.8, 0.45),
-    "Fabio": (0.8, 0.45),
-    "Hugo": (-0.4, 0.95),
-    "Iván": (0.4, 0.95),
-    "Beto": (-0.8, -0.45),
-    "Gina": (0.8, -0.45),
-    "Carlos": (-0.62, -0.95),
-    "Julia": (0.62, -0.95),
-    "Diana": (0.0, -0.95),
+    "Ana": (-0.4, 0.62),
+    "Beto": (-0.2, 0.3),
+    "Carlos": (-0.4, -0.35),
+    "Diana": (0.8, -0.95),
+    "Elena": (-0.6, 0.3),
+    "Fábio": (-0.8, 0.62),
+    "Gina": (-0.6, 0.95),
+    "Hugo": (-0.8, -0.95),
+    "Ivan": (-0.8, -0.35),
+    "Júlia": (0.0, 0.95),
+    "Kauã": (0.2, 0.62),
+    "Luana": (0.0, -0.35),
+    "Marcos": (0.6, 0.3),
+    "Nayara": (0.4, -0.35),
+    "Otávio": (0.8, -0.35),
+    "Paula": (0.8, 0.62),
+    "Quitéria": (0.6, 0.95),
 }
+
+# Escala de los nodos según cuántos ciudadanos hay: hasta NODOS_REFERENCIA (los 10 del grafo de antes), el tamaño de
+# siempre; con más, se encogen con la raíz de la proporción (el área total de nodos se mantiene) para que quepan.
+NODOS_REFERENCIA = 10
+
+
+def escala_nodos(cantidad):
+    return min(1.0, math.sqrt(NODOS_REFERENCIA / cantidad)) if cantidad > 0 else 1.0
 
 
 # {ciudadano: (x, y)} de todos los ciudadanos del grafo. Los conocidos usan la tabla

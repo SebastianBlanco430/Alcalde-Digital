@@ -23,6 +23,7 @@ from ursina import destroy
 from backend.logica.roles import ROLES
 from backend.red.saneado import sanear_texto_visible
 from frontend import online_vehiculos_calculos as ovc
+from frontend import vehiculo_calculos as vc
 from frontend.componentes import destruir_arbol
 from frontend.rostro_calculos import ROSTRO_PROCEDURAL_POR_ROL
 from frontend.piloto_glb import crear_piloto_skin
@@ -213,7 +214,8 @@ class VehiculosOnline:
             mundo = self.escena._mundo
             suelo = getattr(mundo, "altura_con_escaleras", None) or getattr(mundo, "altura", None)
             y = float(suelo(e.x, e.z)) if suelo is not None else float(datos[2])
-            return ovc.datos_con_vehiculo(datos, e.x, e.z, y, e.rumbo, e.velocidad, c.tipo)
+            return ovc.datos_con_vehiculo(datos, e.x, e.z, y, e.rumbo, e.velocidad, c.tipo,
+                                          caballito=e.caballito > vc.ANGULO_MINIMO_CABALLITO)
         self._fuente_original = original
         self._fuente_envuelta = fuente
         nucleo.fuente_pos = fuente
@@ -287,12 +289,14 @@ class VehiculosOnline:
             if remoto is None:
                 return
         muestra = flujo.muestra_de(pid)
+        caballito = False
         if muestra is not None:
             x, z, rumbo, vel = muestra.x, muestra.z, muestra.r, muestra.v
+            caballito = bool(muestra.f & ovc.BIT_CABALLITO)
         else:
             entrada = next(e for e in flujo.vehiculos_snap if e["i"] == vid)
             x, z, rumbo, vel = entrada["x"], entrada["z"], entrada["r"], 0.0
-        estado = remoto.animador.avanzar(x, z, rumbo, vel, dt)
+        estado = remoto.animador.avanzar(x, z, rumbo, vel, dt, caballito)
         remoto.vehiculo.modelo.aplicar_estado(estado, min(dt, 0.05), self.escena._mundo.altura,
                                               remoto.animador.acelerando)
 

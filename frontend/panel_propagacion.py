@@ -120,7 +120,8 @@ class PanelPropagacion(Entity):
             self._cuadros[(a, b)] = cuadro
         for nombre, (px, py) in self._puntos.items():
             contenedor = Entity(parent=self._capa_nodos, position=(px, py))
-            diametro = vista.diametro_nodo(grafo_social.grado(nombre), grado_maximo, self.DIAMETRO_NODO)
+            diametro = vista.diametro_nodo(grafo_social.grado(nombre), grado_maximo,
+                                           self.DIAMETRO_NODO * vista.escala_nodos(len(self._puntos)))
             # El aro va DETRÁS del círculo (z mayor) y asoma como borde; solo los influyentes
             # (dorado) y, al terminar la animación, los aislados (rojo) lo muestran.
             aro = Entity(parent=contenedor, model="circle", scale=diametro + 2 * self.GROSOR_ARO,

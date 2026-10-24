@@ -12,7 +12,8 @@ HUNDIMIENTO_BASE = 0.1    # m que el mástil se entierra en el techo (no queda f
 # 7 colores bien distintos entre sí y de los tintes pastel de la favela: rojo, azul rey, verde,
 # naranja, morado, turquesa y blanco (un edificio jugable cada uno).
 COLORES_BANDERA = ((205, 32, 40), (30, 70, 200), (30, 150, 70), (240, 125, 20),
-                   (135, 45, 175), (20, 180, 170), (245, 245, 245))
+                   (135, 45, 175), (20, 180, 170), (245, 245, 245),
+                   (250, 205, 30), (230, 70, 160), (120, 200, 50), (90, 100, 130))   # los 4 lugares de 2026-10
 
 
 # Posición (x, y, z) de la base del mástil sobre el techo de `e`: en la esquina trasera (la más

@@ -246,8 +246,14 @@ class GrafoSocial:
         return f"GrafoSocial(ciudadanos={self.numero_ciudadanos()}, relaciones={self.numero_relaciones()})"
 
 
-# Grafo de ejemplo con 10 ciudadanos: Ana muy conectada, Carlos con una sola
-# relación y Diana aislada (caso borde).
+# Grafo de ejemplo con 17 ciudadanos de Ciudad Nova (iniciales distintas, de la A a la Q: cada nodo se
+# dibuja con su inicial) en tres componentes:
+#   - la red de Ana (11): Ana muy conectada (4 relaciones) y un ciclo Ana-Elena-Hugo-Ivan-Fábio; cadenas que
+#     acaban en Luana y en Kauã (una sola relación); puntos de articulación Ana, Beto, Carlos, Gina y Júlia;
+#   - la comunidad del Morro (5), separada de la anterior: Marcos con 3 relaciones, un triángulo con Nayara y
+#     Otávio, y Paula como puente hacia Quitéria (una sola relación);
+#   - Diana, aislada (caso borde).
+# Los 10 primeros son los de siempre (solo cambia la grafía: Fábio, Ivan, Júlia); los 7 últimos, de 2026-10.
 def construir_grafo_social_ejemplo():
     grafo = GrafoSocial()
 
@@ -257,22 +263,36 @@ def construir_grafo_social_ejemplo():
         "Carlos",
         "Diana",
         "Elena",
-        "Fabio",
+        "Fábio",
         "Gina",
         "Hugo",
-        "Iván",
-        "Julia",
+        "Ivan",
+        "Júlia",
+        "Kauã",
+        "Luana",
+        "Marcos",
+        "Nayara",
+        "Otávio",
+        "Paula",
+        "Quitéria",
     ):
         grafo.agregar_ciudadano(ciudadano)
 
     grafo.agregar_relacion("Ana", "Beto")
     grafo.agregar_relacion("Ana", "Elena")
-    grafo.agregar_relacion("Ana", "Fabio")
+    grafo.agregar_relacion("Ana", "Fábio")
     grafo.agregar_relacion("Ana", "Gina")
     grafo.agregar_relacion("Beto", "Carlos")
     grafo.agregar_relacion("Elena", "Hugo")
-    grafo.agregar_relacion("Fabio", "Iván")
-    grafo.agregar_relacion("Gina", "Julia")
-    grafo.agregar_relacion("Hugo", "Iván")
+    grafo.agregar_relacion("Fábio", "Ivan")
+    grafo.agregar_relacion("Gina", "Júlia")
+    grafo.agregar_relacion("Hugo", "Ivan")
+    grafo.agregar_relacion("Júlia", "Kauã")
+    grafo.agregar_relacion("Carlos", "Luana")
+    grafo.agregar_relacion("Marcos", "Nayara")
+    grafo.agregar_relacion("Marcos", "Otávio")
+    grafo.agregar_relacion("Nayara", "Otávio")
+    grafo.agregar_relacion("Marcos", "Paula")
+    grafo.agregar_relacion("Paula", "Quitéria")
 
     return grafo

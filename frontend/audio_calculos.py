@@ -68,6 +68,13 @@ def pitch_motor(velocidad, vmax, minimo=0.75, maximo=1.75):
     return minimo + (maximo - minimo) * fraccion
 
 
+# Caballito (`levantada` 0..1, ver vehiculo_calculos.fraccion_caballito): el motor de la moto se «revoluciona»
+# (sube de tono y algo de volumen) con la rueda en el aire. Devuelve (factor de pitch, factor de volumen).
+def factores_caballito(levantada, pitch_extra=0.28, volumen_extra=0.15):
+    levantada = max(0.0, min(1.0, levantada))
+    return 1.0 + pitch_extra * levantada, 1.0 + volumen_extra * levantada
+
+
 # Volumen del motor: ralentí audible parado y más fuerte con velocidad.
 def volumen_motor(velocidad, vmax, ralenti=0.35):
     fraccion = max(0.0, min(1.0, abs(velocidad) / max(vmax, 1e-6)))

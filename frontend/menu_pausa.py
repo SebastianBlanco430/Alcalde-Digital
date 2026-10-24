@@ -8,21 +8,31 @@
 from panda3d.core import ClockObject
 from ursina import Entity, Text, camera, color
 
-from frontend import estilo, tipografia
+from frontend import estilo, tipografia, vehiculo_calculos
 from frontend.componentes import (
     BotonPrimario, BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb,
 )
 from frontend.fondo_menu import FocoTeclado, anadir_filo
 
-ANCHO, ALTO = 0.60, 0.70
+ANCHO, ALTO = 0.74, 0.70        # antes 0.60 de ancho: la guía de teclas creció (vehículos y «seguir misión»)
 ALTO_CON_AJUSTES = 0.80      # con el botón «Ajustes» el panel crece (4 botones en vez de 3)
 Z_FRENTE = -50
 ALFA_VELO = 170
 ANCHO_BOTON = 0.42
 ALTO_BOTON = a_unidades(56)
 
-# (tecla, acción) de la guía; dos columnas.
-TECLAS = (("WASD", "mover"), ("Shift", "correr"), ("E", "entrar"), ("Tab", "teléfono"))
+# (tecla, acción) de la guía; dos columnas, en orden de lectura (izquierda, derecha, siguiente fila...). Con más
+# de 2 filas el panel crece FILA_TECLAS por fila y todo su contenido sube la mitad, para seguir centrado.
+# En vehículo: Shift = caballito, Ctrl = turbo, Espacio = freno de mano (frontend/vehiculo_mundo.py). Sin caballitos
+# (vehiculo_calculos.CABALLITOS = False) Shift sigue siendo el turbo y no hay Ctrl.
+if vehiculo_calculos.CABALLITOS:
+    TECLAS = (("WASD", "mover"), ("Tab", "teléfono"), ("Shift", "correr / caballito"), ("M", "seguir misión"),
+              ("Espacio", "saltar / frenar"), ("E", "entrar / montar"), ("Ctrl", "turbo"))
+else:
+    TECLAS = (("WASD", "mover"), ("Tab", "teléfono"), ("Shift", "correr / turbo"), ("M", "seguir misión"),
+              ("Espacio", "saltar / frenar"), ("E", "entrar / montar"))
+FILA_TECLAS = 0.058
+X_COLUMNAS = (-0.33, 0.05)      # x de la tecla de cada columna
 
 
 # Tecla estilo teclado: papel con borde de tinta y base gruesa; devuelve la entidad.
@@ -45,7 +55,9 @@ class MenuPausa(Entity):
             from backend.logica.ajustes import AJUSTES
             con_ajustes = AJUSTES
         self.con_ajustes = bool(con_ajustes)
-        alto = ALTO_CON_AJUSTES if self.con_ajustes else ALTO
+        extra = FILA_TECLAS * max(0, (len(TECLAS) + 1) // 2 - 2)     # filas de teclas de más (sobre 2)
+        alto = (ALTO_CON_AJUSTES if self.con_ajustes else ALTO) + extra
+        dy = extra / 2
         self.velo = Entity(parent=self, model="quad", color=color.rgba32(*estilo.TINTA, ALFA_VELO),
                            scale=(4, 4), z=0.01)
         self.panel = panel_tinta(self, ANCHO, alto, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
@@ -59,6 +71,7 @@ class MenuPausa(Entity):
             ys = (0.19, 0.19 - 0.108, 0.19 - 0.216, 0.19 - 0.324)
         else:
             ys = (0.125, 0.125 - 0.115, None, 0.125 - 0.23)
+        ys = tuple(None if y is None else y + dy for y in ys)
         self.boton_reanudar = BotonPrimario(
             "Reanudar", al_clic=al_reanudar, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=24,
             parent=self, position=(0, ys[0], -0.001))
@@ -80,13 +93,13 @@ class MenuPausa(Entity):
         self._frame_cierre_ajustes = -1   # frame en que se cerró «Ajustes» (para el Escape compartido)
         self._ocultos_por_ajustes = []
 
-        # Guía de teclas: 2 columnas x 2 filas, con una línea fina encima.
-        y0 = -0.255 if self.con_ajustes else -0.235
+        # Guía de teclas: 2 columnas, con una línea fina encima.
+        y0 = (-0.255 if self.con_ajustes else -0.235) + dy
         self.teclas = []
         for i, (tecla, accion) in enumerate(TECLAS):
             columna, fila = i % 2, i // 2
-            x = -0.235 + columna * 0.245
-            y = y0 - fila * 0.058
+            x = X_COLUMNAS[columna]
+            y = y0 - fila * FILA_TECLAS
             ancho_t = a_unidades(34) + a_unidades(11) * len(tecla)
             self.teclas.append(_tecla(self, tecla, x + ancho_t / 2, y, ancho_t))
             Text(accion, parent=self, origin=(-0.5, 0), position=(x + ancho_t + 0.014, y, -0.001),

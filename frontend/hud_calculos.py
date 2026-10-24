@@ -46,6 +46,10 @@ TEXTO_SIN_MISION = "Sin misión activa"
 MODO_ICONO = "icono"
 MODO_NOTIFICACION = "notificacion"
 MODO_ABIERTO = "abierto"
+# Casilla «Seguir misión» del panel (ver backend/logica/telefono.py): el estado se dice con texto, no solo
+# con la marca, para quien no distingue colores.
+TEXTO_SEGUIR = "Seguir misión"
+TECLA_SEGUIR = "M"
 
 
 @dataclass(frozen=True)
@@ -64,6 +68,8 @@ class VistaTelefono:
     linea_mision: str
     linea_destino: str       # "" si no hay misión
     filas: tuple             # FilaMensaje, los más recientes primero
+    sigue_mision: bool = True    # casilla «Seguir misión» marcada (ayudas hacia el destino visibles)
+    texto_seguir: str = ""       # «Seguir misión: Sí (M)»; "" si no hay misión (la casilla no se muestra)
 
 
 _MODO_POR_ESTADO = {ABIERTO: MODO_ABIERTO, NOTIFICANDO: MODO_NOTIFICACION}
@@ -79,10 +85,12 @@ def vista_telefono(telefono, mision, nuevos_al_abrir=0):
         FilaMensaje(m.remitente, m.texto, resaltado=(indice < nuevos_al_abrir) or not m.leido)
         for indice, m in enumerate(reversed(mensajes))
     )
+    sigue = sigue_mision(telefono)
     if mision is None:
-        linea_mision, linea_destino = TEXTO_SIN_MISION, ""
+        linea_mision, linea_destino, texto_seguir = TEXTO_SIN_MISION, "", ""
     else:
         linea_mision, linea_destino = f"Misión: {mision.titulo}", f"Destino: {mision.destino}"
+        texto_seguir = texto_casilla_seguir(sigue)
     return VistaTelefono(
         modo=_MODO_POR_ESTADO.get(telefono.estado(), MODO_ICONO),
         contador=telefono.no_leidos(),
@@ -91,7 +99,24 @@ def vista_telefono(telefono, mision, nuevos_al_abrir=0):
         linea_mision=linea_mision,
         linea_destino=linea_destino,
         filas=filas,
+        sigue_mision=sigue,
+        texto_seguir=texto_seguir,
     )
+
+
+# ¿El jugador sigue su misión? (casilla «Seguir misión»). Un teléfono sin la casilla (falsos de las pruebas) la sigue.
+def sigue_mision(telefono):
+    consulta = getattr(telefono, "sigue_mision", None)
+    return bool(consulta()) if callable(consulta) else True
+
+
+def texto_casilla_seguir(sigue):
+    return f"{TEXTO_SEGUIR}: {'Sí' if sigue else 'No'} ({TECLA_SEGUIR})"
+
+
+# El destino que el mundo dibuja (baliza, ruta, minimapa, bandera): el de la misión solo si el jugador la sigue.
+def destino_visible(destino, sigue_mision):
+    return destino if sigue_mision else None
 
 
 # -- Ruta del GPS (se comparte entre el minimapa y el mundo) --------------------

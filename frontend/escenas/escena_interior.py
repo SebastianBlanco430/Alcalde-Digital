@@ -7,6 +7,11 @@
 #                      pantalla; el monitor "enciende" (Civitas - iniciando sesión de <Rol>),
 #                      destello y se llama `al_terminar` (ConexionFlujo abre el juego).
 #   modo 'levantarse': sentado, se levanta (POSE_SENTADO -> POSE_PARADO) y se llama `al_terminar`.
+#                      El monitor muestra «Sesión cerrada» con el resumen de la misión (`resultado`, opcional).
+#
+# Pantallas del monitor (frontend/pantalla_monitor.py, bandera PANTALLAS_CIVITAS): UNA textura dibujada con
+# Pillow por pantalla y una barra de carga (quad hijo) que se llena durante el tecleo. Con la bandera en False,
+# el fondo azul liso con texto blanco de antes.
 #
 # La habitación está centrada en el origen; el mundo exterior está desactivado mientras tanto, así
 # que no se mezclan. La cámara es propia (no orbital): se guarda y restaura el estado previo
@@ -22,7 +27,8 @@ from ursina.shaders import lit_with_shadows_shader
 from backend.logica.roles import ROLES
 from frontend import camara_calculos as cc
 from frontend import guion_cinematicas as guion
-from frontend import poses
+from frontend import pantalla_monitor, poses, rendimiento
+from frontend import pantalla_monitor_calculos as pmc
 from frontend.cinematica import ease_in_out, lerp, lerp_angulo, lerp_vec3
 from frontend.componentes import destruir_arbol, rgb
 from frontend.director_cinematica import DirectorCinematica
@@ -184,17 +190,54 @@ class EscenaInterior(Escena):
         self.pantalla = pieza(parent=self, model="quad", color=rgb(COLOR_PANTALLA_APAGADA),
                               position=(mx, my, mz - 0.012), scale=(guion.ANCHO_PANTALLA, guion.ALTO_PANTALLA),
                               shader=None)
+        # Relleno de la barra de carga (PANTALLAS_CIVITAS): 2 mm delante del quad, estirado según el tecleo.
+        self.barra_carga = Entity(parent=self.pantalla, model="quad", color=rgb(pantalla_monitor.COLOR_RELLENO_BARRA),
+                                  shader=None, z=-0.002, enabled=False)
         silenciar(self.pantalla)
 
     def _encender_pantalla(self, rol):
+        if pantalla_monitor.PANTALLAS_CIVITAS and self.jugador is not None:
+            info = ROLES[self.jugador.rol]
+            self._poner_textura(pantalla_monitor.textura_inicio(
+                self.jugador.rol, info.nombre, info.color, self.jugador.nombre, self.lugar))
+            self._llenar_barra(0.0)
+            return
         self.pantalla.color = rgb(COLOR_PANTALLA_ENCENDIDA)
         self.pantalla_texto.text = f"Civitas\n\nIniciando sesión de\n{rol}"
         self.pantalla_texto.scale = 1.7
 
+    # Pantalla «Sesión cerrada» (modo levantarse). Sin PANTALLAS_CIVITAS: el texto de siempre.
+    def _cerrar_sesion(self, rol, resultado):
+        if pantalla_monitor.PANTALLAS_CIVITAS:
+            info = ROLES[self.jugador.rol]
+            self._poner_textura(pantalla_monitor.textura_cierre(
+                self.jugador.rol, info.nombre, info.color, self.lugar, resultado))
+            return
+        self._encender_pantalla(rol)
+        self.pantalla_texto.text = "Sesión cerrada"
+
     def _apagar_pantalla(self, texto=""):
+        self.pantalla.texture = None
+        self.barra_carga.enabled = False
         self.pantalla.color = rgb(COLOR_PANTALLA_APAGADA)
         self.pantalla_texto.text = texto
         self.pantalla_texto.scale = 1.7
+
+    # Pone una pantalla de Civitas: la textura en blanco (sin teñir) y sin el texto suelto de antes.
+    def _poner_textura(self, textura):
+        self.pantalla.texture = textura
+        self.pantalla.color = color.white
+        self.pantalla_texto.text = ""
+        self.barra_carga.enabled = False
+
+    # Barra de carga de la pantalla de inicio con avance `progreso` en [0, 1].
+    def _llenar_barra(self, progreso):
+        if not pantalla_monitor.PANTALLAS_CIVITAS:
+            return
+        x, y, ancho, alto = pmc.relleno_barra(progreso)
+        self.barra_carga.enabled = ancho > 0
+        self.barra_carga.position = (x, y, -0.002)
+        self.barra_carga.scale = (max(ancho, 1e-4), alto)
 
     # -- Tema --
 
@@ -304,13 +347,13 @@ class EscenaInterior(Escena):
             plan = guion.plan_interior_sentarse()
             animaciones = self._animaciones_sentarse(rol)
         elif modo == "levantarse":
-            self._encender_pantalla(rol)
-            self.pantalla_texto.text = "Sesión cerrada"
+            self._cerrar_sesion(rol, datos.get("resultado"))
             plan = guion.plan_interior_levantarse()
             animaciones = self._animaciones_levantarse()
         else:
             raise ValueError(f"Modo de interior desconocido: {modo!r}")
         self.director.reproducir(plan, animaciones, al_terminar=self._terminar, escala=self.escala_tiempo)
+        rendimiento.precargar(self)        # la sala y el personaje a la GPU antes del primer frame
 
     def al_salir(self):
         self.director.cancelar()
@@ -412,6 +455,7 @@ class EscenaInterior(Escena):
             p.colocar(ax, az)
             p.fijar_rumbo(0)
             entrada = ease_in_out(min(1.0, t * 3))            # las manos suben al teclado en el primer tercio
+            self._llenar_barra(t)                              # la barra de carga se llena mientras teclea
             base = poses.interpolar_pose(poses.POSE_SENTADO, poses.pose_teclear(0), entrada)
             fase = t * GOLPES_TECLEO * 2 * math.pi
             tecleo = poses.pose_teclear(fase)
@@ -420,6 +464,7 @@ class EscenaInterior(Escena):
 
         def acercar(t):
             p.aplicar_pose(poses.pose_teclear(t * 2 * math.pi))
+            self._llenar_barra(1.0)
             k = ease_in_out(t)
             a, via, b = tomas["teclear"]["position"], guion.VIA_ACERCAR, tomas["acercar_fin"]["position"]
             posicion = tuple((1 - k) ** 2 * a[i] + 2 * (1 - k) * k * via[i] + k ** 2 * b[i] for i in range(3))

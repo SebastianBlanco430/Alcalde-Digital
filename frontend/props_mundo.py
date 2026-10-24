@@ -1,5 +1,5 @@
 # Decorado del mundo 3D (Ursina): árboles variados, arbustos con flores, farolas, bancos, vallas,
-# carteles, jardineras y una fuente en la Plaza Central; además cintas de calle con ruido de color.
+# carteles, jardineras y una fuente en la Praça da Sé; además cintas de calle con ruido de color.
 #
 # Todo es DECORADO PURO: ninguna pieza tiene colisión (el backend no los conoce y no se toca), por
 # eso se colocan siempre FUERA de las calles, de las huellas de los edificios y de las casas, de las
@@ -36,7 +36,7 @@ RADIO_PROP = {"arbol": 1.15, "arbusto": 0.9, "banco": 1.0, "valla": 1.2, "cartel
 PROPS_POR_PLAZA = 4
 PROPS_EN_CORONA = 9            # árboles/arbustos/carteles por plaza, sobre el pasto alrededor del aro
 RADIO_ANILLO_PLAZA = 7.3     # m del centro de la plaza a los props de su borde interior
-PLAZA_DE_LA_FUENTE = "Plaza Central"
+PLAZA_DE_LA_FUENTE = "Praça da Sé"
 
 # Verdes de las copas, flores y maderas (RGB 0-255). Con luz, el lado al sol sube y el de sombra queda.
 VERDES = ((44, 102, 50), (60, 116, 48), (34, 88, 58), (78, 116, 42), (48, 108, 72))
@@ -430,7 +430,7 @@ def _tipo_por_azar(u, pesos):
 
 
 # Lista de Prop del mundo: decorado a los lados de las calles, alrededor de cada plaza (dentro y
-# fuera de su aro) y la fuente de la Plaza Central.
+# fuera de su aro) y la fuente de la Praça da Sé.
 def colocar_props(mundo):
     suelo = mundo.altura
     reserva = Reserva(mundo)

@@ -54,7 +54,8 @@ BANDERA_EN_AIRE = 1
 BANDERA_ESCALERA = 2
 BANDERA_DENTRO = 4
 BANDERA_VEHICULO = 8
-BANDERAS_VALIDAS = BANDERA_EN_AIRE | BANDERA_ESCALERA | BANDERA_DENTRO | BANDERA_VEHICULO
+BANDERA_CABALLITO = 16          # rueda delantera levantada: solo se conserva con vehículo (ver validar)
+BANDERAS_VALIDAS = BANDERA_EN_AIRE | BANDERA_ESCALERA | BANDERA_DENTRO | BANDERA_VEHICULO | BANDERA_CABALLITO
 # --- Infracciones ---------------------------------------------------------------------------------------------
 UMBRAL_DESCONEXION = 25.0               # puntos de infracción acumulados que desconectan
 FUGA_POR_SEGUNDO = 0.5                  # puntos que se perdonan por segundo
@@ -191,6 +192,8 @@ class ValidadorMovimiento:
                     return self._rechazar("vehiculo", n)
             veh = self.veh_autorizado            # lo concedido manda, aunque el cliente aún no lo declare
             f = (f | BANDERA_VEHICULO) if veh else (f & ~BANDERA_VEHICULO)
+        if not veh:
+            f &= ~BANDERA_CABALLITO              # a pie no hay caballito
         # Interior local: el anfitrión solo anota banderas (los demás ven «dentro»), no valida ni mueve.
         if f & BANDERA_DENTRO:
             self.f = f

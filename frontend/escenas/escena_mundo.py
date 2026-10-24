@@ -35,7 +35,7 @@ from backend.logica import navegacion
 from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 from backend.logica.roles import ROLES
 from frontend import camara_calculos as cc
-from frontend import geometria_mundo, poses
+from frontend import geometria_mundo, hud_calculos, poses, rendimiento
 from frontend.componentes import destruir_arbol
 from frontend import guion_cinematicas as guion
 from frontend.camara_tercera_persona import CamaraTerceraPersona
@@ -86,6 +86,7 @@ class EscenaMundo(Escena):
         self.director = DirectorCinematica(parent=self)
         self.peatones = Peatones(mundo, parent=self)      # gente que pasea (decoración)
         self.baliza = Baliza(parent=self, enabled=False)
+        self._ayudas_para = None         # (jugador activo, destino seguido) con que se pusieron baliza y bandera
         self.ruta_piso = RutaPiso(suelo=mundo.altura, parent=self)
 
         # HUD 2D (camera.ui): hermano de la escena, no hijo (la escena cuelga de `scene`).
@@ -128,6 +129,7 @@ class EscenaMundo(Escena):
             self._sesion = self.flujo.sesion
             self._reconstruir_personajes()
             activar_niebla()      # otra vez: los Personaje recién creados no la tenían (solo cuenta lo ya existente)
+            rendimiento.precargar(self)    # ciudad, personajes y vehículos a la GPU ya: sin tirones al girar
         self.refrescar()
         if nueva_partida:
             self.camara.yaw = self._yaw_hacia_el_destino()
@@ -170,6 +172,8 @@ class EscenaMundo(Escena):
         if self.flujo is None or self._sesion is None:
             return
         self.hud.actualizar(dt, self._sesion, yaw_grados=self.camara.yaw)
+        if (self.flujo.jugador_activo().nombre, self._destino_seguido()) != self._ayudas_para:
+            self._poner_ayudas_destino()       # se marcó o desmarcó «Seguir misión» (o cambió el destino)
         self._actualizar_ruta_piso()
 
     # Modo online: crea la IntegracionOnline si el flujo es un FlujoEnLinea (y la quita si se vuelve al hot-seat o
@@ -246,13 +250,21 @@ class EscenaMundo(Escena):
             self.avatares[jugador.nombre] = avatar
         self.camara.ignorar = list(self.avatares.values())
 
-    # Rumbo (yaw) que mira desde el jugador activo hacia la puerta de su misión (o 0).
-    def _yaw_hacia_el_destino(self):
+    # Destino de la misión del jugador activo SOLO si la sigue (casilla «Seguir misión» del teléfono, tecla M);
+    # si no, None: sin baliza, ruta del piso, bandera destacada ni giro inicial hacia él. La misión sigue igual.
+    def _destino_seguido(self):
         mision = self.flujo.mision_actual()
         if mision is None:
+            return None
+        return hud_calculos.destino_visible(mision.destino, hud_calculos.sigue_mision(self.flujo.jugador_activo().telefono))
+
+    # Rumbo (yaw) que mira desde el jugador activo hacia la puerta de su misión (o 0).
+    def _yaw_hacia_el_destino(self):
+        destino = self._destino_seguido()
+        if destino is None:
             return 0.0
         activo = self.flujo.jugador_activo()
-        px, pz = self._mundo.punto_interaccion(mision.destino)
+        px, pz = self._mundo.punto_interaccion(destino)
         return geometria_mundo.rumbo_de(px - activo.x, pz - activo.z)
 
     # Vuelca el modelo (posiciones, turno, misión) a personajes, baliza y HUD.
@@ -268,18 +280,7 @@ class EscenaMundo(Escena):
             (f"Turno de {activo.nombre} ({ROLES[activo.rol].nombre})" if self.texto_turno_fn is None
              else self.texto_turno_fn(activo)),
             f"Misión: {mision.titulo}" if mision is not None else self.TEXTO_SIN_MISION)
-        # Baliza sobre la puerta del destino; sin misión se oculta.
-        if mision is None:
-            self.baliza.enabled = False
-        else:
-            px, pz = self._mundo.punto_interaccion(mision.destino)
-            self.baliza.colocar(px, pz, self._mundo.edificio_de(mision.destino).alto + 2.2,
-                                suelo=self._mundo.altura(px, pz))
-            self.baliza.enabled = True
-        # La bandera del edificio destino ondea más fuerte y con borde amarillo.
-        destino = mision.destino if mision is not None else None
-        for lugar, bandera in self.ciudad.banderas.items():
-            bandera.destacar(lugar == destino)
+        self._poner_ayudas_destino()
         # Fin del catálogo: nadie tiene misiones pendientes -> panel "Partida terminada".
         if self.flujo.partida_terminada() and not self._cinematica:
             self.hud.panel_fin.mostrar(self._sesion.estado_partida.indicadores())
@@ -287,14 +288,30 @@ class EscenaMundo(Escena):
             self.hud.panel_fin.ocultar()
         self.avanzar_hud(0)
 
+    # Baliza sobre la puerta del destino y su bandera destacada (ondea más fuerte, borde amarillo). Sin misión, o
+    # si el jugador activo no la sigue, se ocultan. La llaman refrescar() y avanzar_hud() cuando cambia el turno
+    # o la casilla «Seguir misión».
+    def _poner_ayudas_destino(self):
+        destino = self._destino_seguido()
+        self._ayudas_para = (self.flujo.jugador_activo().nombre, destino)
+        if destino is None:
+            self.baliza.enabled = False
+        else:
+            px, pz = self._mundo.punto_interaccion(destino)
+            self.baliza.colocar(px, pz, self._mundo.edificio_de(destino).alto + 2.2,
+                                suelo=self._mundo.altura(px, pz))
+            self.baliza.enabled = True
+        for lugar, bandera in self.ciudad.banderas.items():
+            bandera.destacar(lugar == destino)
+
     # Línea del GPS en el piso: del jugador por las esquinas y hasta la puerta.
     def _actualizar_ruta_piso(self):
         activo = self.flujo.jugador_activo()
-        mision = self.flujo.mision_actual()
-        if mision is None or self.flujo.partida_terminada():
+        destino = self._destino_seguido()
+        if destino is None or self.flujo.partida_terminada():
             self.ruta_piso.actualizar([])
             return
-        puntos = navegacion.ruta_gps_hasta_puerta(self._mundo, activo.x, activo.z, mision.destino)
+        puntos = navegacion.ruta_gps_hasta_puerta(self._mundo, activo.x, activo.z, destino)
         self.ruta_piso.actualizar([(activo.x, activo.z)] + puntos)
 
     # -- Cinemáticas --

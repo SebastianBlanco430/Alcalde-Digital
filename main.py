@@ -200,6 +200,7 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     aplicacion = Ursina(title="Alcalde Digital", icon=icono.as_posix(), borderless=False, fullscreen=False,
                         development_mode=False, size=TAMANO_VENTANA)
     compat_macos.reaplicar()
+    rendimiento.preparar_raices()    # posición de la cámara para la niebla, en la raíz (frontend/rendimiento.py)
     if medidor_fps.modo() != "libre":
         limitar_fps(FPS_MAXIMOS)
     if medidor_fps.modo():

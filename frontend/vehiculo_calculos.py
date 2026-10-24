@@ -12,6 +12,13 @@
 # llegue a los pedales / estribos y al manubrio. Colisión: reutiliza navegacion.mover_con_colisiones y
 # comprueba además delante y detrás del vehículo (es más largo que el peatón).
 #
+# CABALLITO (bandera CABALLITOS): mientras se mantiene Shift y se va a más de caballito_vmin, la rueda delantera
+# sube a ritmo constante (cuanto más tiempo, más alto) hasta caballito_max (la bici algo menos que la moto); al
+# soltar, o si se frena por debajo del mínimo, baja suave. El ángulo vive en EstadoVehiculo.caballito y el modelo lo
+# gira alrededor del apoyo de la rueda TRASERA (no se mete en el suelo; la colisión es 2D y no cambia). No es gratis:
+# con la rueda arriba se gira menos (PERDIDA_VOLANTE_CABALLITO) y se acelera menos (PERDIDA_ACEL_CABALLITO).
+# Teclas: con CABALLITOS el turbo pasa de Shift a Ctrl (vehiculo_mundo.py); con False, Shift vuelve a ser turbo.
+#
 # Los modelos 3D (vehiculo_modelo.py) y la colocación en el mundo (vehiculo_mundo.py) solo traducen esto.
 
 import math
@@ -23,6 +30,11 @@ from frontend.azar_fijo import azar_de
 G = 9.81
 BICICLETA = "bicicleta"
 MOTO = "moto"
+CABALLITOS = True
+PERDIDA_VOLANTE_CABALLITO = 0.6   # fracción de giro que se pierde con la rueda en su máximo
+PERDIDA_ACEL_CABALLITO = 0.35     # fracción de aceleración que se pierde con la rueda en su máximo
+ANGULO_MINIMO_CABALLITO = math.radians(0.2)   # por debajo, el caballito termina (0 exacto)
+BAJADA_FINAL_CABALLITO = math.radians(4.0)    # rad/s que se suman a la bajada suave (acorta la cola)
 
 
 @dataclass(frozen=True)
@@ -30,7 +42,7 @@ class PerfilVehiculo:
     tipo: str
     nombre: str                 # texto para el aviso («bicicleta», «moto»)
     vmax: float                 # m/s sin turbo
-    vturbo: float               # m/s con turbo (Shift)
+    vturbo: float               # m/s con turbo (Ctrl; Shift sin CABALLITOS)
     vreversa: float             # m/s hacia atrás (empujando)
     acel: float                 # m/s² desde parado
     freno: float                # m/s² con S / freno
@@ -47,19 +59,25 @@ class PerfilVehiculo:
     vuelta_pedal: float         # vueltas de rueda por vuelta de pedal (relación de marchas); 0 = sin pedales
     altura_asiento: float       # m del suelo a la parte alta del sillín
     altura_camara: float        # m extra de altura del pivote de la cámara (el piloto va más alto)
+    caballito_max: float = 0.0  # rad: rueda delantera arriba como mucho (0 = sin caballito)
+    caballito_sube: float = 0.0  # rad/s mientras se mantiene Shift
+    caballito_baja: float = 2.0  # 1/s: rapidez de la bajada suave al soltar
+    caballito_vmin: float = 0.0  # m/s mínimos para levantar la rueda
 
 
 PERFIL_BICICLETA = PerfilVehiculo(
     tipo=BICICLETA, nombre="bicicleta", vmax=8.0, vturbo=9.2, vreversa=1.6, acel=2.6, freno=6.5, freno_mano=9.0,
     rodadura=0.9, arrastre=0.07, batalla=1.04, radio_rueda=0.34, semi_largo=0.55, volante_max=0.62,
     a_lateral=8.0, rapidez_volante=7.0, lean_max=math.radians(26), vuelta_pedal=2.4, altura_asiento=0.93,
-    altura_camara=0.25)
+    altura_camara=0.25, caballito_max=math.radians(24), caballito_sube=math.radians(22), caballito_baja=2.6,
+    caballito_vmin=2.0)
 
 PERFIL_MOTO = PerfilVehiculo(
     tipo=MOTO, nombre="moto", vmax=16.0, vturbo=20.0, vreversa=2.2, acel=4.2, freno=10.0, freno_mano=13.0,
     rodadura=1.1, arrastre=0.05, batalla=1.30, radio_rueda=0.32, semi_largo=0.75, volante_max=0.52,
     a_lateral=11.0, rapidez_volante=5.5, lean_max=math.radians(32), vuelta_pedal=0.0, altura_asiento=0.80,
-    altura_camara=0.35)
+    altura_camara=0.35, caballito_max=math.radians(34), caballito_sube=math.radians(28), caballito_baja=2.0,
+    caballito_vmin=3.0)
 
 PERFILES = {BICICLETA: PERFIL_BICICLETA, MOTO: PERFIL_MOTO}
 TIPOS = (BICICLETA, MOTO)
@@ -77,13 +95,15 @@ def perfil_de(tipo):
     return PERFILES[tipo]
 
 
-# Entrada de un frame: acelerar en [-1, 1] (W = +1, S = -1), direccion en [-1, 1] (D = +1), turbo, freno de mano.
+# Entrada de un frame: acelerar en [-1, 1] (W = +1, S = -1), direccion en [-1, 1] (D = +1), turbo, freno de mano y
+# caballito (Shift mantenido).
 @dataclass(frozen=True)
 class EntradaVehiculo:
     acelerar: float = 0.0
     direccion: float = 0.0
     turbo: bool = False
     freno_mano: bool = False
+    caballito: bool = False
 
 
 @dataclass
@@ -107,6 +127,7 @@ class EstadoVehiculo:
     aceleracion: float = 0.0         # m/s² longitudinal del último frame
     choque: float = 0.0              # 0..1: intensidad del último choque con un obstáculo
     altura_prev: float = 0.0
+    caballito: float = 0.0           # rad: rueda delantera levantada (pivota en el apoyo de la trasera)
 
 
 # -- Utilidades -------------------------------------------------------------------------------------------------
@@ -174,6 +195,28 @@ def _frenar_hacia_cero(v, decel, dt):
     if v > 0:
         return max(0.0, v - decel * dt)
     return min(0.0, v + decel * dt)
+
+
+# -- Caballito --------------------------------------------------------------------------------------------------
+
+
+# Ángulo del caballito (rad) tras dt. Pedido (`levantar`) y a caballito_vmin o más: sube a ritmo constante hasta
+# caballito_max. Si no: baja suave (exponencial, más un empujón lineal BAJADA_FINAL_CABALLITO para que la cola no
+# dure: del máximo al suelo en ~1,5-2 s) y por debajo de ANGULO_MINIMO_CABALLITO termina en 0 exacto.
+def paso_caballito(angulo, levantar, velocidad, perfil, dt):
+    if perfil.caballito_max <= 0:
+        return 0.0
+    if levantar and velocidad >= perfil.caballito_vmin:
+        return min(perfil.caballito_max, angulo + perfil.caballito_sube * dt)
+    angulo = _aproximar(angulo, 0.0, perfil.caballito_baja, dt) - BAJADA_FINAL_CABALLITO * dt
+    return 0.0 if angulo < ANGULO_MINIMO_CABALLITO else angulo
+
+
+# 0..1: cuánto está levantada la rueda respecto de su máximo (para el costo en giro y aceleración, cámara y audio).
+def fraccion_caballito(angulo, perfil):
+    if perfil.caballito_max <= 0:
+        return 0.0
+    return _limitar(angulo / perfil.caballito_max, 0.0, 1.0)
 
 
 # -- Dirección --------------------------------------------------------------------------------------------------
@@ -401,10 +444,14 @@ def paso_vehiculo(estado, mapa, entrada, perfil, dt):
         if signo < 0:
             factor = 1.0
 
+    # Caballito: con la rueda arriba se acelera y se gira menos (ver CABALLITOS).
+    levantada = fraccion_caballito(estado.caballito, perfil)
+    acelerar = entrada.acelerar * (1.0 - PERDIDA_ACEL_CABALLITO * levantada) if entrada.acelerar > 0 else entrada.acelerar
     estado.velocidad, estado.aceleracion = paso_velocidad(
-        estado.velocidad, entrada.acelerar, entrada.turbo, entrada.freno_mano, perfil, dt, factor)
+        estado.velocidad, acelerar, entrada.turbo, entrada.freno_mano, perfil, dt, factor)
+    estado.caballito = paso_caballito(estado.caballito, entrada.caballito and CABALLITOS, estado.velocidad, perfil, dt)
     estado.volante = paso_volante(estado.volante, entrada.direccion, perfil, dt)
-    angulo = angulo_manubrio(estado.volante, estado.velocidad, perfil)
+    angulo = angulo_manubrio(estado.volante, estado.velocidad, perfil) * (1.0 - PERDIDA_VOLANTE_CABALLITO * levantada)
     estado.giro_manubrio = angulo
     omega = velocidad_de_giro(estado.velocidad, angulo, perfil, entrada.freno_mano)
     estado.velocidad_giro = omega
@@ -467,12 +514,14 @@ def estado_inicial(x, z, rumbo=0.0):
 
 # Efectos de la velocidad sobre la cámara, ADITIVOS al comportamiento normal: (metros extra de distancia, grados
 # extra de FOV, metros extra de altura del pivote). Curva suave: poco a baja velocidad, el máximo al tope turbo.
-def efectos_de_camara(velocidad, perfil):
+# Con caballito (`caballito` en rad) la cámara se aleja y sube un poco para que se vea la rueda en el aire.
+def efectos_de_camara(velocidad, perfil, caballito=0.0):
     t = _limitar(abs(velocidad) / perfil.vturbo, 0.0, 1.0)
     curva = t * t * (3 - 2 * t)
+    levantada = fraccion_caballito(caballito, perfil)
     if perfil.tipo == MOTO:
-        return 2.6 * curva, 11.0 * curva, perfil.altura_camara
-    return 1.4 * curva, 6.0 * curva, perfil.altura_camara
+        return 2.6 * curva + 0.6 * levantada, 11.0 * curva, perfil.altura_camara + 0.35 * levantada
+    return 1.4 * curva + 0.4 * levantada, 6.0 * curva, perfil.altura_camara + 0.25 * levantada
 
 
 # Yaw de la cámara que se acerca al rumbo del vehículo (la cámara se coloca detrás al avanzar) cuando el jugador

@@ -90,7 +90,9 @@ class TelefonoUI(Entity):
 
     ANCHO_ICONO, ALTO_ICONO = 0.075, 0.12
     ANCHO_BANNER = 0.44
-    ANCHO_PANEL, ALTO_PANEL = 0.42, 0.52
+    ANCHO_PANEL, ALTO_PANEL = 0.42, 0.52      # más alto tapa el chip del destino del minimapa; la casilla
+                                              # «Seguir misión» le quita sitio a los mensajes (se recortan solos)
+    ALTO_CASILLA = a_unidades(34)
 
     # obtener_telefono(): Telefono del jugador ACTIVO. obtener_mision(): Mision actual
     # o None. Son callables para no atar la vista a la sesión (se prueban con falsos).
@@ -142,6 +144,11 @@ class TelefonoUI(Entity):
     def alternar(self):
         if self._telefono is not None:
             self._telefono.alternar()
+
+    # Casilla «Seguir misión» (clic en el panel; la tecla M la maneja el controlador del jugador).
+    def alternar_seguir(self):
+        if self._telefono is not None:
+            self._telefono.alternar_seguir_mision()
 
     # Un paso de `dt` segundos: sincroniza con el teléfono del jugador activo, corre el
     # reloj de la notificación (4 s y luego terminar_notificacion), desliza el banner y
@@ -273,6 +280,8 @@ class TelefonoUI(Entity):
             _texto_envuelto(self.panel, vista.linea_destino, ancho_texto, 17,
                             estilo.COLOR_TEXTO_TENUE, (izquierda, y, -0.001))
             y -= a_unidades(17) * 1.25
+        if vista.texto_seguir:
+            y = self._dibujar_casilla(vista, izquierda, ancho_texto, y - 0.008)
         y -= 0.014
         Text("Mensajes", parent=self.panel, origin=(-0.5, 0.5), position=(izquierda, y, -0.001),
              scale=escala_fuente(17), color=rgb(estilo.COLOR_TEXTO_TENUE))
@@ -294,6 +303,31 @@ class TelefonoUI(Entity):
             _fondo(self.panel, ancho_texto, alto_fila, rgb(tono), 6,
                    position=(0, y - alto_fila / 2, -0.001))
             y -= alto_fila + 0.008
+
+    # Casilla «Seguir misión» (docs/DISENO.md): toda la fila es un botón; caja con borde de tinta, amarilla y con
+    # visto si está marcada, vacía si no, y el estado ESCRITO («Sí» / «No»), no solo dibujado. Devuelve la y de abajo.
+    def _dibujar_casilla(self, vista, izquierda, ancho_texto, y):
+        alto = self.ALTO_CASILLA
+        centro_y = y - alto / 2
+        fila = BotonAccion("", al_clic=self.alternar_seguir, ancho=ancho_texto, alto=alto, parent=self.panel,
+                           position=(0, centro_y, -0.001))
+        fila.color = rgb(estilo.COLOR_TARJETA)
+        fila.highlight_color = rgb(estilo.COLOR_SUPERFICIE_ALTA)
+        fila.pressed_color = rgb(estilo.COLOR_SUPERFICIE_ALTA)
+        lado = a_unidades(20)
+        cx = izquierda + 0.012 + lado / 2
+        borde = a_unidades(3)
+        _fondo(self.panel, lado + 2 * borde, lado + 2 * borde, rgb(estilo.TINTA), 4, position=(cx, centro_y, -0.002))
+        _fondo(self.panel, lado, lado, rgb(COLOR_DESTINO if vista.sigue_mision else estilo.COLOR_FONDO), 3,
+               position=(cx, centro_y, -0.003))
+        if vista.sigue_mision:              # visto de tinta: un trazo corto y uno largo
+            Entity(parent=self.panel, model="quad", color=rgb(estilo.TINTA), rotation_z=45,
+                   position=(cx - lado * 0.2, centro_y - lado * 0.06, -0.004), scale=(lado * 0.42, lado * 0.16))
+            Entity(parent=self.panel, model="quad", color=rgb(estilo.TINTA), rotation_z=-55,
+                   position=(cx + lado * 0.1, centro_y + lado * 0.06, -0.004), scale=(lado * 0.7, lado * 0.16))
+        Text(vista.texto_seguir, parent=self.panel, origin=(-0.5, 0), position=(cx + lado / 2 + 0.012, centro_y, -0.004),
+             scale=escala_fuente(17), color=rgb(estilo.COLOR_TEXTO))
+        return y - alto
 
 
 # -- Minimapa ------------------------------------------------------------------
@@ -362,7 +396,7 @@ class Minimapa(Entity):
     def _construir_mapa(self):
         g = self.geometria
         for a, b in self._mapa.segmentos():
-            cuadro = Entity(parent=self.capa_calles, model="quad")
+            cuadro = Entity(parent=self.capa_calles, model="quad", color=rgb(self.COLOR_CALLES))
             self.calles.append((cuadro, a, b))
         for lugar in self._mapa.lugares():
             # contorno de tinta: separa el color del lugar del aro amarillo del destino
@@ -382,7 +416,7 @@ class Minimapa(Entity):
         self._colocar_mapa()
 
     # Color de identidad del lugar (estilo.COLORES_LUGAR). Los nombres del mapa son más largos
-    # («Universidad de Ciudad Nova», «Parque Municipal»): se busca el nombre exacto y, si no,
+    # («Universidade de Ciudad Nova», «Parque do Povo»): se busca el nombre exacto y, si no,
     # la clave con la que empieza. Lugar desconocido: gris neutro.
     @classmethod
     def color_de_lugar(cls, lugar):
@@ -397,7 +431,7 @@ class Minimapa(Entity):
     def _colocar_mapa(self):
         g = self.geometria
         for cuadro, a, b in self.calles:
-            self._poner_segmento(cuadro, g.lugar(a), g.lugar(b), g.ancho_calle(), rgb(self.COLOR_CALLES))
+            self._poner_segmento(cuadro, g.lugar(a), g.lugar(b), g.ancho_calle())    # color fijo: al crearla
         for lugar, circulo in self.lugares.items():
             circulo.position = g.lugar(lugar)
             self.contornos_lugar[lugar].position = (*g.lugar(lugar)[:2], 0.0002)
@@ -459,13 +493,15 @@ class Minimapa(Entity):
             triangulos += [(base, base + 1, base + 2), (base, base + 2, base + 3)]
         return Mesh(vertices=vertices, triangles=triangulos)
 
-    # Coloca un cuadro como línea gruesa de p0 a p1 (rotation_z en sentido horario).
-    def _poner_segmento(self, cuadro, p0, p1, grosor, tono):
+    # Coloca un cuadro como línea gruesa de p0 a p1 (rotation_z en sentido horario). Sin `tono` conserva su color
+    # (las calles: se recolocan en cada giro de la cámara y su color no cambia).
+    def _poner_segmento(self, cuadro, p0, p1, grosor, tono=None):
         cu, cv, largo, rotacion = hud_calculos.segmento_a_cuadro(p0, p1)
         cuadro.position = (cu, cv)
         cuadro.scale = (largo, grosor)
         cuadro.rotation_z = rotacion
-        cuadro.color = tono
+        if tono is not None:
+            cuadro.color = tono
 
     # posiciones: [(nombre, rgb_rol, x, z)] de todos los jugadores; activo: nombre del
     # jugador del turno; destino: lugar o None; ruta: lugares que faltan (GuiaRuta).
@@ -590,7 +626,7 @@ class AvisoInteraccion(Entity):
         self.tecla.x = izquierda + self.LADO_TECLA / 2
         self.texto.x = izquierda + self.LADO_TECLA + self.SEPARACION_TECLA
 
-    # `texto`: otro mensaje (p. ej. "Presiona E para entrar a la Alcaldía"); None = el de siempre.
+    # `texto`: otro mensaje (p. ej. "Presiona E para entrar a la Prefeitura"); None = el de siempre.
     # El fondo se ajusta al ancho de tecla + texto (entre ANCHO_MIN y ANCHO_MAX; si aun así no
     # cabe, el texto se achica).
     def actualizar(self, estado_mision, estado_telefono, texto=None):
@@ -940,11 +976,13 @@ class HudMundo(Entity):
         activo = flujo.jugador_activo()
         mision = flujo.mision_actual()
         destino = mision.destino if mision is not None else None
-        cambio = self.guia.actualizar(activo.x, activo.z, destino)
+        # «Seguir misión» desmarcada: ni ruta ni destino en el minimapa (el aviso de la E sí usa el destino real).
+        seguido = hud_calculos.destino_visible(destino, hud_calculos.sigue_mision(activo.telefono))
+        cambio = self.guia.actualizar(activo.x, activo.z, seguido)
 
         self.minimapa.actualizar(
             [(j.nombre, ROLES[j.rol].color, j.x, j.z) for j in sesion.jugadores()],
-            activo.nombre, destino, self.guia.ruta)
+            activo.nombre, seguido, self.guia.ruta)
         self.telefono_ui.avanzar(dt)
         self.panel_fin.avanzar(dt)
         self.aviso.actualizar(flujo.estado_mision(), activo.telefono.estado(),

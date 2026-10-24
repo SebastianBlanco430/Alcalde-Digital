@@ -55,8 +55,8 @@ umbral es el plinto de la casa (queda enterrado o sobre un zócalo).
    (`sorted(MODELOS)`). Un modelo nuevo también aparecerá en la ladera y cambiará la favela.
 6. Mira el resultado en una ventana real: `venv\Scripts\python main.py`. Con `ALCALDE_FPS=1` imprime los FPS.
 
-Asignación actual: Plaza Central y Universidad = casa1; Terminal y Parque = casa2; Barrio Las Flores = casa3;
-Alcaldía y Hospital = casa4.
+Asignación actual: Praça da Sé y Universidade = casa1; Rodoviária y Parque = casa2; Morro da Esperança = casa3;
+Prefeitura y Hospital = casa4.
 
 ## 4. Personajes
 

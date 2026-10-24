@@ -14,8 +14,9 @@ import math
 from backend.logica.roles import ROLES
 from backend.logica.sesion import MAX_JUGADORES, Jugador, SesionJuego
 
-# Banderas de estado visibles para los demás jugadores (se sincronizan en cada snap).
-BANDERAS = ("en_aire", "escalera", "dentro", "vehiculo")
+# Banderas de estado visibles para los demás jugadores (se sincronizan en cada snap). «caballito» (bit 16): la
+# rueda delantera del vehículo que conduce está levantada (frontend/vehiculo_calculos.py); solo vale con vehículo.
+BANDERAS = ("en_aire", "escalera", "dentro", "vehiculo", "caballito")
 
 
 # Convierte un iterable de banderas a máscara de bits (las desconocidas se ignoran).

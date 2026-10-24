@@ -140,17 +140,34 @@ def es_ip_local(ip, ip_local):
         return False
 
 
-def calcular_huellas(mundo, semilla, catalogo):
-    """(huella_mundo, huella_contenido) que deben coincidir en anfitrión y clientes."""
+def calcular_huellas(mundo, semilla, catalogo, noticias=None, grafo_social=None):
+    """(huella_mundo, huella_contenido) que deben coincidir en anfitrión y clientes.
+
+    Mundo: semilla, lugares con su coordenada, calles y límites. Contenido: versión del protocolo, misiones (con
+    sus textos), roles, noticias (id, gravedad, veracidad y deltas), el grafo social y el ciudadano de cada rol.
+    `noticias` (tuplas de noticias_semilla) y `grafo_social` se inyectan; sin ellos se usan los de la semilla, que
+    son los que usan main.py y el servidor. Dos equipos con cualquiera de estos datos distintos no se emparejan."""
     lugares = []
     for lugar in sorted(mundo.lugares()):
         x, z = mundo.coordenada(lugar)
         lugares.append([lugar, round(float(x), 2), round(float(z), 2)])
+    calles = sorted(sorted([a, b]) for a, b in mundo.segmentos())
     limites = [round(float(v), 2) for v in mundo.limites_recorribles()]
-    h_mundo = huellas.huella_mundo({"semilla": int(semilla), "lugares": lugares, "limites": limites})
-    misiones = sorted([m.id, m.rol, m.destino, m.cantidad_noticias] for m in catalogo)
-    h_contenido = huellas.huella_contenido({"v": protocolo.PROTOCOLO_V, "misiones": misiones,
-                                            "roles": list(ORDEN_ROLES)})
+    h_mundo = huellas.huella_mundo({"semilla": int(semilla), "lugares": lugares, "calles": calles,
+                                    "limites": limites})
+    if noticias is None:
+        from backend.datos.noticias_semilla import NOTICIAS_SEMILLA as noticias
+    if grafo_social is None:
+        from backend.grafos.grafo_social import construir_grafo_social_ejemplo
+        grafo_social = construir_grafo_social_ejemplo()
+    from backend.logica.propagacion import CIUDADANO_POR_ROL
+    misiones = sorted([m.id, m.rol, m.destino, m.cantidad_noticias, m.titulo, m.mensaje] for m in catalogo)
+    lista_noticias = sorted([n[0], n[1], n[3], sorted(n[4].items()), sorted(n[5].items())] for n in noticias)
+    relaciones = sorted(sorted([a, b]) for a in grafo_social.ciudadanos() for b in grafo_social.vecinos(a) if a < b)
+    h_contenido = huellas.huella_contenido({
+        "v": protocolo.PROTOCOLO_V, "misiones": misiones, "roles": list(ORDEN_ROLES), "noticias": lista_noticias,
+        "ciudadanos": sorted(grafo_social.ciudadanos()), "relaciones": relaciones,
+        "ciudadano_por_rol": sorted(CIUDADANO_POR_ROL.items())})
     return h_mundo, h_contenido
 
 

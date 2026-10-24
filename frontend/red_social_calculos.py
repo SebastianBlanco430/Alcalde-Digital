@@ -104,16 +104,23 @@ COLORES_AVATAR = (
 AZUL_VERIFICADO = (64, 160, 255)
 DORADO_VERIFICADO = (255, 200, 80)
 
-_MEDIOS = ("Diario Nova", "Nova al Día", "Radio Ladera", "Noticias del Barrio", "El Pregonero", "Canal Civitas")
+# Las listas solo CRECEN por el final (2026-10: lugares nuevos y vecinos del grafo social): cambiar su tamaño cambia
+# qué autor, tendencia o comentario sale para cada noticia, pero sigue siendo determinista (crear_azar con el texto).
+_MEDIOS = ("Diario Nova", "Nova al Día", "Radio Ladera", "Noticias del Barrio", "El Pregonero", "Canal Civitas",
+           "Rádio Comunitária 98,7", "Jornal do Morro")
 _PERSONAS = (
     "Paola Reyes", "Andrés Quintero", "Marta Lozano", "Camila Duarte", "Joao Mendes", "Luciana Prado",
     "Tío Chucho", "Sebas Ramírez", "Dani Ocampo", "Valentina Cruz", "Don Efraín", "Rafa Torres",
     "Mariana Silva", "Bruno Almeida",
+    "Luana Ferreira", "Kauã Oliveira", "Dona Quitéria", "Seu Otávio", "Nayara Santos", "Marcos do Morro",
+    "Mestre Zé do Pandeiro",
 )
-_ANONIMAS = ("Vecino Indignado", "La Voz del Barrio", "Cuenta Anónima", "Nova Alerta 24", "Chisme Nova", "Ojo con Nova")
+_ANONIMAS = ("Vecino Indignado", "La Voz del Barrio", "Cuenta Anónima", "Nova Alerta 24", "Chisme Nova", "Ojo con Nova",
+            "Fofoca da Laje", "Zap do Morro")
 _INSTITUCIONES = (
-    "Alcaldía de Ciudad Nova", "Universidad de Nova", "Hospital Las Flores", "Comisión Electoral",
-    "Terminal de Buses", "Secretaría de Cultura",
+    "Prefeitura de Ciudad Nova", "Universidade de Nova", "Hospital Santa Casa", "Comisión Electoral",
+    "Rodoviária", "Secretaría de Cultura",
+    "Mercado Municipal", "Escola de Samba Unidos da Esperança", "Estação do Teleférico",
 )
 _BOTS = ("Nova Premios", "Gana Ya", "Oferta Total", "Sorteo Nova", "Cripto Nova")
 
@@ -288,31 +295,37 @@ _COMENTARIOS = {
         "¡Qué vergüenza! Esto no se puede quedar así.",
         "Ya nadie respeta a Ciudad Nova. Increíble.",
         "Siempre lo mismo y nadie dice nada. ¡Basta!",
+        "Isso é um absurdo! ¿Hasta cuándo, Ciudad Nova?",
     ),
     "esceptico": (
         "¿Alguien tiene la fuente? No me cuadra.",
         "Hmm, esto huele raro. ¿Hay enlace al comunicado?",
         "Antes de creerlo esperaría una confirmación oficial.",
+        "Tá, mas cadê a fonte? Sin enlace no me lo creo.",
     ),
     "bot": (
         "GANA $$$ desde casa >> premios.civitas.invalid #Gratis",
         "Sigue a @promo_nova y recibe tu bono. Escríbeme ya!!",
         "Mira esto >> increible.civitas.invalid",
+        "Ganhe dinheiro fácil >> sorte.civitas.invalid #Promo",
     ),
     "apoyo": (
         "Gracias por compartir, ojalá más gente lo vea.",
         "Justo lo que estaba buscando, gracias.",
         "Buen dato. Lo comparto con mi familia.",
+        "Valeu por avisar, lo paso al grupo de la familia.",
     ),
     "chiste": (
         "Y yo aquí esperando el bus, jaja.",
         "Esto parece sacado de una telenovela, jajaja.",
         "Lo único estable en Nova es el trancón.",
+        "Más enredado que los cables de un poste del morro, jaja.",
     ),
     "verificador": (
         "Ojo: aún no hay confirmación. Esperemos antes de compartir.",
         "Contrasten con fuentes oficiales, por favor.",
         "Revisen la fecha y la fuente antes de reenviar.",
+        "Antes de mandarlo al grupo, confirma con la Rádio Comunitária.",
     ),
 }
 ARQUETIPOS = tuple(_COMENTARIOS)
@@ -342,11 +355,13 @@ def comentarios_de(texto, cantidad=3):
 # --------------------------------------------------------------------------- tendencias
 
 _TENDENCIAS = (
-    ("Ciudad Nova", "#CiudadNova"), ("Política", "#AlcaldíaAbierta"),
-    ("Tendencia", "#VerificaAntes"), ("Barrio", "#LasFlores"),
+    ("Ciudad Nova", "#CiudadNova"), ("Política", "#PrefeituraAberta"),
+    ("Tendencia", "#VerificaAntes"), ("Barrio", "#MorroDaEsperança"),
     ("Política", "#DebateNova"), ("Salud", "#AguaSegura"),
     ("Movilidad", "#BusesNocturnos"), ("Educación", "#BecasNova"),
     ("Civitas", "#Civitas"), ("Elecciones", "#VotaInformado"),
+    ("Cultura", "#EnsaioDeSamba"), ("Movilidad", "#TeleféricoNova"), ("Economía", "#PreçoDaFeira"),
+    ("Barrio", "#RádioDoMorro"),
 )
 
 
@@ -364,8 +379,10 @@ def tendencias_de(texto, cantidad=3):
 _TITULOS_ENLACE = (
     "Lo que sabemos hasta ahora", "Comunicado completo y cronología", "Minuto a minuto desde Ciudad Nova",
     "Lo que dicen los vecinos del barrio", "Todo lo que debes saber en 3 minutos", "Análisis: ¿qué hay detrás de esto?",
+    "Lo que se comenta en la laje",
 )
-_DOMINIOS = ("diarionova.civitas.invalid", "novaaldia.civitas.invalid", "radioladera.civitas.invalid", "elpregonero.civitas.invalid")
+_DOMINIOS = ("diarionova.civitas.invalid", "novaaldia.civitas.invalid", "radioladera.civitas.invalid", "elpregonero.civitas.invalid",
+             "jornaldomorro.civitas.invalid")
 VARIANTES_IMAGEN = ("ciudad", "multitud", "captura", "calle", "video")
 TIPOS_MEDIA = ("ninguna", "imagen", "enlace")
 

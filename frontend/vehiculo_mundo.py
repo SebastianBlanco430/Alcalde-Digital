@@ -3,7 +3,10 @@
 # (Entity). NO toca controlador_jugador, escena_mundo ni hud: la fase de integración los conecta con esta API.
 #
 # Controles (decisión): RELATIVOS AL VEHÍCULO. W/S = acelerar/frenar (S parado = marcha atrás), A/D = dirección,
-# Shift = turbo, Espacio = freno de mano (derrape; NO salta). Con la cámara orbital el movimiento relativo a la
+# Shift (mantenido) = caballito, Ctrl = turbo, Espacio = freno de mano (derrape; NO salta). Decisión 2026-10-23:
+# Shift era el turbo; el caballito lo necesitaba (es la tecla «de truco» y la misma con que se corre a pie) y el
+# turbo pasó a Ctrl, que el juego no usaba. Con vc.CABALLITOS = False, Shift vuelve a ser el turbo y no hay
+# caballito. Con la cámara orbital el movimiento relativo a la
 # cámara (como al caminar) obliga a dar vueltas con inercia y la bici se "retuerce"; el relativo al vehículo
 # se comporta como una bici/moto y la cámara se coloca sola detrás (seguir_rumbo_camara) si no se toca el ratón.
 #
@@ -164,11 +167,11 @@ class MundoVehiculos(Entity):
     # Un paso de conducción con la entrada (h, v) en [-1, 1]. Devuelve (x, z) del vehículo; actualiza el modelo.
     # `camara` (opcional): CamaraTerceraPersona; se le recoloca el yaw detrás del vehículo y, si tiene los atributos
     # `fov_extra` / `distancia_extra` / `altura_extra`, se le pasan los efectos de velocidad (ver informe).
-    def avanzar(self, h, v, dt, turbo=False, freno_mano=False, camara=None):
+    def avanzar(self, h, v, dt, turbo=False, freno_mano=False, camara=None, caballito=False):
         c = self.conducido
         if c is None:
             return None
-        entrada = vc.EntradaVehiculo(acelerar=v, direccion=h, turbo=turbo, freno_mano=freno_mano)
+        entrada = vc.EntradaVehiculo(acelerar=v, direccion=h, turbo=turbo, freno_mano=freno_mano, caballito=caballito)
         vc.paso_vehiculo(c.estado, self.mundo, entrada, c.perfil, dt)
         self.acelerando = v > 0.05
         c.modelo.aplicar_estado(c.estado, min(dt, vc.DT_MAXIMO), self.mundo.altura, self.acelerando)
@@ -201,7 +204,8 @@ class MundoVehiculos(Entity):
     def efectos_camara(self):
         if self.conducido is None:
             return (0.0, 0.0, 0.0)
-        return vc.efectos_de_camara(self.conducido.estado.velocidad, self.conducido.perfil)
+        estado = self.conducido.estado
+        return vc.efectos_de_camara(estado.velocidad, self.conducido.perfil, estado.caballito)
 
     def posicion(self):
         c = self.conducido
@@ -210,11 +214,19 @@ class MundoVehiculos(Entity):
     def velocidad(self):
         return 0.0 if self.conducido is None else self.conducido.estado.velocidad
 
-    # Lee el teclado (WASD/flechas, Shift, Espacio) y conduce. Para quien quiera usar el controlador solo.
+    # Lee el teclado (WASD/flechas, Shift, Ctrl, Espacio) y conduce. Para quien quiera usar el controlador solo.
     def avanzar_con_teclado(self, camara=None):
         h, v = geometria_mundo.ejes_de_teclas(held_keys)
-        turbo = bool(held_keys["left shift"] or held_keys["right shift"])
-        return self.avanzar(h, v, time.dt, turbo, bool(held_keys["space"]), camara)
+        turbo, caballito = teclas_turbo_caballito(bool(held_keys["left shift"] or held_keys["right shift"]))
+        return self.avanzar(h, v, time.dt, turbo, bool(held_keys["space"]), camara, caballito)
+
+
+# (turbo, caballito) según la tecla Shift (`shift`) y Ctrl (se lee aquí). Con vc.CABALLITOS: Shift = caballito y
+# Ctrl = turbo; sin él, Shift = turbo (lo de antes).
+def teclas_turbo_caballito(shift):
+    if not vc.CABALLITOS:
+        return shift, False
+    return bool(held_keys["left control"] or held_keys["right control"]), shift
 
 
 
@@ -320,7 +332,7 @@ class IntegracionVehiculos:
         self.escena.hud.ocultar_aviso()
 
     # Gancho `modo_vehiculo.avanzar` del ControladorJugador: un paso de conducción. Espacio = freno de mano,
-    # Shift (`correr`) = turbo. Devuelve (x, z) del vehículo.
+    # Shift (`correr`) = caballito y Ctrl = turbo (sin vc.CABALLITOS, Shift = turbo). Devuelve (x, z) del vehículo.
     def avanzar(self, controlador, h, v, dt, correr):
         flujo = self.escena.flujo
         jugador = self.jugador
@@ -329,7 +341,8 @@ class IntegracionVehiculos:
         if jugador.telefono.bloquea_movimiento():
             h = v = 0
         freno = bool(held_keys["space"])
-        x, z = self.mundo.avanzar(h, v, dt, bool(correr), freno, camara=self.escena.camara)
+        turbo, caballito = teclas_turbo_caballito(bool(correr))
+        x, z = self.mundo.avanzar(h, v, dt, turbo, freno, camara=self.escena.camara, caballito=caballito)
         jugador.x, jugador.z = x, z
         flujo.actualizar_posicion(x, z)
         return (x, z)

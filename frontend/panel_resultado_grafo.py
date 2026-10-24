@@ -261,6 +261,7 @@ class PanelResultadoGrafo(Entity):
         self._puntos = calc.puntos_en_rectangulo(
             normalizadas, self.MEDIO_ANCHO_GRAFO, self.MEDIO_ALTO_GRAFO, (gx, gy))
         grado_maximo = max((grafo.grado(c) for c in grafo.ciudadanos()), default=0)
+        diametro_base = self.DIAMETRO_NODO * vista.escala_nodos(len(grafo.ciudadanos()))   # más ciudadanos: más chicos
 
         # Aristas: contorno de tinta + línea de color encima.
         self._aristas = vista.aristas(grafo)
@@ -277,7 +278,7 @@ class PanelResultadoGrafo(Entity):
         # Nodos: contorno de tinta, aro (dorado/rojo), contorno interior, relleno e inicial.
         for nombre, (px, py) in self._puntos.items():
             grado = grafo.grado(nombre)
-            d = vista.diametro_nodo(grado, grado_maximo, self.DIAMETRO_NODO, self.FACTOR_NODO_MAX)
+            d = vista.diametro_nodo(grado, grado_maximo, diametro_base, self.FACTOR_NODO_MAX)
             aislado = nombre in estado["aislados"]
             influyente = nombre in estado["influyentes"]
             con_aro = aislado or influyente

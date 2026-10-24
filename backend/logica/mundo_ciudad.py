@@ -35,6 +35,12 @@ RADIO_JUGADOR = 0.35
 # límites de siempre (limites()). El minimapa y los tests de la ciudad siguen usando limites().
 RECORRER_TODO_EL_TERRENO = True
 MARGEN_BORDE_TERRENO = 3.0       # m que se dejan sin pisar antes de que termine el terreno dibujado
+# Rejilla de colisiones (rendimiento): es_transitable miraba los ~600 obstáculos de la favela en cada consulta, y
+# el jugador, la cámara, los peatones y los vehículos la llaman varias veces por frame. Con la rejilla solo se
+# miran los de la celda del punto. El resultado es EXACTAMENTE el mismo: cada obstáculo se apunta en todas las
+# celdas que toca su caja ensanchada por radio_jugador (fuera de ella no puede chocar). False = la lista entera.
+INDICE_COLISIONES = True
+CELDA_COLISIONES = 8.0           # m de lado de cada celda
 DISTANCIA_ENTRADA = 1.2          # m delante de la puerta donde se para el personaje
 LADOS_PUERTA = ("n", "s", "e", "o")
 # Rumbo (rotation_y, grados) con el que se ENTRA por cada cara: hacia dentro del edificio.
@@ -175,6 +181,7 @@ class Zona:
     cz: float
     ancho: float
     fondo: float
+    rumbo: float = 0.0      # grados: hacia dónde mira lo que hay dentro (los rincones secretos; la cancha no lo usa)
 
     def caja(self):
         return (self.cx - self.ancho / 2, self.cx + self.ancho / 2,
@@ -264,6 +271,7 @@ class MundoCiudad:
             self._por_lugar[edificio.lugar] = edificio
 
         self._fisicos = [e.como_obstaculo() for e in self._edificios] + self._obstaculos
+        self._celdas = _indexar(self._fisicos, radio_jugador) if INDICE_COLISIONES else None
         self.terreno = terreno           # objeto con altura(x, z); None = mundo plano
         self._escaleras = list(escaleras)
         self._muros = list(muros)        # losas de contención (backend/datos/muros.py): solo se dibujan
@@ -408,7 +416,8 @@ class MundoCiudad:
         if (self.terreno is not None and not self.terreno.caminable(x, z)
                 and not any(e.contiene(x, z) for e in self._escaleras)):
             return False
-        return not any(o.choca(x, z, self.radio_jugador) for o in self._fisicos)
+        candidatos = self._fisicos if self._celdas is None else self._celdas.get(_celda(x, z), ())
+        return not any(o.choca(x, z, self.radio_jugador) for o in candidatos)
 
     # -- Internos --
 
@@ -463,6 +472,29 @@ class MundoCiudad:
     def __repr__(self):
         return (f"MundoCiudad(lugares={len(self.lugares())}, edificios={len(self._edificios)}, "
                 f"obstaculos={len(self._obstaculos)})")
+
+
+# -- Rejilla de colisiones (ver INDICE_COLISIONES) --------------------------------------
+
+
+def _celda(x, z):
+    return math.floor(x / CELDA_COLISIONES), math.floor(z / CELDA_COLISIONES)
+
+
+# {celda: [obstáculos]}: cada obstáculo en todas las celdas que toca su caja ensanchada `radio`.
+def _indexar(obstaculos, radio):
+    celdas = {}
+    for o in obstaculos:
+        if o.es_circulo:
+            mx = mz = o.radio + radio
+        else:
+            mx, mz = o.ancho / 2 + radio, o.fondo / 2 + radio
+        i0, j0 = _celda(o.cx - mx, o.cz - mz)
+        i1, j1 = _celda(o.cx + mx, o.cz + mz)
+        for i in range(i0, i1 + 1):
+            for j in range(j0, j1 + 1):
+                celdas.setdefault((i, j), []).append(o)
+    return celdas
 
 
 # -- Geometría auxiliar ----------------------------------------------------------------

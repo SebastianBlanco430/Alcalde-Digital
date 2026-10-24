@@ -9,6 +9,7 @@ import math
 from frontend import vehiculo_calculos as vc
 
 BIT_VEHICULO = 8
+BIT_CABALLITO = 16             # rueda delantera levantada (backend.red.sesion_en_linea.BANDERAS)
 TAU_CORRECCION = 0.18          # s: constante de tiempo del difuminado de la corrección al conductor
 UMBRAL_CORRECCION_BRUSCA = 6.0 # m: más que esto se coloca de golpe (sin bajarlo del vehículo)
 FACTOR_VELOCIDAD_BRUSCA = 0.5  # tras un salto grande la velocidad se reduce (para no volver a infringir)
@@ -18,14 +19,19 @@ TIMEOUT_MONTAR = 2.5           # s esperando monta_ok / monta_no antes de dar la
 
 # Reemplaza la posición del peatón por la del vehículo en la tupla que consume ClienteRed.enviar_pos:
 # (x, z, y, rumbo, velocidad, banderas[, veh]). `datos`: la tupla original (banderas: set de nombres o máscara).
-def datos_con_vehiculo(datos, x, z, y, rumbo, velocidad, tipo):
+# `caballito`: la rueda delantera va levantada (los demás lo ven con BIT_CABALLITO).
+def datos_con_vehiculo(datos, x, z, y, rumbo, velocidad, tipo, caballito=False):
     banderas = datos[5]
     if isinstance(banderas, int) and not isinstance(banderas, bool):
-        banderas = banderas | BIT_VEHICULO
+        banderas = (banderas | BIT_VEHICULO | (BIT_CABALLITO if caballito else 0)) & ~(0 if caballito else BIT_CABALLITO)
     else:
         banderas = set(banderas) | {"vehiculo"}
         banderas.discard("en_aire")          # montado no hay salto
         banderas.discard("escalera")
+        if caballito:
+            banderas.add("caballito")
+        else:
+            banderas.discard("caballito")
     return (float(x), float(z), float(y), float(rumbo) % 360.0, max(0.0, abs(float(velocidad))), banderas, tipo)
 
 
@@ -84,8 +90,9 @@ class AnimadorRemoto:
         self._previo = (x, z, rumbo)
         self._omega = 0.0
 
-    # Un paso. Devuelve el EstadoVehiculo listo para VehiculoModelo.aplicar_estado.
-    def avanzar(self, x, z, rumbo, velocidad, dt):
+    # Un paso. Devuelve el EstadoVehiculo listo para VehiculoModelo.aplicar_estado. `caballito`: el piloto remoto lleva
+    # la rueda levantada (BIT_CABALLITO); se anima con la misma regla que el local (sube y baja suave).
+    def avanzar(self, x, z, rumbo, velocidad, dt, caballito=False):
         e, p = self.estado, self.perfil
         if self._previo is None:
             self.colocar(x, z, rumbo)
@@ -121,5 +128,8 @@ class AnimadorRemoto:
             delante, detras = vc.puntos_de_contacto(x, z, e.rumbo, p.batalla / 2)
             objetivo = vc.cabeceo_por_alturas(self.altura(*delante), self.altura(*detras), p.batalla)
             e.cabeceo = _acercar(e.cabeceo, objetivo, 9.0, dt)
+        # El que conduce ya comprobó la velocidad mínima: con la bandera puesta se levanta sin volver a exigirla.
+        e.caballito = vc.paso_caballito(e.caballito, caballito, max(abs(v), p.caballito_vmin) if caballito else abs(v),
+                                        p, dt)
         self._previo = (x, z, rumbo)
         return e

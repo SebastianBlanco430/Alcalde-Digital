@@ -47,11 +47,11 @@ from frontend.banderas import crear_banderas
 from frontend.casas_decorativas import (casco_de_modelo, color_base_como_color, construir_casas,
                                         construir_casas_favela, modelo_pintado, relieve_de_edificio)
 from frontend.cielo import DIRECCION_SOL, CieloDegradado
-from frontend import estilo
+from frontend import estilo, rendimiento
 from frontend.componentes import rgb
 from frontend.detalles_calculos import esquina_del_tanque, franjas_prohibidas
 from frontend.detalles_techos import construir_detalles
-from frontend.favela_detalles import LETRAS_CARTEL, construir_favela_detalles
+from frontend.favela_detalles import LETRAS_CARTEL, construir_favela_detalles, letreros_secretos
 from frontend.geometria_mundo import ENTIERRO_BASE, apoyo_de_caja, medidas_losa, medidas_zocalo
 from frontend.muros_contencion import construir_muros
 from frontend.piezas import MASCARA_LUZ, encender_luz, lineas_sueltas, pieza, silenciar
@@ -75,7 +75,7 @@ SUELO_FAVELA = True
 PLAZAS_PINTADAS = True
 # Calles que siguen siendo de asfalto (la avenida principal que une las plazas del centro); el resto son
 # de arena y tierra compactada. Pares de lugares, en cualquier orden.
-CALLES_ASFALTADAS = (("Alcaldía", "Plaza Central"), ("Plaza Central", "Universidad de Ciudad Nova"))
+CALLES_ASFALTADAS = (("Prefeitura", "Praça da Sé"), ("Praça da Sé", "Universidade de Ciudad Nova"))
 ALTO_ARENA = 0.06                    # m de la cinta de arena sobre el suelo (el asfalto va a 0.10)
 COLOR_ACERA_AVENIDA = (176, 150, 128)   # aceras de la avenida: cemento cálido, no gris
 
@@ -93,7 +93,7 @@ COLOR_LUZ_AMBIENTE = (134, 124, 150)
 
 # Edificios jugables pintados: el color de la pared es el de su lugar en el minimapa (estilo.COLORES_LUGAR).
 PUERTAS_EDIFICIOS = ((236, 64, 64), (252, 204, 44), (44, 112, 226), (34, 166, 112), (252, 124, 32), (146, 66, 204),
-                     (240, 240, 240))
+                     (240, 240, 240), (60, 190, 200), (250, 150, 180), (70, 70, 90), (200, 160, 60))
 COLOR_TECHO_EDIFICIO = (150, 164, 184)
 
 
@@ -279,6 +279,7 @@ class Ciudad3D(Entity):
             # edificios cae fuera del rango de profundidad); en plano, solo los edificios.
             self.luz.update_bounds(self if mundo.terreno is not None else self._raiz_edificios)
             self.luz._light.set_scene(self)          # solo la ciudad (sin personajes) va al mapa
+            rendimiento.agregar_raiz(self)            # ese pase empieza aquí: no hereda la cámara de render
         for contorno in self._contornos:
             contorno.hide(MASCARA_LUZ)                  # la tinta ni proyecta ni recibe sombra
         for nombre in ("suelo", "calles", "plazas", "calles_arena"):
@@ -635,7 +636,7 @@ class Ciudad3D(Entity):
                       scale=(0.05, 0.05, math.hypot(horizontal, q[1] - p[1])))
 
     # Decorado nuevo (árboles variados, arbustos, farolas, bancos, vallas, carteles, jardineras y la
-    # fuente de la Plaza Central): dos mallas únicas hechas en props_mundo, sin colisión. La de luces
+    # fuente de la Praça da Sé): dos mallas únicas hechas en props_mundo, sin colisión. La de luces
     # (focos de las farolas) va sin sombreado y fuera del mapa de sombras.
     def _construir_decorado(self):
         opaca, luces, contorno = construir_props_y_contorno(self._mundo)
@@ -717,6 +718,10 @@ class Ciudad3D(Entity):
                          rotation_y=math.degrees(math.atan2(-nx, -nz)), scale=TAMANO_TEXTO_CARTEL if len(cal.texto) <= 6 else TAMANO_TEXTO_CARTEL * 0.8,
                          color=rgb(letras))
             silenciar(texto)
+        # Carteles de cartón de los rincones secretos (easter eggs): letras de tinta, sin entrar al minimapa ni al GPS.
+        for cadena, posicion, giro, escala in letreros_secretos(self._mundo):
+            silenciar(Text(cadena, parent=self, origin=(0, 0), position=posicion, rotation_y=giro, scale=escala,
+                           color=rgb(estilo.TINTA)))
 
     # Base que llena el hueco entre el suelo y la planta baja (que se apoya en `alto`) y TAPA el plinto
     # que el modelo trae bajo su umbral (`hondo_umbral`): zócalo macizo si el desnivel es pequeño,

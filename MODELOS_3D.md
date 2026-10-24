@@ -17,13 +17,13 @@ queda pendiente y hacia dónde queremos llevar el mapa (favela brasileña en lad
 
 | Edificio | Modelo |
 |---|---|
-| Plaza Central (Café Internet) | casa1 |
-| Universidad de Ciudad Nova | casa1 |
-| Terminal de Buses | casa2 |
-| Parque Municipal (Biblioteca) | casa2 |
-| Barrio Las Flores | casa3 |
-| Alcaldía | casa4 |
-| Hospital Las Flores | casa4 |
+| Praça da Sé (Lan House) | casa1 |
+| Universidade de Ciudad Nova | casa1 |
+| Rodoviária | casa2 |
+| Parque do Povo (Biblioteca) | casa2 |
+| Morro da Esperança | casa3 |
+| Prefeitura | casa4 |
+| Hospital Santa Casa | casa4 |
 
 Las casas repetidas llevan un tinte suave para diferenciarlas.
 
@@ -283,7 +283,7 @@ actual con las reglas de `_Despeje`. Es solo una prueba; el reparto real se hace
 sigue viendo plano hasta la fase D)
 - `backend/datos/terreno.py`, clase `Terreno`:
   - Ladera natural: un plano de **25 m** de desnivel que sube del Hospital (sureste) hacia la
-    Alcaldía (noroeste), sobre el mapa más 40 m alrededor, con un ondulado de ±1,5 m.
+    Prefeitura (noroeste), sobre el mapa más 40 m alrededor, con un ondulado de ±1,5 m.
   - Terrazas planas: las plazas (radio + 1,5 m), los lotes de los edificios (+1,5 m) y el
     camino plaza → puerta, a la altura de su plaza.
   - Calles: planas dentro de cada plaza y en rampa lineal en el tramo libre. Las alturas de
@@ -299,7 +299,7 @@ sigue viendo plano hasta la fase D)
 - `construir_mundo_3d(ladera=True)`. Con `ladera=False` vuelve el mundo plano de antes.
 
 **Números**
-- Plazas, de la más alta a la más baja: Plaza Central 15,5 · Alcaldía 15,4 · Universidad 14,6
+- Plazas, de la más alta a la más baja: Praça da Sé 15,5 · Prefeitura 15,4 · Universidad 14,6
   · Terminal 11,8 · Parque 11,6 · Barrio 9,0 · Hospital 6,9 m.
 - **La red de calles sube unos 8,7 m.** Con plazas planas de radio 9 m y calles de 32 a 37 m,
   las rampas miden solo 12–16 m, así que a 14° no se puede subir mucho más. El resto de los
@@ -307,7 +307,7 @@ sigue viendo plano hasta la fase D)
 - La pendiente máxima en las calles es ≤ 15°, comprobada en el eje y en los bordes del
   asfalto.
 - **Taludes**: el 0,4 % del terreno pasa de 30° (hasta 47°), donde un lote y una calle
-  cercanos están a distinta altura (por ejemplo, entre Barrio Las Flores y la calle a la
+  cercanos están a distinta altura (por ejemplo, entre Morro da Esperança y la calle a la
   Terminal). En la fase D conviene dibujarlos como muros de contención. La colisión sigue en
   2D, así que hoy se podrían caminar.
 
@@ -348,7 +348,7 @@ con un ejecutor mínimo. Para usar pytest: `.venv/Scripts/python.exe -m pip inst
   rampa simétrica entre dos plazas pasaba por recta), se inclina con la pendiente y se rearma
   solo cuando el jugador se mueve más de 25 cm. Se aparta del suelo 4 cm como máximo.
 - **Cinemáticas**: `guion_cinematicas.toma_fachada` y la órbita de salida usan `edificio.y`.
-  Lo probé entrando a la Alcaldía: la toma, la puerta y el personaje quedan bien y se pasa al
+  Lo probé entrando a la Prefeitura: la toma, la puerta y el personaje quedan bien y se pasa al
   interior.
 - **Sombras**: con ladera, el volumen de sombra abarca toda la ciudad (si no, el suelo más
   bajo que los edificios caía fuera del rango de profundidad). El suelo, las calles y las
@@ -482,7 +482,7 @@ Todo es determinista (el azar sale de `azar_de(a, b)` en `frontend/azar_fijo.py`
 | Banderas | `frontend/banderas.py`, `frontend/banderas_calculos.py` | Una por edificio jugable, en la esquina trasera del techo opuesta a la puerta; 7 colores (`COLORES_BANDERA`). Mástil de `ALTO_MASTIL` = 4 m y tela de 6 franjas que ondea (25° en la punta, 3 rad/s). La del destino de la misión se agranda 1.4×, ondea 1.6× más rápido y lleva borde `COLOR_BALIZA`. Se anima desde `Ciudad3D.update()` y no proyecta sombra. |
 | Neblina | `frontend/niebla.py`, `escena_mundo.py` | `activar_niebla()` con `COLOR_NIEBLA` = el horizonte del cielo (`COLOR_HORIZONTE` de `frontend/cielo.py`, (238, 224, 204)), `FIN_NIEBLA` = 260 e `INTENSIDAD_NIEBLA` = 0.65, al entrar al mundo; `desactivar_niebla()` al salir; a 30 m pesa ~7,5 %. Solo afecta a las entidades ya creadas y no a las de `shader=None`. |
 | Cielo y sol | `frontend/cielo.py`, `frontend/ciudad_3d.py` | `CieloDegradado` reemplaza a `ursina.Sky`: domo con colores de vértice (horizonte crema → azul, resplandor hacia el sol), 15 nubes bajas que derivan y dos filas de cerros lejanos; `self.cielo` sigue fuera de `silenciar()`. Luz de tarde: `DIRECCION_SOL` = (1.0, -1.1, 0.8) (para volver a la luz alta, (1, -1.6, 0.8)). Una sola `DirectionalLight` + una `AmbientLight`. |
-| Suelo, marcas y props | `frontend/ciudad_3d.py`, `frontend/props_mundo.py`, `frontend/azar_fijo.py` | Ruido de color por vértice en pasto, asfalto y aceras; líneas de borde y cebras junto a cada plaza; unas 90 piezas de decorado (árboles de 4 tipos, arbustos con flores, farolas, jardineras, canecas, bancos, vallas, carteles) en una sola malla con normales, más una fuente de tres niveles en la Plaza Central. Sin colisión (el backend no los ve) y fuera de calles, huellas de edificios y pasos plaza-puerta. `combine(include_normals=True)` (`COMBINAR_CON_NORMALES`): sin normales el shader usa el último `normal` dibujado y las plazas cambian de brillo según el encuadre. |
+| Suelo, marcas y props | `frontend/ciudad_3d.py`, `frontend/props_mundo.py`, `frontend/azar_fijo.py` | Ruido de color por vértice en pasto, asfalto y aceras; líneas de borde y cebras junto a cada plaza; unas 90 piezas de decorado (árboles de 4 tipos, arbustos con flores, farolas, jardineras, canecas, bancos, vallas, carteles) en una sola malla con normales, más una fuente de tres niveles en la Praça da Sé. Sin colisión (el backend no los ve) y fuera de calles, huellas de edificios y pasos plaza-puerta. `combine(include_normals=True)` (`COMBINAR_CON_NORMALES`): sin normales el shader usa el último `normal` dibujado y las plazas cambian de brillo según el encuadre. |
 | Minimapa | `frontend/hud.py` (`Minimapa`), `frontend/hud_calculos.py` | Casas (88, 92, 108, algo transparente) y escaleras (200, 190, 160) en una malla cada una; se reconstruyen solo si el yaw cambia más de 1.5°. |
 
 **Orden en `Ciudad3D.__init__`:** suelo, calles, plazas, edificios, obstáculos (casas con base, tanques,
@@ -583,7 +583,7 @@ sueltas de antes) y, en `frontend/ciudad_3d.py`, `SUELO_FAVELA`, `PLAZAS_PINTADA
 `FAVELA_DETALLES` en `False`.
 
 ### Suelo (`frontend/suelo_calculos.py`, `suelo_favela.py`, `texturas_favela.py`)
-- **Calles de arena**: solo la avenida `CALLES_ASFALTADAS` (Alcaldía - Plaza Central - Universidad) sigue en asfalto; ahora gastado,
+- **Calles de arena**: solo la avenida `CALLES_ASFALTADAS` (Prefeitura - Praça da Sé - Universidad) sigue en asfalto; ahora gastado,
   con parches de arena y baches (`cinta_asfalto_gastado`) y aceras cálidas. El resto son cintas de arena de 11 m de ancho con
   bordes irregulares (`IRREGULAR_BORDE`), color por vértice (`ARENA_CLARA/MEDIA/ROJIZA`) que se funde con la ladera, y una textura
   procedural (PIL, sin archivos) con rodadas, huellas, piedras y grietas. Una sola malla con textura (`calles_arena`).

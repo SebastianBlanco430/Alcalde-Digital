@@ -15,14 +15,28 @@
 # (por gravedad) tienen la misma forma y el camino de uno sirve en el otro.
 #
 #   id= 3  gravedad=10  becas municipales (verdadera)
+#   id= 5  gravedad=14  reunión de vecinos en la Rádio Comunitária (verdadera)
 #   id= 8  gravedad=20  debate de candidatos (verdadera)
+#   id=10  gravedad=25  horario del Mercado Municipal (verdadera)
 #   id=11  gravedad=30  rutas de buses nocturnos (verdadera)
+#   id=15  gravedad=35  mantenimiento del teleférico (verdadera)
+#   id=20  gravedad=40  vacunación en la Praça da Sé (verdadera)
+#   id=25  gravedad=45  desfile de la Escola de Samba cancelado (falsa)
+#   id=30  gravedad=50  foto del teleférico «colgando» (falsa)
+#   id=35  gravedad=55  precio del feijão al doble (falsa)
 #   id=40  gravedad=65  rumor cierre de hospital (falsa)
+#   id=45  gravedad=70  cierre de la Rádio Comunitária (falsa)
+#   id=50  gravedad=75  pasajes gratis en la Rodoviária (falsa, estafa)
 #   id=55  gravedad=80  rumor agua contaminada (falsa)
+#   id=60  gravedad=85  demolición de la Praça da Sé (falsa)
+#   id=65  gravedad=90  alerta falsa de deslizamientos (falsa)
 #   id=70  gravedad=95  rumor fraude electoral (falsa)
+#   id=75  gravedad=98  elecciones suspendidas por una cuenta falsa (falsa)
 #
-# El orden de NOTICIAS_SEMILLA es desordenado respecto a id/gravedad para no
-# producir un árbol degenerado (tipo lista).
+# El orden de NOTICIAS_SEMILLA NO sigue el id: es el recorrido por niveles de un árbol equilibrado (30, luego 10 y
+# 55, luego 5, 15, 40, 65...), así los dos árboles quedan con altura 5, la mínima para 18 noticias, y nunca
+# degeneran en lista. Las 6 noticias de siempre (3, 8, 11, 40, 55, 70) no cambian; las otras 12 son de 2026-10
+# (contexto de Ciudad Nova: Rádio, Mercado, Teleférico, Escola de Samba, Rodoviária).
 
 from backend.arboles.arbol_noticias import ArbolNoticias
 from backend.arboles.arbol_stats import ArbolStats
@@ -33,31 +47,22 @@ from backend.arboles.isomorfismo import validar_isomorfismo
 # Orden de la lista = orden de inserción en ambos árboles.
 NOTICIAS_SEMILLA = [
     (
-        11,
         30,
-        "La Alcaldía de Ciudad Nova anuncia nuevas rutas de buses nocturnos "
-        "para el centro a partir del próximo mes.",
-        True,
-        {"convivencia": +5, "confianza": +8, "desinformacion": 0},
-        {"convivencia": -2, "confianza": -4, "desinformacion": 0},
-    ),
-    (
-        40,
-        65,
-        "Circula en Civitas que el candidato Rojas planea cerrar el hospital "
-        "público del barrio Las Flores si gana la alcaldía.",
+        50,
+        "Una foto muestra el teleférico de Ciudad Nova «colgando» de un solo cable; en realidad "
+        "es de otra ciudad y de hace años.",
         False,
-        {"convivencia": -10, "confianza": -12, "desinformacion": +14},
-        {"convivencia": +3, "confianza": +10, "desinformacion": -6},
+        {"convivencia": -5, "confianza": -8, "desinformacion": +9},
+        {"convivencia": +2, "confianza": +7, "desinformacion": -5},
     ),
     (
-        8,
-        20,
-        "El debate de candidatos a la alcaldía se transmitirá en vivo por "
-        "Civitas este viernes a las 7pm, confirma la comisión electoral.",
+        10,
+        25,
+        "El Mercado Municipal amplía su horario los domingos durante las fiestas de junio, "
+        "confirma su administración.",
         True,
-        {"convivencia": +6, "confianza": +7, "desinformacion": 0},
-        {"convivencia": -1, "confianza": -3, "desinformacion": 0},
+        {"convivencia": +4, "confianza": +6, "desinformacion": 0},
+        {"convivencia": -2, "confianza": -4, "desinformacion": 0},
     ),
     (
         55,
@@ -69,13 +74,103 @@ NOTICIAS_SEMILLA = [
         {"convivencia": +4, "confianza": +9, "desinformacion": -8},
     ),
     (
+        5,
+        14,
+        "La Rádio Comunitária 98,7 transmitirá en vivo la reunión de vecinos del Morro da "
+        "Esperança este sábado.",
+        True,
+        {"convivencia": +5, "confianza": +6, "desinformacion": 0},
+        {"convivencia": -1, "confianza": -2, "desinformacion": 0},
+    ),
+    (
+        15,
+        35,
+        "La Estação do Teleférico cerrará dos días por mantenimiento programado; la Prefeitura "
+        "ya publicó las fechas.",
+        True,
+        {"convivencia": +5, "confianza": +8, "desinformacion": 0},
+        {"convivencia": -3, "confianza": -6, "desinformacion": +1},
+    ),
+    (
+        40,
+        65,
+        "Circula en Civitas que el candidato Rojas planea cerrar el hospital "
+        "público del Morro da Esperança si gana la alcaldía.",
+        False,
+        {"convivencia": -10, "confianza": -12, "desinformacion": +14},
+        {"convivencia": +3, "confianza": +10, "desinformacion": -6},
+    ),
+    (
+        65,
+        90,
+        "Un mensaje alarmista dice que esta noche habrá deslizamientos en todo el Morro y pide "
+        "abandonar las casas; Defensa Civil no ha emitido ninguna alerta.",
+        False,
+        {"convivencia": -15, "confianza": -13, "desinformacion": +15},
+        {"convivencia": +5, "confianza": +11, "desinformacion": -8},
+    ),
+    (
         3,
         10,
-        "La Universidad de Ciudad Nova abre inscripciones a becas municipales "
+        "La Universidade de Ciudad Nova abre inscripciones a becas municipales "
         "para estudiantes de últimos semestres.",
         True,
         {"convivencia": +7, "confianza": +6, "desinformacion": 0},
         {"convivencia": -1, "confianza": -2, "desinformacion": 0},
+    ),
+    (
+        8,
+        20,
+        "El debate de candidatos a la alcaldía se transmitirá en vivo por "
+        "Civitas este viernes a las 7pm, confirma la comisión electoral.",
+        True,
+        {"convivencia": +6, "confianza": +7, "desinformacion": 0},
+        {"convivencia": -1, "confianza": -3, "desinformacion": 0},
+    ),
+    (
+        11,
+        30,
+        "La Prefeitura de Ciudad Nova anuncia nuevas rutas de buses nocturnos "
+        "para el centro a partir del próximo mes.",
+        True,
+        {"convivencia": +5, "confianza": +8, "desinformacion": 0},
+        {"convivencia": -2, "confianza": -4, "desinformacion": 0},
+    ),
+    (
+        20,
+        40,
+        "El Hospital Santa Casa organiza una jornada gratuita de vacunación en la Praça da Sé "
+        "este domingo.",
+        True,
+        {"convivencia": +8, "confianza": +8, "desinformacion": -2},
+        {"convivencia": -3, "confianza": -7, "desinformacion": +2},
+    ),
+    (
+        35,
+        55,
+        "Circula que el Mercado Municipal subirá al doble el precio del feijão desde mañana; los "
+        "comerciantes lo desmienten.",
+        False,
+        {"convivencia": -9, "confianza": -6, "desinformacion": +10},
+        {"convivencia": +4, "confianza": +6, "desinformacion": -6},
+    ),
+    (
+        45,
+        70,
+        "Una cadena del zap asegura que la Rádio Comunitária fue cerrada «por decir la verdad»; la "
+        "radio sigue al aire.",
+        False,
+        {"convivencia": -10, "confianza": -12, "desinformacion": +12},
+        {"convivencia": +3, "confianza": +9, "desinformacion": -7},
+    ),
+    (
+        60,
+        85,
+        "Un video afirma que la Praça da Sé será demolida para hacer un estacionamiento privado; la "
+        "imagen es un montaje.",
+        False,
+        {"convivencia": -14, "confianza": -12, "desinformacion": +14},
+        {"convivencia": +4, "confianza": +10, "desinformacion": -7},
     ),
     (
         70,
@@ -85,6 +180,33 @@ NOTICIAS_SEMILLA = [
         False,
         {"convivencia": -14, "confianza": -15, "desinformacion": +15},
         {"convivencia": +2, "confianza": +11, "desinformacion": -5},
+    ),
+    (
+        25,
+        45,
+        "Un audio dice que la Escola de Samba se queda sin desfile por orden de la Prefeitura; no "
+        "hay ningún comunicado.",
+        False,
+        {"convivencia": -6, "confianza": -7, "desinformacion": +8},
+        {"convivencia": +2, "confianza": +6, "desinformacion": -4},
+    ),
+    (
+        50,
+        75,
+        "Aseguran que en la Rodoviária regalan pasajes a quien comparta un enlace; es una estafa "
+        "para robar datos.",
+        False,
+        {"convivencia": -8, "confianza": -13, "desinformacion": +13},
+        {"convivencia": +3, "confianza": +10, "desinformacion": -8},
+    ),
+    (
+        75,
+        98,
+        "Una cuenta que imita a la Prefeitura anuncia que las elecciones municipales se suspenden; "
+        "la comisión electoral lo desmiente.",
+        False,
+        {"convivencia": -15, "confianza": -15, "desinformacion": +15},
+        {"convivencia": +3, "confianza": +12, "desinformacion": -6},
     ),
 ]
 

@@ -225,13 +225,17 @@ def _segmentos_intersectan(p1, p2, p3, p4):
 
 
 COORDENADAS_EJEMPLO = {
-    "Alcaldía": (-8, 0),
-    "Plaza Central": (0, 0),
-    "Universidad de Ciudad Nova": (6, 7),
-    "Parque Municipal": (14, 5),
-    "Barrio Las Flores": (14, -4),
-    "Terminal de Buses": (6, -7),
-    "Hospital Las Flores": (21, -9),
+    "Prefeitura": (-8, 0),
+    "Praça da Sé": (0, 0),
+    "Universidade de Ciudad Nova": (6, 7),
+    "Parque do Povo": (14, 5),
+    "Morro da Esperança": (14, -4),
+    "Rodoviária": (6, -7),
+    "Hospital Santa Casa": (21, -9),
+    "Mercado Municipal": (-2, -12),
+    "Escola de Samba": (12, 12),
+    "Rádio Comunitária": (12, -13),
+    "Estação do Teleférico": (-14, 6),
 }
 
 

@@ -30,6 +30,7 @@ from backend.logica.mundo_ciudad import (
     RADIO_JUGADOR,
     Callejon,
     CasaDecorativa,
+    Obstaculo,
     Zona,
     _distancia_punto_caja,
     _distancia_segmento_caja,
@@ -73,6 +74,19 @@ PROBABILIDAD_HUECO_LEJOS = 0.55  # fracción máxima de casas que faltan en el b
 
 CANCHA = (24.0, 14.0)            # m (largo, ancho) de la cancha de fútbol de barrio
 MERCADO = (16.0, 9.0)            # m del mercadito de toldos
+
+# Rincones secretos (easter eggs, bandera EASTER_EGGS): dos puestos de broma escondidos en lo alto de la ladera,
+# uno a cada lado (cuadrantes CUADRANTES_SECRETOS de los límites), lejos de calles y plazas: un «expendio» de talco
+# y dulces y una «armería» de pistolas de agua. Son decorado (no cambian misiones ni indicadores, no salen en el
+# minimapa ni en el GPS); lo único que choca es la mesa (mesas_secretas). Deterministas: mismo mapa, mismo sitio en
+# todos los equipos. False = el barrio de antes (sin las zonas ni las mesas).
+EASTER_EGGS = True
+SECRETOS = ("puesto_talco", "armeria_juguete")
+RINCON_SECRETO = (5.0, 4.0)      # m del rincón (largo, ancho)
+LEJOS_SECRETO = 6.0              # m mínimos a calles y plazas: que no se vea desde ellas
+MESA_SECRETA = (2.4, 0.9)        # m de la mesa del puesto (a lo largo del lado largo del rincón)
+# (x0, x1, z0, z1) como fracción de los límites: arriba a la izquierda y arriba a la derecha.
+CUADRANTES_SECRETOS = ((0.0, 0.45, 0.5, 1.0), (0.55, 1.0, 0.5, 1.0))
 
 
 # Zona rectangular de `ancho` x `fondo` (en x, z) lo más plana posible dentro de `limites`, a más de
@@ -388,14 +402,70 @@ def zonas_abiertas(mapa, edificios, suelo, limites):
     ocupadas = [e.caja() for e in edificios]
     zonas = []
     cancha = buscar_zona_plana(mapa, ocupadas, suelo, limites, CANCHA[0], CANCHA[1], lejos=3.0,
-                               cerca=mapa.coordenada("Plaza Central") if "Plaza Central" in mapa.lugares() else None)
+                               cerca=mapa.coordenada("Praça da Sé") if "Praça da Sé" in mapa.lugares() else None)
     if cancha:
         zonas.append(Zona("cancha", round(cancha[0], 2), round(cancha[1], 2), cancha[2], cancha[3]))
     # El mercadito queda pegado a la acera de una calle, para que el paso hacia él sea la propia calle.
     mercado = _mercado_junto_a_calle(mapa, ocupadas + [z.caja() for z in zonas], suelo, limites)
     if mercado:
         zonas.append(mercado)
+    if EASTER_EGGS:
+        zonas += _rincones_secretos(mapa, ocupadas + [z.caja() for z in zonas], suelo, limites)
     return zonas
+
+
+# Un rincón plano por tipo de SECRETOS, cada uno en su cuadrante de los límites (ver EASTER_EGGS).
+def _rincones_secretos(mapa, ocupadas, suelo, limites):
+    xmin, xmax, zmin, zmax = limites
+    ancho, alto = xmax - xmin, zmax - zmin
+    rincones = []
+    for tipo, (fx0, fx1, fz0, fz1) in zip(SECRETOS, CUADRANTES_SECRETOS):
+        cuadrante = (xmin + ancho * fx0, xmin + ancho * fx1, zmin + alto * fz0, zmin + alto * fz1)
+        arriba = ((cuadrante[0] + cuadrante[1]) / 2, cuadrante[3])      # desempata hacia lo alto del cuadrante
+        sitio = buscar_zona_plana(mapa, ocupadas + [r.caja() for r in rincones], suelo, cuadrante,
+                                  RINCON_SECRETO[0], RINCON_SECRETO[1], lejos=LEJOS_SECRETO, cerca=arriba)
+        if sitio:
+            rincones.append(Zona(tipo, round(sitio[0], 2), round(sitio[1], 2), sitio[2], sitio[3]))
+    return rincones
+
+
+# Los rincones secretos ya orientados: cada uno mira (rumbo 0/90/180/270) hacia el lado por el que se llega, el que
+# tiene más suelo libre de `cajas` (las casas ya colocadas) delante de su borde; si empatan, hacia la plaza más
+# cercana. Las demás zonas se devuelven tal cual.
+def orientar_secretos(zonas, cajas, mapa):
+    plazas = [mapa.coordenada(lugar) for lugar in mapa.lugares()]
+    resultado = []
+    for z in zonas:
+        if z.tipo not in SECRETOS:
+            resultado.append(z)
+            continue
+        px, pz = min(plazas, key=lambda p: math.hypot(p[0] - z.cx, p[1] - z.cz))
+
+        def puntaje(rumbo, z=z, px=px, pz=pz):
+            fx, fz = round(math.sin(math.radians(rumbo))), round(math.cos(math.radians(rumbo)))
+            borde = abs(fx) * z.ancho / 2 + abs(fz) * z.fondo / 2
+            libres = 0
+            for d in (0.8, 1.6, 2.4, 3.2):
+                for lado in (-1.0, 0.0, 1.0):
+                    x, y = z.cx + fx * (borde + d) + fz * lado, z.cz + fz * (borde + d) - fx * lado
+                    libres += not any(c[0] - RADIO_JUGADOR <= x <= c[1] + RADIO_JUGADOR
+                                      and c[2] - RADIO_JUGADOR <= y <= c[3] + RADIO_JUGADOR for c in cajas)
+            return libres, (px - z.cx) * fx + (pz - z.cz) * fz
+
+        resultado.append(replace(z, rumbo=max((0.0, 90.0, 180.0, 270.0), key=puntaje)))
+    return resultado
+
+
+# La mesa de cada rincón secreto como Obstaculo (lo único que choca): en el centro, a lo ancho del frente (su rumbo).
+def mesas_secretas(zonas):
+    mesas = []
+    for z in zonas:
+        if z.tipo in SECRETOS:
+            largo, fondo = MESA_SECRETA
+            frente_en_z = z.rumbo % 180 == 0              # mira a +z o -z: la mesa va a lo largo de x
+            ancho, alto = (largo, fondo) if frente_en_z else (fondo, largo)
+            mesas.append(Obstaculo("puesto_secreto", z.cx, z.cz, ancho=ancho, fondo=alto))
+    return mesas
 
 
 # Rectángulo de MERCADO a un lado de una calle, pegado a su acera, lo más plano posible.

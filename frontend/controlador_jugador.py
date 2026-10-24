@@ -3,7 +3,8 @@
 # avatar (vista). Es hijo de EscenaMundo, así que Ursina NO le entrega update() ni
 # input() mientras la escena está desactivada (p. ej. durante el minijuego).
 #
-# Teclas: WASD / flechas = mover (Shift = correr, si se configuró), Tab = teléfono, E =
+# Teclas: WASD / flechas = mover (Shift = correr, si se configuró), Tab = teléfono, M = seguir o no la
+# misión (las ayudas hacia el destino; la misión no cambia), E =
 # interactuar (solo si el modelo dice puede_interactuar(), es decir EN_RADIO del destino),
 # Escape = pausa (solo si la escena la ofrece: `alternar_pausa()`). Espacio/Enter saltan las
 # cinemáticas, pero eso es global (main.py) porque hay que poder saltar también en el interior.
@@ -48,6 +49,7 @@ from frontend import geometria_mundo
 VELOCIDAD = 7.0     # unidades de mundo por segundo
 DISTANCIA_PENDIENTE = 0.5  # m adelante en que se mide el desnivel para frenar en subida
 DT_MAXIMO = 0.05   # tope por frame: un tirón no atraviesa paredes ni salta la cámara
+TECLA_SEGUIR_MISION = "m"   # marca / desmarca «Seguir misión» del teléfono (backend/logica/telefono.py)
 
 
 class ControladorJugador(Entity):
@@ -253,6 +255,8 @@ class ControladorJugador(Entity):
             return
         if key == "tab":
             jugador.telefono.alternar()
+        elif key == TECLA_SEGUIR_MISION and hasattr(jugador.telefono, "alternar_seguir_mision"):
+            jugador.telefono.alternar_seguir_mision()     # ayudas hacia el destino: sí / no (la misión no cambia)
         elif key == "e":
             # Con el teléfono abierto no se interactúa (tampoco se camina).
             puede = flujo.puede_interactuar() and not jugador.telefono.bloquea_movimiento()

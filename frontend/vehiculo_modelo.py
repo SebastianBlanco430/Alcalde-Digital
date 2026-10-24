@@ -7,7 +7,8 @@
 # Jerarquía de un VehiculoModelo (todo con ignore=True salvo el piloto):
 #   raiz (x, altura del suelo, z; rotation_y = rumbo)
 #     |- sombra            disco oscuro bajo el vehículo (no se inclina)
-#     `- inclinable        cabeceo (pendiente) y balanceo (lean) alrededor del suelo
+#     `- pivote_caballito  en el apoyo de la rueda trasera: levanta la delantera (caballito, Shift)
+#        `- inclinable     cabeceo (pendiente) y balanceo (lean) alrededor del suelo
 #          |- rueda_tras   gira con la distancia recorrida
 #          `- suspension   rebote del chasis
 #               |- cuadro, biela (gira con el pedaleo), pedal_d / pedal_i (siguen a la biela sin girar), pata
@@ -124,7 +125,11 @@ class VehiculoModelo(Entity):
 
         grupos = self.piezas.grupos
         self.sombra = _sombra(self, 2.0 if tipo == vc.BICICLETA else 2.5, 0.75 if tipo == vc.BICICLETA else 0.9)
-        self.inclinable = _entidad(self)
+        # Caballito: el giro se hace alrededor del apoyo de la rueda trasera (en el suelo, bajo su eje), así la
+        # trasera no se mueve y el piloto, que cuelga de la suspensión, sigue agarrado al manubrio.
+        apoyo_z = grupos["rueda_tras"].pivote[2]
+        self.pivote_caballito = _entidad(self, (0.0, 0.0, apoyo_z))
+        self.inclinable = _entidad(self.pivote_caballito, (0.0, 0.0, -apoyo_z))
         self.nodos = {}
         self.rueda_tras = self._grupo("rueda_tras", grupos["rueda_tras"], self.inclinable)
         self.suspension = _entidad(self.inclinable)
@@ -217,6 +222,7 @@ class VehiculoModelo(Entity):
         recostado = 0.14 if self.tipo == vc.BICICLETA else -0.11
         self.inclinable.rotation_z = math.degrees(recostado)
         self.inclinable.rotation_x = 0
+        self.pivote_caballito.rotation_x = 0
         self.suspension.y = 0
         self.nodos["manubrio"].rotation_y = -9 if self.tipo == vc.MOTO else 8
         if self.humo is not None:
@@ -230,6 +236,7 @@ class VehiculoModelo(Entity):
         self.rotation_y = estado.rumbo
         self.inclinable.rotation_z = math.degrees(estado.inclinacion)
         self.inclinable.rotation_x = -math.degrees(estado.cabeceo)
+        self.pivote_caballito.rotation_x = -math.degrees(getattr(estado, "caballito", 0.0))   # morro arriba
         self.suspension.y = -estado.rebote * 0.6
         self.nodos["manubrio"].rotation_y = math.degrees(estado.giro_manubrio)
         self.nodos["rueda_del"].rotation_x = math.degrees(estado.giro_rueda_del)

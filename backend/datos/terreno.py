@@ -25,7 +25,7 @@
 import math
 
 DESNIVEL = 25.0                 # m entre lo más bajo y lo más alto de la ladera natural
-DIRECCION_SUBIDA = (-0.8, 0.6)  # hacia dónde sube la ladera en (x, z): del Hospital a la Alcaldía
+DIRECCION_SUBIDA = (-0.8, 0.6)  # hacia dónde sube la ladera en (x, z): del Hospital a la Prefeitura
 MARGEN_LADERA = 40.0            # m de ladera alrededor de los límites del mapa
 AMPLITUD_ONDULADO = 1.5         # m
 PENDIENTE_MAXIMA = 15.0         # grados, en las calles

@@ -240,9 +240,14 @@ class EnganchesAudio:
             self.audio.ajustar_bucle("bici_cadena", volumen, ac.pitch_cadena(velocidad, vmax))
         else:
             vmax = vmax or MOTO_VMAX_DEFECTO
-            volumen = 0.0 if pausa else ac.volumen_motor(velocidad, vmax)
-            self.audio.bucle("motor_moto", volumen, ac.pitch_motor(velocidad, vmax), fundido=0.4)
-            self.audio.ajustar_bucle("motor_moto", volumen, ac.pitch_motor(velocidad, vmax))
+            # Caballito: el motor sube de tono con la rueda en el aire (frontend/vehiculo_calculos.py).
+            angulo = float(getattr(getattr(conducido, "estado", None), "caballito", 0.0) or 0.0)
+            maximo = float(getattr(getattr(conducido, "perfil", None), "caballito_max", 0.0) or 0.0)
+            f_pitch, f_volumen = ac.factores_caballito(angulo / maximo if maximo > 0 else 0.0)
+            volumen = 0.0 if pausa else min(1.0, ac.volumen_motor(velocidad, vmax) * f_volumen)
+            pitch = ac.pitch_motor(velocidad, vmax) * f_pitch
+            self.audio.bucle("motor_moto", volumen, pitch, fundido=0.4)
+            self.audio.ajustar_bucle("motor_moto", volumen, pitch)
         self._conduciendo = tipo
 
     # -- Ajustes --

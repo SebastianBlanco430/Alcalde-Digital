@@ -8,7 +8,9 @@ import math
 # ---------------------------------------------------------------------------
 # Constantes de versión, límites y tiempos
 # ---------------------------------------------------------------------------
-PROTOCOLO_V = 1
+# v2 (2026-10): bit 16 de las banderas de `pos`/`snap` (caballito) y huellas que también cubren calles, noticias,
+# grafo social y textos de misión (anfitrion.calcular_huellas). Un equipo con v1 se rechaza con «version».
+PROTOCOLO_V = 2
 JUEGO = "AlcaldeDigital"
 
 DIR_C2H = "c2h"   # cliente -> anfitrión

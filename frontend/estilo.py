@@ -89,13 +89,17 @@ RADIO_PANEL_PX = 14
 
 # --- Lugares: identidad, nunca estado ---
 COLORES_LUGAR = {
-    "Plaza Central": (240, 200, 90),
-    "Alcaldía": (70, 110, 190),
-    "Universidad": (140, 110, 200),
+    "Praça da Sé": (240, 200, 90),
+    "Prefeitura": (70, 110, 190),
+    "Universidade": (140, 110, 200),
     "Parque": (80, 170, 100),
-    "Barrio Las Flores": (230, 120, 150),
-    "Terminal": (235, 140, 60),
+    "Morro da Esperança": (230, 120, 150),
+    "Rodoviária": (235, 140, 60),
     "Hospital": (60, 180, 170),
+    "Mercado": (200, 96, 58),
+    "Escola de Samba": (220, 60, 160),
+    "Rádio": (110, 190, 60),
+    "Estação do Teleférico": (120, 130, 160),
 }
 
 # --- Roles de personaje propuestos (decisión del dueño, T15; aún NO usados) ---

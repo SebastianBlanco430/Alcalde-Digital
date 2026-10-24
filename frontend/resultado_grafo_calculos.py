@@ -177,13 +177,16 @@ def _plural(n, singular, plural):
     return f"{n} {singular if n == 1 else plural}"
 
 
-# Nombres separados por coma ("Ana, Beto y Carlos" -> con "y" final); "ninguno" si no hay.
-def lista_nombres(nombres):
+# Nombres separados por coma ("Ana, Beto y Carlos" -> con "y" final); "ninguno" si no hay. Con más de `maximo`
+# (con el grafo de 17 ciudadanos una comunidad aislada puede tener 12) se acorta: "Ana, Beto, Carlos y 9 más".
+def lista_nombres(nombres, maximo=4):
     nombres = list(nombres)
     if not nombres:
         return "ninguno"
     if len(nombres) == 1:
         return nombres[0]
+    if len(nombres) > maximo:
+        return ", ".join(nombres[:maximo - 1]) + f" y {len(nombres) - maximo + 1} más"
     return ", ".join(nombres[:-1]) + " y " + nombres[-1]
 
 

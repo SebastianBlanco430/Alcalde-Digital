@@ -70,11 +70,13 @@ class BanderaTecho(Entity):
         silenciar(self)                      # ninguna tiene update(): la anima Ciudad3D
         self.animar(0)
 
-    # Ondea `dt` segundos: cada franja gira sobre su eje vertical con fase propia.
+    # Ondea `dt` segundos: cada franja gira sobre su eje vertical con fase propia. Rendimiento: las franjas solo
+    # giran en y, así que se usa setH de Panda (H = -rotation_y en Ursina) en vez de la propiedad rotation_y,
+    # que relee la rotación entera y arma dos Vec3 por llamada (42 por frame con 7 banderas).
     def animar(self, dt):
         self._fase += dt * VELOCIDAD_ONDEO * self._rapidez
         for k, franja in enumerate(self.franjas):
-            franja.rotation_y = giro_franja(k, self._fase)
+            franja.setH(-giro_franja(k, self._fase))
 
     # La bandera del destino de la misión: 1.4x más grande, ondea 1.6x más rápido y lleva borde amarillo.
     def destacar(self, activo):

@@ -6,7 +6,7 @@
 #
 # Negro sostenido (mundo 3D): con `sostener` > 0 la pantalla se queda en negro total ese
 # tiempo entre la salida y la entrada (fase SOSTENIENDO), y `ejecutar(accion, texto=...)`
-# deja un texto visible (`texto`) solo mientras dura ese negro ("Alcaldía de Ciudad Nova").
+# deja un texto visible (`texto`) solo mientras dura ese negro ("Prefeitura de Ciudad Nova").
 # Con sostener = 0 (por defecto) la fase no existe y todo funciona como antes.
 #
 # Reentrancia: la acción puede iniciar otro fundido (con duraciones 0 el cambio al interior

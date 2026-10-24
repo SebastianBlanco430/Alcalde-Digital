@@ -1,4 +1,4 @@
-# Ciudad Nova en 3D (datos puros): el mapa de ejemplo a escala real, los 7 edificios
+# Ciudad Nova en 3D (datos puros): el mapa de ejemplo a escala real, los 11 edificios
 # ubicados a mano y los obstáculos decorativos (árboles del parque, farolas, bancos).
 #
 # Escala: 1 unidad = 1 metro. Las coordenadas del grafo del ejemplo se multiplican por
@@ -71,13 +71,18 @@ SEPARACION_VEGETACION = 0.8 # m entre una planta y cualquier otra cosa
 # en él y la caja del edificio pasa a ser la del modelo (ver _encajar_modelo); `alto` se ignora.
 # Sin modelo (""), la caja es el edificio de cubos tal cual.
 _EDIFICIOS = (
-    ("Plaza Central", -3, 18, 12, 10, 7, "s", "Café Internet de la Plaza", "casa1"),
-    ("Alcaldía", -32, 18, 14, 10, 9, "s", "", "casa4"),
-    ("Universidad de Ciudad Nova", 24, 46, 14, 12, 10, "s", "", "casa1"),
-    ("Parque Municipal", 74, 20, 12, 12, 6, "o", "Biblioteca del Parque", "casa2"),
-    ("Barrio Las Flores", 40, -8.5, 12, 12, 6, "e", "", "casa3"),
-    ("Terminal de Buses", 24, -46, 14, 12, 6, "n", "", "casa2"),
-    ("Hospital Las Flores", 84, -18, 14, 12, 9, "s", "", "casa4"),
+    ("Praça da Sé", -3, 18, 12, 10, 7, "s", "Lan House da Praça", "casa1"),
+    ("Prefeitura", -32, 18, 14, 10, 9, "s", "", "casa4"),
+    ("Universidade de Ciudad Nova", 24, 46, 14, 12, 10, "s", "", "casa1"),
+    ("Parque do Povo", 74, 20, 12, 12, 6, "o", "Biblioteca do Parque", "casa2"),
+    ("Morro da Esperança", 40, -8.5, 12, 12, 6, "e", "", "casa3"),
+    ("Rodoviária", 24, -46, 14, 12, 6, "n", "", "casa2"),
+    ("Hospital Santa Casa", 84, -18, 14, 12, 9, "s", "", "casa4"),
+    # Lugares añadidos en 2026-10 (cada lote en el lado de su plaza por el que no llega ninguna calle).
+    ("Mercado Municipal", -8, -66, 14, 12, 7, "n", "", "casa2"),
+    ("Escola de Samba", 48, 66, 14, 12, 7, "s", "G.R.E.S. Unidos da Esperança", "casa3"),
+    ("Rádio Comunitária", 48, -70, 12, 12, 6, "n", "Rádio Comunitária 98,7 FM", "casa1"),
+    ("Estação do Teleférico", -56, 42, 14, 10, 8, "s", "", "casa4"),
 )
 
 
@@ -224,7 +229,7 @@ def _bancos(mapa, despeje):
 
 
 def _arboles_parque(mapa, despeje):
-    cx, cz = mapa.coordenada("Parque Municipal")
+    cx, cz = mapa.coordenada("Parque do Povo")
     arboles = []
     for radio_anillo in (12.5, 16.0):
         for grados in range(0, 360, 20):
@@ -570,10 +575,13 @@ def construir_mundo_3d(ladera=True, casas=None, semilla=SEMILLA_CASAS, denso=Tru
         tope = barrio_favela.CANTIDAD_BARRIO if casas is None else casas
         nuevas = barrio_favela.generar_casas(mapa, edificios, despeje, obstaculos, terreno, zonas, region,
                                              semilla, cantidad=tope)
+        # Rincones secretos (easter eggs): se orientan hacia su lado abierto, ya con las casas, y su mesa choca.
+        zonas = barrio_favela.orientar_secretos(zonas, [_caja(c) for c in nuevas], mapa)
+        obstaculos = obstaculos + barrio_favela.mesas_secretas(zonas)
         # Red de seguridad: sin bolsas de suelo libre aisladas de las calles dentro del mundo jugable.
         fijos = [e.caja() for e in edificios] + [_caja(o) for o in obstaculos if o.es_caja]
         fijos += [(o.cx - o.radio, o.cx + o.radio, o.cz - o.radio, o.cz + o.radio) for o in obstaculos if o.es_circulo]
-        nuevas = barrio_favela.quitar_bolsas(nuevas, fijos, mapa.coordenada("Plaza Central"), plano.limites())
+        nuevas = barrio_favela.quitar_bolsas(nuevas, fijos, mapa.coordenada("Praça da Sé"), plano.limites())
         obstaculos = obstaculos + nuevas
         callejones = barrio_favela.callejones_entre(nuevas)
         escaleras = escaleras + _escaleras_de_callejones(callejones, escaleras, terreno)

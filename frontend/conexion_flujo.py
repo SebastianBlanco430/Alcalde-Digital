@@ -202,7 +202,7 @@ class ConexionFlujo:
         def volver_al_interior():
             try:
                 self._gestor.cambiar_a(INTERIOR, jugador=saliente, lugar=lugar, modo="levantarse",
-                                       al_terminar=salir_al_mundo)
+                                       al_terminar=salir_al_mundo, resultado=resultado)
             except BaseException:
                 self._restaurar_mundo()
                 raise

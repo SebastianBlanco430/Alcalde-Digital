@@ -191,27 +191,41 @@ class GrafoCiudad:
         return f"GrafoCiudad(lugares={self.numero_lugares()}, conexiones={self.numero_conexiones()})"
 
 
-# Grafo de ejemplo con 7 lugares conexos, coherente con noticias_semilla.py.
+# Grafo de ejemplo con 11 lugares conexos, coherente con noticias_semilla.py. Los 4 últimos se añadieron
+# en 2026-10 (al final: no cambian el orden ni los colores de los 7 de antes). Hay dos ciclos nuevos
+# (Praça - Rodoviária - Mercado y Universidade - Parque - Escola de Samba) y tres puntos de articulación:
+# Praça da Sé (separa Prefeitura y Teleférico), Prefeitura (separa el Teleférico) y Morro da Esperança
+# (separa el Hospital y la Rádio).
 def construir_grafo_ciudad_ejemplo():
     grafo = GrafoCiudad()
 
     for lugar in (
-        "Alcaldía",
-        "Plaza Central",
-        "Universidad de Ciudad Nova",
-        "Hospital Las Flores",
-        "Barrio Las Flores",
-        "Parque Municipal",
-        "Terminal de Buses",
+        "Prefeitura",
+        "Praça da Sé",
+        "Universidade de Ciudad Nova",
+        "Hospital Santa Casa",
+        "Morro da Esperança",
+        "Parque do Povo",
+        "Rodoviária",
+        "Mercado Municipal",
+        "Escola de Samba",
+        "Rádio Comunitária",
+        "Estação do Teleférico",
     ):
         grafo.agregar_lugar(lugar)
 
-    grafo.agregar_conexion("Alcaldía", "Plaza Central")
-    grafo.agregar_conexion("Plaza Central", "Universidad de Ciudad Nova")
-    grafo.agregar_conexion("Plaza Central", "Terminal de Buses")
-    grafo.agregar_conexion("Terminal de Buses", "Barrio Las Flores")
-    grafo.agregar_conexion("Barrio Las Flores", "Hospital Las Flores")
-    grafo.agregar_conexion("Barrio Las Flores", "Parque Municipal")
-    grafo.agregar_conexion("Universidad de Ciudad Nova", "Parque Municipal")
+    grafo.agregar_conexion("Prefeitura", "Praça da Sé")
+    grafo.agregar_conexion("Praça da Sé", "Universidade de Ciudad Nova")
+    grafo.agregar_conexion("Praça da Sé", "Rodoviária")
+    grafo.agregar_conexion("Rodoviária", "Morro da Esperança")
+    grafo.agregar_conexion("Morro da Esperança", "Hospital Santa Casa")
+    grafo.agregar_conexion("Morro da Esperança", "Parque do Povo")
+    grafo.agregar_conexion("Universidade de Ciudad Nova", "Parque do Povo")
+    grafo.agregar_conexion("Praça da Sé", "Mercado Municipal")
+    grafo.agregar_conexion("Rodoviária", "Mercado Municipal")
+    grafo.agregar_conexion("Universidade de Ciudad Nova", "Escola de Samba")
+    grafo.agregar_conexion("Parque do Povo", "Escola de Samba")
+    grafo.agregar_conexion("Morro da Esperança", "Rádio Comunitária")
+    grafo.agregar_conexion("Prefeitura", "Estação do Teleférico")
 
     return grafo
