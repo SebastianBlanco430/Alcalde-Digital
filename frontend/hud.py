@@ -14,6 +14,7 @@
 from panda3d.core import TextNode
 from ursina import Entity, Mesh, Text, camera, color, window
 
+from backend.datos.nombres_visibles import nombre_visible
 from backend.logica.roles import ROLES
 from frontend import diseno_adaptable, diseno_adaptable_calculos, estilo, hud_calculos, iconos
 from frontend.componentes import (
@@ -202,7 +203,9 @@ class TelefonoUI(Entity):
     def _dibujar(self):
         vista = self.vista
         self.insignia.enabled = vista.contador > 0
-        self.texto_contador.text = str(min(vista.contador, 9)) + ("+" if vista.contador > 9 else "")
+        contador = str(min(vista.contador, 9)) + ("+" if vista.contador > 9 else "")
+        if self.texto_contador.text != contador:     # .text rehace la malla aunque sea el mismo texto
+            self.texto_contador.text = contador
         self._dibujar_banner(vista)
         self._dibujar_panel(vista)
 
@@ -361,6 +364,7 @@ class Minimapa(Entity):
         self.capa_casas = Entity(parent=self, z=-0.0015)      # casas y escaleras (una malla cada una)
         self.capa_ruta = Entity(parent=self, z=-0.002)
         self.capa_lugares = Entity(parent=self, z=-0.003)
+        self.capa_plazas = Entity(parent=self.capa_lugares)   # plazas y marcas de puerta: se gira entera
         self.capa_jugadores = Entity(parent=self, z=-0.004)
         self.flecha = Entity(
             parent=self, z=-0.006, scale=self.LARGO_FLECHA, double_sided=True,
@@ -383,6 +387,7 @@ class Minimapa(Entity):
                                       color=self.COLOR_ESCALERAS)
         self.reconstrucciones_casas = 0   # cuántas veces se rehicieron las mallas (lo usan los tests)
         self._yaw_casas = None            # yaw con el que se construyeron las mallas
+        self._yaw_mapa = None             # yaw con el que se colocaron calles y plazas
         self._construir_mapa()
         self._reconstruir_casas()
         self.marcador_destino = Entity(parent=self.capa_lugares, model="circle", z=0.0005,
@@ -400,9 +405,9 @@ class Minimapa(Entity):
             self.calles.append((cuadro, a, b))
         for lugar in self._mapa.lugares():
             # contorno de tinta: separa el color del lugar del aro amarillo del destino
-            self.contornos_lugar[lugar] = Entity(parent=self.capa_lugares, model="circle", z=0.0002,
+            self.contornos_lugar[lugar] = Entity(parent=self.capa_plazas, model="circle", z=0.0002,
                                                  scale=g.diametro_plaza() * 1.22, color=rgb(estilo.TINTA))
-            self.lugares[lugar] = Entity(parent=self.capa_lugares, model="circle",
+            self.lugares[lugar] = Entity(parent=self.capa_plazas, model="circle",
                                          scale=g.diametro_plaza(),
                                          color=rgb(self.color_de_lugar(lugar)))
         for lugar in self._mapa.lugares():
@@ -411,7 +416,7 @@ class Minimapa(Entity):
             except (AttributeError, ValueError):
                 continue
             self.marcas_edificios[lugar] = Entity(
-                parent=self.capa_lugares, model="quad", z=-0.0005, scale=0.011,
+                parent=self.capa_plazas, model="quad", z=-0.0005, scale=0.011,
                 color=rgb((60, 64, 84)))
         self._colocar_mapa()
 
@@ -437,14 +442,20 @@ class Minimapa(Entity):
             self.contornos_lugar[lugar].position = (*g.lugar(lugar)[:2], 0.0002)
         for lugar, marca in self.marcas_edificios.items():
             marca.position = g.punto(*self._mapa.edificio_de(lugar).puerta())
+        self._yaw_mapa = g.yaw
+        self.capa_calles.rotation_z = self.capa_plazas.rotation_z = 0
 
-    # Gira el minimapa con la cámara. Barato: la escala no cambia, solo se recolocan 7 + 7 cuadros;
-    # las mallas de casas y escaleras se rehacen solo si el yaw cambió más de YAW_MIN_CASAS.
+    # Gira el minimapa con la cámara. La escala no cambia; las mallas de casas y escaleras se rehacen solo si el
+    # yaw cambió más de YAW_MIN_CASAS, y calles y plazas solo se recolocan una a una cada YAW_MIN_MAPA_SUAVE grados.
     def fijar_yaw(self, yaw_grados):
         if abs(yaw_grados - self.geometria.yaw) < 0.05:
             return
         self.geometria.girar(yaw_grados)
-        self._colocar_mapa()
+        if (self.GIRO_SUAVE_MAPA and self._yaw_mapa is not None
+                and hud_calculos.diferencia_yaw(yaw_grados, self._yaw_mapa) <= self.YAW_MIN_MAPA_SUAVE):
+            self._girar_capas_mapa()
+        else:
+            self._colocar_mapa()
         self._firma_ruta = None            # la ruta y la flecha se redibujan con el nuevo yaw
         if (self._yaw_casas is not None
                 and hud_calculos.diferencia_yaw(yaw_grados, self._yaw_casas) > self._umbral_casas()):
@@ -459,6 +470,16 @@ class Minimapa(Entity):
 
     def _umbral_casas(self):
         return self.YAW_MIN_CASAS_SUAVE if self.GIRO_SUAVE_CASAS else self.YAW_MIN_CASAS
+
+    # Rendimiento (GIRO_SUAVE_MAPA): recolocar calles, plazas y marcas costaba ~0,3 ms por frame al girar la cámara.
+    # Como con las casas, entre recolocaciones se giran las capas enteras (exacto: el giro es alrededor del centro
+    # del minimapa) y solo se recoloca cada YAW_MIN_MAPA_SUAVE grados. False = lo de siempre.
+    GIRO_SUAVE_MAPA = True
+    YAW_MIN_MAPA_SUAVE = 6.0
+
+    def _girar_capas_mapa(self):
+        delta = (self.geometria.yaw - self._yaw_mapa + 180) % 360 - 180
+        self.capa_calles.rotation_z = self.capa_plazas.rotation_z = -delta
 
     def _girar_capa_casas(self):
         if not self.GIRO_SUAVE_CASAS or self._yaw_casas is None:
@@ -549,7 +570,8 @@ class Minimapa(Entity):
         self.etiqueta_destino.enabled = self.fondo_etiqueta.enabled = destino is not None
         if destino is None:
             return
-        self.etiqueta_destino.text = _seguro(destino)
+        # Con la traducción corta: el chip no debe pasar del ancho del minimapa.
+        self.etiqueta_destino.text = _seguro(nombre_visible(destino, corto=True))
         ancho = _medidor(self.etiqueta_destino)(self.etiqueta_destino.text)
         relleno, alto = 0.012, a_unidades(16) * 1.5
         self.fondo_etiqueta.model = modelo_redondeado(ancho + 2 * relleno, alto, 6)
@@ -582,10 +604,10 @@ class Minimapa(Entity):
 
     def entidades_dibujadas(self):
         # Entidades visibles con su posición local (u, v): para comprobar el recorte.
-        todas = [self.capa_calles, self.capa_ruta, self.capa_lugares, self.capa_jugadores]
+        todas = [self.capa_calles, self.capa_ruta, self.capa_lugares, self.capa_plazas, self.capa_jugadores]
         resultado = []
         for capa in todas:
-            resultado += [e for e in capa.children if e.enabled]
+            resultado += [e for e in capa.children if e.enabled and e is not self.capa_plazas]
         if self.flecha.enabled:
             resultado.append(self.flecha)
         return resultado
@@ -996,6 +1018,6 @@ class HudMundo(Entity):
         if destino is None or edificio_de is None:
             return None
         try:
-            return f"Presiona E para entrar a {edificio_de(destino).titulo}"
+            return f"Presiona E para entrar a {nombre_visible(edificio_de(destino).titulo)}"
         except ValueError:
             return None

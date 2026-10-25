@@ -9,6 +9,7 @@
 import math
 from dataclasses import dataclass
 
+from backend.datos.nombres_visibles import glosar_texto, nombre_visible
 from backend.logica import navegacion
 from backend.logica.misiones import EN_RADIO
 from backend.logica.telefono import ABIERTO, NOTIFICANDO
@@ -79,22 +80,25 @@ _MODO_POR_ESTADO = {ABIERTO: MODO_ABIERTO, NOTIFICANDO: MODO_NOTIFICACION}
 # `nuevos_al_abrir`: cuántos mensajes (los más recientes) estaban sin leer justo antes
 # de abrir; abrir() los marca leídos de inmediato, así que la vista los recuerda para
 # resaltarlos. Dos vistas iguales dibujan lo mismo (dataclass congelada).
+# Los nombres brasileños se traducen solo aquí (nombres_visibles): los mensajes guardados siguen con el texto
+# original (flujo_partida compara MENSAJE_SIN_MISIONES).
 def vista_telefono(telefono, mision, nuevos_al_abrir=0):
     mensajes = telefono.mensajes()
     filas = tuple(
-        FilaMensaje(m.remitente, m.texto, resaltado=(indice < nuevos_al_abrir) or not m.leido)
+        FilaMensaje(m.remitente, glosar_texto(m.texto), resaltado=(indice < nuevos_al_abrir) or not m.leido)
         for indice, m in enumerate(reversed(mensajes))
     )
     sigue = sigue_mision(telefono)
     if mision is None:
         linea_mision, linea_destino, texto_seguir = TEXTO_SIN_MISION, "", ""
     else:
-        linea_mision, linea_destino = f"Misión: {mision.titulo}", f"Destino: {mision.destino}"
+        linea_mision = f"Misión: {glosar_texto(mision.titulo)}"
+        linea_destino = f"Destino: {nombre_visible(mision.destino)}"
         texto_seguir = texto_casilla_seguir(sigue)
     return VistaTelefono(
         modo=_MODO_POR_ESTADO.get(telefono.estado(), MODO_ICONO),
         contador=telefono.no_leidos(),
-        texto_notificacion=mensajes[-1].texto if mensajes else "",
+        texto_notificacion=glosar_texto(mensajes[-1].texto) if mensajes else "",
         encabezado=ENCABEZADO_TELEFONO,
         linea_mision=linea_mision,
         linea_destino=linea_destino,

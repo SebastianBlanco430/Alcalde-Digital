@@ -14,6 +14,7 @@
 from panda3d.core import TextNode
 from ursina import Button, Entity, Text, color, window
 
+from backend.datos.nombres_visibles import nombre_visible
 from backend.logica.roles import ORDEN_ROLES, ROLES
 from backend.logica.sesion import MAX_JUGADORES
 from frontend import estilo, iconos, tipografia
@@ -186,7 +187,7 @@ class TarjetaRol(Entity):
             tono = estilo.COLOR_PANEL if gris else (
                 estilo.COLOR_SUPERFICIE_ALTA if hover else estilo.COLOR_TARJETA)
             self.texto_lugar.text = self._envolver(
-                self.texto_lugar, f"Empieza en: {ROLES[self.rol].lugar_inicio}")
+                self.texto_lugar, f"Empieza en: {nombre_visible(ROLES[self.rol].lugar_inicio, corto=True)}")
             self.texto_lugar.color = rgb(estilo.COLOR_TEXTO_TENUE if gris else estilo.ACENTO_SECUNDARIO)
         self.panel.fondo.color = rgb(tono)
         self.retrato.texture = iconos.textura_retrato(self.rol, gris=gris)

@@ -606,11 +606,22 @@ class VistaRedSocial(Entity):
         self.nombre_jugador.text = calc.recortar_a_ancho(nombre or "Jugador", medir, 0.19)
         self.rol_jugador.text = calc.recortar_a_ancho(str(rol or ""), self.medidor.funcion(PX_META), 0.19)
 
-    def fijar_mision(self, cadena):
+    # La píldora crece hacia la izquierda y no debe pisar «Siguiendo». Si no cabe se usa `corta` (sin traducir los
+    # nombres), luego 16 px y, si aun así no cabe, se recorta.
+    def fijar_mision(self, cadena, corta=None):
+        px = 18
+        if cadena:
+            disponible = X_FEED_DER - 0.07 - (X_FEED_IZQ + 0.232 + self.medidor.ancho("Siguiendo", 20))
+            if corta and self.medidor.ancho(cadena, px) > disponible:
+                cadena = corta
+            if self.medidor.ancho(cadena, px) > disponible:
+                px = 16
+                cadena = calc.recortar_a_ancho(cadena, self.medidor.funcion(px), disponible)
         self.texto_mision.text = cadena
+        self.texto_mision.scale = escala_fuente(px)
         self.pildora.enabled = bool(cadena)
         if cadena:
-            ancho = self.medidor.ancho(cadena, 18) + 0.05
+            ancho = self.medidor.ancho(cadena, px) + 0.05
             _redimensionar_panel(self.pildora, ancho, 0.05, 0, estilo.RADIO_CHIP_PX)
             self.pildora.x = X_FEED_DER - 0.02 - ancho / 2
 
@@ -663,9 +674,11 @@ class VistaRedSocial(Entity):
         else:
             datos = calc.publicacion_de(texto)
         self._datos = datos
-        self.tarjeta.mostrar(datos)
-        self._mostrar_respuestas(datos)
-        self._mostrar_tendencias(datos)
+        # Se dibuja con los nombres traducidos; los contadores siguen con `datos`.
+        visibles = calc.publicacion_visible(datos)
+        self.tarjeta.mostrar(visibles)
+        self._mostrar_respuestas(visibles)
+        self._mostrar_tendencias(visibles)
         if animar:
             self._animar_entrada()
 
@@ -682,6 +695,12 @@ class VistaRedSocial(Entity):
 
     def _mostrar_tendencias(self, datos):
         for (categoria, etiqueta, cuenta), (cat, tag, n) in zip(self.tendencias, datos["tendencias"]):
+            # Con la traducción («Política · Alcaldía abierta») la categoría puede pisar la cuenta: se acorta la cuenta.
+            libre = ANCHO_TARJETA_DER - 0.044 - 0.012
+            medir = self.medidor.funcion(PX_META)
+            if medir(cat) + medir(n) > libre:
+                n = calc.cuenta_corta(n)
+                cat = calc.recortar_a_ancho(cat, medir, libre - medir(n))
             categoria.text, etiqueta.text, cuenta.text = cat, tag, n
         for (avatar, nombre, insignia, handle), autor in zip(self.seguir, datos["seguir"]):
             avatar.fijar(autor)

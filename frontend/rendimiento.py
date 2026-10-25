@@ -32,12 +32,22 @@
 #    medio de un frame: al girar la cámara por la favela salían tirones de 80-250 ms dentro de renderFrame (el
 #    «1 % bajo» de 5-15 FPS en Windows). precargar(nodo) lo hace todo de una vez al entrar a la escena
 #    (NodePath.prepare_scene, ~150 ms la primera vez, escondidos en la carga). ALCALDE_SIN_PRECARGA=1 lo apaga.
+#
+# 6. BUCLE_RAPIDO: aun silenciadas, el bucle de Ursina recorre las ~2470 entidades del mundo y a cada una le pide
+#    primero `enabled` (una propiedad) y después `ignore`. Se cambia la tarea "update" por una copia del bucle que
+#    mira `ignore` primero: mismas condiciones en otro orden (~0,3 ms menos). ALCALDE_SIN_BUCLE_RAPIDO=1 lo apaga.
+#
+# 7. ALCALDE_SIN_VSYNC=1 (solo para medir; por defecto no cambia nada) quita la sincronía vertical y deja el tope de
+#    60. Con vsync en un monitor de 60 Hz, un frame de algo más de 16,7 ms espera al refresco siguiente y el juego
+#    cae a 30 FPS. En la RTX 3050 (144 Hz) no se notó: hay que medirlo con F3 en un equipo más lento.
 
+import __main__
 import os
 import sys
 
-from panda3d.core import PTA_LVecBase3f, loadPrcFileData
-from ursina import Entity, scene
+from panda3d.core import PTA_LVecBase3f, ClockObject, loadPrcFileData
+from ursina import Entity, application, mouse, scene
+from ursina import main as ursina_main
 
 RECOLECTAR_ESTADOS = False
 SILENCIADOR = True
@@ -46,6 +56,7 @@ CAMARA_EN_LA_RAIZ = True
 ENTRADA_CAMARA = "camera_world_position"
 ORDEN_TAREA_CAMARA = 45   # después del update de Ursina (orden 0) y antes de dibujar (igLoop, orden 50)
 PRECARGAR_ESCENAS = True
+BUCLE_RAPIDO = True
 
 
 def _variable(nombre):
@@ -59,6 +70,8 @@ def _todo_apagado():
 def configurar_panda():
     if not RECOLECTAR_ESTADOS and not _variable("ALCALDE_RECOLECTAR_ESTADOS") and not _todo_apagado():
         loadPrcFileData("", "garbage-collect-states #f")
+    if _variable("ALCALDE_SIN_VSYNC"):
+        loadPrcFileData("", "sync-video #f")
     if camara_en_la_raiz_activa():
         for shader in _shaders_con_niebla():
             shader.continuous_input.pop(ENTRADA_CAMARA, None)
@@ -215,6 +228,74 @@ def camara_en_la_raiz_activa():
     return CAMARA_EN_LA_RAIZ and not _variable("ALCALDE_CAMARA_POR_ENTIDAD") and not _todo_apagado()
 
 
+def bucle_rapido_activo():
+    return BUCLE_RAPIDO and not _variable("ALCALDE_SIN_BUCLE_RAPIDO") and not _todo_apagado()
+
+
+# Copia de Ursina._update (Ursina 8.3.0) con `ignore` como primera condición (ver BUCLE_RAPIDO). Si se actualiza
+# Ursina, hay que revisarla.
+def _update_rapido(tarea):
+    tiempo = ursina_main.time
+    if application.calculate_dt:
+        tiempo.dt_unscaled = ClockObject.get_global_clock().get_dt()
+        tiempo.dt = tiempo.dt_unscaled * application.time_scale
+    mouse.update()
+
+    if hasattr(__main__, "update") and __main__.update and not application.paused:
+        __main__.update()
+
+    for secuencia in application.sequences:
+        secuencia.update()
+
+    marcadas = scene._entities_marked_for_removal
+    if marcadas:
+        scene.entities = [e for e in scene.entities if e not in marcadas]
+        marcadas.clear()
+
+    pausado = application.paused
+    for e in scene.entities:
+        if e.ignore:
+            continue
+        if marcadas and e in marcadas:
+            continue
+        if not e.enabled:
+            continue
+        if pausado and e.ignore_paused is False:
+            continue
+        if e.has_disabled_ancestor():
+            continue
+
+        if hasattr(e, "update") and callable(e.update):
+            e.update()
+        if not e:
+            continue
+
+        if hasattr(e, "scripts"):
+            for script in e.scripts:
+                if script.enabled and hasattr(script, "update") and callable(script.update):
+                    script.update()
+        if not e:
+            continue
+
+        if e.shader and hasattr(e.shader, "continuous_input"):
+            for clave, valor in e.shader.continuous_input.items():
+                e.set_shader_input(clave, valor())
+
+    ursina_main._audio_manager.update()
+    return tarea.cont
+
+
+# Cambia la tarea "update" de Ursina por _update_rapido, con el mismo orden de ejecución.
+def _instalar_bucle_rapido():
+    base = application.base
+    original = getattr(base, "_update_task", None)
+    if original is None:
+        return
+    orden = original.get_sort()
+    base.task_mgr.remove(original)
+    base._update_task = base.task_mgr.add(_update_rapido, "update", sort=orden)
+
+
 # Lo llama main.crear_aplicacion() con la ventana ya abierta. Devuelve el silenciador (o None). Nunca lanza:
 # si algo falla, se avisa y el juego sigue como siempre.
 def instalar():
@@ -224,6 +305,8 @@ def instalar():
             application.base.task_mgr.add(_tarea_camara, "camara_en_la_raiz", sort=ORDEN_TAREA_CAMARA)
         if picking_activo():
             PickingSoloConCursor()
+        if bucle_rapido_activo():
+            _instalar_bucle_rapido()
         return SilenciadorAutomatico() if activo() else None
     except Exception as error:      # noqa: BLE001 — una optimización nunca debe impedir jugar
         print(f"[rendimiento] no se pudo instalar ({error}); se sigue sin estas optimizaciones.", file=sys.stderr)

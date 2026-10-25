@@ -13,6 +13,7 @@ from panda3d.core import TextNode
 from ursina import Button, Entity, Text, color, destroy
 from ursina.models.procedural.quad import Quad
 
+from backend.datos.nombres_visibles import glosar_texto
 from frontend import estilo, tipografia
 from frontend.texto import envolver_texto
 
@@ -180,7 +181,7 @@ class TarjetaNoticia(Entity):
         if texto is None:
             texto, rgb_texto = self.mensaje_vacio, estilo.COLOR_TEXTO_TENUE
         else:
-            rgb_texto = estilo.COLOR_TEXTO
+            texto, rgb_texto = glosar_texto(texto), estilo.COLOR_TEXTO
 
         self.lineas = envolver_texto(texto, self.medir, self.ancho_util())
         self.texto.color = rgb(rgb_texto)

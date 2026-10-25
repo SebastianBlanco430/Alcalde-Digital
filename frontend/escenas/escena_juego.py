@@ -6,6 +6,7 @@
 
 from ursina import Entity, Text, invoke, time
 
+from backend.datos.nombres_visibles import glosar_texto
 from backend.datos.noticias_semilla import construir_arboles
 from backend.logica.estado_partida import NOMBRES_INDICADORES, EstadoPartida
 from backend.logica.lote_mision import LoteMision
@@ -300,7 +301,7 @@ class EscenaJuego(Escena):
         self.panel_propagacion.ocultar()
         self.panel_resultado.mostrar(
             self.grafo_social, self.lote.propagaciones_con_niveles(), self.lote.deltas_acumulados,
-            titulo=self.mision.titulo, indicadores=self.estado.indicadores(),
+            titulo=glosar_texto(self.mision.titulo), indicadores=self.estado.indicadores(),
             al_continuar=lambda: self._continuar_resultado(intento))
 
     # «Continuar»: entrega el resultado una sola vez (y solo si la escena sigue vigente).
@@ -344,7 +345,7 @@ class EscenaJuego(Escena):
             self.texto_completada.text = ""
         else:
             self.texto_mision.text = (
-                f"Misión: {self.mision.titulo} ({self.decisiones}/{self.mision.cantidad_noticias})"
+                f"Misión: {glosar_texto(self.mision.titulo)} ({self.decisiones}/{self.mision.cantidad_noticias})"
             )
             self.texto_completada.text = self.TEXTO_COMPLETADA if self.mision_terminada else ""
 
@@ -370,8 +371,9 @@ class EscenaJuego(Escena):
             self.red.fijar_mision("")
             self.red.fijar_completada("")
         else:
-            self.red.fijar_mision(
-                f"Misión: {self.mision.titulo} ({self.decisiones}/{self.mision.cantidad_noticias})")
+            progreso = f"({self.decisiones}/{self.mision.cantidad_noticias})"
+            self.red.fijar_mision(f"Misión: {glosar_texto(self.mision.titulo)} {progreso}",
+                                  corta=f"Misión: {self.mision.titulo} {progreso}")
             self.red.fijar_completada(self.TEXTO_COMPLETADA if self.mision_terminada else "")
 
     # Id del rol del jugador ("influencer", ...) sea dict u objeto.

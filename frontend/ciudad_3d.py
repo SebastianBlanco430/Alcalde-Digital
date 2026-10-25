@@ -41,6 +41,7 @@ from ursina.lights import AmbientLight, DirectionalLight
 from ursina.shaders import lit_with_shadows_shader, unlit_shader
 
 from backend.datos.modelos_edificios import CARPETA_MODELOS, escala_de, modelo_de
+from backend.datos.nombres_visibles import glosa_de
 from backend.logica import escaleras_calculos
 from frontend.azar_fijo import azar_de, ruido_suave
 from frontend.banderas import crear_banderas
@@ -532,14 +533,22 @@ class Ciudad3D(Entity):
     # Cartel sobre la puerta: tablero oscuro y texto con el nombre del edificio. Cuelga de la
     # puerta pero va centrado en la fachada (si la puerta está corrida, el +x local de la puerta
     # apunta en sentido contrario al desfase, así que el centro de la fachada está en x = desfase).
+    # Si el nombre tiene traducción (nombres_visibles) va debajo, más pequeña y en amarillo, y el tablero crece hacia
+    # arriba: en algunas fachadas .glb la cornisa tapa la parte de abajo del tablero.
     def _letrero(self, e):
         puerta = self.puertas[e.lugar]
-        ancho = min(max(len(e.titulo) * 0.42, 3.0), e.frente - 0.5)
+        glosa = glosa_de(e.titulo)
+        escala = 9.4 if glosa else 11
+        ancho = min(max(len(e.titulo) * 0.42 * escala / 11, len(glosa or "") * 0.25, 3.0), e.frente - 0.5)
         x, y = e.desfase_puerta, puerta.alto + 0.75
+        sube = 0.2 if glosa else 0.0
         pieza(parent=puerta, model="cube", color=rgb(COLOR_LETRERO),
-              position=(x, y, -0.12), scale=(ancho, 0.8, 0.14))
-        texto = Text(e.titulo, parent=puerta, origin=(0, 0), position=(x, y, -0.22),
-                     scale=11, color=color.rgb32(240, 240, 245))
+              position=(x, y + sube, -0.12), scale=(ancho, 0.8 + 2 * sube, 0.14))
+        texto = Text(e.titulo, parent=puerta, origin=(0, 0), position=(x, y + (0.36 if glosa else 0), -0.22),
+                     scale=escala, color=color.rgb32(240, 240, 245))
+        if glosa:
+            Text(f"({glosa})", parent=puerta, origin=(0, 0), position=(x, y, -0.22),
+                 scale=6.5, color=color.rgb32(255, 214, 102))
         self.letreros[e.lugar] = texto
 
     # -- Escaleras de la favela --

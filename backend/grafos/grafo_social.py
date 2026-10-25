@@ -246,12 +246,17 @@ class GrafoSocial:
         return f"GrafoSocial(ciudadanos={self.numero_ciudadanos()}, relaciones={self.numero_relaciones()})"
 
 
+# Relación Luana-Nayara: une la comunidad del Morro con la red de Ana, así los cuatro ciudadanos de rol quedan en la
+# misma componente. False = sin el puente (el Morro queda aparte).
+PUENTE_MORRO = True
+
+
 # Grafo de ejemplo con 17 ciudadanos de Ciudad Nova (iniciales distintas, de la A a la Q: cada nodo se
-# dibuja con su inicial) en tres componentes:
-#   - la red de Ana (11): Ana muy conectada (4 relaciones) y un ciclo Ana-Elena-Hugo-Ivan-Fábio; cadenas que
-#     acaban en Luana y en Kauã (una sola relación); puntos de articulación Ana, Beto, Carlos, Gina y Júlia;
-#   - la comunidad del Morro (5), separada de la anterior: Marcos con 3 relaciones, un triángulo con Nayara y
-#     Otávio, y Paula como puente hacia Quitéria (una sola relación);
+# dibuja con su inicial) en dos componentes:
+#   - la red de la ciudad (16): Ana muy conectada (4 relaciones), un ciclo Ana-Elena-Hugo-Ivan-Fábio, cadenas hacia
+#     Luana y Kauã, y la comunidad del Morro (Marcos con 3 relaciones, un triángulo con Nayara y Otávio, Paula como
+#     paso hacia Quitéria) unida a la red de Ana por el puente Luana-Nayara; puntos de articulación Ana, Beto,
+#     Carlos, Gina, Júlia, Luana, Marcos, Nayara y Paula;
 #   - Diana, aislada (caso borde).
 # Los 10 primeros son los de siempre (solo cambia la grafía: Fábio, Ivan, Júlia); los 7 últimos, de 2026-10.
 def construir_grafo_social_ejemplo():
@@ -294,5 +299,7 @@ def construir_grafo_social_ejemplo():
     grafo.agregar_relacion("Nayara", "Otávio")
     grafo.agregar_relacion("Marcos", "Paula")
     grafo.agregar_relacion("Paula", "Quitéria")
+    if PUENTE_MORRO:
+        grafo.agregar_relacion("Luana", "Nayara")
 
     return grafo

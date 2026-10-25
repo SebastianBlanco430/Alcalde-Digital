@@ -19,6 +19,7 @@
 # escena se revierte EN_MINIJUEGO -> EN_RADIO (`cancelar_minijuego`) y se devuelve el control
 # en el mundo; ningún camino deja la pantalla en negro (el Fundido se libera solo).
 
+from backend.datos.nombres_visibles import nombre_visible
 from backend.logica.misiones import EN_MINIJUEGO
 
 # Nombres con que main.py registra las escenas en el gestor.
@@ -134,11 +135,12 @@ class ConexionFlujo:
 
     # -- Cadena 3D --
 
+    # Nombre del edificio con su traducción, para el fundido y la barra del marco.
     def _titulo_del_lugar(self, lugar):
         try:
-            return self._mapa.edificio_de(lugar).titulo
+            return nombre_visible(self._mapa.edificio_de(lugar).titulo)
         except (AttributeError, ValueError):
-            return lugar
+            return nombre_visible(lugar)
 
     # Revierte EN_MINIJUEGO -> EN_RADIO y devuelve el control en el mundo (sin cinemática).
     def _revertir_al_mundo(self, flujo):

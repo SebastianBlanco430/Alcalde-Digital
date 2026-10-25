@@ -4,9 +4,9 @@
 # No decide si el alcance modifica indicadores; solo calcula quién recibe la noticia.
 
 # Ciudadano del grafo de ejemplo asociado a cada rol del jugador.
-# influencer -> Ana, la más conectada (máximo alcance: toda su red de 11); candidato y periodista
-# tienen un ciudadano con conexiones medias en la misma red; ciudadano -> Marcos, vecino de la
-# comunidad del Morro: lo que comparte se queda en su comunidad (5), separada de la red de Ana.
+# Los cuatro están en la misma red, así que compartir llega a los mismos 15 ciudadanos, pero no igual de rápido:
+# influencer -> Ana, la más conectada (7 saltos); candidato y periodista -> Elena y Fábio (8); ciudadano -> Marcos,
+# vecino del Morro, que llega a la red de Ana por el puente Luana-Nayara (8).
 CIUDADANO_POR_ROL = {
     "influencer": "Ana",
     "candidato": "Elena",

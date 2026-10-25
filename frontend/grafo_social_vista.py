@@ -18,7 +18,8 @@ FRENADO = "frenado"
 
 # Posiciones fijas (x, y) en [-1, 1] (y arriba) de los 17 ciudadanos del grafo de ejemplo: la red de Ana a la
 # izquierda (el ciclo Ana-Fábio-Ivan-Hugo-Elena como un lazo y las cadenas cortas hacia Júlia-Kauã y Carlos-Luana),
-# la comunidad del Morro a la derecha y Diana (aislada) sola abajo a la derecha. Buscadas en una rejilla para que
+# la comunidad del Morro a la derecha (unida a la red de Ana por el puente Luana-Nayara, en la misma fila: un trazo
+# horizontal corto que no cruza nada) y Diana (aislada) sola abajo a la derecha. Buscadas en una rejilla para que
 # ninguna arista se cruce, los nombres (bajo el nodo, o hacia afuera en los bordes: ver
 # resultado_grafo_calculos.lado_etiqueta) no pisen otros nodos ni nombres en el panel de resultado y los nodos no se
 # toquen en el panel pequeño de alcance (lo comprueban las pruebas, con escala_nodos aplicada).

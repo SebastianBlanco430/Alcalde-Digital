@@ -31,6 +31,7 @@ import math
 
 from ursina import application, camera, mouse, scene, time
 
+from backend.datos.nombres_visibles import glosar_texto
 from backend.logica import navegacion
 from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 from backend.logica.roles import ROLES
@@ -279,7 +280,7 @@ class EscenaMundo(Escena):
         self.hud.panel_turno.fijar(
             (f"Turno de {activo.nombre} ({ROLES[activo.rol].nombre})" if self.texto_turno_fn is None
              else self.texto_turno_fn(activo)),
-            f"Misión: {mision.titulo}" if mision is not None else self.TEXTO_SIN_MISION)
+            f"Misión: {glosar_texto(mision.titulo)}" if mision is not None else self.TEXTO_SIN_MISION)
         self._poner_ayudas_destino()
         # Fin del catálogo: nadie tiene misiones pendientes -> panel "Partida terminada".
         if self.flujo.partida_terminada() and not self._cinematica:

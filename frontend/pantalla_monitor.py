@@ -18,6 +18,7 @@ from collections import OrderedDict
 
 from PIL import Image, ImageDraw, ImageFont
 
+from backend.datos.nombres_visibles import glosar_texto, nombre_visible
 from frontend import estilo, iconos, red_social_iconos, tipografia
 from frontend import pantalla_monitor_calculos as pmc
 
@@ -95,6 +96,13 @@ def _ajustar(d, cadena, px, ancho, negrita=False):
     return cadena.rstrip() + "..."
 
 
+# Mayor tamaño entre `px` y `px_min` con el que `cadena` cabe en `ancho` (si ni así cabe, `px_min`).
+def _px_que_cabe(d, cadena, px, px_min, ancho, negrita=False):
+    while px > px_min and d.textlength(cadena, font=_fuente(px, negrita)) > ancho:
+        px -= 2
+    return max(px, px_min)
+
+
 # Logo de Civitas y su nombre arriba a la izquierda (con `grande`, el de la pantalla de inicio).
 def _cabecera(img, d, grande):
     lado = 150 if grande else 96
@@ -129,8 +137,10 @@ def _chip(d, x, y, cadena, px=28):
 # Franja inferior con el mensaje corto (comillas de cómic).
 def _mensaje(d, cadena):
     x0, y0, x1, y1 = pmc.CAJA_MENSAJE
-    cadena = _ajustar(d, f"« {cadena} »", 30, x1 - x0 - 40)
-    _texto(d, ((x0 + x1) / 2, (y0 + y1) / 2), cadena, 30, estilo.PAPEL, ancla="mm")
+    cadena = f"« {cadena} »"
+    px = _px_que_cabe(d, cadena, 30, 24, x1 - x0 - 40)
+    cadena = _ajustar(d, cadena, px, x1 - x0 - 40)
+    _texto(d, ((x0 + x1) / 2, (y0 + y1) / 2), cadena, px, estilo.PAPEL, ancla="mm")
 
 
 def imagen_inicio(rol, nombre_rol, color_rol, jugador, lugar):
@@ -150,12 +160,12 @@ def imagen_inicio(rol, nombre_rol, color_rol, jugador, lugar):
         _texto(d, (x, 416), nombre, 30, estilo.COLOR_TEXTO_TENUE)
         x_chip += d.textlength(nombre, font=_fuente(30)) + 24
     if lugar:
-        _chip(d, x_chip, 408, _ajustar(d, lugar, 28, ancho * 0.5, True))
+        _chip(d, x_chip, 408, _ajustar(d, nombre_visible(lugar, corto=True), 28, ancho * 0.5, True))
     _texto(d, (x, 478), pmc.TEXTO_CARGA, 28, estilo.COLOR_TEXTO)
     x0, y0, x1, y1 = pmc.CAJA_BARRA
     d.rounded_rectangle(pmc.CAJA_BARRA, 10, fill=_rgba(estilo.COLOR_BARRA_FONDO), outline=_rgba(estilo.TINTA),
                         width=pmc.BORDE_BARRA_PX)
-    _mensaje(d, pmc.mensaje_inicio(rol, lugar or ""))
+    _mensaje(d, glosar_texto(pmc.mensaje_inicio(rol, lugar or "")))
     return img
 
 
@@ -168,7 +178,9 @@ def imagen_cierre(rol, nombre_rol, color_rol, lugar, resultado):
     _retrato(img, d, rol, color_rol)
     x = pmc.CAJA_BARRA[0]
     ancho = pmc.CAJA_TARJETA[2] - x - 40
-    _texto(d, (x, 288), _ajustar(d, pmc.despedida(nombre_rol), 52, ancho, True), 52, estilo.PAPEL,
+    despedida = glosar_texto(pmc.despedida(nombre_rol))
+    px = _px_que_cabe(d, despedida, 52, 36, ancho, True)
+    _texto(d, (x, 288 + (52 - px) // 2), _ajustar(d, despedida, px, ancho, True), px, estilo.PAPEL,
            negrita=True, contorno=4)
     resumen = pmc.resumen_cierre(resultado, estilo.ETIQUETAS_INDICADORES)
     if resumen is None:
@@ -181,7 +193,7 @@ def imagen_cierre(rol, nombre_rol, color_rol, lugar, resultado):
             _texto(d, (x + 270, y), cambio, 30, _TONO_CAMBIO[tono], negrita=True)
         if resumen["alcance"]:
             _texto(d, (x, 548), _ajustar(d, resumen["alcance"], 28, ancho), 28, estilo.COLOR_TEXTO_TENUE)
-    _mensaje(d, pmc.mensaje_cierre(rol, lugar or ""))
+    _mensaje(d, glosar_texto(pmc.mensaje_cierre(rol, lugar or "")))
     return img
 
 

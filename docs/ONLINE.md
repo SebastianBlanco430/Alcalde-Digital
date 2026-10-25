@@ -3,7 +3,7 @@
 > **Borrador para revisión legal antes de publicar.** El autor de este texto no es abogado. Es material de un
 > proyecto de aprendizaje con datos ficticios; no es asesoría legal.
 >
-> Versión 1.0 · 2026-10-23 · Protocolo de red v1
+> Versión 1.1 · 2026-10-24 · Protocolo de red v3
 
 El modo online permite jugar en cooperación en tiempo real hasta 4 personas. **Una persona aloja la partida** y
 las demás se conectan a su dirección IP y puerto. No hay servidores externos ni cuentas: todo ocurre entre los
@@ -117,11 +117,23 @@ Si se corta tu conexión, tienes unos **90 segundos** para reconectar y conserva
 - Posible etiqueta de alias mal colocada en el mundo (por revisar).
 - Un nombre con letras de otros alfabetos parecidas a las latinas puede evadir la lista de nombres reservados.
 
+### Versiones y contenido compartido
+
+Todos los equipos deben tener **la misma versión del juego**. El anfitrión compara dos huellas (SHA-256): la del
+mundo (semilla, lugares, calles y límites) y la del contenido (misiones con sus textos, roles, noticias, el grafo
+social con sus relaciones y el ciudadano de cada rol). Si no coinciden, la sala rechaza la entrada.
+
+- **Protocolo v3 (2026-10-24):** el grafo social ganó la relación puente Luana–Nayara (la comunidad del Morro ya
+  no está separada de la red de Ana). Un equipo con la versión anterior recibe el rechazo «versión distinta».
+- Los significados en español de los nombres brasileños («Prefeitura (Alcaldía)») son **solo de pantalla**: no
+  entran en las huellas, así que dos equipos se emparejan aunque uno los tenga apagados (`ALCALDE_SIN_GLOSAS=1`).
+
 ## 9. Solución de problemas
 
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
 | «Tu mundo es distinto» | `ALCALDE_SEMILLA` o `ALCALDE_VEHICULOS_ONLINE` distintos | Igualarlos en todos y reiniciar |
+| «Versión del protocolo distinta» | Un equipo tiene otra versión del juego (p. ej. sin el grafo social v3) | Actualizar todos a la misma versión |
 | «Código incorrecto» | Código mal escrito | Pedirlo de nuevo; no distingue mayúsculas |
 | «Sala ocupada» | Límite por IP (2) o sala llena (4) | Subir `--max-por-ip` o esperar |
 | No se conecta por Tailscale/ZeroTier | Ámbito `lan` | Anfitrión con ámbito `abierto` |

@@ -11,6 +11,8 @@ import hashlib
 import math
 import unicodedata
 
+from backend.datos.nombres_visibles import glosa_etiqueta, glosar_texto
+
 
 # --------------------------------------------------------------------------- azar estable
 
@@ -412,6 +414,34 @@ def publicacion_de(texto, media=None):
         "seguir": autores_a_seguir(texto),
     }
     return datos
+
+
+# Copia de una publicación para dibujarla, con los nombres brasileños traducidos (nombres_visibles). Va DESPUÉS de
+# publicacion_de: el azar sale del texto original. «A quién seguir» no se traduce: recorta a 0,19 y no cabría.
+def publicacion_visible(datos):
+    visibles = dict(datos)
+    visibles["texto"] = glosar_texto(datos["texto"])
+    visibles["autor"] = dict(datos["autor"], nombre=glosar_texto(datos["autor"]["nombre"]))
+    visibles["comentarios"] = [
+        dict(c, texto=glosar_texto(c["texto"]), autor=dict(c["autor"], nombre=glosar_texto(c["autor"]["nombre"])))
+        for c in datos["comentarios"]]
+    visibles["tendencias"] = [tendencia_visible(t) for t in datos["tendencias"]]
+    media = datos.get("media")
+    if media and media.get("titulo_enlace"):
+        visibles["media"] = dict(media, titulo_enlace=glosar_texto(media["titulo_enlace"]))
+    return visibles
+
+
+# «12,4 K publicaciones» -> «12,4 K».
+def cuenta_corta(cuenta):
+    return cuenta.replace(" publicaciones", "")
+
+
+# La traducción de la etiqueta va en la línea de la categoría: «Barrio · Radio del cerro».
+def tendencia_visible(tendencia):
+    categoria, etiqueta, cuenta = tendencia
+    glosa = glosa_etiqueta(etiqueta)
+    return (f"{categoria} · {glosa}" if glosa else categoria), etiqueta, cuenta
 
 
 # --------------------------------------------------------------------------- disposición

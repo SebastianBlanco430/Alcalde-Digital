@@ -24,6 +24,7 @@ from ursina import Entity, Text, camera, color, scene, time
 from ursina.lights import AmbientLight, DirectionalLight
 from ursina.shaders import lit_with_shadows_shader
 
+from backend.datos.nombres_visibles import glosa_de
 from backend.logica.roles import ROLES
 from frontend import camara_calculos as cc
 from frontend import guion_cinematicas as guion
@@ -263,12 +264,19 @@ class EscenaInterior(Escena):
             self._tematico.append(self._construir_prop(prop, tema, ("oeste", "norte", "este")[indice]))
 
     # Cartel con el nombre del lugar en la pared norte, sobre el escritorio.
+    # Con traducción (nombres_visibles), una segunda línea más pequeña y el tablero algo más alto. El texto va en
+    # z = 0.07, delante de la cara del tablero que da a la habitación (+z del ancla).
     def _letrero(self, tema):
         ancla = self._ancla("letrero")
-        ancho = min(max(len(tema.letrero) * 0.2, 1.6), 3.4)
-        pieza(parent=ancla, model="cube", color=rgb((30, 32, 46)), position=(0, 2.3, 0.04), scale=(ancho, 0.34, 0.05))
-        Text(tema.letrero, parent=ancla, origin=(0, 0), position=(0, 2.3, 0.0), scale=4.2,
-             color=color.rgb32(240, 240, 245), rotation_y=180)
+        glosa = glosa_de(tema.letrero)
+        ancho = min(max(len(tema.letrero) * 0.2, len(glosa or "") * 0.13, 1.6), 3.4)
+        alto = 0.46 if glosa else 0.34
+        pieza(parent=ancla, model="cube", color=rgb((30, 32, 46)), position=(0, 2.3, 0.04), scale=(ancho, alto, 0.05))
+        Text(tema.letrero, parent=ancla, origin=(0, 0), position=(0, 2.37 if glosa else 2.3, 0.07),
+             scale=3.8 if glosa else 4.2, color=color.rgb32(240, 240, 245), rotation_y=180)
+        if glosa:
+            Text(f"({glosa})", parent=ancla, origin=(0, 0), position=(0, 2.19, 0.07), scale=2.6,
+                 color=color.rgb32(255, 214, 102), rotation_y=180)
         silenciar(ancla)
         return ancla
 

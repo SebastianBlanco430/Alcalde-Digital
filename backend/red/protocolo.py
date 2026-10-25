@@ -10,7 +10,8 @@ import math
 # ---------------------------------------------------------------------------
 # v2 (2026-10): bit 16 de las banderas de `pos`/`snap` (caballito) y huellas que también cubren calles, noticias,
 # grafo social y textos de misión (anfitrion.calcular_huellas). Un equipo con v1 se rechaza con «version».
-PROTOCOLO_V = 2
+# v3 (2026-10): relación Luana-Nayara en el grafo social. Un equipo con el grafo anterior se rechaza con «version».
+PROTOCOLO_V = 3
 JUEGO = "AlcaldeDigital"
 
 DIR_C2H = "c2h"   # cliente -> anfitrión

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import ursina as ursina_paquete
 
-from panda3d.core import ClockObject, WindowProperties, loadPrcFileData
+from panda3d.core import ClockObject, Filename, WindowProperties, loadPrcFileData
 # Ursina trae un PNG con perfil iCCP antiguo: libpng avisa en cada arranque (inofensivo).
 loadPrcFileData("", "notify-level-pnmimage error")
 from ursina import Entity, Ursina, application, window
@@ -195,9 +195,10 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     compat_macos.aplicar()
     rendimiento.configurar_panda()   # opciones de Panda que deben ir antes de abrir la ventana
     # El icono por defecto ('textures/ursina.ico') es relativo y Panda no lo encuentra (un error por
-    # cada cambio de propiedades de la ventana): se pasa la ruta absoluta del que trae Ursina.
-    icono = Path(ursina_paquete.__file__).resolve().parent / "textures" / "ursina.ico"
-    aplicacion = Ursina(title="Alcalde Digital", icon=icono.as_posix(), borderless=False, fullscreen=False,
+    # cada cambio de propiedades de la ventana): se pasa la ruta absoluta del que trae Ursina, en
+    # formato de Panda ('/c/...'); con 'C:/...' Panda tampoco la encuentra en Windows.
+    icono = Filename.from_os_specific(str(Path(ursina_paquete.__file__).resolve().parent / "textures" / "ursina.ico"))
+    aplicacion = Ursina(title="Alcalde Digital", icon=icono.get_fullpath(), borderless=False, fullscreen=False,
                         development_mode=False, size=TAMANO_VENTANA)
     compat_macos.reaplicar()
     rendimiento.preparar_raices()    # posición de la cámara para la niebla, en la raíz (frontend/rendimiento.py)

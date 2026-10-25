@@ -108,4 +108,12 @@ Paralelas sin choques: {T1,T2,T4,T6,T12,T14} → {T3 después de T1 = mismo agen
 - **Mundo:** horizonte/niebla (238,224,204) con intensidad 0.65 (no 206,222,224); luz de tarde `DIRECCION_SOL` = (1, -1.1, 0.8); cielo propio (`frontend/cielo.py`); props y fuente (`frontend/props_mundo.py`); causa del «blanco» de plazas y aceras: `combine()` sin normales, ahora `COMBINAR_CON_NORMALES = True`.
 - **Pies y sombra de contacto:** `ELEVACION_PIES` = 0.26 m en el mundo (0.03 en el interior), sombra de contacto y aro de resaltado translúcido (`frontend/sombra_calculos.py`, `sombra_contacto.py`).
 - **Peatones:** 12 en lugar de 6; los 6 originales conservan su recorrido (`crear_peatones`).
+- **Nombres brasileños con su significado (2026-10-24):** en pantalla, cada nombre o palabra en portugués con un
+  significado común lleva su traducción entre paréntesis: «Prefeitura (Alcaldía)», «mutirão (trabajo comunitario
+  voluntario)». Solo la primera aparición en cada texto. No se glosan nombres de persona, topónimos reales que son
+  puro nombre («Praça da Sé») ni cognados transparentes («Mercado Municipal»). Tabla y criterio en
+  `backend/datos/nombres_visibles.py`; las claves de la lógica no cambian. Espacios pequeños usan una forma corta
+  (`CORTOS`): chip del destino del minimapa, chip del monitor y «Empieza en» de la selección de rol. Los letreros 3D
+  ponen la glosa en una segunda línea amarilla más pequeña. La píldora de misión de Civitas cae al título sin glosa
+  (y a 16 px) si no cabe junto a la pestaña «Siguiendo». `GLOSAR_NOMBRES = False` o `ALCALDE_SIN_GLOSAS=1` los quitan.
 - **No hecho aún:** colores de rol (T15, decisión del dueño), T17 ciudad 3D orbitando en el inicio, T18 contorno de tinta en edificios, T19 textura procedural de pasto/asfalto.
