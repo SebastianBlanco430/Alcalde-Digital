@@ -34,6 +34,21 @@ LUGARES = {
     "Jornal do Morro": "Periódico del cerro",
     "Fofoca da Laje": "Chisme de la azotea",
     "Zap do Morro": "WhatsApp del cerro",
+    # Mapa grande
+    "Posto de Saúde Vila Nova": "Puesto de salud Vila Nova",
+    "Ponto de Mototáxi da Entrada": "Parada de mototaxis de la entrada",
+    "Ponto de Mototáxi": "Parada de mototaxis",
+    "Padaria Pão Quente": "Panadería Pan Caliente",
+    "Supermercado Dois Irmãos": "Supermercado Dos Hermanos",
+    "Oficina do Seu Zé": "Taller de don Zé",
+    "Bar do Cabo": "Bar del Cabo",
+    "Igreja Nossa Senhora da Esperança": "Iglesia Nuestra Señora de la Esperanza",
+    "Escola Municipal Paulo Freire": "Escuela municipal Paulo Freire",
+    "Salão da Dona Lu": "Peluquería de doña Lu",
+    "Campo de Várzea": "Cancha de barrio",
+    "Feira da Ladeira": "Feria de la cuesta",
+    "Mirante do Alto": "Mirador de lo alto",
+    "Estação Alto do Morro": "Estación Alto del Cerro",
 }
 
 # Traducción corta para los sitios estrechos (chip del minimapa, monitor, «Empieza en»).
@@ -43,6 +58,19 @@ CORTOS = {
     "Rodoviária": "Terminal",
     "Rádio Comunitária": "Radio",
     "Estação do Teleférico": "Teleférico",
+    "Posto de Saúde Vila Nova": "Puesto de salud",
+    "Ponto de Mototáxi da Entrada": "Mototaxis",
+    "Padaria Pão Quente": "Panadería",
+    "Supermercado Dois Irmãos": "Supermercado",
+    "Oficina do Seu Zé": "Taller",
+    "Bar do Cabo": "Bar",
+    "Igreja Nossa Senhora da Esperança": "Iglesia",
+    "Escola Municipal Paulo Freire": "Escuela",
+    "Salão da Dona Lu": "Peluquería",
+    "Campo de Várzea": "Cancha",
+    "Feira da Ladeira": "Feria",
+    "Mirante do Alto": "Mirador",
+    "Estação Alto do Morro": "Estación alta",
 }
 
 # Palabras y frases sueltas; la traducción toma la mayúscula del texto («Mutirão (Trabajo...)», «mutirão (trabajo...)»).

@@ -3,18 +3,19 @@
 # clientes piden `montar{veh}` / `bajar{}` y el anfitrión decide (exclusividad: un vehículo = un jugador).
 #
 # Reglas:
-#   - Spawn DETERMINISTA: los 8 aparcados salen de frontend.vehiculo_calculos.puntos_de_aparcamiento(mundo, n=8,
+#   - Spawn DETERMINISTA: los aparcados (8 en el chico, 24 en el grande: aparcados_para_mundo) salen de frontend.vehiculo_calculos.puntos_de_aparcamiento(mundo, n=n,
 #     semilla=SEMILLA_VEHICULOS) — la misma función y la misma semilla que usa MundoVehiculos en cada cliente,
 #     así que el vehículo número i es el mismo en todos los equipos (el mundo ya se verifica con huella_mundo).
 #   - montar: el jugador debe estar conectado, no «dentro» de un edificio, no ir ya montado, el vehículo debe
 #     existir, estar libre y a menos de RADIO_MONTAR del jugador (RADIO_AVISO del juego + holgura por latencia).
 #   - Mientras va montado, el vehículo SIGUE al piloto (mover); al bajar o desconectarse queda aparcado donde estaba.
-#   - Nada de lo que llega por red se usa como ruta ni clase: `veh` es un entero 0..7 y el tipo sale del catálogo.
+#   - Nada de lo que llega por red se usa como ruta ni clase: `veh` es un entero 0..N_VEHICULOS_MAX-1 y el tipo sale del catálogo.
 import math
 
 from backend.red import protocolo
 
-N_VEHICULOS = 8
+N_VEHICULOS = 8                  # mundo chico (y valor por defecto de aparcados_deterministas)
+N_VEHICULOS_GRANDE = protocolo.N_VEHICULOS_MAX   # mapa grande (v4 del protocolo): 24, igual que frontend.vehiculo_mundo.N_VEHICULOS_GRANDE
 SEMILLA_VEHICULOS = 7            # la misma que el valor por defecto de MundoVehiculos
 RADIO_AVISO = 2.6                # m: igual que frontend/vehiculo_calculos.RADIO_AVISO (hay test de paridad)
 HOLGURA_MONTAR = 1.6             # m de tolerancia por latencia y posiciones suavizadas
@@ -41,6 +42,16 @@ def aparcados_deterministas(mundo, n=N_VEHICULOS, semilla=SEMILLA_VEHICULOS):
             for a in vc.puntos_de_aparcamiento(mundo, n=n, semilla=semilla)]
 
 
+def n_vehiculos_de(mundo):
+    """Cuántos vehículos aparcados hay online en este mundo: 24 con un MundoGrande, 8 con el chico."""
+    return N_VEHICULOS_GRANDE if hasattr(mundo, "contenido_de_chunk") else N_VEHICULOS
+
+
+def aparcados_para_mundo(mundo, semilla=SEMILLA_VEHICULOS):
+    """aparcados_deterministas con la cantidad que toca al mundo (los 8 primeros del grande son los del chico)."""
+    return aparcados_deterministas(mundo, n=n_vehiculos_de(mundo), semilla=semilla)
+
+
 class VehiculoCoop:
     __slots__ = ("id", "tipo", "x", "z", "rumbo", "piloto", "x0", "z0", "rumbo0")
 
@@ -65,7 +76,7 @@ class ReservaVehiculos:
 
     def __init__(self, aparcados):
         self._vehiculos = [VehiculoCoop(i, tipo, x, z, r) for i, (tipo, x, z, r) in enumerate(aparcados)
-                           if tipo in TIPOS_VEHICULO][:N_VEHICULOS]
+                           if tipo in TIPOS_VEHICULO][:protocolo.N_VEHICULOS_MAX]
         self._de_jugador = {}       # id de jugador -> VehiculoCoop
 
     def __len__(self):

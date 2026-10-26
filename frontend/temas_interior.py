@@ -42,6 +42,27 @@ TEMAS = {
                               "Rádio Comunitária 98,7 FM", ("cafetera", "afiches", "reloj")),
     "Estação do Teleférico": Tema((218, 226, 236), (96, 104, 120), (120, 130, 160),
                                   "Estação do Teleférico", ("mapa_rutas", "reloj", "planta_grande")),
+    # Lugares del mapa grande (con edificio): reutilizan los props de siempre.
+    "Posto de Saúde Vila Nova": Tema((236, 244, 244), (160, 184, 190), (46, 160, 130),
+                                     "Posto de Saúde Vila Nova", ("camilla", "afiches", "reloj")),
+    "Ponto de Mototáxi da Entrada": Tema((240, 224, 190), (96, 90, 86), (240, 150, 40),
+                                         "Ponto de Mototáxi", ("mapa_rutas", "mostrador", "afiches")),
+    "Padaria Pão Quente": Tema((250, 232, 196), (150, 104, 70), (220, 150, 60),
+                               "Padaria Pão Quente", ("mostrador", "cafetera", "reloj")),
+    "Supermercado Dois Irmãos": Tema((236, 240, 218), (120, 124, 130), (200, 70, 60),
+                                     "Supermercado Dois Irmãos", ("mostrador", "afiches", "planta_grande")),
+    "Oficina do Seu Zé": Tema((214, 210, 204), (84, 84, 90), (230, 170, 40),
+                              "Oficina do Seu Zé", ("mostrador", "afiches", "reloj")),
+    "Bar do Cabo": Tema((244, 214, 176), (110, 78, 56), (190, 90, 50),
+                        "Bar do Cabo", ("mostrador", "cafetera", "afiches")),
+    "Igreja Nossa Senhora da Esperança": Tema((240, 236, 224), (130, 110, 96), (120, 150, 200),
+                                              "Igreja Nossa Senhora da Esperança", ("bandera", "planta_grande", "reloj")),
+    "Escola Municipal Paulo Freire": Tema((236, 232, 200), (140, 116, 90), (60, 130, 220),
+                                          "Escola Municipal Paulo Freire", ("pizarra", "libreria", "reloj")),
+    "Salão da Dona Lu": Tema((248, 218, 226), (150, 120, 120), (210, 80, 140),
+                             "Salão da Dona Lu", ("mostrador", "afiches", "planta_grande")),
+    "Estação Alto do Morro": Tema((214, 224, 236), (92, 100, 116), (110, 130, 170),
+                                  "Estação Alto do Morro", ("mapa_rutas", "reloj", "planta_grande")),
 }
 
 

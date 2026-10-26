@@ -61,6 +61,45 @@ void main() {
 }
 '''
 
+# macOS entrega un contexto OpenGL 2.1 (GLSL 1.20): los shaders de arriba (1.30/1.40) no compilan allí y los
+# personajes salían blancos (el vértice se pintaba con el shader por defecto). Misma lógica en GLSL 1.20:
+# los índices de hueso llegan como vec4 (Panda los convierte) y no hay `in`/`out`/`texture()`.
+_VERTEX_120 = f'''#version 120
+uniform mat4 p3d_ModelViewProjectionMatrix;
+uniform mat4 p3d_TransformTable[{MAX_HUESOS}];
+attribute vec4 p3d_Vertex;
+attribute vec4 transform_weight;
+attribute vec4 transform_index;
+attribute vec2 p3d_MultiTexCoord0;
+attribute vec4 p3d_Color;
+uniform vec2 texture_scale;
+uniform vec2 texture_offset;
+varying vec2 uvs;
+varying vec4 vertex_color;
+
+void main() {{
+    mat4 hueso = p3d_TransformTable[int(transform_index.x)] * transform_weight.x
+               + p3d_TransformTable[int(transform_index.y)] * transform_weight.y
+               + p3d_TransformTable[int(transform_index.z)] * transform_weight.z
+               + p3d_TransformTable[int(transform_index.w)] * transform_weight.w;
+    gl_Position = p3d_ModelViewProjectionMatrix * (hueso * p3d_Vertex);
+    uvs = (p3d_MultiTexCoord0 * texture_scale) + texture_offset;
+    vertex_color = p3d_Color;
+}}
+'''
+
+_FRAGMENT_120 = '''#version 120
+
+uniform sampler2D p3d_Texture0;
+uniform vec4 p3d_ColorScale;
+varying vec2 uvs;
+varying vec4 vertex_color;
+
+void main() {
+    gl_FragColor = texture2D(p3d_Texture0, uvs) * p3d_ColorScale * vertex_color;
+}
+'''
+
 _cache = []
 _avisado = []
 
@@ -77,7 +116,8 @@ def _avisar(motivo):
 
 def _atributo():
     if not _cache:
-        shader = Shader.make(Shader.SL_GLSL, _VERTEX, _FRAGMENT)
+        vertex, fragment = (_VERTEX_120, _FRAGMENT_120) if sys.platform == "darwin" else (_VERTEX, _FRAGMENT)
+        shader = Shader.make(Shader.SL_GLSL, vertex, fragment)
         if shader is None:
             raise RuntimeError("el shader no compiló")
         _cache.append(ShaderAttrib.make(shader).set_flag(ShaderAttrib.F_hardware_skinning, True))

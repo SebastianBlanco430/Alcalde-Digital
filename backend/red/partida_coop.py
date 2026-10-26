@@ -504,7 +504,9 @@ class PartidaCooperativa:
     def _cerrar_por_anfitrion(self, motivo):
         if self._fin_emitido:
             return
-        self._terminar(motivo)
+        # Sin "fin": si no, el cliente creia que la partida acabo bien y tapaba el aviso de sala cerrada.
+        self._fin_emitido = True
+        self._fase = FASE_FIN
         self._emitir("sala_cerrada", motivo=motivo)
 
     def _terminar(self, motivo):

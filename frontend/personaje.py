@@ -25,11 +25,13 @@ from frontend.componentes import rgb
 from frontend import sombra_calculos as sc
 from frontend.rostro_modelo import colocar_rostro_procedural
 from frontend.sombra_contacto import SombraContacto, crear_aro
-from frontend.piezas import COLOR_MARCADOR, COLOR_PIEL, etiqueta, silenciar
+from frontend.piezas import COLOR_MARCADOR, COLOR_PIEL, etiqueta, limitar_etiqueta, silenciar
 from frontend.piezas import malla_unida as _malla_unida_base
 
 CONTORNO_ACTIVO = True            # contorno de tinta (casco invertido) en cada pieza del muñeco
 
+GESTO_VEL_MAX = 0.1              # m/s: en movimiento no hay gestos de mano
+GESTO_TIEMPO = 0.35              # s que tarda el gesto en entrar y salir
 VELOCIDAD_CARRERA = 8.5          # m/s con intensidad 1 (ver poses.pose_caminar)
 RESPIRACION = 1.6                # rad/s de la fase en reposo
 COLOR_PANTALON = color.rgb32(52, 58, 82)
@@ -87,6 +89,9 @@ class Personaje(Entity):
         self._fase = 0.0
         self._intensidad = 0.0
         self._activo = False
+        self._gesto = None            # gesto de mano pedido ("dar" | "recibir" | None) y su peso 0..1
+        self._gesto_peso = 0.0
+        self._gesto_pose = None
 
         self.aro = crear_aro(self)                 # translúcido y sobre las capas del suelo (y = 0.30)
         self.cuerpo = Entity(parent=self)          # gira hacia donde camina; la etiqueta no
@@ -219,7 +224,38 @@ class Personaje(Entity):
             self._fase = poses.fase_siguiente(self._fase, velocidad, dt)
         else:
             self._fase = (self._fase + RESPIRACION * dt) % poses.DOS_PI
-        self.aplicar_pose(poses.pose_caminar(self._fase, self._intensidad))
+        pose = poses.pose_caminar(self._fase, self._intensidad)
+        if self._gesto is not None or self._gesto_peso > 0.0:
+            pose = self._mezclar_gesto(pose, velocidad, dt)
+        self.aplicar_pose(pose)
+
+    # Gestos de mano (traspaso): mezcla la pose de caminar/reposo con POSE_DAR/POSE_RECIBIR. Se ignoran en movimiento.
+    def fijar_gesto(self, nombre):
+        if nombre is None:
+            self._gesto = None
+            return True
+        if nombre not in poses.POSES_GESTO or self.velocidad >= GESTO_VEL_MAX:
+            return False
+        self._gesto = nombre
+        self._gesto_pose = poses.POSES_GESTO[nombre]
+        return True
+
+    def _mezclar_gesto(self, pose, velocidad, dt):
+        se_mueve = velocidad >= GESTO_VEL_MAX
+        if self._gesto is not None and not se_mueve:
+            self._gesto_peso = min(1.0, self._gesto_peso + dt / GESTO_TIEMPO)
+        else:
+            self._gesto_peso = max(0.0, self._gesto_peso - dt / (GESTO_TIEMPO / (3 if se_mueve else 1)))
+            if se_mueve:
+                self._gesto = None
+        if self._gesto_pose is None or self._gesto_peso <= 0.0:
+            return pose
+        t = self._gesto_peso * self._gesto_peso * (3 - 2 * self._gesto_peso)
+        return poses.interpolar_pose(pose, self._gesto_pose, t)
+
+    # El muñeco procedural no tiene esqueleto: sin nodo de mano (la bolsita vuela entre puntos a la altura del pecho).
+    def mano(self, lado="d"):
+        return None
 
     # -- Posición y rumbo --
 
@@ -280,6 +316,7 @@ class Personaje(Entity):
 
     # Solo corre con la escena activa (Ursina salta update() con un ancestro desactivado).
     def update(self):
+        limitar_etiqueta(self.etiqueta)      # el nombre no ocupa media pantalla con la cámara cerca
         if self.rostro is not None:   # parpadeo, mirada, boca y cejas (también durante las cinemáticas)
             self._t_rostro += time.dt
             self.rostro.actualizar(self._t_rostro, self._clip_rostro(), self.rumbo, time.dt)

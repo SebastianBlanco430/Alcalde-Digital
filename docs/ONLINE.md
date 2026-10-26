@@ -125,6 +125,11 @@ social con sus relaciones y el ciudadano de cada rol). Si no coinciden, la sala 
 
 - **Protocolo v3 (2026-10-24):** el grafo social ganó la relación puente Luana–Nayara (la comunidad del Morro ya
   no está separada de la red de Ana). Un equipo con la versión anterior recibe el rechazo «versión distinta».
+- **Mapa grande (por defecto):** anfitrión y clientes construyen el MISMO mundo (`ALCALDE_MAPA_GRANDE`, por defecto 1: 24
+  lugares, ~4600 casas) y el catálogo grande de 47 misiones. La huella del mundo añade la clave `casas` (firma de las casas
+  generadas) solo con el mapa grande; la del mundo chico (`ALCALDE_MAPA_GRANDE=0`) no cambia. Un equipo con el mapa chico y
+  otro con el grande no se emparejan («Tu mundo es distinto»): poned la misma variable en todos. Con el mapa grande el juego
+  local tiene 24 vehículos, pero en línea solo existen los 8 primeros (el protocolo nombra 0..7; `N_VEHICULOS_MAX`).
 - Los significados en español de los nombres brasileños («Prefeitura (Alcaldía)») son **solo de pantalla**: no
   entran en las huellas, así que dos equipos se emparejan aunque uno los tenga apagados (`ALCALDE_SIN_GLOSAS=1`).
 
@@ -132,7 +137,7 @@ social con sus relaciones y el ciudadano de cada rol). Si no coinciden, la sala 
 
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
-| «Tu mundo es distinto» | `ALCALDE_SEMILLA` o `ALCALDE_VEHICULOS_ONLINE` distintos | Igualarlos en todos y reiniciar |
+| «Tu mundo es distinto» | `ALCALDE_SEMILLA`, `ALCALDE_VEHICULOS_ONLINE` o `ALCALDE_MAPA_GRANDE` distintos | Igualarlos en todos y reiniciar |
 | «Versión del protocolo distinta» | Un equipo tiene otra versión del juego (p. ej. sin el grafo social v3) | Actualizar todos a la misma versión |
 | «Código incorrecto» | Código mal escrito | Pedirlo de nuevo; no distingue mayúsculas |
 | «Sala ocupada» | Límite por IP (2) o sala llena (4) | Subir `--max-por-ip` o esperar |

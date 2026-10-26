@@ -28,7 +28,7 @@ from ursina import Entity, time
 from frontend import estilo, geometria_mundo, modelo_calculos as mc
 from frontend.componentes import rgb
 from frontend.personaje import Personaje
-from frontend.piezas import COLOR_MARCADOR, etiqueta, silenciar
+from frontend.piezas import COLOR_MARCADOR, etiqueta, limitar_etiqueta, silenciar
 from frontend import rostro_calculos as rc
 from frontend import animacion_humana as ah
 from frontend import skinning_gpu
@@ -39,6 +39,9 @@ from frontend.sombra_contacto import SombraContacto, crear_aro
 CARPETA_MODELOS = Path(__file__).resolve().parent.parent / "assets" / "modelos" / "personajes"
 TIEMPO_MEZCLA = 0.2              # s para pasar de un clip a otro
 OFFSET_SENTADO = (0.0, 0.0, -0.7)   # (x, y, z) del cuerpo sin sentarse: detrás de la silla (ASIENTO)
+
+VEL_MAX_GESTO = 0.1              # m/s: por encima el personaje se mueve y no hace gestos de mano
+TIEMPO_GESTO_MANO = 0.35         # s que tarda el gesto en entrar y salir
 
 ANIMACION_HUMANA = True          # clips horneados con cinemática humana (frontend/animacion_humana.py); False = clips del .glb
 
@@ -95,6 +98,10 @@ class PersonajeModelo(Entity):
         self._en_aire = False         # estado de salto (lo fija el controlador con fijar_estado_aire)
         self._vel_vertical = 0.0
         self._subiendo = False        # subiendo escalones (fijar_subiendo_escalera)
+        self._gesto = None            # gesto de mano pedido ("dar" | "recibir" | None)
+        self._gesto_clip = None       # clip del gesto que suena (sigue hasta que el peso vuelve a 0)
+        self._gesto_peso = 0.0        # 0..1: cuánto manda el gesto sobre el reposo
+        self._manos = {}              # lado ("d"/"i") -> NodePath expuesto (o None si no se pudo)
 
         self.aro = crear_aro(self, sc.altura_aro(False))   # translúcido, sobre las capas del suelo
         self.cuerpo = Entity(parent=self)
@@ -155,6 +162,8 @@ class PersonajeModelo(Entity):
 
     def _mezclar(self, dt):
         if self._humano is not None:
+            if self._gesto is not None or self._gesto_peso > 0.0:
+                self._avanzar_gesto(dt)
             self._humano.mezclar(dt)
             return
         paso = dt / TIEMPO_MEZCLA
@@ -166,6 +175,55 @@ class PersonajeModelo(Entity):
             if peso == 0.0 and clip != self._clip:
                 self.actor.stop(clip)
                 del self._pesos[clip]
+
+    # -- Gestos de mano (traspaso) --
+
+    # Pide un gesto ("dar", "recibir") o lo quita (None). False si no se puede: sin animación humana, gesto
+    # desconocido o el personaje se está moviendo.
+    def fijar_gesto(self, nombre):
+        if nombre is None:
+            self._gesto = None
+            return True
+        clip = ah.CLIPS_GESTO.get(nombre)
+        if self._humano is None or clip is None or self.actor is None or clip not in self.actor.getAnimNames():
+            return False
+        if self.velocidad >= VEL_MAX_GESTO or self._en_aire:
+            return False
+        self._gesto = nombre
+        if self._gesto_clip != clip:
+            self._gesto_clip = clip
+            self._gesto_peso = 0.0
+        return True
+
+    # El peso sube/baja en TIEMPO_GESTO_MANO s; si se mueve o salta el gesto se ignora y baja rápido.
+    def _avanzar_gesto(self, dt):
+        se_mueve = self.velocidad >= VEL_MAX_GESTO or self._en_aire
+        if self._gesto is not None and not se_mueve:
+            self._gesto_peso = min(1.0, self._gesto_peso + dt / TIEMPO_GESTO_MANO)
+        else:
+            self._gesto_peso = max(0.0, self._gesto_peso - dt / (TIEMPO_GESTO_MANO / 3 if se_mueve else TIEMPO_GESTO_MANO))
+            if se_mueve:
+                self._gesto = None
+        if self._gesto is None and self._gesto_peso <= 0.0:
+            self._gesto_clip = None
+
+    # Nodo que sigue la mano ("d" o "i") del esqueleto (exposeJoint, con caché). None si no hay hueso.
+    # Solo sigue al hueso si la CPU calcula los huesos (también con el skinning por GPU: lo hace igual).
+    def mano(self, lado="d"):
+        if lado in self._manos:
+            return self._manos[lado]
+        nodo = None
+        if self._humano is not None and self.actor is not None:
+            sufijo = "R" if lado == "d" else "L"
+            for hueso in (f"DEF-hand.{sufijo}", f"hand.{sufijo}"):
+                try:
+                    if self.actor.getJoints(jointName=hueso):
+                        nodo = self.actor.exposeJoint(None, "modelRoot", hueso)
+                        break
+                except Exception as error:
+                    print(f"[assets] {self.nombre}: no se pudo exponer la mano ({error})", file=sys.stderr)
+        self._manos[lado] = nodo
+        return nodo
 
     # -- Pose --
 
@@ -247,6 +305,7 @@ class PersonajeModelo(Entity):
         return self._activo
 
     def update(self):
+        limitar_etiqueta(self.etiqueta)      # el nombre no ocupa media pantalla con la cámara cerca
         self._mezclar(time.dt)        # la mezcla corre también durante las cinemáticas
         if self.rostro is not None and self._animar_rostro():   # gestos de la cara: parpadeo, mirada, boca y cejas según el clip
             self._t_rostro += time.dt

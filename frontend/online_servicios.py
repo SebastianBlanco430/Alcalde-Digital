@@ -11,7 +11,7 @@
 
 import logging
 
-from backend.datos.misiones_semilla import CATALOGO_MISIONES
+from backend.datos.misiones_semilla import CATALOGO_MISIONES, catalogo_de_mundo
 from backend.red import huellas
 from backend.red.anfitrion import calcular_huellas
 from backend.red.cliente import ClienteRed
@@ -61,7 +61,7 @@ class ServiciosOnline:
     def __init__(self, mundo, semilla, catalogo=None, fabrica_anfitrion=None, fabrica_cliente=None):
         self.mundo = mundo
         self.semilla = semilla
-        self.catalogo = CATALOGO_MISIONES if catalogo is None else catalogo
+        self.catalogo = catalogo_de_mundo(mundo) if catalogo is None else catalogo
         self._fabrica_anfitrion = fabrica_anfitrion
         self._fabrica_cliente = fabrica_cliente
 

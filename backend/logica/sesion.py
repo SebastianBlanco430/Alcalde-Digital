@@ -3,6 +3,7 @@
 # son de la ciudad, no de cada jugador). Serializable a JSON.
 
 from backend.logica.roles import ORDEN_ROLES, ROLES
+from backend.logica.perfil_economia import PerfilEconomia
 from backend.logica.telefono import Telefono
 
 MAX_JUGADORES = 4
@@ -12,27 +13,33 @@ MAX_JUGADORES = 4
 # La posición aquí es la fuente de verdad (el mundo gráfico solo la dibuja).
 class Jugador:
 
-    def __init__(self, nombre, rol, x, z, telefono=None):
+    def __init__(self, nombre, rol, x, z, telefono=None, economia=None):
         self.nombre = nombre
         self.rol = rol
         self.x = x
         self.z = z
         self.telefono = telefono if telefono is not None else Telefono()
+        self.economia = economia      # PerfilEconomia; None hasta que perfil_de() lo crea (guardados viejos)
 
     def a_dict(self):
-        return {
+        datos = {
             "nombre": self.nombre,
             "rol": self.rol,
             "x": self.x,
             "z": self.z,
             "telefono": self.telefono.a_dict(),
         }
+        if self.economia is not None:
+            datos["economia"] = self.economia.a_dict()
+        return datos
 
     @classmethod
     def desde_dict(cls, datos):
+        crudo = datos.get("economia")      # guardados de antes no lo traen
+        economia = PerfilEconomia.desde_dict(crudo) if isinstance(crudo, dict) else None
         return cls(
             datos["nombre"], datos["rol"], datos["x"], datos["z"],
-            Telefono.desde_dict(datos["telefono"]),
+            Telefono.desde_dict(datos["telefono"]), economia,
         )
 
     def __repr__(self):

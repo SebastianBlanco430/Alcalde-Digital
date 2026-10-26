@@ -86,7 +86,7 @@ def lineas_panel(fps, sistema, renderer):
     if s.get("cpu") is not None:
         lineas.append(f"CPU {s['cpu']:5.1f} %   juego {_fmt(s.get('cpu_juego'), '5.1f', ' %')}"
                       f"   {s.get('nucleos', '?')} hilos")
-        if s.get("cpu_mhz"):
+        if (s.get("cpu_mhz") or 0) >= 100:      # Apple Silicon informa 4 MHz: se oculta
             lineas.append(f"CPU reloj {s['cpu_mhz']:.0f} MHz")
         lineas.append(f"RAM {_fmt(s.get('ram_usada'), '.1f')}/{_fmt(s.get('ram_total'), '.1f')} GB"
                       f" ({_fmt(s.get('ram_pct'), '.0f', ' %')})   juego {_fmt(s.get('ram_juego'), '.0f', ' MB')}")

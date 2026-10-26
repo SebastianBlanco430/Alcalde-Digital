@@ -51,6 +51,12 @@ POSE_SENTADO = types.MappingProxyType(_pose(
 _BASE_TECLEAR = dict(POSE_SENTADO, brazo_i=30, brazo_d=30, codo_i=60, codo_d=60, torso=6, cabeza=-4)
 
 
+# Gestos del traspaso de mano a mano (parado, un brazo estirado hacia delante). Mismas claves que POSE_PARADO.
+POSE_DAR = types.MappingProxyType(dict(POSE_PARADO, brazo_d=66, codo_d=14, torso=2))
+POSE_RECIBIR = types.MappingProxyType(dict(POSE_PARADO, brazo_i=58, codo_i=14, torso=2))
+POSES_GESTO = {"dar": POSE_DAR, "recibir": POSE_RECIBIR}
+
+
 # Pose de caminar/reposo para la fase φ y la intensidad i (se limita a [0, 1]).
 def pose_caminar(fase, intensidad):
     i = min(1.0, max(0.0, intensidad))

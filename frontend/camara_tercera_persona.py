@@ -36,6 +36,13 @@ DISTANCIA_MIN_COLISION = 1.2  # la cámara nunca se mete más cerca del pivote q
 # estaba a menos de ~1.6 m de él. False = comportamiento de antes.
 CAMARA_ANALITICA = True
 MINIMO_ANALITICO = 0.3        # m: lo más cerca del pivote que la colisión analítica deja la cámara
+# AVATAR PEGADO A LA PARED (aditivo): con la cámara a menos de DISTANCIA_OCULTAR_AVATAR del pivote (el jugador de
+# espaldas junto a una fachada) la cámara quedaba DENTRO del torso y tapaba la pantalla; se oculta ese avatar y se
+# vuelve a mostrar al pasar de DISTANCIA_MOSTRAR_AVATAR (histéresis, sin parpadeo). None = comportamiento de antes.
+OCULTAR_AVATAR_CERCA = True
+DISTANCIA_OCULTAR_AVATAR = 1.2
+DISTANCIA_MOSTRAR_AVATAR = 1.5
+RADIO_AVATAR_PIVOTE = 0.8     # m: el avatar es el de `ignorar` más cercano al pivote, dentro de este radio
 FOV = 65
 PLANO_CERCANO = 0.1
 PLANO_LEJANO = 500
@@ -71,6 +78,7 @@ class CamaraTerceraPersona(Entity):
         self._fov = float(FOV)                   # FOV suavizado (FOV al caminar, +FOV_EXTRA_CORRER al correr)
         self._meta_previa = None                 # (x, z) del objetivo en el frame anterior
         self._reposo = (0.0, 0.0)                # sesgo del recentrado del cursor (ver quitar_reposo)
+        self._oculto_por_camara = None           # avatar que ESTA cámara ocultó (solo ese se vuelve a mostrar)
 
     # -- Estado --
 
@@ -79,6 +87,7 @@ class CamaraTerceraPersona(Entity):
 
     def tomar_control(self):
         self.controlada = True
+        self._devolver_avatar()
         self._reposo = (0.0, 0.0)
         self._meta_previa = None
         camera.fov = FOV                         # las cinemáticas parten del FOV normal, no del ensanchado al correr
@@ -154,6 +163,42 @@ class CamaraTerceraPersona(Entity):
         camera.position = cc.posicion_orbital(pivote, self.yaw, self.pitch, self.distancia_real)
         camera.rotation = (self.pitch, self.yaw, 0)
         self._actualizar_fov(meta, dt)
+        if OCULTAR_AVATAR_CERCA:
+            self._ocultar_avatar_si_tapa(pivote)
+
+    def _devolver_avatar(self):
+        oculto, self._oculto_por_camara = self._oculto_por_camara, None
+        if oculto is not None:
+            try:
+                oculto.show()
+            except Exception:
+                pass
+
+    # Oculta el avatar del jugador mientras la cámara está casi pegada a él; solo vuelve a mostrar el que ocultó
+    # ella misma (si otro sistema —vehículos, interior— lo ocultó antes, no se toca).
+    def _ocultar_avatar_si_tapa(self, pivote):
+        oculto = self._oculto_por_camara
+        if oculto is not None:
+            try:
+                if self.distancia_real > DISTANCIA_MOSTRAR_AVATAR or self.controlada:
+                    oculto.show()
+                    self._oculto_por_camara = None
+            except Exception:                       # entidad destruida entre frames
+                self._oculto_por_camara = None
+            return
+        if self.distancia_real >= DISTANCIA_OCULTAR_AVATAR:
+            return
+        mejor, mejor_d = None, RADIO_AVATAR_PIVOTE
+        for e in self.ignorar:
+            try:
+                d = math.hypot(e.world_x - pivote[0], e.world_z - pivote[2])
+                if d < mejor_d and not e.is_empty() and not e.is_hidden():
+                    mejor, mejor_d = e, d
+            except Exception:
+                continue
+        if mejor is not None:
+            mejor.hide()
+            self._oculto_por_camara = mejor
 
     # FOV dinámico: +FOV_EXTRA_CORRER al correr. La señal sale de la velocidad real del objetivo
     # (no hay que tocar el controlador); un salto de posición (cambio de turno) no cuenta como correr.
@@ -199,6 +244,7 @@ class CamaraTerceraPersona(Entity):
 
     # Orden: padre, tipo de lente, fov (depende del tipo), planos, pose.
     def restaurar_camara(self):
+        self._devolver_avatar()
         guardada = self._guardada
         if guardada is None:
             return

@@ -36,6 +36,7 @@ class Mision:
     mensaje: str
     destino: str
     cantidad_noticias: int = 2
+    pago: int = 0           # R$ que cobra quien la completa (economía); 0 = no paga
 
 
 class SistemaMisiones:

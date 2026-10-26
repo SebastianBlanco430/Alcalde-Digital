@@ -435,4 +435,26 @@ def pesos_salto(vel_vertical):
     return impulso / total, ascenso / total, caida / total
 
 
-DURACION_ATERRIZAJE = 0.28      # s que tarda en irse la flexión de amortiguación al caer
+# Gestos de entregar y recibir (1 fotograma): piernas en reposo y un brazo estirado hacia delante. "dar" usa el
+# brazo derecho; "recibir" el izquierdo (queda frente a la derecha del vendedor) con la palma algo más baja.
+GESTOS = ("dar", "recibir")
+
+
+def pose_gesto(nombre, m=None):
+    m = m or Medidas()
+    xc = m.cadera_i[0]
+    alt = m.altura_tobillo
+    yc = abs(m.cadera_i[1]) + SEPARACION[0]
+    reposo = (4.0, 6.0, 14.0, 3.0)
+    if nombre == "dar":
+        brazos = {"i": reposo, "d": (66.0, 8.0, 84.0, 4.0)}
+    elif nombre == "recibir":
+        brazos = {"i": (60.0, 8.0, 76.0, 4.0), "d": reposo}
+    else:
+        raise ValueError(f"gesto desconocido: {nombre}")
+    z0 = (0.0, 0.0, 0.0)
+    rots = {"pelvis": z0, "lumbar": (0, 1.0, 0), "pecho": (0, 3.0, 0), "cuello": z0, "cabeza": (0, -1.5, 0)}
+    return _armar_pose(m, (0.0, 0.0, -0.012), rots, (xc, yc, alt, 0.0, 0.0), (xc, -yc, alt, 0.0, 0.0), brazos)
+
+
+DURACION_ATERRIZAJE = 0.28     # s que tarda en irse la flexión de amortiguación al caer

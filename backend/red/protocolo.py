@@ -11,7 +11,10 @@ import math
 # v2 (2026-10): bit 16 de las banderas de `pos`/`snap` (caballito) y huellas que también cubren calles, noticias,
 # grafo social y textos de misión (anfitrion.calcular_huellas). Un equipo con v1 se rechaza con «version».
 # v3 (2026-10): relación Luana-Nayara en el grafo social. Un equipo con el grafo anterior se rechaza con «version».
-PROTOCOLO_V = 3
+# v4 (2026-10, mapa grande): 24 vehículos online (N_VEHICULOS_MAX 8 -> 24; el snapshot `veh` y `montar` admiten 0..23) y el
+# viaje rápido (mototáxi y teleférico): `viaje` (C2H) -> `viaje_ok` / `viaje_no` (H2C). Un equipo con v3 se rechaza con
+# «version» y un texto que dice cuál usa la sala (anfitrion._rechazar_version).
+PROTOCOLO_V = 4
 JUEGO = "AlcaldeDigital"
 
 DIR_C2H = "c2h"   # cliente -> anfitrión
@@ -38,7 +41,7 @@ HZ_LATIDO_POS = 2             # «pos» de latido aunque no cambie
 
 LIMITE_MSG_SOSTENIDO = 60     # mensajes/s por conexión (ver limites.py)
 LIMITE_MSG_RAFAGA = 120
-LIMITES_POR_TIPO = {"pos": 30, "decision": 2, "saludo_rapido": 1, "iniciar": 2}  # msg/s por tipo
+LIMITES_POR_TIPO = {"pos": 30, "decision": 2, "saludo_rapido": 1, "iniciar": 2, "viaje": 1}  # msg/s por tipo
 
 CODIGOS_RECHAZO = ("version", "sala_llena", "rol_tomado", "codigo_malo", "mundo_distinto",
                    "nombre_invalido", "expulsado", "lleno_de_conexiones")
@@ -46,7 +49,15 @@ CODIGOS_RECHAZO = ("version", "sala_llena", "rol_tomado", "codigo_malo", "mundo_
 # Vehículos online (T9): motivos admitidos en monta_no / desmontado (conjunto cerrado, nunca texto libre).
 MOTIVOS_VEHICULO = frozenset({"ocupado", "lejos", "ya_montado", "no_existe", "fase", "dentro",
                               "desactivado", "desconectado", "bajada"})
-N_VEHICULOS_MAX = 8
+N_VEHICULOS_MAX = 24      # mapa grande: 24 aparcados (frontend.vehiculo_mundo.N_VEHICULOS_GRANDE); el chico usa los 8 primeros
+# Máximo de vehículos de cada tipo en un snapshot (los 24 salen alternados bici/moto: 12 y 12; hay holgura).
+MAX_VEHICULOS_POR_TIPO = {"bicicleta": 16, "moto": 16}
+
+# Viaje rápido (mototáxi y teleférico): ids del destino y motivos de rechazo (conjuntos cerrados, nunca texto libre).
+# Paridad con backend/logica/viaje_rapido.DESTINOS / MOTIVOS (hay una prueba).
+DESTINOS_VIAJE = frozenset({"entrada", "se", "morro", "hospital", "tele_alta", "tele_base"})
+MOTIVOS_VIAJE = frozenset({"lejos", "mismo_lugar", "no_existe", "fase", "dentro", "montado", "espera", "desactivado",
+                           "desconectado"})
 
 # Límites numéricos de coordenadas (el mundo es pequeño; evita valores absurdos)
 COORD_MAX = 100000.0
@@ -133,7 +144,7 @@ _JUGADOR_SALA = {
     "conectado": _b(), "anfitrion": _b(),
 }
 _SPAWN = {"id": _ID, "x": _X, "z": _X, "y": _Y}
-# i = índice del vehículo (0..7), k = tipo, p = jugador que lo conduce (ausente si está aparcado).
+# i = índice del vehículo (0..N_VEHICULOS_MAX-1), k = tipo, p = jugador que lo conduce (ausente si está aparcado).
 _VEHICULO_SNAP = {"i": _i(0, N_VEHICULOS_MAX - 1), "k": _s(32), "x": _X, "z": _X, "r": _R,
                   "p": _i(0, MAX_JUGADORES - 1, obligatorio=False)}
 
@@ -175,7 +186,7 @@ ESQUEMAS = {
         "jugadores": Campo("lista_obj", largo=MAX_JUGADORES, hijo=_JUGADOR_SNAP),
         "ind": Campo("dic_num", largo=16, largo_item=48, minimo=-1e6, maximo=1e6,
                      obligatorio=False),
-        "veh": Campo("lista_obj", largo=8, hijo=_VEHICULO_SNAP, obligatorio=False),
+        "veh": Campo("lista_obj", largo=N_VEHICULOS_MAX, hijo=_VEHICULO_SNAP, obligatorio=False),
     }),
     "corregir": ((DIR_H2C,), {"x": _X, "z": _X, "y": _Y, "seq": _i(0, 2 ** 31)}),
     "mision": ((DIR_H2C,), {
@@ -190,6 +201,11 @@ ESQUEMAS = {
     "monta_ok": ((DIR_H2C,), {"veh": _i(0, N_VEHICULOS_MAX - 1)}),
     "monta_no": ((DIR_H2C,), {"motivo": _s(24, opciones=MOTIVOS_VEHICULO)}),
     "desmontado": ((DIR_H2C,), {"motivo": _s(24, opciones=MOTIVOS_VEHICULO)}),
+    # Viaje rápido (v4): el cliente pide ir a `destino` (lista fija); el anfitrión valida el ORIGEN (cerca de la parada o
+    # estación) y reubica al jugador. El cobro es local del cliente (online no sincroniza dinero).
+    "viaje": ((DIR_C2H,), {"destino": _s(24, opciones=DESTINOS_VIAJE)}),
+    "viaje_ok": ((DIR_H2C,), {"destino": _s(24, opciones=DESTINOS_VIAJE), "x": _X, "z": _X, "y": _Y}),
+    "viaje_no": ((DIR_H2C,), {"motivo": _s(24, opciones=MOTIVOS_VIAJE)}),
     "ok": ((DIR_H2C,), {}),
     "rechazo_interactuar": ((DIR_H2C,), {"motivo": _s(120)}),
     "decision": ((DIR_C2H,), {
@@ -355,6 +371,20 @@ def _validar_valor(valor, campo, ruta):
         raise ErrorProtocolo("esquema_invalido", True, c)
 
 
+def _validar_vehiculos_snap(lista):
+    """Límites por tipo de vehículo y ids sin repetir (el esquema ya validó rangos y largo)."""
+    vistos = set()
+    cuenta = {}
+    for v in lista:
+        if v["i"] in vistos:
+            raise ErrorProtocolo("veh_repetido", False, "veh")
+        vistos.add(v["i"])
+        cuenta[v["k"]] = cuenta.get(v["k"], 0) + 1
+        tope = MAX_VEHICULOS_POR_TIPO.get(v["k"])       # un tipo desconocido no se limita aquí (el cliente lo descarta)
+        if tope is not None and cuenta[v["k"]] > tope:
+            raise ErrorProtocolo("veh_tipo", False, "veh")
+
+
 def validar(mensaje, direccion):
     """Valida un mensaje ya parseado (dict con clave «t») y lo devuelve tal cual."""
     if type(mensaje) is not dict:
@@ -371,6 +401,8 @@ def validar(mensaje, direccion):
     if not _profundidad(cuerpo, MAX_PROFUNDIDAD):
         raise ErrorProtocolo("profundidad", True)
     _validar_dic(cuerpo, esquema, "")
+    if tipo == "snap" and "veh" in cuerpo:
+        _validar_vehiculos_snap(cuerpo["veh"])
     return mensaje
 
 

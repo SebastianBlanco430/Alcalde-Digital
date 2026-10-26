@@ -127,7 +127,7 @@ class HudOnline(Entity):
 
     def fijar_resumen(self, texto):
         if texto:
-            self.resumen.text = _seguro(str(texto))
+            self.resumen.text = _seguro(_partir(str(texto), 70))
             self.resumen.enabled = True
         else:
             self.resumen.enabled = False

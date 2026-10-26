@@ -54,7 +54,9 @@ CONTRASTE_ACROMATOPSIA = 1.15
 # Alto contraste: saturación y contraste.
 SATURACION_ALTO_CONTRASTE = 1.30
 CONTRASTE_ALTO = 1.18
-GRIS_MEDIO = 0.5       # en RGB lineal, pivote del contraste
+# Pivote del contraste en RGB lineal. Con 0.5 (gris medio lineal) las sombras por debajo de ~sRGB 70 salian negras
+# (acromatopsia y alto contraste): con 0.02 las sombras se conservan (sRGB 40 queda en 40).
+GRIS_MEDIO = 0.02
 
 
 def _producto(a, b):

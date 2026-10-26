@@ -20,7 +20,7 @@
 # en el mundo; ningún camino deja la pantalla en negro (el Fundido se libera solo).
 
 from backend.datos.nombres_visibles import nombre_visible
-from backend.logica.misiones import EN_MINIJUEGO
+from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 
 # Nombres con que main.py registra las escenas en el gestor.
 INICIO = "inicio"
@@ -28,6 +28,7 @@ SELECCION_ROL = "seleccion_rol"
 MUNDO = "mundo"
 JUEGO = "juego"
 INTERIOR = "interior"
+TRABAJO = "trabajo"      # minijuego 2D de un puesto de trabajo (frontend/escenas/escena_trabajo.py)
 
 
 class ConexionFlujo:
@@ -53,6 +54,7 @@ class ConexionFlujo:
         # escenas); main los registra y Espacio/Enter los llama. Cada uno devuelve False si no hay nada.
         self.saltadores = []
         self.flujo = None
+        self._trabajo_en_curso = None      # {"jugador", "trabajo", "nombre"} del turno de trabajo abierto
 
     # Inicio: "Empezar" lleva a la selección de roles.
     def ir_a_seleccion(self):
@@ -101,6 +103,77 @@ class ConexionFlujo:
             return
         self.flujo.completar_mision(resultado)
         self._con_transicion(self._volver_al_mundo)
+
+    # -- Trabajo (turno de un puesto, aparte de las misiones) --
+
+    # Mundo: E en un puesto de trabajo. `puesto` = objeto con `.trabajo` (backend Trabajo) y `.nombre`, o un
+    # Trabajo suelto. Devuelve True si el turno empezó. No toca SistemaMisiones ni pasa turno: solo fundido con el
+    # nombre del puesto -> escena TRABAJO. Se guarda el jugador que empieza: es el que cobra al terminar.
+    # True si CANSANCIO está activa y el jugador no puede trabajar (fatiga >= FATIGA_AGOTADO).
+    @staticmethod
+    def _agotado(jugador):
+        from frontend import economia_config as cfg
+        if not cfg.CANSANCIO:
+            return False
+        from backend.logica.perfil_economia import perfil_de
+        from backend.logica.trabajos import puede_trabajar
+        return not puede_trabajar(perfil_de(jugador))
+
+    def iniciar_trabajo(self, puesto):
+        flujo = self.flujo
+        if (flujo is None or puesto is None or self._trabajo_en_curso is not None or self._transicion_en_curso()
+                or flujo.partida_terminada() or getattr(self.cinematicas, "_cinematica", False)
+                or flujo.estado_mision() in (EN_MINIJUEGO, COMPLETADA)):
+            return False
+        trabajo = getattr(puesto, "trabajo", puesto)
+        nombre = getattr(puesto, "nombre", None) or trabajo.nombre
+        jugador = flujo.jugador_activo()
+        if self._agotado(jugador):          # la regla de cansancio también aquí, no solo en la interfaz
+            return False
+        self._trabajo_en_curso = {"jugador": jugador, "trabajo": trabajo, "nombre": nombre}
+
+        def abrir():
+            try:
+                self._gestor.cambiar_a(TRABAJO, jugador=jugador, trabajo=trabajo, al_terminar=self.terminar_trabajo)
+            except BaseException:
+                self._trabajo_en_curso = None
+                self._restaurar_mundo()
+                raise
+
+        self._con_transicion_lugar(abrir, texto=nombre)
+        return True
+
+    # Trabajo: terminó el turno (`resultado` de TurnoTrabajo.resultado(), o None si lo abandonó). Ingresa el pago
+    # y la fatiga en el perfil del jugador capturado al iniciar, y vuelve al mundo con un aviso «+R$ N».
+    def terminar_trabajo(self, resultado):
+        datos, self._trabajo_en_curso = self._trabajo_en_curso, None
+        if datos is None:
+            return
+        aviso = None
+        if resultado is not None:
+            from backend.logica.pago_trabajo import aplicar_resultado
+            from backend.logica.perfil_economia import perfil_de
+            aviso = aplicar_resultado(perfil_de(datos["jugador"]), datos["trabajo"], resultado)["mensaje"]
+
+        def volver():
+            self._volver_al_mundo()
+            if aviso:
+                self._avisar_en_el_mundo(aviso)
+
+        self._con_transicion(volver)
+
+    # Aviso breve sobre el mundo (usa el aviso temporal de la economía si existe; si no, el aviso genérico).
+    def _avisar_en_el_mundo(self, texto):
+        escena = self.cinematicas
+        economia = getattr(escena, "economia", None)
+        temporal = getattr(economia, "aviso_temporal", None)
+        try:
+            if callable(temporal):
+                temporal(texto)
+            else:
+                escena.hud.mostrar_aviso(texto)
+        except Exception:
+            pass
 
     # Espacio / Enter: salta lo primero que esté en curso (en el orden de `saltadores`; cada uno
     # devuelve True si actuó). Una pulsación no salta dos cosas a la vez.
@@ -155,9 +228,42 @@ class ConexionFlujo:
         except BaseException:  # noqa: BLE001
             pass
 
+    # True si el lugar NO tiene edificio (mapa grande: Campo de Várzea, Feira da Ladeira, Mirante do Alto): no hay puerta
+    # ni sala interior que mostrar. Un mapa sin `edificio_de` (los falsos de las pruebas) cuenta como «con edificio».
+    def _sin_edificio(self, lugar):
+        edificio_de = getattr(self._mapa, "edificio_de", None)
+        if edificio_de is None:
+            return False
+        try:
+            edificio_de(lugar)
+        except ValueError:
+            return True
+        return False
+
+    # Lugar al aire libre: fundido con el nombre del lugar -> JUEGO con el marco del monitor (sin cinemática de puerta
+    # ni interior). Al terminar el lote vuelve por el camino sin interior (`_salir_del_edificio`).
+    def _entrar_al_aire_libre(self, flujo, contexto):
+        jugador, mision = contexto["jugador"], contexto["mision"]
+        titulo = self._titulo_del_lugar(mision.destino)
+
+        def abrir_juego():
+            try:
+                self._gestor.cambiar_a(
+                    JUEGO, jugador=jugador, estado=contexto["estado"], mision=mision,
+                    al_terminar=self.terminar_mision, grafo_social=self._grafo_social,
+                    marco=True, lugar=titulo)
+            except BaseException:
+                self._revertir_al_mundo(flujo)
+                raise
+
+        self._con_transicion_lugar(abrir_juego, texto=titulo)
+
     def _entrar_al_edificio(self, flujo, contexto):
         jugador, mision = contexto["jugador"], contexto["mision"]
         lugar, titulo = mision.destino, self._titulo_del_lugar(mision.destino)
+        if self._sin_edificio(lugar):
+            self._entrar_al_aire_libre(flujo, contexto)
+            return
 
         def abrir_juego():
             try:
@@ -195,6 +301,9 @@ class ConexionFlujo:
         flujo = self.flujo
         saliente, lugar = flujo.jugador_activo(), flujo.mision_actual().destino
         flujo.completar_mision(resultado)       # el modelo avanza en el acto: pasa el turno
+        if self._sin_edificio(lugar):           # al aire libre: no hay interior ni puerta; fundido y de vuelta al mundo
+            self._con_transicion(self._volver_al_mundo)
+            return
 
         def salir_al_mundo():
             def abrir_mundo():

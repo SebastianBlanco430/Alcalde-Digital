@@ -160,7 +160,11 @@ def imagen_inicio(rol, nombre_rol, color_rol, jugador, lugar):
         _texto(d, (x, 416), nombre, 30, estilo.COLOR_TEXTO_TENUE)
         x_chip += d.textlength(nombre, font=_fuente(30)) + 24
     if lugar:
-        _chip(d, x_chip, 408, _ajustar(d, nombre_visible(lugar, corto=True), 28, ancho * 0.5, True))
+        # el chip usa todo el ancho que queda a la derecha del jugador (antes, como mucho la mitad: «Universidade de Ciudad N…»)
+        disponible = max(ancho * 0.5, ancho - (x_chip - x) - 40)
+        texto_lugar = nombre_visible(lugar, corto=True)
+        px_lugar = _px_que_cabe(d, texto_lugar, 28, 20, disponible, True)
+        _chip(d, x_chip, 408 + (28 - px_lugar) // 2, _ajustar(d, texto_lugar, px_lugar, disponible, True), px_lugar)
     _texto(d, (x, 478), pmc.TEXTO_CARGA, 28, estilo.COLOR_TEXTO)
     x0, y0, x1, y1 = pmc.CAJA_BARRA
     d.rounded_rectangle(pmc.CAJA_BARRA, 10, fill=_rgba(estilo.COLOR_BARRA_FONDO), outline=_rgba(estilo.TINTA),
@@ -179,7 +183,7 @@ def imagen_cierre(rol, nombre_rol, color_rol, lugar, resultado):
     x = pmc.CAJA_BARRA[0]
     ancho = pmc.CAJA_TARJETA[2] - x - 40
     despedida = glosar_texto(pmc.despedida(nombre_rol))
-    px = _px_que_cabe(d, despedida, 52, 36, ancho, True)
+    px = _px_que_cabe(d, despedida, 52, 26, ancho, True)
     _texto(d, (x, 288 + (52 - px) // 2), _ajustar(d, despedida, px, ancho, True), px, estilo.PAPEL,
            negrita=True, contorno=4)
     resumen = pmc.resumen_cierre(resultado, estilo.ETIQUETAS_INDICADORES)

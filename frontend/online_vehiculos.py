@@ -21,6 +21,7 @@
 from ursina import destroy
 
 from backend.logica.roles import ROLES
+from backend.red import protocolo
 from backend.red.saneado import sanear_texto_visible
 from frontend import online_vehiculos_calculos as ovc
 from frontend import vehiculo_calculos as vc
@@ -60,6 +61,7 @@ class VehiculosOnline:
         self.escena = escena
         self.integ = escena.vehiculos
         self.mundo = self.integ.mundo
+        self.mundo.recortar(protocolo.N_VEHICULOS_MAX)     # tope del protocolo v4: 24 (el grande los usa todos; el chico tiene 8)
         self.flujo = flujo
         self._avisar = avisar or (lambda texto: None)
         self._obtener_bucle = obtener_bucle or (lambda: None)

@@ -13,7 +13,7 @@ import sys
 import threading
 
 from backend.datos.ciudad_3d import ESCALA_MUNDO, SEMILLA_CASAS, construir_mundo_3d
-from backend.datos.misiones_semilla import CATALOGO_MISIONES
+from backend.datos.misiones_semilla import CATALOGO_MISIONES, catalogo_de_mundo
 from backend.datos.noticias_semilla import construir_arboles
 from backend.grafos.grafo_social import construir_grafo_social_ejemplo
 from backend.logica.estado_partida import EstadoPartida
@@ -24,20 +24,34 @@ from backend.red.partida_coop import MazoSembrado, PartidaCooperativa
 RADIO_INTERACCION = 2.0     # m: igual que main.py (distancia a la puerta para «llegué»)
 
 
+def _construir_mundo(semilla):
+    """El mismo mundo que el juego local (frontend/mundo_config: ALCALDE_MAPA_GRANDE; por defecto el mapa grande)."""
+    try:
+        from frontend import mundo_config
+        grande = mundo_config.mapa_grande_activo()
+    except Exception:
+        grande = False
+    if grande:
+        from backend.datos.ciudad_grande import construir_mundo_grande
+        return construir_mundo_grande(semilla=semilla)
+    return construir_mundo_3d(semilla=semilla)
+
+
 def construir_anfitrion(puerto=0, ambito="lan", semilla=SEMILLA_CASAS, abierto=False, mundo=None,
                         partida_opciones=None, **opciones):
     """Arma mundo + partida + anfitrión (sin arrancarlo). `opciones` pasan a Anfitrion;
     `mundo` reutiliza uno ya construido (pruebas); `partida_opciones` pasa a PartidaCooperativa."""
     codigo = opciones.pop("codigo", None) or huellas.generar_codigo_sala(
         huellas.LARGO_CODIGO_ABIERTO if ambito == "abierto" else huellas.LARGO_CODIGO)
-    mundo = mundo if mundo is not None else construir_mundo_3d(semilla=semilla)
+    mundo = mundo if mundo is not None else _construir_mundo(semilla)
+    catalogo = catalogo_de_mundo(mundo)       # el grande con el mapa grande; el de siempre con el chico
     arbol_noticias, arbol_stats = construir_arboles()
     estado = EstadoPartida(arbol_noticias, arbol_stats, mazo=MazoSembrado(arbol_noticias, semilla))
     partida = PartidaCooperativa(
-        estado, mundo, CATALOGO_MISIONES, grafo_social=construir_grafo_social_ejemplo(),
+        estado, mundo, catalogo, grafo_social=construir_grafo_social_ejemplo(),
         escala_mundo=ESCALA_MUNDO, punto_interaccion=mundo.punto_interaccion,
         radio_interaccion=RADIO_INTERACCION, **(partida_opciones or {}))
-    h_mundo, h_contenido = calcular_huellas(mundo, semilla, CATALOGO_MISIONES)
+    h_mundo, h_contenido = calcular_huellas(mundo, semilla, catalogo)
     return Anfitrion(partida, mundo, semilla, codigo, h_mundo, h_contenido, ambito=ambito,
                      puerto=puerto, abierto=abierto, **opciones)
 
