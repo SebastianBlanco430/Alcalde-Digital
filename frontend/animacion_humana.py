@@ -25,6 +25,7 @@ FPS = 30.0
 PREFIJO_MARCHA = "HumMarcha"
 CLIP_ESCALON = "HumEscalon"
 CLIPS_SALTO = {"impulso": "HumImpulso", "ascenso": "HumAscenso", "caida": "HumCaida", "aterrizaje": "HumAterrizaje"}
+CLIPS_GESTO = {"dar": "HumEntregar", "recibir": "HumRecibir"}     # poses de 1 fotograma (traspaso de mano a mano)
 NOMBRES_MARCHA = tuple(f"{PREFIJO_MARCHA}{i}" for i in range(len(ac.VELS)))
 TIEMPO_MEZCLA = 0.14             # s para cambiar de clip
 TIEMPO_GESTO = 0.32              # s para entrar y SALIR de Saludar/Hablar (cambio de pose grande: más suave)
@@ -351,6 +352,8 @@ def hornear_clips(modelo_np, rol):
         clips.append((CLIP_ESCALON, [ac.pose_escalon(k / FOTOGRAMAS, m) for k in range(FOTOGRAMAS)]))
         for etapa, nombre in CLIPS_SALTO.items():
             clips.append((nombre, [ac.pose_salto(etapa, m)]))
+        for gesto, nombre in CLIPS_GESTO.items():
+            clips.append((nombre, [ac.pose_gesto(gesto, m)]))
         for nombre, poses in clips:
             banco = _construir_clip(esq, nombre, poses)
             personaje.attachNewNode(AnimBundleNode("rig", banco))
@@ -413,6 +416,11 @@ class AnimadorHumano:
             k = ac._suave(self.t_aterrizaje / ac.DURACION_ATERRIZAJE)
             suelo = {c: w * (1 - k) for c, w in suelo.items()}
             suelo[CLIPS_SALTO["aterrizaje"]] = k
+        g = getattr(p, "_gesto_peso", 0.0)
+        if g > 0.0 and suelo == {IDLE: 1.0}:      # gesto de mano solo si está quieto; con g == 0 todo queda como antes
+            clip = getattr(p, "_gesto_clip", None)
+            if clip in CLIPS_GESTO.values():
+                return {IDLE: 1 - g, clip: g}, 0.0
         return suelo, cadencia
 
     def _objetivo_suelo(self):
@@ -458,7 +466,7 @@ class AnimadorHumano:
         actor = self.actor
         self.reproduciendo.add(clip)
         self.tasas.pop(clip, None)
-        if clip in CLIPS_SALTO.values():
+        if clip in CLIPS_SALTO.values() or clip in CLIPS_GESTO.values():
             actor.pose(clip, 0)
             return
         if clip in NOMBRES_MARCHA or clip == CLIP_ESCALON:
@@ -477,7 +485,7 @@ class AnimadorHumano:
         self.p._iniciar_loop(clip)
 
     def _tasa(self, clip, cadencia):
-        if clip in CLIPS_SALTO.values():
+        if clip in CLIPS_SALTO.values() or clip in CLIPS_GESTO.values():
             return
         if self.congelado:
             tasa = 0.0

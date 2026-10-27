@@ -273,10 +273,12 @@ def _proponer(azar, barrio, x_izq, z_fila, prof, reduccion):
 
 
 # Casas del barrio: filas de izquierda a derecha, con los filtros de la clase _Barrio. `cantidad`
-# es el tope. `limites` es el rectángulo (xmin, xmax, zmin, zmax) donde puede haber casas.
-def generar_casas(mapa, edificios, despeje, previos, terreno, zonas, limites, semilla, cantidad=CANTIDAD_BARRIO):
+# es el tope. `limites` es el rectángulo (xmin, xmax, zmin, zmax) donde puede haber casas. `fabrica_barrio` construye
+# el estado de la generación (por defecto _Barrio; barrio_indexado._BarrioIndexado da el mismo resultado con índices).
+def generar_casas(mapa, edificios, despeje, previos, terreno, zonas, limites, semilla, cantidad=CANTIDAD_BARRIO,
+                   fabrica_barrio=_Barrio):
     azar = random.Random(semilla + SEMILLA_BARRIO)
-    barrio = _Barrio(mapa, edificios, despeje, previos, terreno, zonas, limites)
+    barrio = fabrica_barrio(mapa, edificios, despeje, previos, terreno, zonas, limites)
     x0, x1, z0, z1 = limites
     casas = []
     z_fila = z0

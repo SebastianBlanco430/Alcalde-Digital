@@ -24,6 +24,7 @@ from frontend.piezas import silenciar
 from frontend.piloto_glb import crear_piloto_skin
 from frontend.vehiculo_modelo import ELEVACION_SUELO, VehiculoModelo
 
+N_VEHICULOS_GRANDE = 24        # vehículos aparcados en el mapa grande (el chico conserva 8)
 TEXTO_MONTAR = "E: montar {nombre}"
 TEXTO_BAJAR = "E: bajar de la {nombre}"
 SEGUNDOS_RATON = 1.5           # tras mover el ratón la cámara no se recoloca sola durante este tiempo
@@ -82,6 +83,17 @@ class MundoVehiculos(Entity):
         self._reutilizado = False
         for p in vc.puntos_de_aparcamiento(mundo, n=n, semilla=semilla):
             self.colocar(p)
+
+    # Deja solo los `n` primeros vehículos (online: el protocolo v4 admite N_VEHICULOS_MAX = 24; los primeros n son los
+    # mismos en todos los equipos porque puntos_de_aparcamiento elige de forma incremental).
+    def recortar(self, n):
+        if self.conduciendo:
+            return
+        while len(self.vehiculos) > n:
+            sobrante = self.vehiculos.pop()
+            sobrante.modelo.enabled = False
+            from frontend.componentes import destruir_arbol       # destroy() no destruye a los hijos
+            destruir_arbol(sobrante.modelo)
 
     def colocar(self, aparcado):
         modelo = VehiculoModelo(aparcado.tipo, aparcado.indice, parent=self)
@@ -237,8 +249,10 @@ def teclas_turbo_caballito(shift):
 #   - avanzar(controlador, h, v, dt, correr): lo llama ControladorJugador.avanzar mientras se conduce.
 class IntegracionVehiculos:
 
-    def __init__(self, escena, n=8):
+    def __init__(self, escena, n=None):
         self.escena = escena
+        if n is None:       # mapa grande: más vehículos repartidos por todo el mapa; el chico, los 8 de siempre
+            n = N_VEHICULOS_GRANDE if hasattr(escena._mundo, "contenido_de_chunk") else 8
         self.mundo = MundoVehiculos(escena._mundo, n=n, parent=escena)
         self.jugador = None
         self._texto = None

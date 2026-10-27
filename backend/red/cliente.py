@@ -309,6 +309,11 @@ class ClienteRed:
     def enviar_bajar(self):
         return self._enviar_critico({"t": "bajar"})
 
+    # v4: pedir un viaje rápido (mototáxi / teleférico) a `destino` (id de protocolo.DESTINOS_VIAJE). El anfitrión responde
+    # viaje_ok{destino,x,z,y} o viaje_no{motivo}.
+    def enviar_viaje(self, destino):
+        return self._enviar_critico({"t": "viaje", "destino": str(destino)})
+
     def enviar_saludo(self, indice):
         return self._enviar_critico({"t": "saludo_rapido", "indice": indice})
 

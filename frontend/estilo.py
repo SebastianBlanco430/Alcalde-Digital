@@ -16,7 +16,7 @@ COLOR_BARRA_MEDIO = (215, 180, 60)    # 34 <= valor <= 66: zona intermedia
 COLOR_BARRA_ALTO = (80, 190, 110)     # valor > 66: zona saludable
 
 COLOR_BOTON = (70, 90, 150)
-COLOR_BOTON_RESALTADO = (95, 118, 185)
+COLOR_BOTON_RESALTADO = (80, 102, 168)   # texto claro encima: contraste >4,5 (antes 95,118,185 = 3,9)
 COLOR_BOTON_DESHABILITADO = (55, 57, 70)
 COLOR_BOTON_TEXTO = (240, 240, 245)
 COLOR_ACENTO = (255, 220, 60)           # amarillo del destino; reservado para el botón primario
@@ -100,6 +100,20 @@ COLORES_LUGAR = {
     "Escola de Samba": (220, 60, 160),
     "Rádio": (110, 190, 60),
     "Estação do Teleférico": (120, 130, 160),
+    # Mapa grande
+    "Posto de Saúde Vila Nova": (46, 160, 130),
+    "Ponto de Mototáxi da Entrada": (240, 150, 40),
+    "Padaria Pão Quente": (220, 150, 60),
+    "Supermercado Dois Irmãos": (200, 70, 60),
+    "Oficina do Seu Zé": (230, 170, 40),
+    "Bar do Cabo": (190, 90, 50),
+    "Igreja Nossa Senhora da Esperança": (120, 150, 200),
+    "Escola Municipal Paulo Freire": (60, 130, 220),
+    "Salão da Dona Lu": (210, 80, 140),
+    "Campo de Várzea": (90, 170, 70),
+    "Feira da Ladeira": (230, 120, 90),
+    "Mirante do Alto": (150, 120, 190),
+    "Estação Alto do Morro": (110, 130, 170),
 }
 
 # --- Roles de personaje propuestos (decisión del dueño, T15; aún NO usados) ---

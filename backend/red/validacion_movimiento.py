@@ -32,7 +32,7 @@ TOLERANCIA = 1.15                       # margen sobre lo legítimo (latencia, r
 VELOCIDAD_MAX_A_PIE = VELOCIDAD_CORRER * PENDIENTE_FACTOR_MAXIMO * TOLERANCIA
 # vturbo de frontend/vehiculo_calculos.PERFILES (copia respaldo si no se puede importar; hay test de paridad).
 VTURBO_RESPALDO = {"bicicleta": 9.2, "moto": 20.0}
-RESERVA_S = 0.5                         # segundos de recorrido que puede acumular el cubo
+RESERVA_S = 1.0                         # segundos de recorrido que puede acumular el cubo
 # --- Altura ------------------------------------------------------------------------------------------------
 MARGEN_SUELO = 0.3                      # m: por debajo del suelo con escaleras menos esto = infracción
 MARGEN_VERTICAL = 0.5                   # m de holgura en |Δy| (peldaños suavizados, lag)
@@ -118,6 +118,7 @@ class ValidadorMovimiento:
         self.veh = None
         self.veh_autorizado = SIN_CONTROL_VEHICULO
         self._t_bajada = -1e9
+        self._veh_viejo_tolerado = False      # ver tolerar_bajada()
         self.tiene_posicion = False
         self.fichas = 0.0                 # metros de presupuesto disponibles
         self._t_ultimo = None             # reloj del último pos aceptado (o de colocar)
@@ -153,6 +154,12 @@ class ValidadorMovimiento:
     def olvidar_vehiculo(self):
         self.veh_autorizado = SIN_CONTROL_VEHICULO
 
+    # Tras una RECONEXIÓN el cliente aún puede mandar un latido de su última posición declarando el vehículo que llevaba
+    # (la sala ya lo bajó): durante GRACIA_BAJADA se toma como «a pie», sin infracción, igual que tras una bajada normal.
+    def tolerar_bajada(self, ahora=None):
+        self._t_bajada = self.reloj() if ahora is None else ahora
+        self._veh_viejo_tolerado = True       # y los latidos siguientes, hasta el primer `pos` a pie (no depende del reloj)
+
     # Estado que el anfitrión publica en los snapshots de este jugador.
     def estado(self):
         return {"x": self.x, "z": self.z, "y": self.y, "r": self.r, "v": self.v, "f": self.f, "veh": self.veh}
@@ -183,10 +190,12 @@ class ValidadorMovimiento:
         if veh is not None and veh not in self.vturbo:
             return self._rechazar("vehiculo", n)
         autoridad = self.veh_autorizado is not SIN_CONTROL_VEHICULO
+        if veh is None:
+            self._veh_viejo_tolerado = False
         if autoridad:
             # Reclamar un vehículo que el anfitrión no ha concedido (o uno distinto) es trampa o un error grave.
             if veh is not None and veh != self.veh_autorizado:
-                if self.veh_autorizado is None and t - self._t_bajada <= GRACIA_BAJADA:
+                if self.veh_autorizado is None and (t - self._t_bajada <= GRACIA_BAJADA or self._veh_viejo_tolerado):
                     veh = None                   # recién bajado: el latido de 2 Hz repite la última posición
                 else:
                     return self._rechazar("vehiculo", n)
@@ -245,10 +254,10 @@ class ValidadorMovimiento:
             return "tipos"
         for clave, tope in (("x", LIMITE_COORD), ("z", LIMITE_COORD), ("y", LIMITE_Y), ("r", LIMITE_RUMBO)):
             valor = pos[clave]
-            if not _es_numero(valor) or not math.isfinite(valor) or abs(valor) > tope:
+            if not _es_numero(valor) or abs(valor) > tope or not math.isfinite(valor):
                 return "tipos"
         valor = pos["v"]
-        if not _es_numero(valor) or not math.isfinite(valor) or not (0.0 <= valor <= LIMITE_VELOCIDAD):
+        if not _es_numero(valor) or not (0.0 <= valor <= LIMITE_VELOCIDAD) or not math.isfinite(valor):
             return "tipos"
         veh = pos.get("veh")
         if veh is not None and (not isinstance(veh, str) or len(veh) > 16):

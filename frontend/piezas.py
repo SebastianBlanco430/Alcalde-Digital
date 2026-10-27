@@ -84,6 +84,26 @@ def etiqueta(texto, **opciones):
     return texto_3d
 
 
+# Acota el tamaño aparente de la etiqueta (frontend/etiqueta_calculos.py): cada frame, con la cámara cerca, la escala
+# baja con la distancia para que en pantalla no pase de lo que mide a DISTANCIA_REFERENCIA. Nunca lanza. Lo llama el
+# update() de cada personaje (la etiqueta está silenciada: no tiene el suyo).
+def limitar_etiqueta(texto_3d):
+    try:
+        if not texto_3d.enabled:
+            return
+        from ursina import camera
+        from frontend.etiqueta_calculos import escala_limitada
+        base = getattr(texto_3d, "escala_base", None)
+        if base is None:
+            base = texto_3d.escala_base = texto_3d.scale_x
+        distancia = (camera.world_position - texto_3d.world_position).length()
+        nueva = escala_limitada(base, distancia)
+        if abs(nueva - texto_3d.scale_x) > 1e-3:
+            texto_3d.scale = nueva
+    except Exception:
+        pass
+
+
 # Segmentos sueltos (vértices de a pares) en un solo Geom. Mesh(mode="line") de Ursina los uniría
 # todos en una sola línea continua.
 def lineas_sueltas(vertices):

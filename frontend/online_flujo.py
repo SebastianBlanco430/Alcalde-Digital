@@ -28,7 +28,7 @@ import logging
 import time
 
 from backend.datos.ciudad_3d import ESCALA_MUNDO
-from backend.datos.misiones_semilla import CATALOGO_MISIONES
+from backend.datos.misiones_semilla import CATALOGO_MISIONES, catalogo_de_mundo
 from backend.datos.noticias_semilla import construir_arboles
 from backend.logica.estado_partida import NOMBRES_INDICADORES, VALOR_INICIAL, recortar
 from backend.logica.flujo_partida import MENSAJE_SIN_MISIONES
@@ -223,7 +223,7 @@ class FlujoEnLinea:
         self._mundo = mundo
         self._reloj = reloj
         self._escala = escala_mundo
-        self._catalogo = tuple(CATALOGO_MISIONES if catalogo is None else catalogo)
+        self._catalogo = tuple(catalogo_de_mundo(mundo) if catalogo is None else catalogo)
         self._por_id = {m.id: m for m in self._catalogo}
         if arboles is None:
             arboles = construir_arboles()
@@ -244,6 +244,7 @@ class FlujoEnLinea:
         self._teletransportes = set()
         self._correccion = None
         self.vehiculos_snap = []        # T9: último `veh` del snapshot [{i,k,x,z,r,p?}] (vacío sin VEHICULOS_ONLINE)
+        self.eventos_viaje = []         # v4: viaje_ok / viaje_no por consumir (frontend/viaje_rapido.py)
         self.eventos_vehiculo = []      # T9: monta_ok / monta_no / desmontado por consumir (IntegracionVehiculosOnline)
 
         # Estado de la partida / interacción
@@ -502,6 +503,22 @@ class FlujoEnLinea:
 
     def tomar_eventos_vehiculo(self):
         eventos, self.eventos_vehiculo = self.eventos_vehiculo, []
+        return eventos
+
+    # v4: respuestas del anfitrión a `viaje`. NO mueven al jugador aquí: la escena reubica con el fundido en negro
+    # (frontend/viaje_rapido.py); si no hay escena de viaje el evento se descarta (tope de 8).
+    def _ev_viaje_ok(self, ev):
+        self._encolar_viaje(ev)
+
+    def _ev_viaje_no(self, ev):
+        self._encolar_viaje(ev)
+
+    def _encolar_viaje(self, ev):
+        self.eventos_viaje.append(dict(ev))
+        del self.eventos_viaje[:-8]
+
+    def tomar_eventos_viaje(self):
+        eventos, self.eventos_viaje = self.eventos_viaje, []
         return eventos
 
     def _ev_corregir(self, ev):

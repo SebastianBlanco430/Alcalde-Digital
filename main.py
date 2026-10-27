@@ -20,12 +20,13 @@ from backend.logica.estado_partida import EstadoPartida
 from backend.logica.flujo_partida import FlujoPartida
 from backend.logica.misiones import SistemaMisiones
 from backend.logica.sesion import SesionJuego
-from frontend import online_config
+from frontend import economia_config, online_config
 from frontend import compat_macos, daltonismo, diseno_adaptable, estilo, medidor_fps, tipografia
 from frontend import gpu_dedicada, rendimiento, telemetria
 from frontend import audio_enganches      # sonido: observa el juego y dispara efectos/música (frontend/audio.py)
+from frontend import mundo_config      # bandera del mapa grande (MAPA_GRANDE / ALCALDE_MAPA_GRANDE); apagada = el mundo de siempre
 from frontend.componentes import preparar_fuente, rgb
-from frontend.conexion_flujo import INICIO, INTERIOR, JUEGO, MUNDO, SELECCION_ROL, ConexionFlujo
+from frontend.conexion_flujo import INICIO, INTERIOR, JUEGO, MUNDO, SELECCION_ROL, TRABAJO, ConexionFlujo
 from backend.logica import ajustes as ajustes_jugador
 from frontend.escenas.escena_ajustes import AJUSTES_ESCENA, EscenaAjustes
 from frontend.escenas.escena_inicio import EscenaInicio
@@ -33,6 +34,7 @@ from frontend.escenas.escena_interior import EscenaInterior
 from frontend.escenas.escena_juego import EscenaJuego
 from frontend.escenas.escena_mundo import EscenaMundo
 from frontend.escenas.escena_seleccion_rol import EscenaSeleccionRol
+from frontend.escenas.escena_trabajo import EscenaTrabajo
 from frontend.gestor_escenas import GestorEscenas
 from frontend import guion_cinematicas
 from frontend.transicion import Transicion
@@ -104,9 +106,14 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
     # duracion_cinematica: factor de las cinemáticas de entrar/salir de un edificio (0 = instantáneas)
     # y del negro con el nombre del lugar.
     def crear_flujo(sesion):
-        return FlujoPartida(sesion, SistemaMisiones(
-            mundo, CATALOGO_MISIONES, radio_interaccion=RADIO_INTERACCION,
+        flujo = FlujoPartida(sesion, SistemaMisiones(
+            mundo, mundo_config.catalogo_misiones(mundo), radio_interaccion=RADIO_INTERACCION,
             punto_interaccion=mundo.punto_interaccion))
+        if economia_config.ECONOMIA:     # paga las misiones y recupera fatiga (backend/logica/flujo_economia.py)
+            from backend.logica.flujo_economia import FlujoConEconomia
+            from frontend.economia_mundo import catalogo_activo
+            flujo = FlujoConEconomia(flujo, catalogo_activo())
+        return flujo
 
     transicion = Transicion(duracion_transicion, duracion_transicion)
     # Fundido de la entrada a un edificio: sale a negro, se queda en negro con el nombre del lugar, vuelve.
@@ -145,6 +152,14 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
     escena_interior = EscenaInterior(escala_tiempo=duracion_cinematica)
     gestor.registrar(INTERIOR, escena_interior)
     gestor.registrar(JUEGO, EscenaJuego())
+    gestor.registrar(TRABAJO, EscenaTrabajo())
+    if escena_mundo.economia is not None:      # E en un puesto de trabajo (frontend/trabajo_mundo.py) -> escena de trabajo
+        iniciar = lambda puesto: _trabajar(puesto, conexion, activa, escena_mundo)
+        if economia_config.TRABAJOS:
+            from frontend import trabajo_mundo
+            trabajo_mundo.conectar(escena_mundo.economia, iniciar)
+        else:
+            escena_mundo.economia.al_trabajar = iniciar
     # Orden de salto: primero los fundidos, luego las cinemáticas.
     conexion.saltadores = [transicion_lugar.saltar, transicion.saltar, escena_mundo.saltar_cinematica,
                            escena_interior.saltar_cinematica]
@@ -153,6 +168,14 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
         _conectar_online(gestor, mundo, conexion, activa, escena_mundo, transicion, transicion_lugar,
                          al_empezar_online, arranque_online)
     return conexion
+
+
+# Trabajar: con una partida en línea activa solo avisa (TRABAJO_ONLINE = False en frontend/economia_config.py).
+def _trabajar(puesto, conexion, activa, escena_mundo):
+    if activa[0] is not conexion and not economia_config.TRABAJO_ONLINE:
+        escena_mundo.hud.mostrar_aviso("Trabajar aún no está disponible en línea")
+        return False
+    return activa[0].iniciar_trabajo(puesto)
 
 
 # Partida online real (solo con ONLINE): crea la ConexionEnLinea (misma cadena de escenas y fundidos que el hot-seat) y
@@ -217,7 +240,7 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
 
     gestor = GestorEscenas()
     semilla = leer_semilla()
-    registrar_escenas(gestor, construir_mundo_3d(semilla=semilla), duracion_transicion, duracion_cinematica,
+    registrar_escenas(gestor, mundo_config.construir_mundo_activo(semilla), duracion_transicion, duracion_cinematica,
                       semilla=semilla)
     audio_enganches.instalar(gestor)       # AUDIO = False (frontend/audio.py) o ALCALDE_SIN_AUDIO=1 lo dejan mudo
     gestor.cambiar_a(INICIO)

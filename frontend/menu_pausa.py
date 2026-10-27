@@ -18,6 +18,7 @@ ANCHO, ALTO = 0.74, 0.70        # antes 0.60 de ancho: la guía de teclas creci�
 ALTO_CON_AJUSTES = 0.80      # con el botón «Ajustes» el panel crece (4 botones en vez de 3)
 Z_FRENTE = -50
 ALFA_VELO = 170
+ALFA_VELO_AJUSTES = 245     # con «Ajustes» abierto el HUD del mundo no debe asomar por detrás
 ANCHO_BOTON = 0.42
 ALTO_BOTON = a_unidades(56)
 
@@ -123,6 +124,7 @@ class MenuPausa(Entity):
                                      if e is not self.velo and e is not self.pantalla_ajustes and e.enabled]
         for entidad in self._ocultos_por_ajustes:
             entidad.enabled = False
+        self.velo.color = color.rgba32(*estilo.TINTA, ALFA_VELO_AJUSTES)
         self.pantalla_ajustes.abrir()
 
     # ¿Escape pertenece a «Ajustes»? True si está abierta o se cerró en este mismo frame con ese Escape (el controlador
@@ -140,6 +142,7 @@ class MenuPausa(Entity):
         for entidad in self._ocultos_por_ajustes:
             entidad.enabled = True
         self._ocultos_por_ajustes = []
+        self.velo.color = color.rgba32(*estilo.TINTA, ALFA_VELO)
         foco = getattr(self, "foco", None)
         if foco is not None:
             foco.reiniciar()

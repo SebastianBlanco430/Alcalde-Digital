@@ -36,6 +36,8 @@ Notas para quien entre en una sala:
 - **No hay chat libre**: no se envía texto escrito por ti, salvo el alias.
 - No se recolecta ubicación geográfica real, contactos, cámara ni micrófono.
 - Los datos del juego (personas, misiones, dinero) son **ficticios**.
+- El **inventario, el dinero (R$) y el cansancio son locales**: no se envían en el modo online ni se guardan en
+  el equipo del anfitrión. Ver `docs/CONTENIDO_Y_CLASIFICACION.md` para el contenido y la clasificación.
 
 ## 3. Sin cifrado ni verificación del anfitrión
 

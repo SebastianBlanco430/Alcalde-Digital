@@ -376,12 +376,12 @@ class EscenaSeleccionRol(Escena):
             return
         self._candidata = rol
         self._actualizar_candidata()
-        # Con el teclado, el foco salta a «Seleccionar» para confirmar con Enter.
-        if self.foco.visible:
-            lista = self.foco.controles()
-            if self.boton_seleccionar in lista:
-                self.foco.indice = lista.index(self.boton_seleccionar)
-                self.foco._aplicar()
+        # El foco salta a «Seleccionar» para confirmar con Enter (también tras elegir con el ratón: el anillo
+        # solo se ve si ya se usaba el teclado, `foco.visible` no cambia).
+        lista = self.foco.controles()
+        if self.boton_seleccionar in lista:
+            self.foco.indice = lista.index(self.boton_seleccionar)
+            self.foco._aplicar()
 
     # Confirma la candidata como rol del jugador actual (no hace nada si no hay candidata).
     def confirmar_candidata(self):

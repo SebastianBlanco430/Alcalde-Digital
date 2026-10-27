@@ -307,7 +307,7 @@ ESTILOS_BOTON = {
 # Variante roja para acciones de denuncia (la usa la red social de la escena de juego). Se añade
 # aquí, aparte de los dos estilos de arriba, que no cambian.
 ESTILOS_BOTON["peligro"] = {
-    "normal": estilo.ESTADO_ERROR, "hover": (232, 88, 88), "presionado": (170, 44, 44),
+    "normal": estilo.ESTADO_ERROR, "hover": (190, 48, 48), "presionado": (170, 44, 44),
     "texto": (250, 244, 228),
 }
 ESCALA_HOVER = 1.04
