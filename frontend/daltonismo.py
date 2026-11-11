@@ -11,6 +11,11 @@
 # Con modo 'ninguno' / intensidad 0 el pase se DESMONTA por completo (coste cero y imagen idéntica a la de
 # siempre): solo se paga el búfer extra cuando hay un filtro activo.
 #
+# PASE ÚNICO con el pixelado (frontend/pixelado.py): este FiltroPantalla es el único dueño del FilterManager. Si hay
+# pixelado (divisor > 1) se añade una etapa intermedia (mundo en búfer pequeño -> ampliado NEAREST a resolución nativa,
+# con la interfaz dibujada encima, nítida) y el cuadrado final aplica la matriz de color (o ninguna). Con daltonismo y
+# pixelado apagados no se monta nada.
+#
 # No toca el contorno de tinta ni las luces/sombras: es un pase de post-proceso después de dibujar todo.
 # Bandera reversible: DALTONISMO = False impide instalarlo (los ajustes se guardan igual, pero no se aplican).
 # Trampa (nota 18): el shader va en el cuadrado del filtro, nunca en entidades del mundo; al desmontar
@@ -19,6 +24,7 @@
 from panda3d.core import Shader, Texture, LVecBase3f
 
 from frontend import daltonismo_calculos as calc
+from frontend import pixelado
 
 DALTONISMO = True           # bandera reversible: False = sin filtro de pantalla
 
@@ -70,7 +76,7 @@ def _vec(fila):
     return LVecBase3f(*[float(v) for v in fila])
 
 
-# Pase de pantalla: se monta y desmonta; `aplicar` decide según el modo.
+# Pase de pantalla: se monta y desmonta; `aplicar` (color) y `fijar_pixelado` (resolución) deciden qué hace falta.
 class FiltroPantalla:
 
     def __init__(self):
@@ -78,37 +84,76 @@ class FiltroPantalla:
         self._quad = None
         self._region_ui = None
         self._region_ui_original = None
-        self._textura = None
+        self._textura = None            # lo que dibuja la cámara 3D
+        self._textura_final = None      # lo que lee el cuadrado de la ventana (= _textura, o la etapa nativa)
+        self._topologia = None          # "simple" (un búfer) | "pixel" (búfer pequeño + búfer nativo)
         self.activo = False
-        self.ultimo = None          # (matriz, desplazamiento) aplicados, para pruebas
+        self.ultimo = None              # (matriz, desplazamiento) aplicados, para pruebas
+        self._color = None              # (matriz, desplazamiento) pedidos, o None = sin filtro de color
+        self.divisor = 1.0              # pixelado pedido (1 = nativo)
 
     # Aplica `modo` con `intensidad` (y `simular`): monta, actualiza o desmonta el pase. Devuelve True si
-    # queda un filtro activo. Nunca lanza: si algo falla se desmonta y se sigue sin filtro.
+    # queda un filtro de color activo. Nunca lanza: si algo falla se desmonta y se sigue sin filtro.
     def aplicar(self, modo, intensidad=1.0, simular=False):
         if not DALTONISMO or calc.es_identidad(modo, intensidad, simular):
+            self._color = None
+        else:
+            self._color = calc.parametros(modo, intensidad, simular)
+        self._reconciliar()
+        return self.ultimo is not None
+
+    # Pide el pixelado: `divisor` 1 = nativo (sin etapa), 4 = el mundo a un cuarto de resolución. Devuelve True si queda
+    # una etapa de pixelado montada.
+    def fijar_pixelado(self, divisor):
+        try:
+            divisor = float(divisor)
+        except (TypeError, ValueError):
+            divisor = 1.0
+        self.divisor = divisor if divisor == divisor and divisor > 1.0 else 1.0
+        self._reconciliar()
+        return self.activo and self._topologia == "pixel"
+
+    def _reconciliar(self):
+        con_color = DALTONISMO and self._color is not None
+        con_pixel = pixelado.PIXELADO and self.divisor > 1.0
+        if not con_color and not con_pixel:
             self.desmontar()
             self.ultimo = None
-            return False
-        matriz, desplaza = calc.parametros(modo, intensidad, simular)
+            return
+        topologia = "pixel" if con_pixel else "simple"
         try:
+            if self.activo and self._topologia != topologia:
+                self.desmontar()
             if not self.activo:
-                self._montar()
-            self._fijar(matriz, desplaza)
+                self._montar(topologia)
+            if topologia == "pixel":
+                pixelado.fijar_divisor(self._fm, self.divisor)
+            self._fijar(self._color if con_color else None)
         except Exception as error:      # pragma: no cover - GPU/driver sin soporte
-            print(f"[daltonismo] no se pudo aplicar el filtro: {error}")
+            print(f"[daltonismo] no se pudo aplicar el pase de pantalla: {error}")
             self.desmontar()
-            return False
-        self.ultimo = (matriz, desplaza)
-        return True
+            self.ultimo = None
+            return
+        self.ultimo = self._color if con_color else None
 
-    def _fijar(self, matriz, desplaza):
+    # Matriz de color en el cuadrado final; None = sin filtro de color (solo pixelado): se muestra la textura tal cual,
+    # sin shader.
+    def _fijar(self, filtro_color):
         q = self._quad
+        if filtro_color is None:
+            q.clearShader()
+            q.setTexture(self._textura_final)
+            q.setColor(1, 1, 1, 1)
+            return
+        matriz, desplaza = filtro_color
+        q.setShader(_shader())
+        q.setShaderInput("escena", self._textura_final)
         q.setShaderInput("fila0", _vec(matriz[0]))
         q.setShaderInput("fila1", _vec(matriz[1]))
         q.setShaderInput("fila2", _vec(matriz[2]))
         q.setShaderInput("desplazamiento", _vec(desplaza))
 
-    def _montar(self):
+    def _montar(self, topologia):
         from direct.filter.FilterManager import FilterManager
         from ursina import application, camera
 
@@ -121,13 +166,17 @@ class FiltroPantalla:
         if self._quad is None:
             self._fm = None
             raise RuntimeError("FilterManager no pudo crear el búfer")
-        self._quad.setShader(Shader.make(Shader.SL_GLSL, _VERTICE, _FRAGMENTO))
-        self._quad.setShaderInput("escena", self._textura)
-        # La interfaz se dibuja en el mismo búfer para que también pase por el filtro.
+        self._textura_final = self._textura
+        if topologia == "pixel":
+            self._textura_final = pixelado.anadir_etapa_nativa(self._fm, self._textura, self.divisor)
+        self._topologia = topologia
+        # La interfaz se dibuja en el ÚLTIMO búfer (a resolución nativa) para que también pase por el filtro de color
+        # y nunca por la reducción del pixelado.
         self._region_ui_original = camera.ui_display_region
-        buffer = self._fm.buffers[0]
+        buffer = self._fm.buffers[-1]
         self._region_ui = buffer.makeDisplayRegion()
-        self._region_ui.setSort(self._region_ui_original.getSort())
+        orden = self._region_ui_original.getSort()
+        self._region_ui.setSort(max(orden, 10) if topologia == "pixel" else orden)
         self._region_ui.setCamera(camera.ui_camera)
         self._region_ui.disableClears()
         self._region_ui.setClearDepthActive(True)
@@ -156,7 +205,19 @@ class FiltroPantalla:
             self._region_ui = None
             self._region_ui_original = None
             self._textura = None
+            self._textura_final = None
+            self._topologia = None
             self.activo = False
+
+
+_shader_cache = None
+
+
+def _shader():
+    global _shader_cache
+    if _shader_cache is None:
+        _shader_cache = Shader.make(Shader.SL_GLSL, _VERTICE, _FRAGMENTO)
+    return _shader_cache
 
 
 _filtro = None
@@ -182,4 +243,11 @@ def instalar(gestor_ajustes=None):
             f.aplicar(ajustes.modo_daltonismo, ajustes.intensidad, ajustes.simular_daltonismo)
 
     gestor.suscribir(reaccionar)
+    # Pixelado (mismo pase) y sección «Gráficos» de Ajustes. Si fallan, el daltonismo sigue funcionando.
+    try:
+        pixelado.instalar(gestor, f)
+        from frontend import graficos_ajustes
+        graficos_ajustes.registrar()
+    except Exception as error:      # pragma: no cover
+        print(f"[daltonismo] no se pudo instalar el pixelado: {error}")
     return f

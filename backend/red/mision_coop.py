@@ -127,10 +127,19 @@ class SistemaMisionesCoop(SistemaMisiones):
         return self._reserva.siguiente_para(rol)
 
     # Igual que SistemaMisiones.asignar, pero toma la misión de la reserva y la reserva.
+    # Atómico: primero reserva y solo si la reserva acepta marca NOTIFICADA (si reservar lanza,
+    # el sistema queda en SIN_MISION y la reserva intacta).
     def asignar(self, jugador):
-        mision = super().asignar(jugador)
-        if mision is not None:
-            self._reserva.reservar(mision.id, self.id_jugador)
+        if self._estado != _misiones.SIN_MISION:
+            raise ValueError(
+                f"Ya hay una misión activa (estado {self._estado!r}); termínala antes de asignar otra."
+            )
+        mision = self._buscar_pendiente(jugador.rol)
+        if mision is None:
+            return None
+        self._reserva.reservar(mision.id, self.id_jugador)
+        self._mision = mision
+        self._estado = _misiones.NOTIFICADA
         return mision
 
     # Asigna una misión concreta (decidida por el anfitrión). ValueError si ya hay una

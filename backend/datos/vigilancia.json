@@ -1,0 +1,18 @@
+{
+  "_nota": "Zonas y marcadores del minimapa según la confianza (backend/logica/vigilancia.py + frontend/registro_consecuencias.py). Cada elemento aparece cuando se cumple su 'cuando': {grupo: {min, max}} sobre la confianza 0-100 (grupos: policia, ciudadanos, instituciones) y, opcional, 'flags' (todas) y 'sin_flags' (ninguna). clase 'zona' = rectángulo ancho x fondo, tipo restringida|vigilancia|segura; clase 'marcador' = tipo npc|mision|objetivo|altura. 'ancla' como las de los comercios: {zona|lugar, dx, dz}. Los marcadores de los NPC clave salen de npc_clave.json (siempre que haya partida con GameState), no de aquí.",
+  "refresco_s": 1.5,
+  "elementos": [
+    {"id": "restringida-mercado", "clase": "zona", "tipo": "restringida", "etiqueta": "Zona restringida",
+     "ancla": {"zona": "mercado", "dx": -14.0, "dz": -12.0}, "ancho": 8.0, "fondo": 8.0,
+     "cuando": {"policia": {"max": 20}}},
+    {"id": "vigilancia-mercado", "clase": "zona", "tipo": "vigilancia", "etiqueta": "Zona vigilada",
+     "ancla": {"zona": "mercado", "dx": 0.0, "dz": 0.0}, "ancho": 30.0, "fondo": 24.0,
+     "cuando": {"policia": {"max": 40}}},
+    {"id": "segura-mercado", "clase": "zona", "tipo": "segura", "etiqueta": "Zona segura",
+     "ancla": {"zona": "mercado", "dx": 0.0, "dz": 0.0}, "ancho": 30.0, "fondo": 24.0,
+     "cuando": {"policia": {"min": 70}}},
+    {"id": "ayuda-policial", "clase": "marcador", "tipo": "objetivo", "etiqueta": "Ayuda policial",
+     "ancla": {"zona": "mercado", "dx": 6.0, "dz": -6.0},
+     "cuando": {"policia": {"min": 70}}}
+  ]
+}

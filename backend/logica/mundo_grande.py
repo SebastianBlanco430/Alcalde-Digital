@@ -169,6 +169,15 @@ class MundoGrande(MundoCiudad):
                     _VentanaTerreno(self.terreno, lim), escaleras, cajas, lineas_libres=lineas)
         return list(self._muros_chunk[clave])
 
+    def precalcular_muros(self):
+        """Calcula ya los muros de TODOS los chunks (~2 s en total). Cada chunk tarda 10-50 ms la primera vez, y pagarlo en
+        pleno juego era un tirón al acercarse; se llama al construir el mundo, así el resultado viaja en la caché de
+        disco (backend/datos/cache_mundo.py). Devuelve self."""
+        for cj in range(self.chunks_z):
+            for ci in range(self.chunks_x):
+                self.muros_de_chunk(ci, cj)
+        return self
+
     def muros(self):
         """Todos los muros (recorre todos los chunks: caro; el juego pide muros_de_chunk)."""
         return [m for cj in range(self.chunks_z) for ci in range(self.chunks_x) for m in self.muros_de_chunk(ci, cj)]

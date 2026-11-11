@@ -134,3 +134,21 @@ def altura_sobre_escaleras(perfiles, x, z):
         if h is not None:
             return h
     return None
+
+
+CELDA_INDICE = 3.0              # m: lado de las celdas de indice_por_celdas
+
+
+# {(i, j): (perfil, ...)}: los perfiles (en el MISMO orden de `perfiles`) cuya escalera toca cada celda de `celda` m, con
+# 1 m de margen. Mirar solo los de la celda de un punto da el mismo resultado que altura_sobre_escaleras con todos (el
+# margen cubre de sobra el medio ancho de la escalera), pero sin recorrer las ~360 escaleras del mapa grande en cada
+# consulta (era ~0,9 ms por frame solo para el suelo del jugador).
+def indice_por_celdas(perfiles, celda=CELDA_INDICE):
+    indice = {}
+    for perfil in perfiles:
+        e = perfil.escalera
+        m = e.ancho / 2 + 1.0
+        for i in range(math.floor((min(e.ax, e.bx) - m) / celda), math.floor((max(e.ax, e.bx) + m) / celda) + 1):
+            for j in range(math.floor((min(e.az, e.bz) - m) / celda), math.floor((max(e.az, e.bz) + m) / celda) + 1):
+                indice.setdefault((i, j), []).append(perfil)
+    return {k: tuple(v) for k, v in indice.items()}

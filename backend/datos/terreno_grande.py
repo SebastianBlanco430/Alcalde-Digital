@@ -150,6 +150,17 @@ class TerrenoGrande(Terreno):
         self._candado = threading.Lock()
         self.chunks_calculados = 0
 
+    # Serialización (caché en disco del mundo, backend/datos/cache_mundo.py): el candado no se puede guardar y se crea
+    # de nuevo al cargar; las grillas calculadas hasta el momento sí viajan (es trabajo ya hecho).
+    def __getstate__(self):
+        estado = dict(self.__dict__)
+        estado.pop("_candado", None)
+        return estado
+
+    def __setstate__(self, estado):
+        self.__dict__.update(estado)
+        self._candado = threading.Lock()
+
     @classmethod
     def para_mapa_grande(cls, mapa, edificios, limites, zonas_planas=(), **kw):
         kw.setdefault("desnivel", DESNIVEL_GRANDE)

@@ -80,6 +80,7 @@ TERMINOS = {
     "ensaio": "ensayo",
     "feira": "feria",
     "feijão": "frijoles",
+    "sinuca": "billar",
     "laje": "azotea",
     "morro": "cerro",
     "zap": "WhatsApp",

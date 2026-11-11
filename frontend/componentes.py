@@ -383,6 +383,10 @@ class BotonTinta(BotonAccion):
             self._escalar(ESCALA_HOVER, DURACION_HOVER)
 
     def on_mouse_exit(self):
+        # destroy() de Ursina solo marca la entidad para quitarla de scene.entities (se purga
+        # después); si estaba bajo el cursor, mouse.update() aún la visita con el nodo ya vacío.
+        if self.is_empty():
+            return
         super().on_mouse_exit()
         self._presionado = False
         self._hundir(False)

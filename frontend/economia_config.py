@@ -23,6 +23,14 @@ GESTOS_MANO = True         # gesto de dar/recibir con las manos del personaje
 ITEMS_SENSIBLES = False    # cuchillo pequeño y pistola como objetos de cintura
 CANSANCIO = True           # fatiga >= 100 impide trabajar
 TRABAJO_ONLINE = False     # trabajar en partidas en línea (apagado en v1)
+# GAMESTATE: confianza por grupo, relaciones y flags (backend/logica/game_state.py). Solo hot-seat; ALCALDE_GAMESTATE=0 lo apaga.
+GAMESTATE = os.environ.get("ALCALDE_GAMESTATE") != "0"
+GAMESTATE_ONLINE = False   # en línea no hay consecuencias de confianza (el protocolo no conoce el GameState)
+# ARCHIVO_CASOS: panel del Archivo de casos (tecla J en el mundo; frontend/registro_archivo_casos.py). False = no se crea.
+ARCHIVO_CASOS = True
 # TRANSPORTE: viaje rápido del mapa grande (mototáxi en 3 paradas y teleférico entre las dos estaciones;
 # frontend/transporte_mundo.py). Solo tiene efecto con el mapa grande; con el mundo chico no existe. ALCALDE_TRANSPORTE=0 lo apaga.
 TRANSPORTE = os.environ.get("ALCALDE_TRANSPORTE") != "0"
+# CONSECUENCIAS: diálogo reactivo de los NPC clave, vigilancia policial en el minimapa y reacción de Seu Zé según la
+# confianza (frontend/registro_consecuencias.py). Necesita GAMESTATE; ALCALDE_CONSECUENCIAS=0 la apaga.
+CONSECUENCIAS = os.environ.get("ALCALDE_CONSECUENCIAS") != "0"

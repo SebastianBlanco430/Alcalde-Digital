@@ -37,7 +37,7 @@ MOTIVO_BAJADA = "bajada"
 
 def aparcados_deterministas(mundo, n=N_VEHICULOS, semilla=SEMILLA_VEHICULOS):
     """[(tipo, x, z, rumbo)] de los vehículos aparcados. Siempre lo mismo para el mismo mundo."""
-    from frontend import vehiculo_calculos as vc
+    from backend.logica import vehiculo_calculos as vc
     return [(a.tipo, float(a.x), float(a.z), float(a.rumbo))
             for a in vc.puntos_de_aparcamiento(mundo, n=n, semilla=semilla)]
 

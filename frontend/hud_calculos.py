@@ -35,9 +35,11 @@ def mezclar(a, b, t):
 # -- Aviso de interacción ------------------------------------------------------
 
 
-# "Presiona E para acceder" solo con la misión EN_RADIO y el teléfono sin abrir.
-def aviso_visible(estado_mision, estado_telefono):
-    return estado_mision == EN_RADIO and estado_telefono != ABIERTO
+# "Presiona E para acceder" solo con la misión EN_RADIO y el teléfono sin abrir. Las misiones digitales (parkour,
+# investigación) no se abren con E en su destino sino en la Terminal de la Fiscalía: con ellas el cartel no sale
+# (antes invitaba a pulsar una E que no hacía nada).
+def aviso_visible(estado_mision, estado_telefono, tipo_mision="verificar"):
+    return estado_mision == EN_RADIO and estado_telefono != ABIERTO and tipo_mision == "verificar"
 
 
 # -- Teléfono ------------------------------------------------------------------

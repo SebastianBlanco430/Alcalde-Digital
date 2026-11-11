@@ -90,7 +90,7 @@ class EscenaMundo(Escena):
         self._niebla = {"fin": mundo_config.FIN_NIEBLA_GRANDE} if self._grande else {}
         if self._grande:
             from backend.logica.navegacion_grande import CacheRutaGps
-            self._gps_local = CacheRutaGps()
+            self._gps_local = CacheRutaGps(en_hilo=mundo_config.GPS_EN_HILO)   # el A* no bloquea el frame
         self.camara = CamaraTerceraPersona(self.ciudad.raiz_colisiones, suelo=mundo.altura,
                                            obstaculos=None if self._grande else mundo, parent=self)
         self.camara.objetivo = self._posicion_del_activo
@@ -104,7 +104,8 @@ class EscenaMundo(Escena):
         if self._grande and mundo_config.multitud_grande_activo():     # mapa grande: la multitud (3 niveles) en vez de 12 peatones
             from frontend.multitud import Multitud
             self.peatones = Peatones(mundo, cantidad=0, parent=self)
-            self.multitud = Multitud(mundo, parent=self)
+            self.multitud = Multitud(mundo, jugador=self._posicion_jugador_para_multitud,
+                                     conducta=mundo_config.multitud_conducta_activa(), parent=self)
         else:
             self.peatones = Peatones(mundo, parent=self)      # gente que pasea (decoración)
         self.baliza = Baliza(parent=self, enabled=False)
@@ -119,13 +120,22 @@ class EscenaMundo(Escena):
         self.menu_pausa = MenuPausa(
             al_reanudar=lambda: self.alternar_pausa(False), al_menu=self._ir_al_menu,
             al_salir=application.quit, parent=self.hud)
+        # Pantalla de finales (A2d): sustituye al panel «Partida terminada» cuando el flujo da un final.
+        from frontend.panel_final import PanelFinal
+        self.panel_final = PanelFinal(self._ir_al_menu, parent=self.hud)
         self.online = None               # IntegracionOnline (solo con ONLINE y un FlujoEnLinea)
+        # hook: callable(mision) -> (x, z) del punto EXACTO al que apunta la baliza, o None = la puerta del destino. Lo
+        # pone frontend/registro_mundo_digital.py: las misiones digitales se abren en la Terminal de la Fiscalía.
+        self.punto_de_mision = None
         self.texto_turno_fn = None       # hook: callable(jugador) -> texto del panel de turno (None = «Turno de ...»)
         self.sanear_nombre = None        # hook: callable(nombre) -> nombre visible (None = tal cual)
         self.vehiculos = None
         if VEHICULOS:
             from frontend.vehiculo_mundo import IntegracionVehiculos
             self.vehiculos = IntegracionVehiculos(self)
+        # Paneles a pantalla completa de otros módulos (p. ej. el Archivo de casos): [(abierto(), cerrar())].
+        # Mientras alguno está abierto los controles del mundo quedan congelados y Escape lo cierra en vez de pausar.
+        self._bloqueadores = []
         self.economia = None             # inventario, dinero y E encadenada (frontend/economia_mundo.py)
         if economia_config.ECONOMIA:
             from frontend.economia_mundo import IntegracionEconomia
@@ -178,6 +188,7 @@ class EscenaMundo(Escena):
             self.vehiculos.bajar()
         if self.economia is not None:
             self.economia.cerrar_paneles()
+        self._cerrar_bloqueadores()
         self.director.cancelar()
         self._cinematica = False
         self.hud.cerrar_mapa_grande()
@@ -208,7 +219,7 @@ class EscenaMundo(Escena):
         if self.flujo is None or self._sesion is None:
             return
         self.hud.actualizar(dt, self._sesion, yaw_grados=self.camara.yaw)
-        if (self.flujo.jugador_activo().nombre, self._destino_seguido()) != self._ayudas_para:
+        if self._clave_ayudas(self._destino_seguido()) != self._ayudas_para:
             self._poner_ayudas_destino()       # se marcó o desmarcó «Seguir misión» (o cambió el destino)
         self._actualizar_ruta_piso()
 
@@ -228,15 +239,36 @@ class EscenaMundo(Escena):
 
     # -- Estado de controles --
 
+    # Registra un panel modal de otro módulo: `abierto()` -> bool, `cerrar()` lo cierra (lo llama Escape o salir del mundo).
+    def registrar_bloqueador(self, abierto, cerrar=None):
+        self._bloqueadores.append((abierto, cerrar))
+
+    def _bloqueado_por_paneles(self):
+        return any(abierto() for abierto, _ in self._bloqueadores)
+
+    # Escape: cierra el primer panel registrado que esté abierto. True si cerró alguno.
+    def _cerrar_bloqueador_abierto(self):
+        for abierto, cerrar in self._bloqueadores:
+            if cerrar is not None and abierto():
+                cerrar()
+                return True
+        return False
+
+    def _cerrar_bloqueadores(self):
+        for abierto, cerrar in self._bloqueadores:
+            if cerrar is not None and abierto():
+                cerrar()
+
     # Pausa y cinemáticas congelan al jugador (ver ControladorJugador).
     def controles_bloqueados(self):
-        return (self.en_pausa or self._cinematica or self.hud.mapa_grande_abierto()
+        return (self.en_pausa or self._cinematica or self.hud.mapa_grande_abierto() or self._bloqueado_por_paneles()
                 or (self.online is not None and self.online.bloquea_controles())
                 or (self.economia is not None and self.economia.bloquea_controles()))
 
     # El mapa grande (tecla N) solo se abre con los controles libres: sin pausa, cinemática ni paneles de otros módulos.
     def _puede_abrir_mapa(self):
-        return not (self.en_pausa or self._cinematica or (self.online is not None and self.online.bloquea_controles())
+        return not (self.en_pausa or self._cinematica or self._bloqueado_por_paneles()
+                    or (self.online is not None and self.online.bloquea_controles())
                     or (self.economia is not None and self.economia.bloquea_controles()))
 
     def alternar_pausa(self, abierta=None):
@@ -246,6 +278,8 @@ class EscenaMundo(Escena):
             return                                # Escape cierra el mapa grande, no abre la pausa
         if abierta is None and self.economia is not None and self.economia.escape():
             return                                # Escape cierra el inventario (o cancela mover), no abre la pausa
+        if abierta is None and self._cerrar_bloqueador_abierto():
+            return                                # Escape cierra un panel registrado (Archivo de casos), no abre la pausa
         if abierta is None:
             abierta = not self.en_pausa
         if abierta == self.en_pausa:
@@ -269,6 +303,8 @@ class EscenaMundo(Escena):
             return False
         if self.economia is not None and self.economia.bloquea_controles():
             return False
+        if self._bloqueado_por_paneles():
+            return False
         if self.hud.mapa_grande_abierto():
             return False
         if flujo.estado_mision() in (EN_MINIJUEGO, COMPLETADA):
@@ -289,6 +325,13 @@ class EscenaMundo(Escena):
     def _posicion_del_activo(self):
         activo = self.flujo.jugador_activo()
         return (activo.x, activo.z)
+
+    def _posicion_jugador_para_multitud(self):
+        """(x, z) del jugador al que esquivan los peatones, o None si no hay partida en curso."""
+        try:
+            return self._posicion_del_activo()
+        except Exception:
+            return None
 
     def _reconstruir_personajes(self):
         for avatar in self.avatares.values():
@@ -333,30 +376,59 @@ class EscenaMundo(Escena):
             f"Misión: {glosar_texto(mision.titulo)}" if mision is not None else self.TEXTO_SIN_MISION)
         self._poner_ayudas_destino()
         # Fin del catálogo: nadie tiene misiones pendientes -> panel "Partida terminada".
+        # Con consecuencias (FlujoConGameState.final_partida) se muestra la pantalla de finales en su lugar.
         if self.flujo.partida_terminada() and not self._cinematica:
-            self.hud.panel_fin.mostrar(self._sesion.estado_partida.indicadores())
+            leer_final = getattr(self.flujo, "final_partida", None)
+            final = leer_final() if callable(leer_final) else None
+            if final is not None:
+                self.hud.panel_fin.ocultar()
+                self.panel_final.mostrar(final, self._sesion.estado_partida.indicadores())
+            else:
+                self.panel_final.ocultar()
+                self.hud.panel_fin.mostrar(self._sesion.estado_partida.indicadores())
         else:
             self.hud.panel_fin.ocultar()
+            self.panel_final.ocultar()
         self.avanzar_hud(0)
+
+    # Con qué se pusieron las ayudas: jugador activo, destino seguido y misión (dos misiones seguidas pueden compartir
+    # destino y no punto exacto: una de verificar y una digital en el mismo lugar).
+    def _clave_ayudas(self, destino):
+        mision = self.flujo.mision_actual()
+        return (self.flujo.jugador_activo().nombre, destino, getattr(mision, "id", None))
 
     # Baliza sobre la puerta del destino y su bandera destacada (ondea más fuerte, borde amarillo). Sin misión, o
     # si el jugador activo no la sigue, se ocultan. La llaman refrescar() y avanzar_hud() cuando cambia el turno
     # o la casilla «Seguir misión».
     def _poner_ayudas_destino(self):
         destino = self._destino_seguido()
-        self._ayudas_para = (self.flujo.jugador_activo().nombre, destino)
+        self._ayudas_para = self._clave_ayudas(destino)
         if destino is None:
             self.baliza.enabled = False
         else:
-            px, pz = self._mundo.punto_interaccion(destino)
-            try:
-                alto = self._mundo.edificio_de(destino).alto
-            except ValueError:
-                alto = ALTO_BALIZA_SIN_EDIFICIO      # lugar al aire libre (mapa grande): una baliza a la altura de un techo bajo
+            exacto = self._punto_exacto_de_mision()
+            if exacto is not None:                   # misión digital: la baliza va sobre el terminal, no sobre el lugar
+                (px, pz), alto = exacto, ALTO_BALIZA_SIN_EDIFICIO
+            else:
+                px, pz = self._mundo.punto_interaccion(destino)
+                try:
+                    alto = self._mundo.edificio_de(destino).alto
+                except ValueError:
+                    alto = ALTO_BALIZA_SIN_EDIFICIO      # lugar al aire libre (mapa grande): una baliza a la altura de un techo bajo
             self.baliza.colocar(px, pz, alto + 2.2, suelo=self._mundo.altura(px, pz))
             self.baliza.enabled = True
         for lugar, bandera in self.ciudad.banderas.items():
             bandera.destacar(lugar == destino)
+
+    # (x, z) que da el hook `punto_de_mision` para la misión actual, o None (sin hook, sin misión, o si el hook falla).
+    def _punto_exacto_de_mision(self):
+        if self.punto_de_mision is None:
+            return None
+        try:
+            punto = self.punto_de_mision(self.flujo.mision_actual())
+        except Exception:
+            return None
+        return None if punto is None else (float(punto[0]), float(punto[1]))
 
     # Línea del GPS en el piso: del jugador por las esquinas y hasta la puerta.
     def _actualizar_ruta_piso(self):

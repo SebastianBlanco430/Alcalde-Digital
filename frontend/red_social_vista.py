@@ -56,6 +56,12 @@ PX_NOMBRE, PX_CUERPO, PX_META, PX_RESPUESTA = 20, 21, 16, 17
 LINEA_CUERPO = 1.3
 LINEA_RESPUESTA = 1.25
 
+# Carta de misión (A2d): el rumor que el jugador fue a comprobar. Se marca con un chip y, en lugar de la vista previa,
+# lleva una caja con lo que vio al llegar al lugar (Mision.pista).
+TEXTO_CHIP_MISION = "Rumor de tu misión"
+TEXTO_TITULO_PISTA = "Lo que viste al llegar"
+LINEA_PISTA = 1.25
+
 
 # ----------------------------------------------------------------------------- utilidades
 
@@ -242,6 +248,21 @@ class TarjetaPost(Entity):
         self.enlace_titulo = Text("", parent=self.enlace, origin=(-0.5, 0.5), scale=escala_fuente(PX_RESPUESTA),
                                   font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO), z=-0.01)
         self.enlace_titulo.line_height = 1.2
+        # Carta de misión: chip en la cabecera y caja con la pista (ocultos salvo en esa carta).
+        ancho_chip = medidor.ancho(TEXTO_CHIP_MISION, PX_META, True) + 0.04
+        self.chip_mision = panel_tinta(self, ancho_chip, 0.042, tono=estilo.COLOR_ACENTO, radio_px=estilo.RADIO_CHIP_PX,
+                                       sombra=False, borde_px=2, z=-0.012)
+        self.chip_mision.ancho = ancho_chip
+        _texto(self.chip_mision, TEXTO_CHIP_MISION, PX_META, (0, 0), estilo.COLOR_ACENTO_TEXTO, origen=(0, 0), negrita=True)
+        self.chip_mision.enabled = False
+        self.caja_pista = panel_tinta(self, w - 2 * self.PAD, 0.1, tono=estilo.COLOR_FONDO,
+                                      radio_px=estilo.RADIO_CHIP_PX, sombra=False, borde_px=2, z=-0.005)
+        self.caja_pista.enabled = False
+        self.pista_titulo = _texto(self.caja_pista, TEXTO_TITULO_PISTA, PX_META, (0, 0), estilo.COLOR_ACENTO, negrita=True)
+        self.pista_texto = Text("", parent=self.caja_pista, origin=(-0.5, 0.5), scale=escala_fuente(PX_RESPUESTA),
+                                color=rgb(estilo.COLOR_TEXTO), z=-0.01)
+        self.pista_texto.line_height = LINEA_PISTA
+        self.es_carta_de_mision = False
         # Acciones.
         self.linea_acciones = _rect(self, w - 2 * self.PAD, 0.003, COLOR_LINEA, (0, 0), z=-0.005)
         self.acciones = {
@@ -300,7 +321,23 @@ class TarjetaPost(Entity):
         media = datos["media"]
         self.imagen.enabled = False
         self.enlace.enabled = False
-        if media["tipo"] == "imagen":
+        self.caja_pista.enabled = False
+        self.es_carta_de_mision = media["tipo"] == "pista"
+        self.chip_mision.enabled = self.es_carta_de_mision
+        self.mas.enabled = not self.es_carta_de_mision
+        if self.es_carta_de_mision:
+            self.chip_mision.position = (x0 + w_util - self.chip_mision.ancho / 2, self.mas.y, -0.012)
+            lineas = envolver_texto(media["texto"], self.medidor.funcion(PX_RESPUESTA), w_util - 0.04) or [""]
+            alto = 0.058 + len(lineas) * a_unidades(PX_RESPUESTA) * LINEA_PISTA
+            _redimensionar_panel(self.caja_pista, w_util, alto, 0, estilo.RADIO_CHIP_PX)
+            self.caja_pista.position = (0, y - alto / 2, -0.005)
+            self.caja_pista.borde.color = rgb(estilo.COLOR_ACENTO)
+            self.pista_titulo.position = (-w_util / 2 + 0.02, alto / 2 - 0.024, -0.01)
+            self.pista_texto.text = "\n".join(lineas)
+            self.pista_texto.position = (-w_util / 2 + 0.02, alto / 2 - 0.042, -0.01)
+            self.caja_pista.enabled = True
+            y -= alto + 0.016
+        elif media["tipo"] == "imagen":
             alto = self.ALTO_IMAGEN
             px_ancho = 640
             px_alto = max(40, round(px_ancho * alto / w_util))
@@ -344,7 +381,7 @@ class TarjetaPost(Entity):
         fondo = yb - self.ALTO_BOTON / 2 - self.PAD
         self.altura = self.Y_TOP - fondo
         _redimensionar_panel(self.panel, self.ANCHO, self.altura, (self.Y_TOP + fondo) / 2, estilo.RADIO_TARJETA_PX)
-        self.panel.borde.color = rgb(estilo.TINTA)
+        self.panel.borde.color = rgb(estilo.COLOR_ACENTO if self.es_carta_de_mision else estilo.TINTA)
         self.fondo_y = fondo
 
     # Contadores y estados de los iconos de acción a su valor inicial (sin animación).
@@ -654,15 +691,16 @@ class VistaRedSocial(Entity):
 
     # Publicación a la vista: `texto` (None = no hay más noticias). Si hay un efecto de decisión en
     # curso se aplaza hasta que termine, para que se vea lo que hizo el jugador.
-    def poner_publicacion(self, texto):
+    # `pista` (opcional): la publicación es la CARTA DE MISIÓN; se marca y muestra lo que el jugador vio al llegar.
+    def poner_publicacion(self, texto, pista=None):
         if texto == self._texto_actual and not self._hay_pendiente:
             return
         if self._efecto_activo:
-            self._hay_pendiente, self._pendiente = True, texto
+            self._hay_pendiente, self._pendiente = True, (texto, pista)
             return
-        self._mostrar(texto, animar=True)
+        self._mostrar(texto, animar=True, pista=pista)
 
-    def _mostrar(self, texto, animar):
+    def _mostrar(self, texto, animar, pista=None):
         self._texto_actual = texto
         if texto is None:
             datos = calc.publicacion_de("No hay más noticias disponibles.")
@@ -676,6 +714,8 @@ class VistaRedSocial(Entity):
         self._datos = datos
         # Se dibuja con los nombres traducidos; los contadores siguen con `datos`.
         visibles = calc.publicacion_visible(datos)
+        if pista and texto is not None:
+            visibles = dict(visibles, media={"tipo": "pista", "texto": pista})
         self.tarjeta.mostrar(visibles)
         self._mostrar_respuestas(visibles)
         self._mostrar_tendencias(visibles)
@@ -764,8 +804,8 @@ class VistaRedSocial(Entity):
     def _fin_efecto(self):
         self._efecto_activo = False
         if self._hay_pendiente:
-            texto, self._pendiente, self._hay_pendiente = self._pendiente, None, False
-            self._mostrar(texto, animar=True)
+            (texto, pista), self._pendiente, self._hay_pendiente = self._pendiente, None, False
+            self._mostrar(texto, animar=True, pista=pista)
 
     # Aviso emergente: sube 0.04, se queda y se desvanece.
     def mostrar_aviso(self, cadena, icono, tono, lleno=True):

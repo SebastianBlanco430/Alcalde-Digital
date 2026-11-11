@@ -1,0 +1,24 @@
+{
+  "_nota": "Valores por defecto del diálogo reactivo (backend/logica/dialogos.py). Cada <npc>.json puede sobrescribir umbrales, expresiones, lineas y añadir reglas_actitud. Las reglas se evalúan en orden (las del NPC primero) y gana la primera que cumple; si ninguna, el tono sale de relación y confianza. El motor de casos deja estas banderas (backend/logica/casos.py): caso:<id>:jugado, caso:<id>:final:<nodo>, caso:<id>:resultado:<exito|parcial|fracaso>, caso:<id>:acusado:<personaje>, más las que escribe cada caso en sus efectos. 'mintio' y 'acusacion_falsa' son genéricas: cualquier caso o sistema puede ponerlas con efectos.flags.",
+  "umbrales": {
+    "cortante": {"relacion_max": 30, "confianza_max": 25},
+    "exclusivo": {"relacion_min": 75, "confianza_min": 85},
+    "ayuda_relacion_min": 70
+  },
+  "expresiones": {
+    "normal": "neutral", "cortante": "serio", "exclusivo": "satisfecho",
+    "nervioso": "nervioso", "evasiva": "serio", "hostil": "enojado"
+  },
+  "reglas_actitud": [
+    {"actitud": "hostil", "alguna": ["acusacion_falsa"]},
+    {"actitud": "nervioso", "alguna": ["mintio"]}
+  ],
+  "lineas": {
+    "normal": ["Buenas. ¿En qué te puedo ayudar?"],
+    "cortante": ["Ahora no. Tengo cosas que hacer."],
+    "exclusivo": ["Qué bueno verte. Contigo sí hablo con confianza."],
+    "nervioso": ["Eh... sí, claro. No sé de qué me hablas, de verdad."],
+    "evasiva": ["Mejor hablemos de otra cosa, ¿sí?"],
+    "hostil": ["Aléjate. Ya me hiciste suficiente daño."]
+  }
+}

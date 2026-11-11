@@ -67,9 +67,12 @@ TEXTO_RECHAZO_GENERICO = "Civitas: el anfitrión no te dejó entrar. Inténtalo 
 # y devuelve los indicadores autoritativos («ind»), que los corrigen.
 class EstadoRemoto:
 
-    def __init__(self, arbol_noticias, arbol_stats, al_decidir=None, id_mision=None):
+    def __init__(self, arbol_noticias, arbol_stats, al_decidir=None, id_mision=None, cartas_mision=None):
         self.arbol_noticias = arbol_noticias
         self.arbol_stats = arbol_stats
+        # v5: par de árboles de misión (el MISMO que arma el anfitrión con el mismo catálogo). La carta de misión llega en
+        # la mano con su id (>= 1000) y se resuelve con su propio árbol de stats. None = partida sin consecuencias.
+        self._cartas = cartas_mision
         self._al_decidir = al_decidir        # callable(id_mision, id_noticia, tipo) -> bool
         self._id_mision = id_mision          # callable() -> id de la misión activa o None
         self._indicadores = {nombre: VALOR_INICIAL for nombre in NOMBRES_INDICADORES}
@@ -93,6 +96,10 @@ class EstadoRemoto:
     def mano_ids(self):
         return [nodo.id for nodo, _ in self._mano]
 
+    # ¿La noticia en mesa es la carta de misión (el rumor que el jugador fue a comprobar)? La vista la marca.
+    def es_carta_de_mision(self):
+        return self._cartas is not None and bool(self._mano) and self._cartas.es_de_mision(self._mano[0][0])
+
     # -- Cambios --
 
     def aplicar_deltas(self, deltas):
@@ -115,7 +122,10 @@ class EstadoRemoto:
             if id_noticia is None:
                 _registro.warning("Id de noticia no válido ignorado.")
                 continue
-            nodo, camino = self.arbol_noticias.buscar_con_camino(id_noticia)
+            if self._cartas is not None and self._cartas.mision_de(id_noticia) is not None:
+                nodo, camino = self._cartas.arbol_noticias.buscar_con_camino(id_noticia)
+            else:
+                nodo, camino = self.arbol_noticias.buscar_con_camino(id_noticia)
             if nodo is None:
                 _registro.warning("Noticia %s desconocida: se ignora.", id_noticia)
                 continue
@@ -135,7 +145,8 @@ class EstadoRemoto:
         if id_mision is None:
             return None
         nodo, camino = self._mano[0]
-        nodo_stats = self.arbol_stats.obtener_por_camino(camino)
+        arbol_stats = self._cartas.arbol_stats if self.es_carta_de_mision() else self.arbol_stats
+        nodo_stats = arbol_stats.obtener_por_camino(camino)
         if nodo_stats is None:
             _registro.warning("Isomorfismo roto para la noticia %s: se descarta.", nodo.id)
             self._mano.pop(0)
@@ -229,8 +240,18 @@ class FlujoEnLinea:
             arboles = construir_arboles()
         radio = online_config.RADIO_INTERACCION if radio_interaccion is None else radio_interaccion
 
+        try:
+            from backend.datos.noticias_mision import construir_cartas_mision
+            cartas = construir_cartas_mision(self._catalogo)
+        except ValueError:
+            cartas = None
         self.estado = EstadoRemoto(arboles[0], arboles[1], al_decidir=self._enviar_decision,
-                                   id_mision=self._id_mision_actual)
+                                   id_mision=self._id_mision_actual, cartas_mision=cartas)
+        # v5 (consecuencias): último veredicto propio (mismo formato que FlujoConGameState.ultimo_veredicto), la
+        # confianza de la ciudad que va informando el anfitrión y, al terminar, los datos del final.
+        self.ultimo_veredicto = None
+        self.confianza = {}
+        self._datos_final = None
         self._sistema = SistemaMisionesCoop(
             mundo, self._catalogo, _ReservaEspejo(self._catalogo), tu_id,
             punto_interaccion=mundo.punto_interaccion, radio_interaccion=radio)
@@ -557,6 +578,10 @@ class FlujoEnLinea:
         actual = self._sistema.mision_actual()
         if actual is None or actual.id != ev["id"]:
             return
+        if isinstance(ev.get("confianza"), dict):
+            self.confianza = dict(ev["confianza"])
+            self.ultimo_veredicto = None if ev.get("grupo") is None else {
+                "mision": ev["id"], "veredicto": ev.get("veredicto"), "grupo": ev["grupo"], "delta": ev.get("delta", 0)}
         estado = self._sistema.estado()
         if estado == EN_MINIJUEGO:
             # La escena del minijuego sigue abierta: el espejo se cierra en completar_mision().
@@ -572,7 +597,21 @@ class FlujoEnLinea:
     def _ev_fin(self, ev):
         self.estado.fijar_indicadores(ev["indicadores"])
         self.resumen_fin = ev.get("resumen", "")
+        if isinstance(ev.get("confianza"), dict):
+            self.confianza = dict(ev["confianza"])
+            self._datos_final = (dict(ev["confianza"]), ev.get("pasadas", 0), ev.get("falladas", 0))
         self._fin = True
+
+    # Final de la partida (mismo dict que FlujoConGameState.final_partida) con la confianza que mandó el anfitrión; None
+    # si la sala no tiene consecuencias o los datos no sirven (entonces la vista usa el panel de fin de siempre).
+    def final_partida(self):
+        if self._datos_final is None:
+            return None
+        from backend.logica import confianza_misiones
+        try:
+            return confianza_misiones.evaluar_final(*self._datos_final)
+        except ValueError:
+            return None
 
     def _ev_saludo(self, ev):
         self.ultimo_saludo = (ev["id"], ev["indice"])

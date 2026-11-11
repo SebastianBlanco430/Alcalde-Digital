@@ -18,7 +18,7 @@ from backend.datos.ciudad_3d import ESCALA_MUNDO, SEMILLA_CASAS, construir_mundo
 
 from backend.logica.estado_partida import EstadoPartida
 from backend.logica.flujo_partida import FlujoPartida
-from backend.logica.misiones import SistemaMisiones
+from backend.logica.misiones import RADIO_INTERACCION as radio_misiones, SistemaMisiones
 from backend.logica.sesion import SesionJuego
 from frontend import economia_config, online_config
 from frontend import compat_macos, daltonismo, diseno_adaptable, estilo, medidor_fps, tipografia
@@ -44,7 +44,7 @@ TAMANO_VENTANA = (1280, 720)
 FPS_MAXIMOS = 60
 DURACION_TRANSICION = 0.25   # segundos de salida y de entrada del fundido a negro
 DURACION_CINEMATICA = 1.0    # factor de las duraciones del guion (0 = cinemáticas instantáneas, para los scripts)
-RADIO_INTERACCION = 2.0      # m: "llegué" = a menos de esto de la PUERTA del edificio destino
+RADIO_INTERACCION = radio_misiones      # m: "llegué" = a menos de esto de la PUERTA del destino (única fuente: backend)
 
 
 # Espacio / Enter saltan la cinemática (y el fundido) en curso, en cualquier escena.
@@ -107,12 +107,17 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
     # y del negro con el nombre del lugar.
     def crear_flujo(sesion):
         flujo = FlujoPartida(sesion, SistemaMisiones(
-            mundo, mundo_config.catalogo_misiones(mundo), radio_interaccion=RADIO_INTERACCION,
+            mundo, mundo_config.catalogo_misiones(mundo, con_game_state=economia_config.GAMESTATE and economia_config.ECONOMIA),
+            radio_interaccion=RADIO_INTERACCION,
             punto_interaccion=mundo.punto_interaccion))
         if economia_config.ECONOMIA:     # paga las misiones y recupera fatiga (backend/logica/flujo_economia.py)
             from backend.logica.flujo_economia import FlujoConEconomia
             from frontend.economia_mundo import catalogo_activo
             flujo = FlujoConEconomia(flujo, catalogo_activo())
+        if economia_config.GAMESTATE:    # confianza, relaciones y flags (backend/logica/flujo_gamestate.py)
+            from backend.logica.flujo_gamestate import FlujoConGameState
+            # consecuencias (ALCALDE_CONSECUENCIAS): carta de misión, veredicto -> confianza y final de la partida (A2d)
+            flujo = FlujoConGameState(flujo, consecuencias=economia_config.CONSECUENCIAS)
         return flujo
 
     transicion = Transicion(duracion_transicion, duracion_transicion)
@@ -163,6 +168,8 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
     # Orden de salto: primero los fundidos, luego las cinemáticas.
     conexion.saltadores = [transicion_lugar.saltar, transicion.saltar, escena_mundo.saltar_cinematica,
                            escena_interior.saltar_cinematica]
+    from frontend import extensiones      # escenas de las olas nuevas (mundo digital, parkour)
+    extensiones.aplicar(gestor, conexion, escena_mundo)
     conexion.atajos = AtajosCinematica(destino)
     if online_config.ONLINE:
         _conectar_online(gestor, mundo, conexion, activa, escena_mundo, transicion, transicion_lugar,

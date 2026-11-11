@@ -94,7 +94,7 @@ def _es_entero(v):
 def _perfiles_por_defecto():
     # Las velocidades de turbo reales; si el módulo del frontend no se puede importar, la copia de respaldo.
     try:
-        from frontend.vehiculo_calculos import PERFILES
+        from backend.logica.vehiculo_calculos import PERFILES
         return {k: float(p.vturbo) for k, p in PERFILES.items()}
     except Exception:
         return dict(VTURBO_RESPALDO)

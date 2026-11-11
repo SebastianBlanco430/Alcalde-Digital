@@ -1,4 +1,5 @@
-# Almacén de AJUSTES del jugador (Python puro, sin ursina/panda3d): accesibilidad (daltonismo), audio y
+# Almacén de AJUSTES del jugador (Python puro, sin ursina/panda3d): accesibilidad (daltonismo), gráficos
+# (pixelado), minimapa, audio y
 # espacio para claves de red. Un dataclass con validación/saneado, (de)serialización a dict y JSON, y un
 # gestor con suscriptores para que cualquier módulo (filtro de pantalla, motor de audio, online) reaccione
 # a los cambios sin conocer la pantalla de Ajustes.
@@ -31,6 +32,14 @@ NOMBRES_MODO = {
     "alto_contraste": "Alto contraste",
 }
 MODO_POR_DEFECTO = "ninguno"
+
+# Gráficos (la matemática del pixelado vive en frontend/pixelado_calculos.py; aquí solo se sanea el dato).
+PRESETS_GRAFICOS = ("retro", "nitido", "normal", "personalizado")
+PRESET_GRAFICO_POR_DEFECTO = "nitido"
+# Minimapa: zoom (factor sobre la ventana de ±150 m), modo de giro y nivel de detalle (densidad).
+MINIMAPA_ZOOMS = (0.5, 0.75, 1.0, 1.5, 2.0, 3.0)      # escalones del zoom (el valor guardado siempre cae en uno)
+MODOS_ROTACION_MINIMAPA = ("camara", "norte")
+MINIMAPA_DENSIDAD_MIN, MINIMAPA_DENSIDAD_MAX = 1, 3
 
 LARGO_MAX_NOMBRE = 24               # nombre en línea
 LARGO_MAX_HOST = 64                 # último anfitrión (IP/nombre:puerto)
@@ -73,6 +82,13 @@ class Ajustes:
     modo_daltonismo: str = MODO_POR_DEFECTO
     intensidad: float = 1.0                 # 0 = sin efecto, 1 = completo
     simular_daltonismo: bool = False        # True = muestra cómo lo ve alguien con ese tipo (para diseñar), no corrige
+    # --- Gráficos ---
+    preset_grafico: str = PRESET_GRAFICO_POR_DEFECTO   # retro | nitido | normal | personalizado
+    pixel_scale: float = 0.0                # 0 = resolución nativa (sin pase gráfico), 1 = pixelado máximo
+    # --- Minimapa ---
+    minimapa_zoom: float = 1.0              # uno de MINIMAPA_ZOOMS (1 = lo de siempre)
+    minimapa_rotacion: str = "camara"       # camara = gira con la cámara (arriba = adelante) | norte = norte arriba
+    minimapa_densidad: int = 2              # nivel de detalle: 1 calles y lugares | 2 + casas y escaleras | 3 + rótulos
     # --- Audio ---
     volumen_maestro: float = 0.8
     volumen_musica: float = 0.6
@@ -94,6 +110,15 @@ class Ajustes:
             self.modo_daltonismo = MODO_POR_DEFECTO
         self.intensidad = _acotar(self.intensidad, 0.0, 1.0, 1.0)
         self.simular_daltonismo = _booleano(self.simular_daltonismo, False)
+        if not isinstance(self.preset_grafico, str) or self.preset_grafico not in PRESETS_GRAFICOS:
+            self.preset_grafico = PRESET_GRAFICO_POR_DEFECTO
+        self.pixel_scale = _acotar(self.pixel_scale, 0.0, 1.0, 0.0)
+        zoom = _acotar(self.minimapa_zoom, MINIMAPA_ZOOMS[0], MINIMAPA_ZOOMS[-1], 1.0)
+        self.minimapa_zoom = min(MINIMAPA_ZOOMS, key=lambda z: abs(z - zoom))
+        if not isinstance(self.minimapa_rotacion, str) or self.minimapa_rotacion not in MODOS_ROTACION_MINIMAPA:
+            self.minimapa_rotacion = "camara"
+        self.minimapa_densidad = int(round(_acotar(self.minimapa_densidad, MINIMAPA_DENSIDAD_MIN,
+                                                   MINIMAPA_DENSIDAD_MAX, 2)))
         self.volumen_maestro = _acotar(self.volumen_maestro, 0.0, 1.0, 0.8)
         self.volumen_musica = _acotar(self.volumen_musica, 0.0, 1.0, 0.6)
         self.volumen_efectos = _acotar(self.volumen_efectos, 0.0, 1.0, 0.8)

@@ -29,6 +29,8 @@ MUNDO = "mundo"
 JUEGO = "juego"
 INTERIOR = "interior"
 TRABAJO = "trabajo"      # minijuego 2D de un puesto de trabajo (frontend/escenas/escena_trabajo.py)
+MUNDO_DIGITAL = "mundo_digital"   # Ola 2, subagente A
+PARKOUR = "parkour"               # Ola 2, subagente B
 
 
 class ConexionFlujo:

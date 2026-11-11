@@ -1,0 +1,16 @@
+{
+  "npc": "seu_ze",
+  "lineas": {
+    "normal": ["Bom dia. O de sempre: bicarbonato para cocina y limpieza, R$ 5 la bolsita."],
+    "cortante": ["Compra o no compres, pero rápido. Desde que la ciudad anda así, no confío en nadie."],
+    "exclusivo": ["Para ti, amigo, el mejor precio de la calle. Eres de los pocos que aún cuida este barrio."]
+  },
+  "comentarios": {
+    "normal": "Seu Zé: «Que aproveche.»",
+    "cortante": "Seu Zé: «Toma y sigue tu camino.»",
+    "exclusivo": "Seu Zé: «Para ti, siempre. Cuídate.»",
+    "nervioso": "Seu Zé: «Eh... gracias. Vuelve pronto.»",
+    "evasiva": "Seu Zé: «Mejor no hablemos de eso.»",
+    "hostil": "Seu Zé: «Toma. Y no vuelvas por aquí.»"
+  }
+}

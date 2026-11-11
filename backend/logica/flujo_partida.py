@@ -56,6 +56,18 @@ class FlujoPartida:
     def hay_mision_activa(self):
         return self._sistema.mision_actual() is not None
 
+    # Catálogo de misiones de la partida, en orden (copia). FlujoConGameState lo usa para las cartas de misión y para
+    # escalar la confianza por mapa.
+    def catalogo_misiones(self):
+        return self._sistema.catalogo()
+
+    # Veredicto (A2d): ids de las misiones completadas que quedaron pasadas / falladas (copias).
+    def misiones_pasadas(self):
+        return self._sistema.pasadas()
+
+    def misiones_falladas(self):
+        return self._sistema.falladas()
+
     # True si no hay misión activa y a ningún jugador le quedan misiones.
     def partida_terminada(self):
         self._sincronizar_roles()
@@ -97,6 +109,33 @@ class FlujoPartida:
         self._sistema.terminar()
         self._dar_turno(pasar_antes=True)
         return self._sesion.jugador_activo()
+
+    # Misiones digitales (parkour / investigación): si la misión activa se cumplió por la señal del `game_state`, la
+    # cierra, pasa el turno (como completar_mision) y asigna al nuevo activo. True si cerró una; False si no (sin misión
+    # activa, de verificar o sin señal). No toca nada en ese caso.
+    def revisar_misiones_digitales(self, game_state):
+        if self._sistema.completar_por_senal(game_state) is None:
+            return False
+        self._sistema.terminar()
+        self._dar_turno(pasar_antes=True)
+        return True
+
+    # -- Guardado (JSON) --
+
+    # Estado de las misiones (SistemaMisiones.a_dict): la activa, su estado, las completadas y sus veredictos.
+    def misiones_a_dict(self):
+        return self._sistema.a_dict()
+
+    # Sustituye el sistema de misiones por el guardado en `datos`, con el MISMO mapa, catálogo y punto de interacción.
+    # ValueError (sin cambiar nada) si los datos no cuadran con el catálogo de esta partida (p. ej. son de otro mapa).
+    def restaurar_misiones(self, datos):
+        viejo = self._sistema
+        conocidos = {m.id for m in viejo.catalogo()}
+        ajenos = [i for i in datos.get("completadas", ()) if i not in conocidos]
+        if ajenos:
+            raise ValueError(f"Misiones guardadas que no existen en este catálogo: {ajenos[:3]}")
+        self._sistema = type(viejo).desde_dict(datos, viejo._mapa, viejo.catalogo(), viejo._punto_interaccion)
+        self._sincronizar_roles()
 
     # -- Internos --
 

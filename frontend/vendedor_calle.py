@@ -39,6 +39,7 @@ class VendedorCalle:
         self.npc = self._crear_npc(escena, rumbo, crear_npc)
         self.bolsita = crear_bolsita(escena)
         self.traspaso = None
+        self.reaccion = None            # callable() -> frase corta según la confianza (frontend/registro_consecuencias.py); None = sin reacción
         self._mensaje = None
         self._t_mensaje = 0.0
 
@@ -92,11 +93,21 @@ class VendedorCalle:
         if not resultado.ok:
             self._decir(resultado.mensaje)          # sin dinero / sin espacio / mucho peso: solo mensaje
             return True
-        self._decir("Bolsita de bicarbonato guardada")
+        self._decir(self._mensaje_compra())
         self.traspaso = TraspasoMano(self._escena, self, jugador, self._al_terminar)
         if not self.traspaso.iniciar():
             self.traspaso = None                    # sin avatar: la compra vale igual, sin animación
         return True
+
+    # Mensaje tras comprar; si hay `reaccion` (consecuencias) le añade lo que Seu Zé dice según la confianza. Nunca lanza.
+    def _mensaje_compra(self):
+        base = "Bolsita de bicarbonato guardada"
+        try:
+            frase = self.reaccion() if callable(getattr(self, "reaccion", None)) else None
+        except Exception as error:
+            print(f"[consecuencias] reacción de Seu Zé falló: {error}")
+            frase = None
+        return f"{base}. {frase}" if frase else base
 
     def actualizar(self, dt):
         if self.traspaso is not None:

@@ -1,0 +1,25 @@
+{
+  "npc": "fiscal",
+  "lineas": {
+    "normal": [
+      "Fiscal Rojas, Fiscalía de Ciudad Nova. Si tienes pruebas sobre las cuentas falsas de Civitas, me interesan."
+    ],
+    "cortante": [
+      "La Fiscalía no recibe a quien no genera confianza. Vuelve con algo concreto."
+    ],
+    "exclusivo": [
+      "Qué gusto, tu trabajo con las instituciones ha sido ejemplar. Cuenta conmigo para lo que necesites."
+    ],
+    "evasiva": [
+      "Ese caso quedó cerrado. No voy a comentar más sobre cómo terminó."
+    ]
+  },
+  "reglas_actitud": [
+    {
+      "actitud": "evasiva",
+      "alguna": [
+        "caso:cuentas_fantasma:resultado:fracaso"
+      ]
+    }
+  ]
+}

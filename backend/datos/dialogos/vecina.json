@@ -1,0 +1,14 @@
+{
+  "npc": "vecina",
+  "lineas": {
+    "normal": ["Buenas tardes, hijo. Vivo aquí hace cuarenta años y el mercado ya no es el mismo."],
+    "cortante": ["Con estos políticos ya no hablo. Todos prometen y ninguno cumple."],
+    "exclusivo": ["Tú eres de los buenos, hijo. Si necesitas saber algo del barrio, pregúntame."]
+  },
+  "cooperacion": {
+    "relacion_min": 70,
+    "texto": ["Mi sobrino trabaja en una oficina de datos. Me enseñó una lista rara de cuentas, mira."],
+    "evidencia": "lista_cuentas",
+    "entrega": "Doña Neide te pasa una lista de cuentas falsas."
+  }
+}

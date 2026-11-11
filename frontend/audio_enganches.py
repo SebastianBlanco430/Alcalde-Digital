@@ -177,14 +177,18 @@ class EnganchesAudio:
             return
         if cantidad > self._completadas:
             self._completadas = cantidad
-            self.audio.efecto("mision_exito" if self._fue_exito(sistema.resultado_ultimo()) else "mision_fallo", 0.9)
+            exito = self._fue_exito(sistema.resultado_ultimo(), getattr(flujo, "ultimo_veredicto", None))
+            self.audio.efecto("mision_exito" if exito else "mision_fallo", 0.9)
 
-    # Heurística: éxito si los deltas de los indicadores no suman negativo (sin deltas = éxito).
+    # Éxito de la misión para el sonido. Si hay veredicto (consecuencias activas) manda su efecto en la confianza; si
+    # no, la suma de los deltas de los indicadores, con «desinformacion» al revés (que suba es malo). Sin datos = éxito.
     @staticmethod
-    def _fue_exito(resultado):
+    def _fue_exito(resultado, veredicto=None):
         try:
+            if isinstance(veredicto, dict) and veredicto.get("delta") is not None:
+                return float(veredicto["delta"]) >= 0
             deltas = resultado.get("deltas", {}) if isinstance(resultado, dict) else {}
-            return sum(float(v) for v in deltas.values()) >= 0
+            return sum(-float(v) if k == "desinformacion" else float(v) for k, v in deltas.items()) >= 0
         except (TypeError, ValueError):
             return True
 

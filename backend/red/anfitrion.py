@@ -184,7 +184,7 @@ def texto_version(v_cliente, juego=protocolo.JUEGO):
         return "Este no es el juego Alcalde Digital."
     if isinstance(v_cliente, int) and v_cliente < protocolo.PROTOCOLO_V:
         return (f"Tu juego es de una versión anterior (protocolo {v_cliente}; la sala usa el {protocolo.PROTOCOLO_V}, "
-                f"con mapa grande y 24 vehículos). Actualiza el juego para entrar.")
+                f"con veredicto y confianza de las misiones). Actualiza el juego para entrar.")
     return (f"Tu juego es más nuevo que el de la sala (protocolo {v_cliente}; la sala usa el {protocolo.PROTOCOLO_V}). "
             f"Pídele al anfitrión que lo actualice.")
 
@@ -981,12 +981,19 @@ class Anfitrion:
                             "deltas": ev["deltas"]})]
         if t == "mision_cerrada":
             # Solo a su dueño: los demás se enteran por «ind» y por las «hechas» de su próxima misión.
-            return [(ev["jugador"], {"t": "mision_cerrada", "id": ev["id"], "siguiente": ev["siguiente"]})]
+            msg = {"t": "mision_cerrada", "id": ev["id"], "siguiente": ev["siguiente"]}
+            if "confianza" in ev:                    # v5: consecuencias (veredicto y confianza de la ciudad)
+                msg.update(veredicto=ev.get("veredicto"), grupo=ev.get("grupo"), delta=ev.get("delta", 0),
+                           confianza=ev["confianza"])
+            return [(ev["jugador"], msg)]
         if t == "fin":
             resumen = ev.get("resumen") or {}
             hechas, pendientes = len(resumen.get("completadas", [])), len(resumen.get("pendientes", []))
             texto = f"Misiones completadas: {hechas} de {hechas + pendientes}."
-            return [(para, {"t": "fin", "indicadores": ev["indicadores"], "resumen": _texto(texto, 1000)})]
+            msg = {"t": "fin", "indicadores": ev["indicadores"], "resumen": _texto(texto, 1000)}
+            if "confianza" in ev:
+                msg.update(confianza=ev["confianza"], pasadas=ev.get("pasadas", 0), falladas=ev.get("falladas", 0))
+            return [(para, msg)]
         if t == "sala_cerrada":
             self._sala_cerrada = True
             return [(para, {"t": "sala_cerrada"})]

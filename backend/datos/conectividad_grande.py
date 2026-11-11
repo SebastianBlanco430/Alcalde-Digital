@@ -254,8 +254,8 @@ class Conectividad:
 
 
 def puntos_de_aparcamiento_grande(mundo, n=24):
-    # el cálculo de los puntos vive en frontend/vehiculo_calculos.py (funciones puras, sin ursina); se importa al usarlo
-    from frontend.vehiculo_calculos import puntos_de_aparcamiento
+    # el cálculo de los puntos vive en backend/logica/vehiculo_calculos.py (funciones puras, sin ursina); se importa al usarlo
+    from backend.logica.vehiculo_calculos import puntos_de_aparcamiento
     return [(p.x, p.z) for p in puntos_de_aparcamiento(mundo, n=n)]
 
 

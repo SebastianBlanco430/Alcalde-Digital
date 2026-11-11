@@ -1,0 +1,59 @@
+{
+  "id": "sector_1",
+  "nombre": "Sector corrupto 1: el servidor fantasma",
+  "descripcion": "Cruza el servidor abandonado. La ruta lateral es segura; la directa es mas corta pero pide saltos al limite.",
+  "tema": "corrupto",
+  "inicio": "inicio",
+  "meta": "meta",
+  "y_muerte": -8.0,
+  "penalizacion_caida_s": 3.0,
+  "plataformas": [
+    {"id": "inicio", "x": 0, "y": 0.0, "z": 0, "ancho": 6, "fondo": 6, "checkpoint": true},
+    {"id": "f1", "x": -5, "y": 0.6, "z": 6, "ancho": 4, "fondo": 4},
+    {"id": "f2", "x": -5, "y": 1.2, "z": 12, "ancho": 3, "fondo": 3, "tipo": "desaparece", "aviso_s": 1.4, "oculta_s": 2.5},
+    {"id": "f3", "x": -5, "y": 1.8, "z": 18, "ancho": 4, "fondo": 4, "tipo": "movil",
+     "movimiento": {"eje": [3, 0, 0], "periodo": 6.0, "fase": 0.0}},
+    {"id": "d1", "x": 0, "y": 0.8, "z": 8, "ancho": 4, "fondo": 4},
+    {"id": "d2", "x": 0, "y": 1.6, "z": 15, "ancho": 2.5, "fondo": 2.5},
+    {"id": "cp1", "x": 0, "y": 2.4, "z": 23, "ancho": 5, "fondo": 5, "checkpoint": true},
+    {"id": "p1", "x": 0, "y": 3.0, "z": 29, "ancho": 3, "fondo": 3, "requiere": "sw1"},
+    {"id": "p2", "x": 0, "y": 3.6, "z": 35, "ancho": 3, "fondo": 3, "requiere": "sw1"},
+    {"id": "q1", "x": 0, "y": 4.0, "z": 40.5, "ancho": 3, "fondo": 3, "tipo": "desaparece", "aviso_s": 1.2, "oculta_s": 2.5},
+    {"id": "q2", "x": 4, "y": 4.6, "z": 45, "ancho": 3, "fondo": 3, "checkpoint": true},
+    {"id": "q3", "x": 0, "y": 5.2, "z": 50, "ancho": 3, "fondo": 3},
+    {"id": "meta", "x": 0, "y": 5.8, "z": 56.5, "ancho": 6, "fondo": 6}
+  ],
+  "interruptores": [
+    {"id": "sw1", "x": 1.8, "y": 2.4, "z": 23, "radio": 0.9, "activa": ["p1", "p2"], "duracion_s": null}
+  ],
+  "aristas": [
+    {"desde": "inicio", "hasta": "f1", "coste": 2.0, "riesgo": 0},
+    {"desde": "f1", "hasta": "f2", "coste": 2.0, "riesgo": 0},
+    {"desde": "f2", "hasta": "f3", "coste": 2.5, "riesgo": 0},
+    {"desde": "f3", "hasta": "cp1", "coste": 3.0, "riesgo": 0},
+    {"desde": "inicio", "hasta": "d1", "coste": 1.5, "riesgo": 0},
+    {"desde": "d1", "hasta": "d2", "coste": 2.0, "riesgo": 1},
+    {"desde": "d2", "hasta": "cp1", "coste": 2.5, "riesgo": 2},
+    {"desde": "cp1", "hasta": "p1", "coste": 1.5, "riesgo": 0},
+    {"desde": "p1", "hasta": "p2", "coste": 1.8, "riesgo": 0},
+    {"desde": "p2", "hasta": "q1", "coste": 2.0, "riesgo": 0},
+    {"desde": "q1", "hasta": "q2", "coste": 2.2, "riesgo": 0},
+    {"desde": "q2", "hasta": "q3", "coste": 2.0, "riesgo": 0},
+    {"desde": "q3", "hasta": "meta", "coste": 1.8, "riesgo": 0}
+  ],
+  "puntuacion": {
+    "maximo": 1000,
+    "tiempo_referencia_s": 40.0,
+    "peso_tiempo": 0.5,
+    "peso_eficiencia": 0.5,
+    "penalizacion_caida": 40,
+    "bono_ruta_dificil": 100
+  },
+  "medallas": {"bronce": 400, "plata": 650, "oro": 850},
+  "recompensa": {
+    "evidencia": "servidor_fantasma",
+    "caso": "cuentas_fantasma",
+    "requiere_medalla": null,
+    "efectos": {"ciudadanos": {"investigacion": 4, "moral": 2}}
+  }
+}

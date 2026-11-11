@@ -318,8 +318,21 @@ class MundoCiudad:
         base = self.altura(x, z)
         if not esc.ESCALERAS_PELDANOS or not self._escaleras:
             return base
-        h = esc.altura_sobre_escaleras(self.perfiles_escaleras(), x, z)
+        perfiles = self._perfiles_de_celda(x, z)
+        if not perfiles:
+            return base
+        h = esc.altura_sobre_escaleras(perfiles, x, z)
         return base if h is None else h
+
+    # Perfiles de las escaleras que tocan la celda de (x, z) (índice perezoso, ver esc.indice_por_celdas). Se rehace si
+    # cambia la lista de perfiles.
+    def _perfiles_de_celda(self, x, z):
+        perfiles = self.perfiles_escaleras()
+        cache = getattr(self, "_indice_escaleras", None)
+        if cache is None or cache[0] is not perfiles or cache[1] != len(perfiles):
+            cache = (perfiles, len(perfiles), esc.indice_por_celdas(perfiles))
+            self._indice_escaleras = cache
+        return cache[2].get((math.floor(x / esc.CELDA_INDICE), math.floor(z / esc.CELDA_INDICE)))
 
     # Perfiles de peldaños de cada escalera (mismo orden que escaleras()); el renderizador dibuja
     # exactamente estos peldaños. Sin terreno (mundo plano) no hay peldaños y la lista sale vacía.

@@ -1,0 +1,34 @@
+{
+  "npc": "marcos",
+  "lineas": {
+    "normal": [
+      "Marcos Vela, asesor de la campaña rival. Sea lo que sea, yo no toqué ningún servidor."
+    ],
+    "cortante": [
+      "No tengo nada que hablar contigo. Pregúntale a mi abogado."
+    ],
+    "exclusivo": [
+      "Entre tú y yo, la política es un juego sucio. Pero contigo prefiero jugar limpio."
+    ],
+    "hostil": [
+      "Me arrinconaste con tus pruebas. No esperes que te sonría."
+    ],
+    "nervioso": [
+      "¿Qué te contó Inés? Eso... eso no significa nada, ¿me oyes?"
+    ]
+  },
+  "reglas_actitud": [
+    {
+      "actitud": "hostil",
+      "alguna": [
+        "marcos_acorralado"
+      ]
+    },
+    {
+      "actitud": "nervioso",
+      "flags": [
+        "ines_admitio_credencial"
+      ]
+    }
+  ]
+}

@@ -192,7 +192,7 @@ class EscenaJuego(Escena):
             self.panel_propagacion.fijar_grafo(grafo_social)
             self.panel_propagacion.fijar_rol(self._rol_id())
         if mision is not None:
-            self.lote = LoteMision(mision, grafo_social, rol=self._rol_id())
+            self.lote = LoteMision(mision, grafo_social, rol=self._rol_id(), estado=estado)   # estado: carta de misión (A2d)
         self.refrescar()
 
     # Al salir se invalida el invoke pendiente: _finalizar_mision no debe disparar
@@ -357,7 +357,13 @@ class EscenaJuego(Escena):
 
         noticia = self.estado.noticia_actual()
         if not self.mision_terminada:    # al terminar el lote se queda a la vista la última decisión
-            self.red.poner_publicacion(None if noticia is None else noticia.texto)
+            # Carta de misión (A2d): se marca y enseña la pista (lo que el jugador vio al llegar al lugar).
+            pista = self.lote.pista() if self.lote is not None and self.lote.es_carta_de_mision() else None
+            # En línea la carta de misión llega en la mano que reparte el anfitrión (EstadoRemoto la reconoce).
+            en_linea = getattr(self.estado, "es_carta_de_mision", None)
+            if pista is None and self.mision is not None and callable(en_linea) and en_linea():
+                pista = getattr(self.mision, "pista", "")
+            self.red.poner_publicacion(None if noticia is None else noticia.texto, pista=pista or None)
 
         hay_noticia = self.estado.hay_noticia() and not self.mision_terminada
         self.boton_compartir.fijar_habilitado(hay_noticia)

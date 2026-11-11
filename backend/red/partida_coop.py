@@ -16,13 +16,21 @@
 # y "para": id del destinatario o None = a todos); se leen con tomar_eventos().
 #
 # Reloj inyectable (`reloj`, por defecto time.monotonic) para probar la gracia sin dormir.
+#
+# CONSECUENCIAS (`consecuencias=True`, protocolo v5; el servidor lo enciende): como en la partida local (A2d), UNA de las
+# cartas de la mano es el rumor de la misión (backend/datos/noticias_mision.py; ids >= 1000, no chocan con el mazo). La
+# decisión sobre esa carta da el veredicto de la misión, que mueve la confianza del grupo en un GameState del anfitrión
+# (una sola confianza de la ciudad, compartida por todos). «mision_cerrada» lleva veredicto, grupo, delta y la confianza
+# resultante; «fin» lleva la confianza y el recuento de pasadas y falladas, con lo que cada cliente arma el mismo final.
+# Con False (por defecto, y lo que usan las pruebas antiguas) todo queda como antes.
 
 import random
 import time
 
+from backend.logica import confianza_misiones
 from backend.logica.lote_mision import LoteMision
 from backend.logica.mazo_noticias import MazoNoticias
-from backend.logica.misiones import EN_MINIJUEGO
+from backend.logica.misiones import EN_MINIJUEGO, RADIO_INTERACCION
 from backend.red.mision_coop import ReservaMisiones, SistemaMisionesCoop
 from backend.red.sesion_en_linea import SesionEnLinea
 
@@ -62,9 +70,17 @@ class MazoSembrado(MazoNoticias):
 class PartidaCooperativa:
 
     def __init__(self, estado_partida, mapa, catalogo, grafo_social=None, reloj=time.monotonic,
-                 escala_mundo=1.0, punto_interaccion=None, radio_interaccion=1.5,
-                 histeresis=0.3, gracia=GRACIA_RECONEXION):
+                 escala_mundo=1.0, punto_interaccion=None, radio_interaccion=RADIO_INTERACCION,
+                 histeresis=0.3, gracia=GRACIA_RECONEXION, consecuencias=False):
         self.sesion = SesionEnLinea(estado_partida, escala_mundo=escala_mundo)
+        self._cartas = None            # CartasMision del catálogo (None = sin consecuencias)
+        self._tabla = None             # {grupo: DeltasGrupo}
+        self._gs = None                # GameState del anfitrión (confianza de la ciudad)
+        self._carta_de = {}            # id jugador -> id de la carta de misión que tiene (o tuvo) en la mano
+        self._decision_mision = {}     # id jugador -> decisión tomada sobre su carta de misión
+        self._veredictos = {confianza_misiones.PASADA: 0, confianza_misiones.FALLADA: 0}
+        if consecuencias:
+            self._activar_consecuencias(catalogo)
         self.reserva = ReservaMisiones(catalogo)
         self._mapa = mapa
         self._catalogo = list(catalogo)
@@ -88,7 +104,25 @@ class PartidaCooperativa:
         self._eventos = []
         self._fin_emitido = False
 
+    def _activar_consecuencias(self, catalogo):
+        from backend.datos.noticias_mision import construir_cartas_mision
+        from backend.logica.game_state import GameState
+        catalogo = list(catalogo)
+        try:
+            self._cartas = construir_cartas_mision(catalogo)
+        except ValueError:
+            return                     # catálogo sin cartas válidas: la partida sigue sin consecuencias
+        self._tabla = confianza_misiones.tabla_deltas(catalogo)
+        self._gs = GameState(npcs=[], reloj=lambda: len(self._cierres))
+
     # -- Consulta --
+
+    def consecuencias_activas(self):
+        return self._gs is not None
+
+    # Confianza de la ciudad por grupo ({} sin consecuencias).
+    def confianzas(self):
+        return self._gs.confianzas() if self._gs is not None else {}
 
     @property
     def fase(self):
@@ -196,6 +230,8 @@ class PartidaCooperativa:
             sistema.liberar()
         self._lotes.pop(id_jugador, None)
         self._manos.pop(id_jugador, None)
+        self._carta_de.pop(id_jugador, None)
+        self._decision_mision.pop(id_jugador, None)
         self._listos.discard(id_jugador)
         self._ultimo_seq.pop(id_jugador, None)
         self.sesion.quitar_jugador(id_jugador)
@@ -296,12 +332,26 @@ class PartidaCooperativa:
             return self._rechazar("rechazo_decision", id_jugador, "noticia_no_esta_en_la_mano")
         nodo, camino = carta
         estado = self.estado_partida
-        nodo_stats = estado.arbol_stats.obtener_por_camino(camino)
+        # La carta de misión se resuelve con SU árbol de stats (el par de árboles de misión), las demás con el del mazo.
+        es_carta_mision = self._cartas is not None and self._carta_de.get(id_jugador) == nodo.id
+        arbol_stats = self._cartas.arbol_stats if es_carta_mision else estado.arbol_stats
+        nodo_stats = arbol_stats.obtener_por_camino(camino)
         if nodo_stats is None:
-            return self._rechazar("rechazo_decision", id_jugador, "noticia_sin_stats")
+            # Isomorfismo roto: la carta no se puede resolver. Se saca de la mano y cuenta como
+            # descartada; así el lote avanza y el anfitrión puede cerrar la misión.
+            mano.remove(carta)
+            lote = self._lotes[id_jugador]
+            lote.registrar(tipo, None, quedan_noticias=bool(mano))
+            self._emitir("rechazo_decision", para=id_jugador, motivo="noticia_sin_stats",
+                         noticia=id_noticia)
+            if lote.terminada():
+                self._cerrar_mision(id_jugador)
+            return None
         deltas = dict(nodo_stats.deltas_compartir if tipo == "compartir" else nodo_stats.deltas_reportar)
         estado.aplicar_deltas(deltas)
         mano.remove(carta)
+        if es_carta_mision:
+            self._decision_mision[id_jugador] = tipo
         self._lotes[id_jugador].registrar(tipo, deltas, quedan_noticias=bool(mano))
         self._emitir("ind", valores=estado.indicadores(), autor=id_jugador, deltas=deltas)
         if self._lotes[id_jugador].terminada():
@@ -441,7 +491,15 @@ class PartidaCooperativa:
             return None
         jugador.telefono.notificar(sistema.mensaje_notificacion())
         lote = LoteMision(mision, self._grafo, jugador.rol)
-        mano = self._robar(mision.cantidad_noticias)
+        carta_mision = self._cartas.carta(mision.id) if self._cartas is not None else None
+        self._carta_de.pop(jugador.id, None)
+        self._decision_mision.pop(jugador.id, None)
+        if carta_mision is None or mision.cantidad_noticias < 1:
+            mano = self._robar(mision.cantidad_noticias)
+        else:                           # una de las cartas es el rumor de la misión, en un puesto que varía
+            mano = self._robar(mision.cantidad_noticias - 1)
+            mano.insert((len(self._cierres) + jugador.id) % (len(mano) + 1), carta_mision)
+            self._carta_de[jugador.id] = carta_mision[0].id
         if not mano:
             lote.registrar("compartir", None, quedan_noticias=False)   # nada que decidir
         self._lotes[jugador.id] = lote
@@ -477,14 +535,27 @@ class PartidaCooperativa:
         lote = self._lotes.pop(id_jugador)
         self._manos.pop(id_jugador, None)
         resultado = lote.resultado()
+        veredicto = None
+        if self._carta_de.pop(id_jugador, None) is not None:
+            decision = self._decision_mision.pop(id_jugador, None)
+            veredicto = confianza_misiones.veredicto(sistema.mision_actual(), decision)
+            resultado["decision_mision"] = decision
+            resultado["veredicto"] = veredicto
         mision = sistema.completar(resultado)
         sistema.terminar()
         self._cierres.append({"mision": mision.id, "jugador": id_jugador, "nombre": jugador.nombre,
                               "decisiones": resultado["decisiones"]})
+        consecuencia = {}
+        if self._gs is not None:
+            delta = confianza_misiones.aplicar_veredicto(self._gs, self._tabla, mision, veredicto)
+            if veredicto in self._veredictos:
+                self._veredictos[veredicto] += 1
+            consecuencia = {"veredicto": veredicto, "grupo": mision.grupo if delta is not None else None,
+                            "delta": delta if delta is not None else 0, "confianza": self._gs.confianzas()}
         siguiente = self._asignar(jugador, emitir=False)
         self._emitir("mision_cerrada", id=mision.id, jugador=id_jugador,
                      siguiente=siguiente.id if siguiente is not None else None,
-                     resultado=resultado)
+                     resultado=resultado, **consecuencia)
         if siguiente is not None:
             self._emitir_mision(jugador)
         self._comprobar_fin()
@@ -514,8 +585,13 @@ class PartidaCooperativa:
             return
         self._fin_emitido = True
         self._fase = FASE_FIN
+        consecuencia = {}
+        if self._gs is not None:
+            consecuencia = {"confianza": self._gs.confianzas(),
+                            "pasadas": self._veredictos[confianza_misiones.PASADA],
+                            "falladas": self._veredictos[confianza_misiones.FALLADA]}
         self._emitir("fin", indicadores=self.estado_partida.indicadores(),
-                     resumen=self._resumen(), motivo=motivo)
+                     resumen=self._resumen(), motivo=motivo, **consecuencia)
 
     def _resumen(self):
         hechas = set(self.reserva.completadas())

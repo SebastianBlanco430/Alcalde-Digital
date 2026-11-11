@@ -1,0 +1,44 @@
+{
+  "titulo": "Archivo de casos",
+  "no_disponible": "Archivo no disponible",
+  "no_disponible_detalle": "Solo existe en partidas con consecuencias (modo por turnos, sin conexión).",
+  "vacio": "Todavía no hay nada archivado. Juega un caso en un computador o completa el Sector corrupto.",
+  "sin_coincidencias": "Ningún registro coincide con el filtro.",
+  "pista_no_disponible": "J o Esc: cerrar",
+  "pista": "J o Esc: cerrar    Flechas, Re Pág, Av Pág o rueda: desplazar    C: caso    T: tipo    F: grupo o NPC    X: quitar filtros",
+  "filtros": {"caso": "Caso", "tipo": "Tipo", "actor": "Grupo/NPC", "todos": "Todos"},
+  "secciones": {"registro": "Registro cronológico", "casos": "Casos jugados", "evidencias": "Evidencias", "resumen": "Efecto acumulado"},
+  "sin_casos": "Ningún caso terminado.",
+  "sin_evidencias": "Sin evidencias.",
+  "sin_efectos": "Sin cambios registrados.",
+  "posicion": "Registros {desde}-{hasta} de {total}",
+  "categorias": {
+    "evidencia": "Evidencia",
+    "decision": "Decisión",
+    "prueba": "Prueba",
+    "hallazgo": "Hallazgo",
+    "acusacion": "Acusación",
+    "resultado": "Resultado"
+  },
+  "resultados": {"exito": "Éxito", "parcial": "Parcial", "fracaso": "Fracaso"},
+  "grupos": {"policia": "Policía", "ciudadanos": "Ciudadanos", "instituciones": "Instituciones"},
+  "origenes": {
+    "parkour": "Parkour «{nombre}»",
+    "caso": "Caso «{nombre}»",
+    "desconocido": "{origen}"
+  },
+  "plantillas": {
+    "evidencia": {"titulo": "Evidencia obtenida: {evidencia}", "detalle": "Origen: {origen}"},
+    "decision": {"titulo": "{opcion}", "detalle": "{caso}{por_tiempo}"},
+    "prueba_correcta": {"titulo": "Prueba presentada: {evidencia}", "detalle": "{caso} · Contradice la versión"},
+    "prueba_incorrecta": {"titulo": "Prueba presentada: {evidencia}", "detalle": "{caso} · No encaja (error {errores})"},
+    "hallazgo": {"titulo": "Novedad en el caso", "detalle": "{caso} · {texto}"},
+    "acusacion": {"titulo": "Acusaste a {acusado}", "detalle": "{caso} · Final: {final} · {resultado}"},
+    "acusacion_otra": {"titulo": "Acusación: {opcion}", "detalle": "{caso} · Final: {final} · {resultado}"},
+    "resultado": {"titulo": "Caso cerrado: {final}", "detalle": "{caso} · {resultado}"}
+  },
+  "por_tiempo": " (se acabó el tiempo)",
+  "caso_jugado": "{caso}: {final} · {resultado}",
+  "caso_jugado_acusado": "{caso}: {final} · {resultado} · acusado: {acusado}",
+  "evidencia_linea": "{evidencia} ({origen})"
+}

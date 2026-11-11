@@ -14,7 +14,7 @@ import math
 # v4 (2026-10, mapa grande): 24 vehículos online (N_VEHICULOS_MAX 8 -> 24; el snapshot `veh` y `montar` admiten 0..23) y el
 # viaje rápido (mototáxi y teleférico): `viaje` (C2H) -> `viaje_ok` / `viaje_no` (H2C). Un equipo con v3 se rechaza con
 # «version» y un texto que dice cuál usa la sala (anfitrion._rechazar_version).
-PROTOCOLO_V = 4
+PROTOCOLO_V = 5
 JUEGO = "AlcaldeDigital"
 
 DIR_C2H = "c2h"   # cliente -> anfitrión
@@ -216,11 +216,20 @@ ESQUEMAS = {
         "autor": _ID,
         "deltas": Campo("dic_num", largo=16, largo_item=48, minimo=-1e6, maximo=1e6),
     }),
-    "mision_cerrada": ((DIR_H2C,), {"id": _s(64), "siguiente": _s(64, nulo=True)}),
+    # v5: veredicto de la misión ("pasada" | "fallada" | null), grupo cuya confianza movió, delta y confianza resultante.
+    "mision_cerrada": ((DIR_H2C,), {
+        "id": _s(64), "siguiente": _s(64, nulo=True),
+        "veredicto": _s(16, obligatorio=False, nulo=True), "grupo": _s(32, obligatorio=False, nulo=True),
+        "delta": _n(-1000.0, 1000.0, obligatorio=False),
+        "confianza": Campo("dic_num", largo=8, largo_item=32, minimo=0.0, maximo=100.0, obligatorio=False),
+    }),
     "salir_edificio": ((DIR_C2H,), {}),
     "fin": ((DIR_H2C,), {
         "indicadores": Campo("dic_num", largo=16, largo_item=48, minimo=-1e6, maximo=1e6),
         "resumen": _s(1000),
+        # v5: confianza final por grupo y recuento de veredictos (el cliente arma el final con confianza_misiones).
+        "confianza": Campo("dic_num", largo=8, largo_item=32, minimo=0.0, maximo=100.0, obligatorio=False),
+        "pasadas": _i(0, 10000, obligatorio=False), "falladas": _i(0, 10000, obligatorio=False),
     }),
     "ping": ((DIR_C2H, DIR_H2C), {"n": _i(0, 2 ** 31), "tt": _n(0.0, 1e9)}),
     "pong": ((DIR_C2H, DIR_H2C), {"n": _i(0, 2 ** 31), "tt": _n(0.0, 1e9)}),

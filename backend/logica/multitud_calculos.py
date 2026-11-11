@@ -35,8 +35,15 @@ PROBABILIDAD_PAUSA_PLAZA = 0.7
 PAUSA_GIRO_BRUSCO = 5.0         # s mínimos si el camino da un giro de más de ~145 grados
 LARGO_RUTA = (30.0, 150.0)      # m del camino (ida; el circuito mide el doble)
 LARGO_MINIMO = 20.0
-PASO_VALIDACION = 0.6           # m / s entre muestras al validar una ruta
+PASO_VALIDACION = 0.3           # m / s entre muestras al validar una ruta
+DESVIOS_VALIDACION = (0.15, 0.575, 1.0)       # desvíos relativos que se comprueban (los dos bordes del carril y el centro)
 RADIO_MAXIMO_CRUCE = 12.0       # m: distancia máxima de la entrada de un beco al eje de su calle
+# Velocidad según la pendiente del tramo (factor_pendiente): cuesta arriba se camina más despacio (hasta FACTOR_MIN_SUBIDA
+# en las laderas más duras); cuesta abajo suave, apenas más rápido; cuesta abajo fuerte, con cuidado.
+CAIDA_POR_SUBIDA = 1.6          # el factor baja 0,16 por cada 10 % de pendiente de subida
+FACTOR_MIN_SUBIDA = 0.55
+BAJADA_COMODA = 0.08            # pendiente de bajada hasta la que se gana velocidad
+FACTOR_MIN_BAJADA = 0.7
 
 # Peso (densidad relativa) de cada lugar como origen de rutas: más gente en plazas, mercado, feria y estaciones.
 PESO_LUGAR = {
@@ -58,6 +65,7 @@ NIVEL_C, NIVEL_B, NIVEL_A = 0, 1, 2
 RADIO_A, HISTERESIS_A = 25.0, 4.0
 RADIO_B, HISTERESIS_B = 90.0, 8.0
 MAXIMO_A, MAXIMO_B = 8, 32
+RADIO_APARICION = 70.0          # m: más cerca, un agente A LA VISTA no aparece ni desaparece (espera a salir de la vista)
 
 _MASCARA = (1 << 64) - 1
 
@@ -79,6 +87,16 @@ def _izquierda(ux, uz):
 
 def _rumbo(dx, dz):
     return math.degrees(math.atan2(dx, dz))
+
+
+def factor_pendiente(pendiente):
+    """Factor (0,55..1,03) de la velocidad de marcha en un tramo de `pendiente` (subida / largo; negativa = bajada)."""
+    if pendiente >= 0.0:
+        return max(FACTOR_MIN_SUBIDA, 1.0 - CAIDA_POR_SUBIDA * pendiente)
+    baja = -pendiente
+    if baja <= BAJADA_COMODA:
+        return 1.0 + 0.4 * baja
+    return max(FACTOR_MIN_BAJADA, 1.0 + 0.4 * BAJADA_COMODA - 1.3 * (baja - BAJADA_COMODA))
 
 
 # -- Grafo peatonal -----------------------------------------------------------------------------------------------------
@@ -156,12 +174,14 @@ def construir_grafo(mundo):
 class Ruta:
     """Circuito cerrado de 2n vértices: el camino de n tramos de ida y los mismos de vuelta. Por vértice k:
     `eje` (x, z), `n_ent` y `n_sal` (desvío lateral al llegar y al salir, ya con holgura y esquina) y `pausa` (s).
-    `dist[k]` y `pausas[k]` son las sumas acumuladas (distancia y pausas antes del vértice k); `largos[k]`, el tramo k -> k+1."""
+    `dist[k]` y `pausas[k]` son las sumas acumuladas (distancia y pausas antes del vértice k); `largos[k]`, el tramo k -> k+1.
+    `factores[k]` es el factor de velocidad del tramo k por su pendiente (1 sin `alturas`) y `tiempos[k]` la suma de
+    largo / factor antes del vértice k (los segundos de marcha a 1 m/s)."""
 
     __slots__ = ("clave", "eje", "n_ent", "n_sal", "pausa", "largos", "dir_ent", "dir_sal", "dist", "pausas",
-                 "total_dist", "total_pausas", "escala", "origen", "_parametros")
+                 "total_dist", "total_pausas", "escala", "origen", "_parametros", "factores", "tiempos", "total_tiempo")
 
-    def __init__(self, clave, nodos_xz, holguras, pausas_ida, pausas_vuelta, origen=""):
+    def __init__(self, clave, nodos_xz, holguras, pausas_ida, pausas_vuelta, origen="", alturas=None):
         self.clave = clave
         self.origen = origen
         self.escala = 1.0
@@ -204,6 +224,15 @@ class Ruta:
             p.append(p[-1] + pausa[k])
         self.dist, self.pausas = tuple(d), tuple(p)
         self.total_dist, self.total_pausas = d[-1], p[-1]
+        if alturas is None:
+            factores = [1.0] * m
+        else:
+            factores = [factor_pendiente((alturas[indice[(k + 1) % m]] - alturas[indice[k]]) / self.largos[k])
+                        for k in range(m)]
+        tiempos = [0.0]
+        for k in range(m):
+            tiempos.append(tiempos[-1] + self.largos[k] / factores[k])
+        self.factores, self.tiempos, self.total_tiempo = tuple(factores), tuple(tiempos), tiempos[-1]
 
     def vertices(self):
         return len(self.eje)
@@ -222,7 +251,7 @@ def _parametros(ruta, semilla):
 def duracion_ciclo(ruta, semilla):
     """Segundos que tarda el agente en dar una vuelta completa al circuito."""
     v, f, _, _ = _parametros(ruta, semilla)
-    return ruta.total_dist / v + f * ruta.total_pausas
+    return ruta.total_tiempo / v + f * ruta.total_pausas
 
 
 def _suave(x):
@@ -233,13 +262,13 @@ def _suave(x):
 def _evaluar(ruta, u, v, f, d):
     """Estado en el instante `u` (s, ya dentro del ciclo) de un agente de velocidad `v`, factor de pausas `f` y desvío
     relativo `d`. (x, z, rumbo, velocidad, en_movimiento, distancia recorrida del circuito)."""
-    dist, pausas = ruta.dist, ruta.pausas
+    dist, pausas, tiempos = ruta.dist, ruta.pausas, ruta.tiempos
     m = len(ruta.eje)
-    k = bisect.bisect_right(range(m), u, key=lambda i: dist[i] / v + f * pausas[i]) - 1
+    k = bisect.bisect_right(range(m), u, key=lambda i: tiempos[i] / v + f * pausas[i]) - 1
     if k < 0:
         k = 0
     k_sig = k + 1 if k + 1 < m else 0
-    inicio = dist[k] / v + f * pausas[k]
+    inicio = tiempos[k] / v + f * pausas[k]
     espera = u - inicio
     duracion = f * ruta.pausa[k]
     esc = ruta.escala * d
@@ -260,6 +289,7 @@ def _evaluar(ruta, u, v, f, d):
         vel = math.hypot(dx, dz) / (duracion * (b - a)) * 1.5
         return (ax + ni[0] * esc + dx * w, az + ni[1] * esc + dz * w, _rumbo(dx, dz), vel, True, dist[k])
     largo = ruta.largos[k]
+    v = v * ruta.factores[k]                                # más despacio cuesta arriba
     frac = (espera - duracion) * v / largo
     frac = 0.0 if frac < 0.0 else 1.0 if frac > 1.0 else frac
     bx, bz = ruta.eje[k_sig]
@@ -274,13 +304,48 @@ def posicion_en(t, ruta, semilla):
     """Posición del agente `semilla` en `ruta` en el instante `t` (s del reloj compartido): (x, z, rumbo en grados,
     velocidad m/s, en_movimiento, distancia recorrida en el circuito). Sin estado: misma entrada, misma salida."""
     v, f, fase, d = _parametros(ruta, semilla)
-    ciclo = ruta.total_dist / v + f * ruta.total_pausas
+    ciclo = ruta.total_tiempo / v + f * ruta.total_pausas
     return _evaluar(ruta, (t + fase * ciclo) % ciclo, v, f, d)
 
 
-def muestras_de_ruta(ruta, desvios=(0.15, 1.0), paso=PASO_VALIDACION):
+def tiempo_en_distancia(ruta, s, v, f):
+    """Instante (s dentro del ciclo) en el que un agente de velocidad `v` y factor de pausas `f` pasa por la distancia
+    `s` del circuito (ya terminada la parada del vértice anterior). Inversa de la distancia que da _evaluar."""
+    m = len(ruta.eje)
+    s = 0.0 if s < 0.0 else s
+    k = bisect.bisect_right(ruta.dist, s) - 1
+    if k >= m:
+        k, s = m - 1, ruta.total_dist
+    return ruta.tiempos[k] / v + f * (ruta.pausas[k] + ruta.pausa[k]) + (s - ruta.dist[k]) / (v * ruta.factores[k])
+
+
+def pausa_restante(ruta, u, v, f):
+    """Segundos que el agente seguirá QUIETO en el mismo punto a partir del instante `u` del ciclo (0 si anda o está
+    cruzando de acera). Adelantar el reloj del agente esos segundos no lo mueve de sitio: lo usa la conducta para que el
+    tiempo que ya esperó en una cola cuente como parada."""
+    tiempos, pausas = ruta.tiempos, ruta.pausas
+    m = len(ruta.eje)
+    k = bisect.bisect_right(range(m), u, key=lambda i: tiempos[i] / v + f * pausas[i]) - 1
+    if k < 0:
+        k = 0
+    espera = u - (tiempos[k] / v + f * pausas[k])
+    duracion = f * ruta.pausa[k]
+    if espera >= duracion:
+        return 0.0
+    if ruta.n_ent[k] == ruta.n_sal[k]:
+        return duracion - espera
+    a, b = LADO_PARTE_PAUSA
+    s = espera / duracion
+    if s < a:
+        return a * duracion - espera
+    if s >= b:
+        return duracion - espera
+    return 0.0
+
+
+def muestras_de_ruta(ruta, desvios=DESVIOS_VALIDACION, paso=PASO_VALIDACION):
     """[(x, z)] a lo largo de todo el circuito (incluido el cruce de los extremos) con cada desvío relativo de `desvios`."""
-    ciclo = ruta.total_dist + ruta.total_pausas
+    ciclo = ruta.total_tiempo + ruta.total_pausas
     n = int(ciclo / paso) + 1
     return [_evaluar(ruta, ciclo * i / n, 1.0, 1.0, d)[:2] for d in desvios for i in range(n)]
 
@@ -363,7 +428,8 @@ def crear_poblacion(mundo, cantidad=POBLACION, semilla=SEMILLA_MULTITUD, validar
         if len(camino) < 2 or total < LARGO_MINIMO:
             continue
         ida, vuelta = _pausas(graf, camino, azar)
-        ruta = Ruta(len(rutas), [graf.puntos[i] for i in camino], holguras, ida, vuelta, graf.nombres[inicio])
+        alturas = [mundo.altura(*graf.puntos[i]) for i in camino] if hasattr(mundo, "altura") else None
+        ruta = Ruta(len(rutas), [graf.puntos[i] for i in camino], holguras, ida, vuelta, graf.nombres[inicio], alturas)
         if validar and not _ajustar_holgura(ruta, mundo.es_transitable):
             descartadas += 1
             continue
@@ -411,7 +477,9 @@ class Asignador:
 
     El A de una variante sale de su propia piscina (el aspecto de un agente no cambia al pasar de B a A) y, si no hay uno
     libre, el agente se queda en B. Los cambios A <-> B de un agente que se VE (`en_vista(i)`) se aplazan mientras no sean
-    obligados (franja de 6 m junto al radio), para que el intercambio ocurra fuera de la vista."""
+    obligados (franja de 6 m junto al radio), para que el intercambio ocurra fuera de la vista. Lo mismo al aparecer o
+    desaparecer (C <-> A/B, por el cupo o el horario): a menos de RADIO_APARICION m y a la vista se aplaza, así nadie
+    surge ni se esfuma delante del jugador. Con `en_vista=None` (primer reparto, salto de cámara) no se aplaza nada."""
 
     def __init__(self, agentes, actores_por_variante=2, figuras_por_variante=12, maximo_a=MAXIMO_A, maximo_b=MAXIMO_B):
         self.agentes = agentes
@@ -466,6 +534,8 @@ class Asignador:
             if antes == NIVEL_A and quiere == NIVEL_B and en_vista is not None and d < RADIO_A + HISTERESIS_A + 4.0 \
                     and en_vista(i):
                 continue                                        # aplazado: se intercambia cuando salga de la vista
+            if quiere == NIVEL_C and en_vista is not None and d < RADIO_APARICION and en_vista(i):
+                continue                                        # no se esfuma a la vista
             nuevo = self._tomar(NIVEL_B, variante) if quiere == NIVEL_B else None
             if quiere == NIVEL_B and nuevo is None:
                 quiere = NIVEL_C
@@ -474,11 +544,17 @@ class Asignador:
             self.nivel[i], self.recurso[i] = quiere, nuevo
         subir = [i for i in range(n) if deseado[i] > self.nivel[i]]
         subir.sort(key=distancias.__getitem__)
-        for i in subir[:max_promociones]:
+        hechas = 0
+        for i in subir:
+            if hechas >= max_promociones:
+                break
             antes, quiere, variante = self.nivel[i], deseado[i], self.agentes[i].variante
             if quiere == NIVEL_A and antes == NIVEL_B and en_vista is not None and distancias[i] > RADIO_A - 6.0 \
                     and en_vista(i):
                 continue
+            if antes == NIVEL_C and en_vista is not None and distancias[i] < RADIO_APARICION and en_vista(i):
+                continue                                        # no aparece de la nada a la vista
+            hechas += 1
             nuevo = self._tomar(quiere, variante)
             if nuevo is None and quiere == NIVEL_A and antes == NIVEL_C:
                 quiere = NIVEL_B

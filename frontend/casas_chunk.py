@@ -16,7 +16,7 @@
 
 from panda3d.core import (ColorAttrib, Geom, GeomVertexArrayFormat, GeomVertexFormat, GeomVertexWriter, InternalName,
                           MaterialAttrib, NodePath)
-from ursina import Entity, load_model
+from ursina import Entity, application, load_model
 
 from backend.datos.modelos_edificios import MODELOS, modelo_de
 from frontend import casas_decorativas as cd
@@ -26,6 +26,7 @@ from frontend.componentes import rgb
 RELIEVES = (146, 162, 178)
 DRAWS_MAXIMOS_POR_CHUNK = 35          # tope de geoms de las casas de un chunk (lo comprueba la prueba de humo)
 CASAS_POR_TANDA = 4                   # pisos que se copian entre una cesión y otra
+ESPERA = "espera"                     # lo que cede un generador que aguarda al hilo de carga (no hay trabajo que hacer)
 # LOD1: la pared pintada se ve con la textura de concreto (~0,66 de brillo en la esquina) y el zinc/teja ~0,8.
 FACTOR_PARED_LOD1 = 0.68
 FACTOR_TECHO_LOD1 = 0.82
@@ -139,9 +140,11 @@ def pisos_de(casas):
     return [(c, p) for c in casas for p in range(getattr(c, "pisos", 1))]
 
 
-def lote_de_casas(fabrica, casas, alturas, contorno=True, tanda=CASAS_POR_TANDA):
+def lote_de_casas(fabrica, casas, alturas, contorno=True, tanda=CASAS_POR_TANDA, en_hilo=False):
     """Generador: copia cada piso de cada casa (con su pintura) bajo una raíz y la funde con flatten_strong. Su valor de
-    retorno es (lote, tinta): NodePath de las casas y NodePath del casco de tinta (None si contorno=False)."""
+    retorno es (lote, tinta): NodePath de las casas y NodePath del casco de tinta (None si contorno=False).
+    `en_hilo`: funde en el hilo de carga de Panda y cede ESPERA mientras tanto (ver _fundir_en_hilo); quien lo pida debe
+    seguir dando pasos al gestor de tareas (app.step) entre un `next` y otro, o la espera no termina nunca."""
     raiz = NodePath("casas_chunk")
     raiz_tinta = NodePath("contorno_chunk") if contorno else None
     hechos = 0
@@ -165,14 +168,41 @@ def lote_de_casas(fabrica, casas, alturas, contorno=True, tanda=CASAS_POR_TANDA)
                 yield
     yield
     raiz.clear_model_nodes()
-    raiz.flatten_strong()
-    yield
     if raiz_tinta is not None:
         raiz_tinta.clear_model_nodes()
-        raiz_tinta.flatten_strong()
-        raiz_tinta.set_light_off()
+    yield
+    if en_hilo and fundir_en_hilo_disponible():
+        raiz, raiz_tinta = yield from _fundir_en_hilo(raiz, raiz_tinta)
+    else:
+        raiz.flatten_strong()
         yield
+        if raiz_tinta is not None:
+            raiz_tinta.flatten_strong()
+            yield
+    if raiz_tinta is not None:
+        raiz_tinta.set_light_off()
     return raiz, raiz_tinta
+
+
+def fundir_en_hilo_disponible():
+    """¿Se puede fundir en el hilo de carga de Panda? Hace falta la aplicación viva (su Loader) y Panda con hilos reales."""
+    from panda3d.core import Thread
+    base = getattr(application, "base", None)
+    return base is not None and getattr(base, "loader", None) is not None and Thread.is_threading_supported()
+
+
+def _fundir_en_hilo(raiz, raiz_tinta):
+    """Generador: flatten_strong de las dos raíces en el hilo de carga de Panda (Loader.asyncFlattenStrong: copia cada
+    raíz y funde la COPIA fuera del hilo principal). Eran los pasos más largos de un chunk (17 y 28 ms de media, hasta
+    44 ms: un tirón visible al caminar). Mientras espera cede ESPERA para que el gestor no gaste su presupuesto dando
+    vueltas. Devuelve las raíces YA fundidas (nodos nuevos; las originales se descartan)."""
+    nodos = [raiz] if raiz_tinta is None else [raiz, raiz_tinta]
+    listos = []
+    application.base.loader.asyncFlattenStrong(nodos, inPlace=False, callback=listos.append)
+    while not listos:
+        yield ESPERA
+    fundidos = listos[0]
+    return fundidos[0], (fundidos[1] if raiz_tinta is not None else None)
 
 
 def cajas_lod1(acum, casas, apoyos):

@@ -81,7 +81,45 @@ class EscenaInicio(Escena):
             self.botones = tuple(b for b in self.botones if b is not self.boton_salir) + (
                 self.boton_online, self.boton_salir)
         self.foco = FocoTeclado(lambda: self.botones, parent=self)
+        # «Continuar» (guardado de partida): oculto hasta que frontend/registro_guardado.py lo ofrece y hay un guardado.
+        self.boton_continuar = BotonPrimario(
+            "Continuar", al_clic=self._clic_continuar, ancho=self.ANCHO_BOTON, alto=alto_b,
+            tamano_fuente_px=26, parent=self, position=(-self.X_PAREJA, self.Y_BOTON), enabled=False)
+        self.texto_continuar = Text(
+            "", parent=self, origin=(0, 0), position=(-self.X_PAREJA, self.Y_BOTON + alto_b / 2 + a_unidades(16), -0.001),
+            scale=escala_fuente(15), color=rgb(estilo.COLOR_TEXTO), enabled=False)
+        self._botones_base = self.botones
+        self._al_continuar = None
+        self._resumen_guardado = None
+
+    X_PAREJA = a_unidades(140)          # con «Continuar» a la vista, él y «Partida nueva» van uno al lado del otro
+
+    # Lo llama frontend/registro_guardado.py: `al_continuar()` carga la partida guardada y `resumen()` devuelve su texto
+    # corto («2 jugadores · 5 misiones hechas») o "" si no hay guardado de este mundo.
+    def ofrecer_continuar(self, al_continuar, resumen):
+        self._al_continuar, self._resumen_guardado = al_continuar, resumen
+        self._refrescar_continuar()
+
+    def _clic_continuar(self):
+        if self._al_continuar is not None:
+            self._al_continuar()
+
+    def _refrescar_continuar(self):
+        texto = ""
+        if self._resumen_guardado is not None:
+            try:
+                texto = self._resumen_guardado() or ""
+            except Exception:
+                texto = ""
+        hay = bool(texto)
+        self.boton_continuar.enabled = hay
+        self.texto_continuar.enabled = hay
+        self.texto_continuar.text = f"Partida guardada: {texto}" if hay else ""
+        self.boton_comenzar.x = self.X_PAREJA if hay else 0
+        self.boton_comenzar.text_entity.text = "Partida nueva" if hay else "Empezar"
+        self.botones = ((self.boton_continuar,) + self._botones_base) if hay else self._botones_base
 
     def al_entrar(self, **datos):
+        self._refrescar_continuar()
         self.foco.reiniciar()
         self.fondo.t = 0.0

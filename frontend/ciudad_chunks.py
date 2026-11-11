@@ -36,7 +36,7 @@ from frontend import chunks_calculos as calc
 from frontend.arboles_lowpoly import arbol_bajo, arbusto_bajo
 from frontend.banderas import crear_banderas
 from frontend.calles_chunk import calles_del_chunk, plazas_globales
-from frontend.casas_chunk import FabricaCasas, cajas_lod1, lote_de_casas
+from frontend.casas_chunk import ESPERA, FabricaCasas, cajas_lod1, lote_de_casas
 from frontend.cielo import DIRECCION_SOL, CieloDegradado
 from frontend.ciudad_3d import (COLOR_LUZ_AMBIENTE, COLOR_LUZ_SOL, RESOLUCION_SOMBRAS, SOMBRAS, CONTORNO_TINTA, Ciudad3D,
                                 rgb_luz)
@@ -51,6 +51,7 @@ from frontend.suelo_favela import textura_del_camino, textura_del_grano
 from frontend.terreno_lod import CampoSuelo, malla_fondo, malla_lod0, malla_lod1
 
 MAX_SOLTAR_POR_FRAME = 2          # chunks (niveles) que se destruyen por frame
+DEUDA_MAXIMA_PASOS = 4            # la deuda del presupuesto de construcción no pasa de tantos frames de presupuesto
 CADA_N_FRAMES_PLAN = 8            # cada cuántos frames se replanifica (si no se movió antes)
 MOVIMIENTO_REPLAN = 6.0           # m que obligan a replanificar
 RADIO_CAMARA = 48.0               # m: la cámara solo choca con casas de chunks LOD0 a esta distancia del jugador
@@ -124,11 +125,13 @@ class GestorChunks(Entity):
         self.radio_lod1 = mundo_config.RADIO_LOD1
         self.tiempos = {0: [], 1: []}           # s de CPU gastados por chunk construido (estadísticas)
         self._t_tarea = 0.0
+        self._saldo = 0.0                       # s de presupuesto de construcción disponibles (negativo = deuda)
         self.construidos = {0: 0, 1: 0}
         self.max_paso_ms = 0.0
         self.peor_paso = None                   # (ms, clave, nivel, (archivo, función, línea)) del paso más largo
         self.diagnostico = True
         self.ignore_paused = True
+        self._en_hilo = mundo_config.FUNDIR_EN_HILO      # flatten de las casas en el hilo de carga (False en construir_anillo)
 
     # -- Foco --
 
@@ -207,7 +210,7 @@ class GestorChunks(Entity):
         g_arena = yield from arena.volcar_a_geom("calles_arena")
         g_asfalto = yield from asfalto.volcar_a_geom("asfalto")
         lote, tinta = yield from lote_de_casas(self.fabrica, [casas_h[i] for i in orden], [apoyos[i][1] for i in orden],
-                                               contorno=CONTORNO_TINTA)
+                                               contorno=CONTORNO_TINTA, en_hilo=self._en_hilo)
         obj = yield from construir_objetos(self.ctx, vista, clave, casas_h, apoyos, propias)
         g_lit = yield from obj.lit.volcar_a_geom("objetos")
         g_pintura = yield from obj.pintura.volcar_a_geom("pintura")
@@ -341,7 +344,8 @@ class GestorChunks(Entity):
     # -- Ciclo --
 
     def _avanzar(self):
-        """Un paso de la tarea actual. False si no hay nada que hacer."""
+        """Un paso de la tarea actual. False si no hay nada que hacer; ESPERA si la tarea aguarda al hilo de carga (no
+        tiene sentido darle más pasos este frame)."""
         if self._tarea is None:
             while self._cola:
                 _, clave, nivel = self._cola.pop(0)
@@ -355,8 +359,9 @@ class GestorChunks(Entity):
         clave, nivel, gen = self._tarea
         antes = self._donde(gen) if self.diagnostico else None
         t0 = reloj.perf_counter()
+        cedido = None
         try:
-            next(gen)
+            cedido = next(gen)
             fin = None
         except StopIteration as e:
             fin = e
@@ -368,7 +373,7 @@ class GestorChunks(Entity):
         if fin is not None:
             self._tarea = None
             self._terminar(clave, nivel, fin.value)
-        return True
+        return ESPERA if cedido is ESPERA else True
 
     # (archivo, función, línea) donde está detenido el generador más interno: dónde empieza el próximo paso (diagnóstico).
     @staticmethod
@@ -427,11 +432,23 @@ class GestorChunks(Entity):
                 or math.hypot(foco[0] - self._foco_plan[0], foco[1] - self._foco_plan[1]) > MOVIMIENTO_REPLAN):
             self._replanificar(foco)
         self._soltar()
-        t0 = reloj.perf_counter()
+        # Presupuesto como CUENTA (no como «sigue mientras no te pases»): un paso de generador dura de media ~3,5 ms, más
+        # que el presupuesto normal, así que el bucle anterior hacía un paso, veía que aún «quedaba» tiempo en el reloj del
+        # segundo y gastaba ~7,7 ms por frame con cualquier presupuesto. Ahora cada frame ingresa su presupuesto en el
+        # saldo, un paso solo arranca con saldo positivo y su duración REAL se descuenta: la media por frame es el
+        # presupuesto. La deuda se acota para que un paso largo (hasta ~40 ms) no pare la construcción medio segundo.
         presupuesto = self._presupuesto() / 1000.0
-        while reloj.perf_counter() - t0 < presupuesto:
-            if not self._avanzar():
+        self._saldo = min(self._saldo + presupuesto, presupuesto)
+        while self._saldo > 0.0:
+            t0 = reloj.perf_counter()
+            avance = self._avanzar()
+            if not avance:
                 break
+            self._saldo -= reloj.perf_counter() - t0
+            if avance is ESPERA:
+                break
+        if self._saldo < -DEUDA_MAXIMA_PASOS * presupuesto:
+            self._saldo = -DEUDA_MAXIMA_PASOS * presupuesto
         if self._sucio_camara:
             self._actualizar_camara(foco)
 
@@ -447,7 +464,7 @@ class GestorChunks(Entity):
             if d < mundo_config.RADIO_URGENTE:
                 return mundo_config.PRESUPUESTO_URGENTE_MS
         if len(self._cola) > mundo_config.COLA_LARGA:
-            return mundo_config.PRESUPUESTO_URGENTE_MS
+            return mundo_config.PRESUPUESTO_COLA_MS
         return mundo_config.PRESUPUESTO_MS
 
     # -- Construcción síncrona (arranque, pruebas) --
@@ -466,21 +483,25 @@ class GestorChunks(Entity):
                 if (n == 0 and calc.distancia_a_caja(foco[0], foco[1], self.limites[c]) <= radio0)
                 or (n == 1 and radio1 is not None)]
         total = len(cola)
-        for k, (_, clave, nivel) in enumerate(cola):
-            if nivel in self.niveles.get(clave, {}):
-                continue
-            gen = self._tarea_nueva(clave, nivel)
-            self._t_tarea = 0.0
-            try:
-                while True:
-                    t0 = reloj.perf_counter()
-                    next(gen)
+        en_hilo, self._en_hilo = self._en_hilo, False      # aquí nadie da pasos al gestor de tareas: se funde en el sitio
+        try:
+            for k, (_, clave, nivel) in enumerate(cola):
+                if nivel in self.niveles.get(clave, {}):
+                    continue
+                gen = self._tarea_nueva(clave, nivel)
+                self._t_tarea = 0.0
+                try:
+                    while True:
+                        t0 = reloj.perf_counter()
+                        next(gen)
+                        self._t_tarea += reloj.perf_counter() - t0
+                except StopIteration as fin:
                     self._t_tarea += reloj.perf_counter() - t0
-            except StopIteration as fin:
-                self._t_tarea += reloj.perf_counter() - t0
-                self._terminar(clave, nivel, fin.value)
-            if progreso is not None:
-                progreso((k + 1) / total, "Chunk %d de %d" % (k + 1, total))
+                    self._terminar(clave, nivel, fin.value)
+                if progreso is not None:
+                    progreso((k + 1) / total, "Chunk %d de %d" % (k + 1, total))
+        finally:
+            self._en_hilo = en_hilo
         self._soltar(10 ** 6)
         self._actualizar_camara(foco)
         return total
@@ -693,7 +714,9 @@ class CiudadGrande(Entity):
             barra = BarraCarga("Cargando el barrio...")
             progreso = barra.actualizar
         try:
-            return self.gestor.construir_anillo(foco, radio, None, progreso)
+            # También el horizonte (LOD1 hasta RADIO_LOD1): son chunks baratos y, con el presupuesto por frame ya
+            # cumplido de verdad, por streaming tardaban ~30 s en completarse tras empezar a jugar.
+            return self.gestor.construir_anillo(foco, radio, mundo_config.RADIO_LOD1, progreso)
         finally:
             if barra is not None:
                 barra.cerrar()

@@ -1,0 +1,231 @@
+{
+  "id": "cuentas_fantasma",
+  "titulo": "Cuentas fantasma en Civitas",
+  "resumen": "Una oleada de cuentas falsas difundió un rumor sobre el agua de Ciudad Nova justo antes del debate. La Fiscalía te pide averiguar quién las activó.",
+  "inicio": "n_intro",
+  "rejugable": false,
+  "fin_por_errores": {"max": 3, "destino": "final_archivo"},
+  "terminal": {"nombre": "Terminal de la Fiscalía", "ancla": {"zona": "mercado", "dx": 3.0, "dz": -4.0, "rumbo": 90}},
+  "parkour": {
+    "nivel": "sector_1",
+    "texto": "Entrar al Sector corrupto",
+    "pista": "El servidor fantasma guarda un rastro que desbloquea más preguntas.",
+    "texto_completado": "Volver al Sector corrupto (rastro ya obtenido)",
+    "no_disponible": "El Sector corrupto no responde ahora mismo."
+  },
+
+  "personajes": {
+    "fiscal": {
+      "nombre": "Fiscal Rojas",
+      "rol": "Fiscalía de Ciudad Nova",
+      "retrato": {
+        "piel": [214, 170, 130], "pelo": [92, 92, 104], "pelo_estilo": "corto",
+        "ropa": [58, 68, 112], "accesorio": "gafas",
+        "expresiones": ["neutral", "serio", "satisfecho"]
+      }
+    },
+    "ines": {
+      "nombre": "Inés Duarte",
+      "rol": "Moderadora de Civitas",
+      "retrato": {
+        "piel": [236, 190, 152], "pelo": [74, 42, 32], "pelo_estilo": "largo",
+        "ropa": [66, 168, 158], "accesorio": "ninguno",
+        "expresiones": ["neutral", "nervioso", "enojado"]
+      }
+    },
+    "marcos": {
+      "nombre": "Marcos Vela",
+      "rol": "Asesor de la campaña rival",
+      "retrato": {
+        "piel": [176, 124, 92], "pelo": [30, 26, 34], "pelo_estilo": "corto",
+        "ropa": [120, 44, 64], "accesorio": "barba",
+        "expresiones": ["neutral", "nervioso", "enojado"]
+      }
+    }
+  },
+
+  "evidencias": {
+    "registro_acceso": {
+      "nombre": "Registro de accesos",
+      "descripcion": "El servidor de Civitas fue abierto a las 02:14 con una credencial temporal desde la oficina de la campaña rival."
+    },
+    "captura_chat": {
+      "nombre": "Captura de chat",
+      "descripcion": "Un mensaje de Marcos pide «activar las cuentas del agua antes del debate»."
+    },
+    "bitacora_moderacion": {
+      "nombre": "Bitácora de moderación",
+      "descripcion": "Inés reportó las cuentas sospechosas dos días antes de que explotara el rumor."
+    },
+    "declaracion_ines": {
+      "nombre": "Declaración de Inés",
+      "descripcion": "Inés admite que prestó una credencial temporal a un consultor externo."
+    },
+    "lista_cuentas": {
+      "nombre": "Lista de cuentas falsas",
+      "descripcion": "Doscientas cuentas creadas en una misma hora, todas con el mismo patrón de nombres."
+    },
+    "servidor_fantasma": {
+      "nombre": "Rastro del servidor fantasma",
+      "descripcion": "Un volcado del servidor abandonado del Sector corrupto: las cuentas falsas se activaron desde una máquina oculta, con la firma de la oficina de la campaña rival."
+    }
+  },
+
+  "nodos": {
+    "n_intro": {
+      "tipo": "dialogo", "personaje": "fiscal", "expresion": "serio",
+      "texto": "Alguien sembró cuentas falsas en Civitas para decir que el agua de Ciudad Nova está contaminada. No es cierto, pero ya corre por toda la ciudad. Habla con la moderadora y luego con el asesor rival. Decide con las pruebas que tengas.",
+      "siguiente": "n_ines_saludo"
+    },
+    "n_ines_saludo": {
+      "tipo": "dialogo", "personaje": "ines", "expresion": "neutral",
+      "texto": "Soy Inés Duarte, moderadora de Civitas. Pregunta lo que necesites, pero ya llevo horas sin dormir.",
+      "siguiente": "n_menu_ines"
+    },
+
+    "n_menu_ines": {
+      "tipo": "menu", "personaje": "ines", "expresion": "neutral",
+      "texto": "Inés espera tus preguntas.",
+      "temporizador": {"segundos": 30, "por_defecto": "cerrar_entrevista"},
+      "preguntas": [
+        {"id": "q_cuentas", "texto": "¿Cómo se crearon las cuentas falsas?", "destino": "r_cuentas"},
+        {"id": "q_acceso", "texto": "Preguntar por el acceso de las 02:14", "destino": "r_acceso",
+         "requiere": {"evidencia": ["registro_acceso"]}, "bloqueo": "Necesitas el registro de accesos del servidor."},
+        {"id": "q_bitacora", "texto": "Mostrar que reportó las cuentas antes", "destino": "r_bitacora",
+         "requiere": {"evidencia": ["bitacora_moderacion"]}, "bloqueo": "Necesitas la bitácora de moderación."},
+        {"id": "q_servidor", "texto": "Mostrarle el rastro del servidor fantasma", "destino": "r_servidor",
+         "requiere": {"evidencia": ["servidor_fantasma"]},
+         "bloqueo": "Necesitas el rastro del servidor fantasma (juega el Sector corrupto desde este mundo virtual)."},
+        {"id": "q_presionar", "texto": "Presionarla para que confiese", "destino": "r_presionar"},
+        {"id": "cerrar_entrevista", "texto": "Terminar la entrevista", "destino": "n_marcos_entra", "una_vez": false}
+      ]
+    },
+    "r_cuentas": {
+      "tipo": "dialogo", "personaje": "ines", "expresion": "neutral",
+      "texto": "Todas nacieron en una sola hora, con el mismo patrón de nombres. Te paso la lista: nadie hace eso a mano.",
+      "efectos": {"grupos": {"instituciones": {"investigacion": 10}}, "da_evidencia": ["lista_cuentas"]},
+      "siguiente": "@volver"
+    },
+    "r_acceso": {
+      "tipo": "dialogo", "personaje": "ines", "expresion": "nervioso",
+      "texto": "Está bien... presté una credencial temporal a un consultor externo. Me dijo que era para una auditoría. No sabía para quién trabajaba.",
+      "efectos": {"grupos": {"instituciones": {"investigacion": 20, "moral": 5}}, "flags": ["ines_admitio_credencial"],
+                  "relaciones": {"ines": 5}, "da_evidencia": ["declaracion_ines"]},
+      "siguiente": "@volver"
+    },
+    "r_bitacora": {
+      "tipo": "dialogo", "personaje": "ines", "expresion": "neutral",
+      "texto": "Sí, lo reporté dos días antes. Nadie me hizo caso. Desde ese momento, alguien con más permisos que yo tapó las alertas.",
+      "efectos": {"grupos": {"policia": {"investigacion": 15}}, "relaciones": {"ines": 5}, "flags": ["ines_reporto_antes"]},
+      "siguiente": "@volver"
+    },
+    "r_servidor": {
+      "tipo": "dialogo", "personaje": "ines", "expresion": "nervioso",
+      "texto": "Esa máquina oculta... yo nunca la vi en el panel. Quien montó eso tenía permisos que ni yo tengo. Guarda ese volcado: es la prueba de que alguien más tocó las cuentas.",
+      "efectos": {"grupos": {"instituciones": {"investigacion": 18, "moral": 4}}, "flags": ["ines_vio_servidor"]},
+      "siguiente": "@volver"
+    },
+    "r_presionar": {
+      "tipo": "dialogo", "personaje": "ines", "expresion": "enojado",
+      "texto": "¡No tienes derecho a tratarme así! No voy a decir nada más sin una prueba delante.",
+      "efectos": {"grupos": {"ciudadanos": {"moral": -20, "secundarios": -10}}, "relaciones": {"ines": -15}, "flags": ["presiono_a_ines"]},
+      "siguiente": "@volver"
+    },
+
+    "n_marcos_entra": {
+      "tipo": "dialogo", "personaje": "marcos", "expresion": "neutral",
+      "texto": "Marcos Vela, asesor de la campaña rival. Vengo por voluntad propia, que quede claro.",
+      "siguiente": "n_menu_marcos"
+    },
+    "n_menu_marcos": {
+      "tipo": "menu", "personaje": "marcos", "expresion": "neutral",
+      "texto": "«Yo jamás toqué ese servidor. Nunca he tenido acceso a Civitas.»",
+      "temporizador": {"segundos": 40, "por_defecto": "dejar_pasar"},
+      "preguntas": [
+        {"id": "q_coartada", "texto": "¿Dónde estaba a las 02:14?", "destino": "r_coartada"},
+        {"id": "q_consultor", "texto": "Preguntar por el consultor externo", "destino": "r_consultor",
+         "requiere": {"flags": ["ines_admitio_credencial"]}, "bloqueo": "Primero tienes que saber del consultor."},
+        {"id": "dejar_pasar", "texto": "Dejar pasar la afirmación", "destino": "n_acusacion", "una_vez": false,
+         "efectos": {"grupos": {"instituciones": {"secundarios": -5}}}}
+      ],
+      "contradicciones": [
+        {"evidencia": "registro_acceso", "destino": "n_marcos_cede", "texto": "El registro lo deja sin coartada.",
+         "efectos": {"grupos": {"instituciones": {"investigacion": 25, "moral": 5}}, "flags": ["marcos_acorralado"]}},
+        {"evidencia": "captura_chat", "destino": "n_marcos_cede", "texto": "Su propio mensaje lo contradice.",
+         "efectos": {"grupos": {"instituciones": {"investigacion": 30, "moral": 5}}, "flags": ["marcos_acorralado"]}},
+        {"evidencia": "declaracion_ines", "destino": "n_marcos_cede", "texto": "La declaración de Inés no encaja con su versión.",
+         "efectos": {"grupos": {"instituciones": {"investigacion": 15}}, "flags": ["marcos_acorralado"]}},
+        {"evidencia": "servidor_fantasma", "destino": "n_marcos_cede", "texto": "La firma del servidor oculto lleva el sello de su oficina.",
+         "efectos": {"grupos": {"instituciones": {"investigacion": 20, "moral": 5}}, "flags": ["marcos_acorralado"]}}
+      ],
+      "error": {
+        "texto": "Esa prueba no contradice lo que dice Marcos.",
+        "efectos": {"grupos": {"instituciones": {"investigacion": -10, "moral": -5, "secundarios": -10}}}
+      }
+    },
+    "r_coartada": {
+      "tipo": "dialogo", "personaje": "marcos", "expresion": "nervioso",
+      "texto": "Dormía, claro. Mi teléfono estaba apagado. No tengo nada más que decir sobre eso.",
+      "efectos": {"grupos": {"instituciones": {"investigacion": 5}}},
+      "siguiente": "@volver"
+    },
+    "r_consultor": {
+      "tipo": "dialogo", "personaje": "marcos", "expresion": "enojado",
+      "texto": "Ah, ¿ahora hay un consultor? Pues pregúntale a él. Yo no contrato a gente que no conozco.",
+      "efectos": {"grupos": {"instituciones": {"investigacion": 10}}},
+      "siguiente": "@volver"
+    },
+    "n_marcos_cede": {
+      "tipo": "dialogo", "personaje": "marcos", "expresion": "enojado",
+      "texto": "Está bien... fue idea mía. Solo queríamos que la gente dudara del agua unos días, hasta pasado el debate.",
+      "siguiente": "n_acusacion"
+    },
+
+    "n_acusacion": {
+      "tipo": "acusacion", "personaje": "fiscal", "expresion": "serio",
+      "texto": "Es la hora de decidir. ¿A quién acusas formalmente ante la Fiscalía?",
+      "temporizador": {"segundos": 45, "por_defecto": "abstenerse"},
+      "acusados": [
+        {"id": "acusar_marcos", "texto": "Acusar a Marcos Vela", "personaje": "marcos",
+         "rutas": [
+           {"requiere": {"evidencia": ["registro_acceso", "captura_chat"]}, "destino": "final_justicia"},
+           {"requiere": {"alguna_evidencia": ["registro_acceso", "captura_chat", "declaracion_ines", "lista_cuentas", "servidor_fantasma"]},
+            "destino": "final_sin_pruebas"}
+         ],
+         "destino": "final_archivo"},
+        {"id": "acusar_ines", "texto": "Acusar a Inés Duarte", "personaje": "ines", "destino": "final_inocente_acusada"},
+        {"id": "abstenerse", "texto": "No acusar a nadie todavía", "destino": "final_archivo"}
+      ]
+    },
+
+    "final_justicia": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "satisfecho", "resultado": "exito",
+      "titulo": "Justicia con pruebas",
+      "texto": "Con el registro y el chat sobre la mesa, la Fiscalía abre el caso contra Marcos Vela. Civitas retira las cuentas y Ciudad Nova vuelve a confiar en lo que lee.",
+      "efectos": {"tipo": "final", "grupos": {"policia": {"investigacion": 20, "moral": 10}, "instituciones": {"investigacion": 30, "moral": 10},
+                                              "ciudadanos": {"moral": 20, "secundarios": 5}},
+                  "relaciones": {"fiscal": 15, "ines": 10, "marcos": -20}}
+    },
+    "final_sin_pruebas": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "neutral", "resultado": "parcial",
+      "titulo": "Acusación débil",
+      "texto": "Marcos queda citado, pero sin pruebas suficientes su abogado desmonta casi todo. Las cuentas se cierran; el responsable sale poco castigado.",
+      "efectos": {"tipo": "final", "grupos": {"instituciones": {"investigacion": 5, "moral": 5}, "ciudadanos": {"secundarios": -5}},
+                  "relaciones": {"fiscal": 3, "marcos": -10}}
+    },
+    "final_inocente_acusada": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "serio", "resultado": "fracaso",
+      "titulo": "Una inocente pagó",
+      "texto": "Inés pierde su empleo y su reputación por una credencial prestada. El verdadero responsable sigue libre y Civitas desconfía de la investigación.",
+      "efectos": {"tipo": "final", "grupos": {"ciudadanos": {"moral": -30, "secundarios": -10}, "instituciones": {"investigacion": -20, "moral": -25}},
+                  "relaciones": {"fiscal": -15, "ines": -25}}
+    },
+    "final_archivo": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "serio", "resultado": "fracaso",
+      "titulo": "Caso archivado",
+      "texto": "Sin una acusación sustentada, o tras demasiadas pruebas mal usadas, la Fiscalía archiva el caso. El rumor del agua se apaga solo, pero nadie responde por él.",
+      "efectos": {"tipo": "final", "grupos": {"instituciones": {"investigacion": -15, "moral": -5}, "ciudadanos": {"secundarios": -10}},
+                  "relaciones": {"fiscal": -10}}
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "_nota": "NPC clave (3-5): sus ids son las relaciones del GameState. Para cambiarlos basta editar este archivo: id, nombre visible, grupo de confianza asociado, rol y de dónde sale el cuerpo en el mundo. origen 'vendedor' = reutiliza a Seu Zé (frontend/vendedor_calle.py); origen 'ancla' = frontend/npc_reactivo.py crea un NPC con modelo .glb (índice `modelo` de npc_calculos.plan_npc, usa >= 101) en el ancla {zona|lugar, dx, dz, rumbo}. El texto de cada uno vive en backend/datos/dialogos/<id>.json.",
+  "npcs": [
+    {
+      "id": "seu_ze", "nombre": "Seu Zé", "grupo": "ciudadanos", "rol": "Vendedor de la calle",
+      "origen": "vendedor",
+      "retrato": {"piel": [196, 146, 104], "pelo": [120, 120, 126], "pelo_estilo": "calvo", "ropa": [150, 110, 70], "accesorio": "barba"}
+    },
+    {
+      "id": "fiscal", "nombre": "Fiscal Rojas", "grupo": "instituciones", "rol": "Fiscalía de Ciudad Nova",
+      "origen": "ancla", "modelo": 101, "ancla": {"zona": "mercado", "dx": 0.5, "dz": -5.0, "rumbo": 180},
+      "retrato": {"piel": [214, 170, 130], "pelo": [92, 92, 104], "pelo_estilo": "corto", "ropa": [58, 68, 112], "accesorio": "gafas"}
+    },
+    {
+      "id": "ines", "nombre": "Inés Duarte", "grupo": "ciudadanos", "rol": "Moderadora de Civitas",
+      "origen": "ancla", "modelo": 102, "ancla": {"zona": "mercado", "dx": -3.5, "dz": -5.0, "rumbo": 180},
+      "retrato": {"piel": [236, 190, 152], "pelo": [74, 42, 32], "pelo_estilo": "largo", "ropa": [66, 168, 158], "accesorio": "ninguno"}
+    },
+    {
+      "id": "marcos", "nombre": "Marcos Vela", "grupo": "instituciones", "rol": "Asesor de la campaña rival",
+      "origen": "ancla", "modelo": 103, "ancla": {"zona": "mercado", "dx": -8.0, "dz": -2.0, "rumbo": 90},
+      "retrato": {"piel": [176, 124, 92], "pelo": [30, 26, 34], "pelo_estilo": "corto", "ropa": [120, 44, 64], "accesorio": "barba"}
+    },
+    {
+      "id": "vecina", "nombre": "Doña Neide", "grupo": "ciudadanos", "rol": "Vecina del mercado",
+      "origen": "ancla", "modelo": 104, "ancla": {"zona": "mercado", "dx": 4.0, "dz": 4.0, "rumbo": 270},
+      "retrato": {"piel": [226, 178, 138], "pelo": [150, 150, 156], "pelo_estilo": "largo", "ropa": [150, 90, 130], "accesorio": "ninguno"}
+    }
+  ]
+}

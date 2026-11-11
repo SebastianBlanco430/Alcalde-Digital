@@ -190,3 +190,27 @@ def puntos_de_ruta(mundo, x, z, ruta):
 # Distancia en metros redondeada a decenas (para el texto del encabezado: no parpadea con cada paso).
 def metros_redondeados(metros):
     return int(round(metros / 10.0)) * 10
+
+
+# -- Zoom y giro locales del mapa abierto (teclas + / - y R) -----------------------------------------------------------------
+
+ZOOMS_MAPA = (1.0, 1.5, 2.0, 3.0, 4.0)
+TECLAS_ZOOM_MAS = ("+", "=", "keypad +")
+TECLAS_ZOOM_MENOS = ("-", "keypad -")
+TECLA_GIRO = "r"
+
+
+# (x, y) de pantalla donde hay que poner la capa del mapa para que el punto `q` (en coordenadas de la capa, ya sin zoom
+# ni giro) caiga en `destino`, con la capa escalada por `zoom` y girada `giro` grados en sentido HORARIO (rotation_z de
+# Ursina): posicion = destino - zoom * R(q).
+def posicion_de_capa(zoom, giro, q, destino):
+    a = math.radians(giro)
+    rx = q[0] * math.cos(a) + q[1] * math.sin(a)
+    ry = -q[0] * math.sin(a) + q[1] * math.cos(a)
+    return (destino[0] - zoom * rx, destino[1] - zoom * ry)
+
+
+# Rectángulo (izq, der, abajo, arriba) en fracciones de pantalla del área del mapa, para recortarlo con scissor.
+def fracciones_de_area(area, aspecto):
+    cx, cy, ancho, alto = area
+    return ((cx - ancho / 2) / aspecto + 0.5, (cx + ancho / 2) / aspecto + 0.5, cy - alto / 2 + 0.5, cy + alto / 2 + 0.5)

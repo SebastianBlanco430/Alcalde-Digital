@@ -13,6 +13,10 @@
 # agente a la vista se aplaza mientras no sea obligado (Asignador). Sin fugas: todas las instancias (actores, figuras,
 # sombras) se crean UNA vez al empezar y se prestan; nunca se crea ni se destruye nada por frame.
 #
+# Conducta local (backend/logica/multitud_conducta.py; bandera mundo_config.MULTITUD_CONDUCTA o ALCALDE_MULTITUD_CONDUCTA):
+# los agentes DIBUJADOS (A y B) esquivan y ceden el paso al jugador, hacen cola y se separan entre ellos, giran suave y
+# hacen pausas. Es una capa sobre la posición analítica: nace al dibujarse el agente y muere al pasar al nivel C.
+#
 # Python por frame: ~0,3-0,6 ms con 10 actores y 36 figuras (scripts/medir_multitud.py). La bandera es
 # mundo_config.MULTITUD_GRANDE (o ALCALDE_MULTITUD=0/1) y solo vale con el mapa grande.
 
@@ -24,6 +28,7 @@ from panda3d.core import NodePath
 from ursina import Entity, camera, color, destroy, time
 
 from backend.logica import multitud_calculos as mc
+from backend.logica import multitud_conducta as cd
 from frontend import multitud_figuras as mf
 from frontend import poses
 from frontend import sombra_calculos as sc
@@ -46,10 +51,13 @@ def _escala_agente(semilla):
 
 class Multitud(Entity):
 
-    def __init__(self, mundo, cantidad=mc.POBLACION, semilla=mc.SEMILLA_MULTITUD, reloj=None, hora=None, **opciones):
+    def __init__(self, mundo, cantidad=mc.POBLACION, semilla=mc.SEMILLA_MULTITUD, reloj=None, hora=None, jugador=None,
+                 conducta=True, **opciones):
         """`reloj`: callable() -> segundos compartidos (por defecto time.time). `hora`: callable() -> hora de juego 0-24
-        para el horario simple (None = sin horario)."""
+        para el horario simple (None = sin horario). `jugador`: callable() -> (x, z) del jugador al que los peatones
+        esquivan (None = nadie). `conducta`: False deja la posición analítica pura (como antes)."""
         super().__init__(**opciones)
+        self._jugador = jugador
         self._mundo = mundo
         self._reloj = reloj or _tiempo.time
         self._hora = hora
@@ -57,6 +65,8 @@ class Multitud(Entity):
         self.agentes = self.poblacion.agentes
         n = len(self.agentes)
         self.asignador = mc.Asignador(self.agentes, ACTORES_POR_VARIANTE, FIGURAS_POR_VARIANTE)
+        self.conducta = cd.Conducta(self.agentes) if conducta else None
+        self._t = self._reloj()
         self._pos = [None] * n
         self._celdas_escaleras = mc.indice_escaleras(mundo)
         self._escala = [_escala_agente(a.semilla) for a in self.agentes]
@@ -125,8 +135,12 @@ class Multitud(Entity):
     # -- Estado de un agente --
 
     def _estado(self, i, t):
-        a = self.agentes[i]
-        e = mc.posicion_en(t, a.ruta, a.semilla)
+        c = self.conducta
+        if c is not None and i in c.activos:        # dibujado: manda la conducta local (avanzada en avanzar())
+            e = (c.x[i], c.z[i], c.rumbo[i], c.vel[i], c.mov[i], c.dist[i])
+        else:
+            a = self.agentes[i]
+            e = mc.posicion_en(t, a.ruta, a.semilla)
         self._pos[i] = e
         return e
 
@@ -163,6 +177,12 @@ class Multitud(Entity):
 
     def _aplicar(self, evento):
         i, antes, rec_antes, nuevo, rec_nuevo = evento
+        c = self.conducta
+        if c is not None:                            # la conducta vive mientras el agente se dibuja (A o B)
+            if antes == mc.NIVEL_C and nuevo != mc.NIVEL_C:
+                c.entrar(i, self._t)
+            elif nuevo == mc.NIVEL_C:
+                c.salir(i)
         if antes == mc.NIVEL_A:
             self._soltar_actor(i, rec_antes)
         elif antes == mc.NIVEL_B:
@@ -224,17 +244,27 @@ class Multitud(Entity):
         if cx is None:
             cx, cz = camera.world_x, camera.world_z
         self._frame += 1
+        self._t = t
         if self._frame % PERIODO_REASIGNAR == 1:
             self._repartir(t, cx, cz)
+        c = self.conducta
+        if c is not None:
+            c.percibir_tanda(self._frame % cd.PERIODO, t, self._jugador() if self._jugador is not None else None)
+            paso = dt if dt > 1e-4 else 1e-4
+            for i in c.activos:
+                c.avanzar(i, t, paso)
         asig = self.asignador
         pos = self._pos
         for i in self._en_a:
             e = self._estado(i, t)
             p = self._actores[asig.recurso[i]]
             p.colocar(e[0], e[1])
+            if c is not None:
+                p.fijar_rumbo(e[2])                   # el giro suave ya lo hace la conducta (también parado: mira a un lado)
             if e[4]:
-                p.mirar_hacia(e[2])
-                p.girar(dt)
+                if c is None:
+                    p.mirar_hacia(e[2])
+                    p.girar(dt)
                 p.animar_caminar(e[3], dt)
                 self._quietos.discard(p)
             elif p not in self._quietos:

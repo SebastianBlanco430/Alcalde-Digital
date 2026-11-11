@@ -1,0 +1,42 @@
+{
+  "npc": "ines",
+  "lineas": {
+    "normal": [
+      "Soy Inés Duarte, moderadora de Civitas. Llevo horas sin dormir revisando cuentas."
+    ],
+    "cortante": [
+      "No tengo tiempo para ti. Déjame trabajar."
+    ],
+    "exclusivo": [
+      "Tú sí me escuchas. Gracias por no juzgarme como los demás."
+    ],
+    "hostil": [
+      "Me acusaste sin pruebas y perdí mi trabajo. No quiero volver a verte."
+    ],
+    "evasiva": [
+      "Ya te dije todo lo que sé. No me presiones otra vez."
+    ]
+  },
+  "reglas_actitud": [
+    {
+      "actitud": "hostil",
+      "alguna": [
+        "caso:cuentas_fantasma:final:final_inocente_acusada"
+      ]
+    },
+    {
+      "actitud": "evasiva",
+      "alguna": [
+        "presiono_a_ines"
+      ]
+    }
+  ],
+  "cooperacion": {
+    "relacion_min": 70,
+    "texto": [
+      "Escucha, confío en ti. Guardé una copia de mi bitácora de moderación."
+    ],
+    "evidencia": "bitacora_moderacion",
+    "entrega": "Inés te entrega la bitácora de moderación."
+  }
+}

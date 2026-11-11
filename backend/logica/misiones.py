@@ -18,6 +18,12 @@ import copy
 import math
 from dataclasses import dataclass
 
+from backend.logica import confianza_misiones, misiones_digitales
+
+# m: «llegué» = a menos de esto de la PUERTA del destino. Única fuente: main.py, el modo online y el
+# servidor la importan; el default del sistema coincide con el juego real.
+RADIO_INTERACCION = 2.0
+
 SIN_MISION = "sin_mision"
 NOTIFICADA = "notificada"
 EN_RUTA = "en_ruta"
@@ -25,6 +31,17 @@ EN_RADIO = "en_radio"
 EN_MINIJUEGO = "en_minijuego"
 COMPLETADA = "completada"
 ESTADOS = (SIN_MISION, NOTIFICADA, EN_RUTA, EN_RADIO, EN_MINIJUEGO, COMPLETADA)
+
+
+# Tipo de misión (cómo se juega) y dificultad (por TEMA del rumor, no por distancia). La dificultad multiplica el pago
+# (ver docs/DISENO.md §10). «verificar» se juega en el lugar (lote de noticias); «parkour» e «investigacion» se completan
+# por SEÑAL del GameState (backend/logica/misiones_digitales.py), solo en la partida de solo.
+TIPOS_MISION = ("verificar", "parkour", "investigacion")
+DIFICULTADES = ("facil", "media", "dificil")
+MULTIPLICADOR_DIFICULTAD = {"facil": 1, "media": 1.5, "dificil": 2}
+
+# Grupos de GameState.confianza a los que puede afectar una misión (veredicto, A2d). Ver docs/DISENO.md §10.
+GRUPOS_CONFIANZA = ("policia", "ciudadanos", "instituciones")
 
 
 # rol None = misión genérica (sirve a cualquier rol). destino = nombre de lugar.
@@ -35,15 +52,51 @@ class Mision:
     titulo: str
     mensaje: str
     destino: str
-    cantidad_noticias: int = 2
+    cantidad_noticias: int = 2     # noticias que se deciden en el lote (LoteMision, mano coop, progreso "n/N")
     pago: int = 0           # R$ que cobra quien la completa (economía); 0 = no paga
+    tipo: str = "verificar"     # uno de TIPOS_MISION
+    dificultad: str = "facil"   # uno de DIFICULTADES; multiplica el pago
+    objetivo: str = ""          # id del nivel de parkour o del caso; obligatorio en esos tipos, vacío en «verificar»
+    # Veredicto (A2d): solo en «verificar», que lo EXIGE completo. El rumor (solo la afirmación, será la carta de misión) es
+    # verdadero o falso; la pista es lo que se ve al llegar; el grupo es el de GameState.confianza al que afecta. Las digitales
+    # NO llevan es_verdadera/rumor/pista; su grupo es "policia" por convención (o vacío).
+    es_verdadera: bool | None = None
+    rumor: str = ""
+    pista: str = ""
+    grupo: str = ""             # uno de GRUPOS_CONFIANZA
+
+    def __post_init__(self):
+        if self.tipo not in TIPOS_MISION:
+            raise ValueError(f"Tipo de misión desconocido en {self.id!r}: {self.tipo!r}; válidos: {TIPOS_MISION}.")
+        if self.dificultad not in DIFICULTADES:
+            raise ValueError(f"Dificultad de misión desconocida en {self.id!r}: {self.dificultad!r}; válidas: {DIFICULTADES}.")
+        if self.tipo == "verificar" and self.objetivo:
+            raise ValueError(f"La misión de verificar {self.id!r} no lleva objetivo (tiene {self.objetivo!r}).")
+        if self.tipo != "verificar" and not self.objetivo.strip():
+            raise ValueError(f"La misión {self.id!r} de tipo {self.tipo!r} necesita un objetivo (id del nivel o del caso).")
+        if self.grupo and self.grupo not in GRUPOS_CONFIANZA:
+            raise ValueError(f"Grupo de confianza desconocido (grupo) en {self.id!r}: {self.grupo!r}; válidos: {GRUPOS_CONFIANZA}.")
+        if self.tipo == "verificar":
+            if not isinstance(self.es_verdadera, bool):
+                raise ValueError(f"La misión de verificar {self.id!r} necesita es_verdadera (True o False), no {self.es_verdadera!r}.")
+            if not self.rumor.strip():
+                raise ValueError(f"La misión de verificar {self.id!r} necesita un rumor (la afirmación a verificar).")
+            if not self.pista.strip():
+                raise ValueError(f"La misión de verificar {self.id!r} necesita una pista (lo que se ve al llegar).")
+            if not self.grupo:
+                raise ValueError(f"La misión de verificar {self.id!r} necesita un grupo de confianza: {GRUPOS_CONFIANZA}.")
+        else:
+            if self.es_verdadera is not None:
+                raise ValueError(f"La misión digital {self.id!r} no lleva es_verdadera (tiene {self.es_verdadera!r}).")
+            if self.rumor or self.pista:
+                raise ValueError(f"La misión digital {self.id!r} no lleva rumor ni pista.")
 
 
 class SistemaMisiones:
 
     # Valida el catálogo: ids únicos y destinos con coordenada en el mapa
     # (ValueError si no).
-    def __init__(self, mapa, catalogo, radio_interaccion=1.5, histeresis=0.3,
+    def __init__(self, mapa, catalogo, radio_interaccion=RADIO_INTERACCION, histeresis=0.3,
                  punto_interaccion=None):
         self._mapa = mapa
         self._punto_interaccion = punto_interaccion if punto_interaccion is not None else mapa.coordenada
@@ -61,6 +114,9 @@ class SistemaMisiones:
         self._estado = SIN_MISION
         self._mision = None
         self._completadas = []
+        # Veredicto (A2d) de las misiones completadas: {id: "pasada" | "fallada"}. Fallar también es completar. Las que
+        # se cerraron sin veredicto (lote sin carta de misión) no aparecen.
+        self._veredictos = {}
         self._resultado = None
         self._roles_en_juego = None
 
@@ -83,6 +139,21 @@ class SistemaMisiones:
     def completadas(self):
         return list(self._completadas)
 
+    # El catálogo con el que se creó el sistema, en orden (copia).
+    def catalogo(self):
+        return list(self._catalogo)
+
+    # Ids de las misiones completadas con veredicto «pasada» / «fallada», en el orden en que se completaron (copias).
+    def pasadas(self):
+        return [i for i in self._completadas if self._veredictos.get(i) == confianza_misiones.PASADA]
+
+    def falladas(self):
+        return [i for i in self._completadas if self._veredictos.get(i) == confianza_misiones.FALLADA]
+
+    # "pasada" | "fallada" de una misión completada, o None si no se completó o se cerró sin veredicto.
+    def veredicto_de(self, id_mision):
+        return self._veredictos.get(id_mision)
+
     # Resultado de la última misión completada (se conserva tras terminar()).
     def resultado_ultimo(self):
         return self._resultado
@@ -91,8 +162,10 @@ class SistemaMisiones:
     def mensaje_notificacion(self):
         return self._mision.mensaje if self._mision is not None else None
 
+    # Solo las misiones de «verificar» se abren con E en el lugar; las digitales se completan por señal
+    # (completar_por_senal), así que estar en el radio de su destino no abre nada.
     def puede_interactuar(self):
-        return self._estado == EN_RADIO
+        return self._estado == EN_RADIO and self._mision.tipo == "verificar"
 
     # True si queda alguna misión sin completar del rol o genérica.
     def hay_misiones_pendientes(self, rol):
@@ -142,13 +215,36 @@ class SistemaMisiones:
         self._exigir(EN_MINIJUEGO, "cancelar el minijuego")
         self._estado = EN_RADIO
 
-    # Guarda el resultado, registra la misión como completada y la devuelve.
+    # Guarda el resultado, registra la misión como completada y la devuelve. Veredicto (A2d): si el resultado trae
+    # "decision_mision" (la decisión sobre la carta de misión, la pone LoteMision), se recuerda si la misión quedó pasada
+    # o fallada (confianza_misiones.veredicto). Fallar NO impide completar: cuenta igual y cobra igual.
     def completar(self, resultado):
         self._exigir(EN_MINIJUEGO, "completar la misión")
         self._resultado = copy.deepcopy(resultado)
+        decision = resultado.get("decision_mision") if isinstance(resultado, dict) else None
+        self._anotar_veredicto(confianza_misiones.veredicto(self._mision, decision))
         self._completadas.append(self._mision.id)
         self._estado = COMPLETADA
         return self._mision
+
+    # Misiones digitales: si la misión activa NO es de verificar y su señal del GameState se cumplió, la completa desde
+    # cualquier estado activo (NOTIFICADA, EN_RUTA o EN_RADIO; no pasa por el minijuego) y la devuelve; si no, None sin
+    # tocar nada. El resultado no trae deltas (no hubo noticias). El llamador cierra con terminar().
+    def completar_por_senal(self, game_state):
+        mision = self._mision
+        if mision is None or mision.tipo == "verificar" or self._estado not in (NOTIFICADA, EN_RUTA, EN_RADIO):
+            return None
+        if not misiones_digitales.cumplida(mision, game_state):
+            return None
+        self._resultado = {"deltas": {}}
+        self._anotar_veredicto(confianza_misiones.veredicto_digital(mision, game_state))
+        self._completadas.append(mision.id)
+        self._estado = COMPLETADA
+        return mision
+
+    def _anotar_veredicto(self, veredicto):
+        if veredicto is not None:
+            self._veredictos[self._mision.id] = veredicto
 
     # COMPLETADA -> SIN_MISION; el resultado_ultimo se conserva.
     def terminar(self):
@@ -164,6 +260,7 @@ class SistemaMisiones:
             "estado": self._estado,
             "mision_actual": self._mision.id if self._mision is not None else None,
             "completadas": list(self._completadas),
+            "veredictos": dict(self._veredictos),
             "resultado": copy.deepcopy(self._resultado),
             "radio_interaccion": self.radio_interaccion,
             "histeresis": self.histeresis,
@@ -190,6 +287,11 @@ class SistemaMisiones:
         sistema._estado = estado
         sistema._mision = por_id[id_actual] if id_actual is not None else None
         sistema._completadas = list(datos["completadas"])
+        # Los guardados anteriores a A2d no traen veredictos: quedan sin ninguno.
+        for id_mision, veredicto in dict(datos.get("veredictos") or {}).items():
+            if veredicto not in confianza_misiones.VEREDICTOS:
+                raise ValueError(f"Veredicto desconocido en los datos guardados para {id_mision!r}: {veredicto!r}")
+            sistema._veredictos[id_mision] = veredicto
         sistema._resultado = copy.deepcopy(datos["resultado"])
         return sistema
 

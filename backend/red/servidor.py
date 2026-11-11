@@ -21,13 +21,13 @@ from backend.red import huellas
 from backend.red.anfitrion import AMBITOS, Anfitrion, calcular_huellas
 from backend.red.partida_coop import MazoSembrado, PartidaCooperativa
 
-RADIO_INTERACCION = 2.0     # m: igual que main.py (distancia a la puerta para «llegué»)
+from backend.logica.misiones import RADIO_INTERACCION     # m: distancia a la puerta para «llegué» (única fuente)
 
 
 def _construir_mundo(semilla):
-    """El mismo mundo que el juego local (frontend/mundo_config: ALCALDE_MAPA_GRANDE; por defecto el mapa grande)."""
+    """El mismo mundo que el juego local (backend/logica/mundo_config: ALCALDE_MAPA_GRANDE; por defecto el mapa grande)."""
     try:
-        from frontend import mundo_config
+        from backend.logica import mundo_config
         grande = mundo_config.mapa_grande_activo()
     except Exception:
         grande = False
@@ -50,7 +50,7 @@ def construir_anfitrion(puerto=0, ambito="lan", semilla=SEMILLA_CASAS, abierto=F
     partida = PartidaCooperativa(
         estado, mundo, catalogo, grafo_social=construir_grafo_social_ejemplo(),
         escala_mundo=ESCALA_MUNDO, punto_interaccion=mundo.punto_interaccion,
-        radio_interaccion=RADIO_INTERACCION, **(partida_opciones or {}))
+        radio_interaccion=RADIO_INTERACCION, **{"consecuencias": True, **(partida_opciones or {})})
     h_mundo, h_contenido = calcular_huellas(mundo, semilla, catalogo)
     return Anfitrion(partida, mundo, semilla, codigo, h_mundo, h_contenido, ambito=ambito,
                      puerto=puerto, abierto=abierto, **opciones)
@@ -75,9 +75,9 @@ def _leer_argumentos(argv):
 
 
 def _vehiculos_online():
-    # La bandera vive en frontend/online_config.py (módulo mínimo, sin ursina): clientes y anfitrión la comparten.
+    # La bandera vive en backend/logica/online_config.py (módulo mínimo, sin ursina): clientes y anfitrión la comparten.
     try:
-        from frontend import online_config
+        from backend.logica import online_config
         return bool(online_config.VEHICULOS_ONLINE)
     except Exception:
         return False
