@@ -21,6 +21,39 @@ def _catalogo():
         return {}
 
 
+FUERA_TERMINAL, LATERAL_TERMINAL = 1.5, 1.4      # m desde la puerta del destino: a un lado, sin taparla
+SEPARACION_TERMINAL = 1.6                        # m del punto del destino cuando el lugar no tiene edificio
+
+
+# Dónde va el computador de un caso: junto al WAYPOINT de su misión digital (el destino que marcan el minimapa y la
+# ruta), para que al llegar ya esté ahí. (x, z, rumbo) o None si el caso no tiene misión digital en este mundo (entonces
+# vale el ancla `terminal` de su JSON).
+def sitio_junto_al_destino(mundo, caso_id):
+    import math
+    from backend.logica import mundo_config
+    try:
+        digitales = [m for m in mundo_config.catalogo_misiones(mundo, con_game_state=True) if m.tipo != "verificar"]
+    except Exception:
+        return None
+    mision = next((m for m in digitales if m.objetivo == caso_id), digitales[0] if digitales else None)
+    if mision is None:
+        return None
+    try:                                         # con edificio: fuera de la puerta y a un lado, mirando a la calle
+        return resolver_ancla(mundo, {"lugar": mision.destino, "fuera": FUERA_TERMINAL, "lateral": LATERAL_TERMINAL})
+    except (ValueError, KeyError, AttributeError):
+        pass
+    try:
+        px, pz = mundo.punto_interaccion(mision.destino)
+    except (ValueError, KeyError, AttributeError):
+        return None
+    transitable = getattr(mundo, "es_transitable", None)
+    for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        x, z = px + dx * SEPARACION_TERMINAL, pz + dz * SEPARACION_TERMINAL
+        if transitable is None or transitable(x, z):
+            return (x, z, math.degrees(math.atan2(-dx, -dz)))      # la silla queda del lado del waypoint
+    return None
+
+
 def registrar(gestor, conexion, escena_mundo):
     from frontend import economia_config
     if not economia_config.GAMESTATE:        # sin GameState (ALCALDE_GAMESTATE=0) el mundo es el de antes: sin computador
@@ -83,6 +116,9 @@ def registrar(gestor, conexion, escena_mundo):
         except (ValueError, KeyError, AttributeError) as error:
             print(f"[mundo digital] sin computador para {caso.id!r}: {error}", file=sys.stderr)
             continue
+        junto = sitio_junto_al_destino(escena_mundo._mundo, caso.id)
+        if junto is not None:                    # el terminal va en el waypoint de su misión, no en el ancla del JSON
+            x, z, rumbo = junto
         computador = Computador(escena_mundo, caso, x, z, rumbo, abrir=lambda c: ir(c.id), glitch=glitch)
         computadores.append(computador)
         economia.registrar(computador)
@@ -101,4 +137,60 @@ def registrar(gestor, conexion, escena_mundo):
         return (elegido.x, elegido.z)
 
     escena_mundo.punto_de_mision = punto_de_mision
+
+    # Guía de las misiones digitales. No se juegan en la puerta de su destino sino en el terminal: quien llega a la
+    # puerta (el minimapa lo lleva allí) lee a dónde ir, y en el terminal el aviso del parkour dice que dentro se pulsa K.
+    def mision_digital():
+        flujo = escena_mundo.flujo
+        mision = flujo.mision_actual() if flujo is not None else None
+        return mision if mision is not None and getattr(mision, "tipo", "verificar") != "verificar" else None
+
+    def pista_del_terminal():
+        mision = mision_digital()
+        if mision is None or mision.tipo != "parkour":
+            return None
+        from frontend.escenas.escena_mundo_digital import TECLA_PARKOUR
+        return f"dentro, pulsa {TECLA_PARKOUR.upper()} para el parkour de tu misión"
+
+    for c in computadores:
+        c.pista_mision = pista_del_terminal
+    if computadores:
+        economia.registrar(GuiaMisionDigital(escena_mundo, mision_digital, punto_de_mision))
     return escena
+
+
+RADIO_GUIA = 9.0          # m de la puerta del destino donde se explica a dónde ir
+RADIO_TERMINAL = 3.0      # más cerca que esto del terminal ya manda el aviso del computador
+
+
+# Interacción solo informativa (Protocol Interaccion de economia_mundo): en la puerta del destino de una misión digital
+# dice dónde se juega de verdad. No consume la E.
+class GuiaMisionDigital:
+
+    prioridad = 1
+
+    def __init__(self, escena, mision_digital, punto_de_mision):
+        self._escena, self._mision, self._punto = escena, mision_digital, punto_de_mision
+
+    def aviso(self, jugador, x, z):
+        import math
+        try:
+            mision = self._mision()
+            if mision is None:
+                return None
+            terminal = self._punto(mision)
+            px, pz = self._escena._mundo.punto_interaccion(mision.destino)
+        except Exception:
+            return None
+        if terminal is None or math.hypot(x - px, z - pz) > RADIO_GUIA:
+            return None
+        metros = math.hypot(x - terminal[0], z - terminal[1])
+        if metros <= RADIO_TERMINAL:
+            return None
+        return f"Misión digital: no es aquí. Sigue la baliza hasta la Terminal de la Fiscalía (a {int(round(metros))} m) y pulsa E"
+
+    def usar(self, jugador, economia=None):
+        return False
+
+    def actualizar(self, dt):
+        pass

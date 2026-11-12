@@ -447,6 +447,9 @@ class EscenaMundo(Escena):
             puntos = self._gps_local.ruta(self._mundo, activo.x, activo.z, destino)
         else:
             puntos = navegacion.ruta_gps_hasta_puerta(self._mundo, activo.x, activo.z, destino)
+        exacto = self._punto_exacto_de_mision()
+        if exacto is not None:                # misión digital: la línea sigue hasta el terminal (donde está la baliza)
+            puntos = list(puntos) + [exacto]
         self.ruta_piso.actualizar([(activo.x, activo.z)] + puntos)
 
     # -- Cinemáticas --

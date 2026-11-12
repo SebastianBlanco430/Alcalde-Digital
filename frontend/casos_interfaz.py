@@ -22,6 +22,7 @@ POS_RETRATO = (-0.70, 0.20)
 POS_EVIDENCIAS = (0.665, 0.03)
 ANCHO_EVIDENCIAS, ALTO_EVIDENCIAS = 0.44, 0.78
 SEGUNDOS_MENSAJE = 3.5
+ALTO_LINEA_TITULO = 0.034        # lo que baja el texto por cada línea de más del título del cuadro
 COLOR_PELIGRO = (255, 120, 130)
 COLOR_BUENO = (120, 240, 160)
 TEXTO_PISTA = "1-9: elegir    P: presentar prueba    Esc: cerrar sesión (el caso queda guardado)"
@@ -86,6 +87,7 @@ class InterfazCaso(Entity):
         self.dialogo_titulo = _texto(self.panel_dialogo, "", 21, origen=(-0.5, 0.5), pos=(-0.43, 0.165), negrita=True,
                                      tono=estilo.COLOR_ACENTO)
         self._dialogo_base = escala_fuente(20)
+        self._titulo_base = escala_fuente(21)
         self.dialogo = Text("", parent=self.panel_dialogo, origin=(-0.5, 0.5), position=(-0.43, 0.14, -0.02),
                             scale=self._dialogo_base, color=rgb(estilo.COLOR_TEXTO))
         self.mensaje = _texto(self, "", 17, pos=(POS_DIALOGO[0], POS_DIALOGO[1] - ALTO_DIALOGO / 2 - 0.028), negrita=True)
@@ -163,9 +165,20 @@ class InterfazCaso(Entity):
             self.retrato.texture = self._textura(retrato_json, expresion)
 
     def mostrar_texto(self, titulo, texto):
-        self.dialogo_titulo.text = titulo or ""
-        self.dialogo.y = 0.14 if not titulo else 0.1
-        self._ajustar(self.dialogo, texto, 0.86, self._dialogo_base, 0.72, 7)
+        # El título del final («<título> - Resultado: … (Pruebas mal usadas: n de m)») es largo: se encoge y, si hace
+        # falta, se parte en 2 líneas dentro del cuadro; el texto baja lo que ocupe el título y pierde esa línea.
+        lineas_titulo = 0
+        if titulo:
+            plan = diseno_adaptable.ajustar_texto(self.dialogo_titulo, 0.86, escala_base=self._titulo_base, escala_min=0.75,
+                                                  max_lineas=2, cadena=titulo)
+            if plan is None:
+                self.dialogo_titulo.text = titulo
+            lineas_titulo = max(1, len(plan["lineas"])) if plan is not None else 1
+        else:
+            self.dialogo_titulo.text = ""
+        extra = max(0, lineas_titulo - 1)
+        self.dialogo.y = 0.14 if not titulo else 0.1 - extra * ALTO_LINEA_TITULO
+        self._ajustar(self.dialogo, texto, 0.86, self._dialogo_base, 0.72, 7 - extra)
 
     @staticmethod
     def _ajustar(entidad, cadena, ancho, base, escala_min, max_lineas):

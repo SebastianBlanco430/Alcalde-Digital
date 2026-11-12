@@ -47,6 +47,7 @@ class Computador:
         self.x, self.z, self.rumbo = float(x), float(z), float(rumbo)
         self._mensaje, self._t_mensaje = None, 0.0
         self._jugador = None
+        self.pista_mision = None          # callable() -> texto extra del aviso (lo pone registro_mundo_digital) o None
         self._director = DirectorCinematica(parent=escena)
         self.raiz = self._construir()
 
@@ -85,7 +86,10 @@ class Computador:
     def aviso(self, jugador, x, z):
         if self.ocupado or not self._cerca(x, z):
             return None
-        return self._mensaje or f"E: usar el computador ({(self.caso.terminal or {}).get('nombre', 'terminal')})"
+        if self._mensaje:
+            return self._mensaje
+        pista = self.pista_mision() if callable(self.pista_mision) else None
+        return f"E: usar el computador ({(self.caso.terminal or {}).get('nombre', 'terminal')})" + (f" · {pista}" if pista else "")
 
     def usar(self, jugador, economia=None):
         if self.ocupado or not self._cerca(jugador.x, jugador.z):
