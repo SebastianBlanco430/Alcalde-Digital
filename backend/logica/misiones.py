@@ -18,7 +18,7 @@ import copy
 import math
 from dataclasses import dataclass
 
-from backend.logica import confianza_misiones, misiones_digitales
+from backend.logica import confianza_misiones, misiones_digitales, rutas_mision
 
 # m: «llegué» = a menos de esto de la PUERTA del destino. Única fuente: main.py, el modo online y el
 # servidor la importan; el default del sistema coincide con el juego real.
@@ -42,6 +42,9 @@ MULTIPLICADOR_DIFICULTAD = {"facil": 1, "media": 1.5, "dificil": 2}
 
 # Grupos de GameState.confianza a los que puede afectar una misión (veredicto, A2d). Ver docs/DISENO.md §10.
 GRUPOS_CONFIANZA = ("policia", "ciudadanos", "instituciones")
+
+# Cómo se anuncia en el teléfono una misión digital (docs/PLAN_CLARIDAD_JUEGO.md §2.4).
+PREFIJO_DIGITAL = {"parkour": "Misión digital · Parkour", "investigacion": "Misión digital · Investigación"}
 
 
 # rol None = misión genérica (sirve a cualquier rol). destino = nombre de lugar.
@@ -119,6 +122,7 @@ class SistemaMisiones:
         self._veredictos = {}
         self._resultado = None
         self._roles_en_juego = None
+        self._rutas = {}        # {rol: ruta} (rutas_mision.ruta_de_rol); el catálogo no cambia, se calcula una vez
 
     # Roles de los jugadores en juego (iterable) o None = desconocidos. Con roles conocidos,
     # las misiones de roles que NADIE juega (p. ej. influencer con 2 jugadores) pasan a ser
@@ -159,8 +163,12 @@ class SistemaMisiones:
         return self._resultado
 
     # Texto para el teléfono de la misión actual, o None si no hay.
+    # Las digitales dicen qué son: «Misión digital · Parkour: …» / «Misión digital · Investigación: …».
     def mensaje_notificacion(self):
-        return self._mision.mensaje if self._mision is not None else None
+        if self._mision is None:
+            return None
+        prefijo = PREFIJO_DIGITAL.get(self._mision.tipo) if rutas_mision.activo() else None
+        return f"{prefijo}: {self._mision.mensaje}" if prefijo else self._mision.mensaje
 
     # Solo las misiones de «verificar» se abren con E en el lugar; las digitales se completan por señal
     # (completar_por_senal), así que estar en el radio de su destino no abre nada.
@@ -303,13 +311,22 @@ class SistemaMisiones:
                 f"No se puede {accion} en el estado {self._estado!r}; se requiere {estado_requerido!r}."
             )
 
+    # Con rutas (ALCALDE_RUTAS): la primera sin completar de la ruta del rol (rutas_mision.ruta_de_rol). Sin rutas: las
+    # del rol y luego las genéricas, en orden de catálogo. En ambos casos, al final las de roles que nadie juega.
     def _buscar_pendiente(self, rol):
-        for mision in self._catalogo:
-            if mision.rol == rol and mision.id not in self._completadas:
-                return mision
-        for mision in self._catalogo:
-            if mision.rol is None and mision.id not in self._completadas:
-                return mision
+        if rutas_mision.activo():
+            if rol not in self._rutas:
+                self._rutas[rol] = rutas_mision.ruta_de_rol(self._catalogo, rol)
+            for mision in self._rutas[rol]:
+                if mision.id not in self._completadas:
+                    return mision
+        else:
+            for mision in self._catalogo:
+                if mision.rol == rol and mision.id not in self._completadas:
+                    return mision
+            for mision in self._catalogo:
+                if mision.rol is None and mision.id not in self._completadas:
+                    return mision
         if self._roles_en_juego is not None:
             for mision in self._catalogo:
                 if (mision.rol is not None and mision.rol not in self._roles_en_juego

@@ -46,7 +46,10 @@ class ControlReloj:
 
     def __init__(self, escena, vista, conexion=None):
         self.escena, self.vista, self.conexion = escena, vista, conexion
-        self.cola = rc.ColaAvisosCausa()
+        # Con las notificaciones del teléfono (ALCALDE_NOTIF_TELEFONO) los avisos de «último día», causa-efecto y cambio de
+        # etapa salen por el teléfono del jugador activo: la cola no deja nada que pintar en el centro.
+        from frontend import notificaciones
+        self.cola = notificaciones.ColaAlTelefono(escena) if notificaciones.activo() else rc.ColaAvisosCausa()
         self.fin = rc.AvisosFin()
         self.motivo = rc.SIN_RELOJ
         self.cierres = 0
@@ -157,6 +160,9 @@ class ControlReloj:
     def _pintar(self, flujo, dt):
         reloj = flujo.reloj
         oculto = (flujo.partida_terminada() or self.motivo in (rc.PAUSA, rc.MAPA, rc.PANEL))
+        if oculto and self.motivo == rc.PANEL and not flujo.partida_terminada():
+            from frontend import registro_tutorial      # el tutorial señala el chip: se queda a la vista
+            oculto = not registro_tutorial.senalando_hud()
         self.vista.chip(rc.texto_chip(reloj), rc.icono_de(reloj.hora()), rc.fraccion_semana(reloj), not oculto)
         if oculto or getattr(self.escena, "_cinematica", False):
             if oculto:

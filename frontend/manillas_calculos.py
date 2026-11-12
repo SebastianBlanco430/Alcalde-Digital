@@ -17,11 +17,36 @@
 #   colores_finales()                              -> la paleta tal como se pinta (HUD, NPC y leyenda), para los tests
 
 import math
+import os
 
 from backend.logica import manillas as m
 
 TECLA = "b"                          # leyenda / detalle de las manillas (libre en el mundo; ver frontend/teclas.py)
-INDICADORES_HUD = m.INDICADORES      # convivencia, confianza, desinformacion, bienestar, conflictos
+PULSERAS_JUGADOR = True              # bandera: 2 pulseras (HUD y muñecas del jugador); ALCALDE_PULSERAS_JUGADOR=0 = las 5 de antes
+
+
+def pulseras_jugador_activo():
+    """¿Solo 2 pulseras (Convivencia y Confianza), en el HUD y en las muñecas del jugador? ALCALDE_PULSERAS_JUGADOR=1/0
+    manda sobre la constante (docs/PLAN_CLARIDAD_JUEGO.md §2.1)."""
+    valor = os.environ.get("ALCALDE_PULSERAS_JUGADOR", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(PULSERAS_JUGADOR)
+
+
+# Las pulseras que ve el jugador: Convivencia (muñeca izquierda) y Confianza (derecha). La desinformación va en su barra
+# (etapas_final_vista) y «bienestar» / «conflictos» siguen por dentro (los usa el Ambiente) pero no se muestran.
+# Se decide al importar (la bandera es de arranque). Con la bandera apagada, las 5 de antes.
+INDICADORES_JUGADOR = ("convivencia", "confianza")
+LADO_MUNECA = {"convivencia": "i", "confianza": "d"}
+INDICADORES_HUD = INDICADORES_JUGADOR if pulseras_jugador_activo() else m.INDICADORES
+# Qué mide cada pulsera, en una frase (leyenda con B; mismos textos que el tutorial).
+QUE_MIDE = {
+    "convivencia": "Pulsera izquierda: qué tan bien se llevan los vecinos. Sube al compartir lo que es verdad y al reportar los bulos.",
+    "confianza": "Pulsera derecha: cuánto le cree la gente a lo que se publica. Sube al acertar el veredicto.",
+}
 ETIQUETAS_CORTAS = {
     "convivencia": "Conviv.", "confianza": "Confianza", "desinformacion": "Bulos", "bienestar": "Bienestar",
     "conflictos": "Roces",
@@ -131,7 +156,7 @@ _NOTA_CULTURA = ("Inspiradas en las fitinhas do Bonfim, las cintas de colores qu
 
 
 def lineas_leyenda():
-    """Contenido de la leyenda: {"titulo", "ciudad": [(indicador, nombre, simbolo)], "niveles": [(nivel, patron, nudos, texto)],
+    """Contenido de la leyenda: {"titulo", "ciudad": [(indicador, nombre, simbolo)], "que_mide": {indicador: frase}, "niveles": [(nivel, patron, nudos, texto)],
     "vecinos": [(estado, patron, nudos, texto)], "notas": [str]}. Todo sale de backend/logica/manillas.py."""
     niveles = []
     textos_nivel = {"florece": "Florece: la ciudad va muy bien", "sano": "Sano: va bien", "tenso": "Tenso: hay fricción",
@@ -145,8 +170,9 @@ def lineas_leyenda():
         vecinos.append((estado, manilla.patron, m.detalle_manilla_npc(estado)["nudos"],
                         f"{estado.capitalize()}: {manilla.descripcion}"))
     return {
-        "titulo": "Manillas de Bonfim",
+        "titulo": "Pulseras de Bonfim" if pulseras_jugador_activo() else "Manillas de Bonfim",
         "ciudad": [(i, m.NOMBRES[i], m.SIMBOLOS[i]) for i in INDICADORES_HUD],
+        "que_mide": {i: QUE_MIDE[i] for i in INDICADORES_HUD if i in QUE_MIDE} if pulseras_jugador_activo() else {},
         "niveles": niveles, "vecinos": vecinos, "notas": [_NOTA_LECTURA, _NOTA_CULTURA],
     }
 

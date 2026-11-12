@@ -47,6 +47,11 @@ def _crear_vigia(escena_mundo):
             try:
                 if not guardado_aviso.aviso_pendiente():
                     return
+                from frontend import notificaciones
+                if notificaciones.activo():          # llega al teléfono (banner o tarjeta), no al centro
+                    notificaciones.notificar_evento(escena_mundo, guardado_aviso.TEXTO_AVISO, tono="info")
+                    guardado_aviso.marcar_aviso_visto()
+                    return
                 from frontend.hud import AvisoGenerico
                 if self._aviso is None:
                     self._aviso = AvisoGenerico(parent=escena_mundo.hud)
@@ -117,6 +122,7 @@ def registrar(gestor, conexion, escena_mundo):
                 print(f"[guardado] no se pudo continuar ({error}); se empieza una partida nueva", file=sys.stderr)
                 guardado.borrar()
                 return conexion.ir_a_seleccion()
+            conexion.partida_restaurada = True       # «Continuar»: el tutorial (registro_tutorial) no sale
             conexion.flujo = flujo
             conexion._volver_al_mundo()
 

@@ -61,7 +61,11 @@ class ObjetoSuelo:
         perfil = perfil_de(jugador, economia.catalogo)
         res = perfil.inventario.guardar(self.pila.item_id, self.pila.cantidad, datos=self.pila.datos)
         if not res.ok:
-            economia.escena.hud.mostrar_aviso(res.mensaje)
+            from frontend import notificaciones
+            if notificaciones.activo():      # resultado (no se pudo recoger): notificación del teléfono
+                notificaciones.notificar_evento(economia.escena, res.mensaje, tono="error")
+            else:
+                economia.escena.hud.mostrar_aviso(res.mensaje)
             return True
         economia.quitar(self)
         return True

@@ -202,7 +202,10 @@ class ConexionFlujo:
         economia = getattr(escena, "economia", None)
         temporal = getattr(economia, "aviso_temporal", None)
         try:
-            if callable(temporal):
+            from frontend import notificaciones
+            if notificaciones.activo():      # resultado del turno de trabajo: notificación del teléfono
+                notificaciones.notificar_evento(escena, texto, tono="exito")
+            elif callable(temporal):
                 temporal(texto)
             else:
                 escena.hud.mostrar_aviso(texto)

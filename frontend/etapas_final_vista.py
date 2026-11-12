@@ -9,10 +9,13 @@
 #   - perfil de audio del mundo (frontend/audio_enganches.fijar_perfil_mundo_etapa)
 #   - aviso corto por la cola de avisos del reloj
 # y pinta el medidor «Confianza de Ciudad Nova» arriba al centro (barra + número + nombre de la etapa con flecha).
+# Debajo del medidor va la barra pequeña de DESINFORMACIÓN (docs/PLAN_CLARIDAD_JUEGO.md §2.2): ícono + «Desinformación
+# 34 · más baja = mejor», con los colores invertidos. Se oculta con el medidor. ALCALDE_BARRA_DESINFO=0 la quita.
 #
 # Depuración: ALCALDE_INDICE_FORZADO=<0-100> fija el índice; con ALCALDE_DEBUG=1, F8 baja una etapa y F9 sube una.
 
 import math
+import os
 import random
 import sys
 
@@ -34,6 +37,28 @@ ANCHO_MEDIDOR, ALTO_MEDIDOR = 0.60, 0.088
 ANCHO_BARRA, ALTO_BARRA = 0.54, 0.012
 Y_MEDIDOR = 0.5 - 0.02 - ALTO_MEDIDOR / 2
 MARCAS = (10, 25, 40, 60, 75, 90)
+
+BARRA_DESINFO = True             # bandera de la barra de desinformación (ALCALDE_BARRA_DESINFO=0 la quita)
+ALTO_DESINFO = ALTO_MEDIDOR / 2  # mismo ancho que el medidor, mitad de alto
+SEPARACION_DESINFO = 0.012       # hueco entre el medidor y la barra
+LADO_ICONO_DESINFO = 0.028
+ALTO_BARRA_DESINFO = 0.008
+SUFIJO_DESINFO = "más baja = mejor"
+
+
+def barra_desinfo_activa():
+    """¿Se pinta la barra de desinformación? ALCALDE_BARRA_DESINFO=1/0 manda sobre la constante."""
+    valor = os.environ.get("ALCALDE_BARRA_DESINFO", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(BARRA_DESINFO)
+
+
+def texto_desinfo(valor):
+    """«Desinformación 34 · más baja = mejor» (puro)."""
+    return f"Desinformación {int(round(max(0.0, min(100.0, float(valor)))))} · {SUFIJO_DESINFO}"
 
 
 def _aviso(texto):
@@ -117,6 +142,46 @@ def crear_controlador(escena, conexion):
             self.flecha.x = self.guion.x = self.etiqueta.x - ancho / 2 - 0.018
             self.flecha.rotation_z = 0 if etapa > 0 else 180       # Circle(3) nace apuntando arriba
             self.flecha.color = self.guion.color = rgb(tono)
+
+    class BarraDesinfo(Entity):
+        """Barra pequeña de desinformación, colgada bajo el medidor (hija suya: se oculta y se escala con él). Ícono
+        (megáfono) + texto con el número + barra de color invertido: más baja = mejor."""
+
+        def __init__(self, **opciones):
+            super().__init__(**opciones)
+            self.position = (0, -ALTO_MEDIDOR / 2 - SEPARACION_DESINFO - ALTO_DESINFO / 2)
+            self.fondo = panel_tinta(self, ANCHO_MEDIDOR, ALTO_DESINFO, tono=estilo.COLOR_FONDO, radio_px=estilo.RADIO_CHIP_PX,
+                                     borde_px=estilo.GROSOR_BORDE_DENSO_PX)
+            izquierda = -ANCHO_BARRA / 2
+            try:
+                from backend.logica import manillas as mdl
+                from frontend import registro_manillas
+                Entity(parent=self, model="quad", scale=(LADO_ICONO_DESINFO, LADO_ICONO_DESINFO),
+                       position=(izquierda + LADO_ICONO_DESINFO / 2, 0, -0.01),
+                       texture=registro_manillas.texturas()[1](mdl.SIMBOLOS["desinformacion"]))
+            except Exception as error:
+                _aviso(f"ícono de desinformación no pintado ({type(error).__name__}: {error})")
+            self.x_barra = izquierda + LADO_ICONO_DESINFO + 0.012
+            self.ancho_barra = ANCHO_BARRA / 2 - self.x_barra
+            self.texto = Text("", parent=self, origin=(-0.5, 0), position=(self.x_barra, 0.009, -0.01),
+                              scale=escala_fuente(12), color=rgb(estilo.COLOR_TEXTO))
+            centro = self.x_barra + self.ancho_barra / 2
+            Entity(parent=self, model="quad", scale=(self.ancho_barra + 0.005, ALTO_BARRA_DESINFO + 0.005),
+                   position=(centro, -0.011, -0.008), color=rgb(estilo.TINTA))
+            Entity(parent=self, model="quad", scale=(self.ancho_barra, ALTO_BARRA_DESINFO), position=(centro, -0.011, -0.009),
+                   color=rgb(estilo.COLOR_BARRA_FONDO))
+            self.barra = Entity(parent=self, model="quad", origin=(-0.5, 0), scale=(0.0001, ALTO_BARRA_DESINFO),
+                                position=(self.x_barra, -0.011, -0.01), color=rgb(estilo.ESTADO_AVISO))
+            self._pintado = None
+
+        def pintar(self, valor):
+            valor = int(round(max(0.0, min(100.0, float(valor)))))
+            if valor == self._pintado:
+                return
+            self._pintado = valor
+            self.texto.text = texto_desinfo(valor)
+            self.barra.scale_x = max(0.0001, self.ancho_barra * valor / 100.0)
+            self.barra.color = rgb(estilo.rgb_por_valor(100 - valor))       # invertido: mucha desinformación = rojo
 
     # -- NPC de etapa -----------------------------------------------------------------------------------------------
 
@@ -250,6 +315,12 @@ def crear_controlador(escena, conexion):
             self._tinte_objetivo = (0.0, 0.0, 0.0, 0.0)
             self._vineta_actual, self._vineta_objetivo = 0.0, 0.0
             self.medidor = Medidor(parent=self)
+            self.barra_desinfo = None
+            if barra_desinfo_activa():
+                try:
+                    self.barra_desinfo = BarraDesinfo(parent=self.medidor)
+                except Exception as error:
+                    _aviso(f"barra de desinformación no instalada ({type(error).__name__}: {error})")
             self.cuerpos = {}                # tipo -> CuerpoEtapa (se crean la primera vez que hacen falta)
             self._visibles = []
             self.cambios = 0                 # cambios de etapa (pruebas)
@@ -450,7 +521,21 @@ def crear_controlador(escena, conexion):
                 return False
             vigia = getattr(conexion, "vigia_reloj", None)
             motivo = getattr(getattr(vigia, "control", None), "motivo", None)
-            return motivo not in (rc.PAUSA, rc.MAPA, rc.PANEL, rc.TERMINADA)
+            if motivo == rc.PANEL:
+                from frontend import registro_tutorial      # el tutorial señala el medidor: se queda a la vista
+                return registro_tutorial.senalando_hud()
+            return motivo not in (rc.PAUSA, rc.MAPA, rc.TERMINADA)
+
+        def _pintar_desinfo(self):
+            if self.barra_desinfo is None:
+                return
+            try:
+                valor = escena._sesion.estado_partida.indicadores()["desinformacion"]
+            except Exception:
+                valor = None
+            self.barra_desinfo.enabled = valor is not None
+            if valor is not None:
+                self.barra_desinfo.pintar(valor)
 
         # -- Frame --
 
@@ -467,6 +552,7 @@ def crear_controlador(escena, conexion):
             visible = self._medidor_visible()
             if visible:
                 self.medidor.pintar(self.indice, self.etapa)
+                self._pintar_desinfo()
             if self.medidor.enabled != visible:
                 self.medidor.enabled = visible
 

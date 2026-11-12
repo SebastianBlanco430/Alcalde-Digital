@@ -246,7 +246,7 @@ def _crear_vigia(escena_mundo):
             self.chip_entidad.fondo = panel_tinta(self.chip_entidad, ancho, ALTO_CHIP, tono=estilo.COLOR_FONDO,
                                                   radio_px=estilo.RADIO_CHIP_PX, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
             self.chip_texto = Text("", parent=self.chip_entidad, origin=(0, 0), position=(0, 0.004, -0.01),
-                                   scale=escala_fuente(16), color=rgb(estilo.COLOR_ACENTO), font=tipografia.FUENTE_TITULO)
+                                   scale=escala_fuente(13), color=rgb(estilo.COLOR_ACENTO), font=tipografia.FUENTE_TITULO)
             apilar = 0.0 if getattr(escena_mundo, "economia", None) is None else ALTO_CHIP + 0.012
             # Sobre el chip del reloj (que va sobre el del dinero).
             self.chip_entidad.position = (-diseno_adaptable.aspecto() / 2 + MARGEN + ancho / 2,

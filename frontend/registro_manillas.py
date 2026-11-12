@@ -16,6 +16,10 @@
 # backend/logica/manillas.py; la parte pura está en frontend/manillas_calculos.py y el dibujo con Pillow en
 # frontend/manillas_dibujo.py. No toca los archivos de multitud, peatones ni NPC: usa la API pública npc.ancla_muneca("i").
 #
+#   4. PULSERAS DEL JUGADOR (docs/PLAN_CLARIDAD_JUEGO.md §2.1): el brazalete solo lleva 2 cintas (Convivencia y Confianza)
+#      y el personaje del jugador activo las lleva en las muñecas (Convivencia izquierda, Confianza derecha), con la
+#      misma malla y dibujo que las de los NPC. ALCALDE_PULSERAS_JUGADOR=0: las 5 cintas de antes y sin pulseras 3D.
+#
 # Banderas: ALCALDE_MANILLAS=0 lo apaga todo; ALCALDE_MANILLAS_HUD=0 solo el brazalete y la leyenda;
 # ALCALDE_MANILLAS_NPC=0 solo las cintas de los NPC.
 
@@ -30,11 +34,17 @@ MANILLAS = True
 MANILLAS_HUD = True
 MANILLAS_NPC = True
 
-ANCHO_CHIP, ALTO_CHIP = 0.355, 0.2
+# El chip se ajusta al número de cintas: 5 columnas (las de antes) o 2 (pulseras del jugador).
+# Con 2, cada cinta lleva debajo su nombre corto («Conviv.», «Confianza»): columnas más separadas y chip algo más alto.
+DOS_PULSERAS = len(mcal.INDICADORES_HUD) <= 2
+ANCHO_CHIP, ALTO_CHIP = (0.215, 0.226) if DOS_PULSERAS else (0.355, 0.2)
+PX_NOMBRE_CINTA = 11
+NOMBRE_LADO = {"i": "izquierda", "d": "derecha"}
+PERIODO_PULSERAS = 6                  # frames entre dos revisiones de las pulseras del jugador (nivel y muñeca)
 MARGEN = 0.02
 Y_CENTRO = -0.07                      # centro vertical del brazalete (entre el panel de turno y los chips de abajo)
 ANCHO_CINTA, ALTO_CINTA = 0.034, 0.085
-PASO_COLUMNA = 0.066
+PASO_COLUMNA = 0.1 if DOS_PULSERAS else 0.066
 LADO_DIJE = 0.026
 
 # Cinta de la muñeca (medidas del esqueleto, en m; algo exagerada para leerse a unos 10 m).
@@ -66,6 +76,15 @@ def npc_activo():
 
 def _aviso(texto):
     print(f"[manillas] {texto}", file=sys.stderr)
+
+
+def _tutorial_senalando():
+    """El tutorial está señalando el HUD: el brazalete se queda a la vista aunque el tutorial bloquee la escena."""
+    try:
+        from frontend import registro_tutorial
+        return registro_tutorial.senalando_hud()
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------- lógica del brazalete (sin ursina; se prueba con escenas falsas)
@@ -102,7 +121,8 @@ class ControlManillas:
         terminada = bool(not sin_partida and flujo.partida_terminada())
         return mcal.oculto_hud(
             en_pausa=bool(getattr(self.escena, "en_pausa", False)), cinematica=bool(getattr(self.escena, "_cinematica", False)),
-            mapa_abierto=self._mapa_abierto(), panel_abierto=self._panel_abierto(), terminada=terminada, sin_partida=sin_partida)
+            mapa_abierto=self._mapa_abierto(), panel_abierto=self._panel_abierto() and not _tutorial_senalando(),
+            terminada=terminada, sin_partida=sin_partida)
 
     def calcular(self):
         """{indicador: aspecto} con el Ambiente vivo, o None si aún no hay partida."""
@@ -126,7 +146,7 @@ class ControlManillas:
 
     def input(self, key):
         """Tecla B: abre / cierra la leyenda (solo con el brazalete visible: no encima de la pausa ni de un panel)."""
-        if key != mcal.TECLA:
+        if key != mcal.TECLA or _tutorial_senalando():
             return False
         if self.vista.leyenda_abierta():
             self.vista.cerrar_leyenda()
@@ -203,6 +223,10 @@ def _crear_vista(escena_mundo):
                                texture=dije(mdl.SIMBOLOS[indicador]))
             self.centro_ui = (x, y - 0.012)
             self.t = None
+            self.nombre = None
+            if DOS_PULSERAS:                 # el nombre en texto: no hay que adivinar cuál es cuál por el dije
+                self.nombre = texto(padre, mcal.ETIQUETAS_CORTAS[indicador], PX_NOMBRE_CINTA,
+                                    (x, y - ALTO_CINTA / 2 - LADO_DIJE - 0.018, -0.01), origen=(0, 0))
 
         def poner(self, clave, inmediato):
             if clave == self.clave:
@@ -236,7 +260,7 @@ def _crear_vista(escena_mundo):
             self.chip = Entity(parent=escena.hud, enabled=False)
             self.chip.fondo = panel_tinta(self.chip, ANCHO_CHIP, ALTO_CHIP, tono=estilo.COLOR_FONDO,
                                           radio_px=estilo.RADIO_CHIP_PX, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
-            texto(self.chip, "Manillas", 13, (-ANCHO_CHIP / 2 + 0.014, ALTO_CHIP / 2 - 0.022, -0.01), titulo=True)
+            texto(self.chip, "Pulseras" if mcal.pulseras_jugador_activo() else "Manillas", 13, (-ANCHO_CHIP / 2 + 0.014, ALTO_CHIP / 2 - 0.022, -0.01), titulo=True)
             tecla = texto(self.chip, mcal.TECLA.upper(), 13, (ANCHO_CHIP / 2 - 0.014, ALTO_CHIP / 2 - 0.022, -0.01),
                           origen=(0.5, 0), titulo=True, tono=estilo.ACENTO_SECUNDARIO)
             tecla.nombre = "tecla"
@@ -351,8 +375,21 @@ def _crear_vista(escena_mundo):
             texto(L, "La ciudad (ahora)", 15, (-ANCHO / 2 + 0.03, 0.315, -0.01), titulo=True, tono=estilo.ACENTO_SECUNDARIO)
             texto(L, "Los vecinos", 15, (0.03, 0.315, -0.01), titulo=True, tono=estilo.ACENTO_SECUNDARIO)
             L.filas_ciudad = []
+            que_mide = info.get("que_mide") or {}
+            paso_fila = 0.15 if que_mide else 0.075          # con la frase de qué mide, cada fila ocupa más
+            ancho_columna = 0.03 - 0.03 - (-ANCHO / 2 + 0.13)  # hasta la columna «Los vecinos», con aire
             for k, (indicador, _nombre, simbolo) in enumerate(info["ciudad"]):
-                y = 0.235 - k * 0.075
+                y = 0.235 - k * paso_fila
+                if que_mide.get(indicador):          # se parte midiendo el ancho real: no invade la otra columna
+                    from frontend import hud as hud_mod
+                    from frontend.texto import envolver_texto
+                    renglon0 = texto(L, "", 12, (-ANCHO / 2 + 0.13, y - 0.044, -0.01), tono=estilo.COLOR_TEXTO)
+                    frase = que_mide[indicador].partition(": ")[2] or que_mide[indicador]     # el lado ya va en el nombre
+                    frase = frase[:1].upper() + frase[1:]
+                    renglones = envolver_texto(frase, hud_mod._medidor(renglon0), ancho_columna)[:3]
+                    renglon0.text = renglones[0] if renglones else ""
+                    for j, renglon in enumerate(renglones[1:], 1):
+                        texto(L, renglon, 12, (-ANCHO / 2 + 0.13, y - 0.044 - j * 0.026, -0.01), tono=estilo.COLOR_TEXTO)
                 cinta = Entity(parent=L, model="quad", scale=(0.03, 0.07), position=(-ANCHO / 2 + 0.05, y, -0.01))
                 Entity(parent=L, model="quad", scale=(0.03, 0.03), position=(-ANCHO / 2 + 0.1, y, -0.01), texture=dije(simbolo))
                 linea = texto(L, "", 13, (-ANCHO / 2 + 0.13, y + 0.012, -0.01), titulo=True)
@@ -369,7 +406,7 @@ def _crear_vista(escena_mundo):
                 texto(L, f"{descr} · {patron}, {mcal._nudos_texto(nudos)}", 12, (0.09, y - 0.016, -0.01))
             texto(L, "Cómo leer la ciudad", 15, (-ANCHO / 2 + 0.03, -0.14, -0.01), titulo=True, tono=estilo.ACENTO_SECUNDARIO)
             for k, (nivel, patron, nudos, frase) in enumerate(info["niveles"]):
-                x = -ANCHO / 2 + 0.03 + k * 0.225
+                x = -ANCHO / 2 + 0.03 + k * 0.213            # 4 columnas que caben enteras en el panel
                 color_n, patron_n, nudos_n = mdl.ESTILO_NIVEL[nivel]
                 des = (0.0, 0.25, 0.6, 1.0)[k]
                 Entity(parent=L, model="quad", scale=(0.022, 0.054), position=(x + 0.011, -0.205, -0.01),
@@ -395,6 +432,9 @@ def _crear_vista(escena_mundo):
                 if cinta.texture is None or getattr(cinta, "_clave", None) != clave:
                     cinta.texture, cinta._clave = textura(clave), clave
                 nombre, _, frase = a["descripcion"].partition(": ")
+                lado = NOMBRE_LADO.get(mcal.LADO_MUNECA.get(indicador)) if mcal.pulseras_jugador_activo() else None
+                if lado:                     # como en el tutorial: «Convivencia · pulsera izquierda»
+                    nombre = f"{nombre} · pulsera {lado}"
                 if linea.text != nombre:
                     linea.text = nombre
                 nuevo = f"{frase} · {a['patron']}, {mcal._nudos_texto(a['nudos'])}"
@@ -452,17 +492,17 @@ class AsignadorCintasNPC:
         return list(nuevo)
 
 
-def _crear_cintas_npc(escena):
-    from ursina import Entity, Mesh, camera, color, time
+# La cinta de una muñeca (aro + cola cruzada): la llevan los NPC (estado emocional) y el jugador (nivel de un indicador).
+# `reserva`: entidad donde descansan las que nadie lleva.
+def _clase_cinta(reserva):
+    from ursina import Entity, Mesh, color
 
     from backend.logica import manillas as mdl
-    from frontend import npc_postura
     from frontend.componentes import rgb
 
     textura, _dije = texturas()
-    reserva = Entity(parent=escena, enabled=True)
 
-    class CintaNPC:
+    class Cinta:
 
         def __init__(self):
             self.raiz = Entity(parent=reserva, enabled=False)
@@ -499,6 +539,148 @@ def _crear_cintas_npc(escena):
             self.raiz.enabled = False
             self.raiz.parent = reserva
             self.estado = None
+
+        # -- Jugador: la cinta de un indicador de la ciudad, con el mismo fundido del brazalete al cambiar de nivel --
+
+        def poner_aspecto(self, ancla, aspecto, inmediato=False):
+            """Cuelga la cinta de `ancla` con el `aspecto` (manillas_calculos.aspecto_ciudad). Si ya colgaba de ahí y
+            cambia el dibujo, se funde (avanzar_fundido)."""
+            clave = mcal.clave_textura(aspecto)
+            if self.raiz.parent is not ancla or not self.raiz.enabled:
+                self.raiz.parent = ancla
+                self.raiz.enabled = True
+                self.raiz.position = (0, 0, 0)
+                inmediato = True
+            if clave == getattr(self, "clave", None) and not inmediato:
+                return
+            previa, self.clave = getattr(self, "clave", None), clave
+            if inmediato or previa is None:
+                self._pintar_clave(clave, 1.0)
+                self._fundido = None
+            else:
+                self._fundido = [0.0, previa, clave]
+
+        def _pintar_clave(self, clave, alfa):
+            r, g, b = clave[0]
+            self.aro.color = color.rgba32(r, g, b, int(255 * alfa))
+            tex = textura(clave)
+            for cola in self.colas:
+                cola.texture = tex
+                cola.color = color.rgba(1, 1, 1, alfa)
+
+        def avanzar_fundido(self, dt):
+            """La cinta vieja se apaga y la nueva se enciende (DURACION_FUNDIDO en total, como en el HUD)."""
+            fundido = getattr(self, "_fundido", None)
+            if fundido is None:
+                return
+            fundido[0] += dt
+            p = mcal.progreso_fundido(fundido[0])
+            if p < 0.5:
+                self._pintar_clave(fundido[1], 1.0 - 2.0 * p)
+            else:
+                self._pintar_clave(fundido[2], 2.0 * p - 1.0)
+            if fundido[0] >= mcal.DURACION_FUNDIDO:
+                self._pintar_clave(fundido[2], 1.0)
+                self._fundido = None
+
+    return Cinta
+
+
+class ControlPulserasJugador:
+    """Pulseras del jugador activo, sin ursina: decide el aspecto de cada una (con histéresis) y a qué muñeca va.
+    `cintas`: {indicador: cinta con poner_aspecto(ancla, aspecto), quitar() y avanzar_fundido(dt)}.
+    `ancla_de(personaje, lado)` -> nodo de la muñeca o None. `personaje_activo()` -> el avatar del turno o None.
+    `valores()` -> {indicador: 0-100} o None."""
+
+    def __init__(self, cintas, personaje_activo, ancla_de, valores):
+        self.cintas, self.personaje_activo, self.ancla_de, self.valores = cintas, personaje_activo, ancla_de, valores
+        self.niveles = {}
+        self.personaje = None
+        self.puestas = {}                      # indicador -> ancla de la que cuelga
+
+    def revisar(self):
+        """Re-ancla al personaje del turno (hot-seat) y actualiza el nivel de cada pulsera. Devuelve las puestas."""
+        personaje, valores = self.personaje_activo(), self.valores()
+        if personaje is None or valores is None:
+            self.quitar_todas()
+            return {}
+        cambio = personaje is not self.personaje
+        self.personaje = personaje
+        for indicador, cinta in self.cintas.items():
+            ancla = self.ancla_de(personaje, mcal.LADO_MUNECA[indicador])
+            if ancla is None or indicador not in valores:
+                cinta.quitar()
+                self.puestas.pop(indicador, None)
+                continue
+            aspecto = mcal.aspecto_ciudad(indicador, valores[indicador], self.niveles.get(indicador))
+            self.niveles[indicador] = aspecto["nivel"]
+            cinta.poner_aspecto(ancla, aspecto, inmediato=cambio or self.puestas.get(indicador) is not ancla)
+            self.puestas[indicador] = ancla
+        return dict(self.puestas)
+
+    def quitar_todas(self):
+        for indicador in list(self.puestas):
+            self.cintas[indicador].quitar()
+        self.puestas = {}
+        self.personaje = None
+
+
+def _crear_pulseras_jugador(escena):
+    from ursina import Entity, time
+
+    from frontend import npc_postura
+
+    reserva = Entity(parent=escena, enabled=True)
+    Cinta = _clase_cinta(reserva)
+    estado = {"cintas": {i: Cinta() for i in mcal.INDICADORES_JUGADOR}}
+
+    def personaje_activo():
+        flujo = getattr(escena, "flujo", None)
+        if flujo is None or getattr(escena, "_sesion", None) is None:
+            return None
+        try:
+            return escena.avatar_de(flujo.jugador_activo())
+        except Exception:
+            return None
+
+    def valores():
+        return mcal.valores_ciudad(ambiente_vivo.obtener(), ambiente_vivo.suave().valores()["indicadores"])
+
+    control = ControlPulserasJugador(estado["cintas"], personaje_activo, npc_postura.ancla_muneca, valores)
+
+    class PulserasJugador(Entity):
+
+        def __init__(self, **opciones):
+            super().__init__(**opciones)
+            self.control = control
+            self._frame = 0
+
+        def update(self):
+            dt = min(time.dt, 0.1)
+            for cinta in control.cintas.values():
+                cinta.avanzar_fundido(dt)
+            self._frame += 1
+            if self._frame % PERIODO_PULSERAS:
+                return
+            # Si reconstruyeron los personajes, las cintas colgadas del avatar viejo quedaron destruidas: se rehacen.
+            if any(c.raiz.is_empty() for c in control.cintas.values()):
+                control.cintas = {i: Cinta() for i in mcal.INDICADORES_JUGADOR}
+                control.puestas, control.personaje = {}, None
+            control.revisar()
+
+    return PulserasJugador(parent=escena)
+
+
+def _crear_cintas_npc(escena):
+    from ursina import Entity, Mesh, camera, color, time
+
+    from backend.logica import manillas as mdl
+    from frontend import npc_postura
+    from frontend.componentes import rgb
+
+    textura, _dije = texturas()
+    reserva = Entity(parent=escena, enabled=True)
+    CintaNPC = _clase_cinta(reserva)
 
     pool = [CintaNPC() for _ in range(mcal.CAPACIDAD_NPC)]
     for estado in mdl.ESTADOS_NPC:                      # las 5 texturas, ya (ninguna se dibuja en pleno juego)
@@ -594,6 +776,11 @@ def registrar(gestor, conexion, escena_mundo):
             conexion.vigia_manillas = _crear_vigia(escena_mundo)
         except Exception as error:
             _aviso(f"brazalete no instalado ({type(error).__name__}: {error})")
+    if mcal.pulseras_jugador_activo():
+        try:
+            conexion.pulseras_jugador = _crear_pulseras_jugador(escena_mundo)
+        except Exception as error:
+            _aviso(f"pulseras del jugador no instaladas ({type(error).__name__}: {error})")
     if npc_activo():
         try:
             conexion.cintas_npc = _crear_cintas_npc(escena_mundo)

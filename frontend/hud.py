@@ -11,6 +11,7 @@
 # Fuente por defecto: no tiene flechas ni ✓ ★ ▲ (por eso la flecha del GPS es una
 # malla propia) y Text interpreta "<...>" como etiquetas (por eso _seguro()).
 
+import dataclasses
 import math
 import time
 
@@ -22,13 +23,15 @@ from backend.logica import ajustes as modelo_ajustes
 from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 from backend.logica.roles import ROLES
 from frontend import (
-    diseno_adaptable, diseno_adaptable_calculos, estilo, hud_calculos, iconos, minimapa_calculos as mm, mundo_config)
+    diseno_adaptable, diseno_adaptable_calculos, estilo, hud_calculos, iconos, minimapa_calculos as mm, mundo_config,
+    notificaciones_calculos)
 from frontend.componentes import (
     BarraIndicador, BotonAccion, BotonPrimario, a_unidades, destruir_arbol, escala_fuente,
     modelo_redondeado, panel_tinta, rgb)
 from frontend.texto import envolver_texto
 
 MARGEN = 0.02                       # separación de los bordes de la pantalla
+ESCALA_HUD = 0.9                     # el HUD conserva su diseño, reducido un 10 %
 COLOR_FONDO_HUD = color.rgba32(12, 14, 24, 240)
 COLOR_RUTA = estilo.COLOR_RUTA          # cian: la ruta (minimapa y mundo); fuente única en estilo.py
 COLOR_DESTINO = estilo.COLOR_DESTINO    # amarillo: el destino (igual que la baliza del mundo)
@@ -114,6 +117,10 @@ class TelefonoUI(Entity):
         self.vista = None
         self._firma_banner = None
         self._firma_panel = None
+        # Varios mensajes seguidos con el teléfono cerrado: el banner los repasa de uno en uno (4 s cada uno) en vez de
+        # pisarse (docs/PLAN_CLARIDAD_JUEGO.md §2.6). None = el banner de antes (ALCALDE_NOTIF_TELEFONO=0).
+        self._cola_banner = notificaciones_calculos.ColaBanner(self.DURACION_NOTIFICACION) \
+            if notificaciones_calculos.activo() else None
 
         self.x_derecho = window.aspect_ratio / 2 - MARGEN
         self.y_inferior = -0.5 + MARGEN
@@ -171,6 +178,8 @@ class TelefonoUI(Entity):
             self.tiempo_notificacion = 0.0
             self.nivel_banner = 0.0
             self._nuevos_al_abrir = 0
+            if self._cola_banner is not None and telefono is not None:
+                self._cola_banner.reiniciar(len(telefono.mensajes()), telefono.no_leidos())
         if telefono is None:
             self.enabled = False
             return
@@ -180,7 +189,12 @@ class TelefonoUI(Entity):
             pass                                   # conserva cuántos eran nuevos
         else:
             self._nuevos_al_abrir = telefono.no_leidos()
-        if telefono.estado() == hud_calculos.NOTIFICANDO:
+        if self._cola_banner is not None:
+            notificando = telefono.estado() == hud_calculos.NOTIFICANDO
+            if self._cola_banner.avanzar(notificando, len(telefono.mensajes()), dt):
+                telefono.terminar_notificacion()
+            self.tiempo_notificacion = self._cola_banner.tiempo
+        elif telefono.estado() == hud_calculos.NOTIFICANDO:
             self.tiempo_notificacion += dt
             if self.tiempo_notificacion >= self.DURACION_NOTIFICACION:
                 telefono.terminar_notificacion()
@@ -192,6 +206,12 @@ class TelefonoUI(Entity):
             self.nivel_banner, objetivo, dt * self.VELOCIDAD_DESLIZ)
         self.vista = hud_calculos.vista_telefono(
             telefono, self._obtener_mision(), self._nuevos_al_abrir)
+        indice = None if self._cola_banner is None else self._cola_banner.indice
+        if indice is not None:                     # el banner enseña el mensaje que toca de la cola, no solo el último
+            mensajes = telefono.mensajes()
+            if indice < len(mensajes) - 1:
+                self.vista = dataclasses.replace(
+                    self.vista, texto_notificacion=hud_calculos.glosar_texto(mensajes[indice].texto))
         self._dibujar()
 
     # Lo que se ve ahora (para los tests y el HUD).
@@ -1172,7 +1192,7 @@ class PanelTurno(Entity):
             aspecto = diseno_adaptable.aspecto()
         maximo = aspecto - 2 * MARGEN - Minimapa.ANCHO - 0.03
         escala = diseno_adaptable_calculos.factor_para_ancho(self._ancho_total, maximo, minimo=0.4)
-        self.scale = escala
+        self.scale = ESCALA_HUD * escala
 
 
 # -- Fin de la partida ---------------------------------------------------------------
@@ -1284,6 +1304,10 @@ class HudMundo(Entity):
         self.guia = hud_calculos.GuiaRuta(mapa)
         # Aviso genérico (API pública: mostrar_aviso / ocultar_aviso), apilado sobre el de «E».
         self.aviso_generico = AvisoGenerico(parent=self, referencia=self.aviso)
+        for componente in (
+                self.panel_turno, self.minimapa, self.telefono_ui,
+                self.aviso, self.aviso_generico, self.panel_fin):
+            componente.scale = ESCALA_HUD
         # Diseño adaptable: lo anclado a un borde sigue al borde cuando cambia la ventana (no-op
         # si el gestor no está instalado o UI_ADAPTABLE es False).
         diseno_adaptable.anclar(self.panel_turno, "izquierda")

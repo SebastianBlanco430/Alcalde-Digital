@@ -7,12 +7,18 @@
 # Los muestra de uno en uno (veredicto_calculos.ColaAvisos) en un aviso propio en la parte alta de la pantalla, para no
 # pisar los de «E» ni los de la economía. Mientras hay una cinemática (salir del edificio) espera.
 #
+# Con las notificaciones del teléfono (frontend/notificaciones.py, ALCALDE_NOTIF_TELEFONO) cada texto llega como mensaje
+# al teléfono del jugador activo (banner con el teléfono cerrado, tarjeta bajo el minimapa con el teléfono abierto) y no
+# se pinta nada en el centro. En hot-seat van al teléfono de QUIEN JUGÓ la misión: al recogerlos el turno ya pasó, así
+# que el vigía recuerda quién era el activo en el frame anterior (`SeguimientoJugador`); si ya no es su turno, el mensaje
+# queda sin leer en su teléfono y le sale al empezar el siguiente.
+#
 # Sin economía no hay pagos y sin GameState no hay veredictos: el vigía no encuentra nada y no pinta nada. En línea
 # tampoco (el flujo en línea no tiene esos atributos).
 
 import sys
 
-from frontend import veredicto_calculos as vc
+from frontend import notificaciones, veredicto_calculos as vc
 
 Y_AVISO = 0.30          # centro del aviso en camera.ui (bajo el panel de turno y el minimapa, sobre el centro)
 
@@ -30,6 +36,36 @@ def recoger(flujo, visto):
     return [t for t in textos if t]
 
 
+class SeguimientoJugador:
+    """Quién jugó la misión que se acaba de cerrar (puro). El cierre pasa el turno ANTES de que el vigía recoja los
+    textos, así que el autor es el activo que se vio en el frame anterior. `autor(activo)` se llama una vez por frame."""
+
+    def __init__(self):
+        self._visto = None
+
+    def reiniciar(self, activo=None):
+        self._visto = activo
+
+    def autor(self, activo):
+        previo = self._visto if self._visto is not None else activo
+        self._visto = activo
+        return previo
+
+
+def _activo_de(flujo):
+    try:
+        return flujo.jugador_activo()
+    except Exception:
+        return None
+
+
+def tono_de(texto):
+    """Tono de la notificación de un texto de pago o veredicto (puro)."""
+    if texto.startswith(vc.TEXTO_FALLADA) or texto.startswith("Sin pago"):
+        return "error"
+    return "exito"
+
+
 def _crear_vigia(escena_mundo):
     from ursina import Entity, time
     from frontend.hud import AvisoGenerico
@@ -43,6 +79,7 @@ def _crear_vigia(escena_mundo):
             self.aviso.y_base = Y_AVISO
             self._visto = {"veredicto": None}
             self._flujo = None
+            self.seguimiento = SeguimientoJugador()
 
         def update(self):
             self.avanzar(time.dt)
@@ -53,13 +90,19 @@ def _crear_vigia(escena_mundo):
                 self._flujo = flujo
                 self.cola.vaciar()
                 self._visto["veredicto"] = getattr(flujo, "ultimo_veredicto", None)
+                self.seguimiento.reiniciar(_activo_de(flujo) if flujo is not None else None)
                 if callable(getattr(flujo, "vaciar_pagos_recientes", None)):
                     flujo.vaciar_pagos_recientes()
             if flujo is None:
                 self.aviso.ocultar()
                 return
+            al_telefono = notificaciones.activo()
+            autor = self.seguimiento.autor(_activo_de(flujo))      # quien jugó la misión (el turno ya pudo pasar)
             for texto in recoger(flujo, self._visto):
-                self.cola.agregar(texto)
+                if al_telefono:
+                    notificaciones.notificar_evento(escena_mundo, texto, tono=tono_de(texto), jugador=autor)
+                else:
+                    self.cola.agregar(texto)
             if getattr(escena_mundo, "_cinematica", False):
                 return                                    # que termine de salir por la puerta
             texto = self.cola.avanzar(dt)

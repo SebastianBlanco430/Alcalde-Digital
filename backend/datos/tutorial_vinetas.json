@@ -1,0 +1,517 @@
+{
+  "saltar": "Saltar",
+  "continuar": "Continuar",
+  "vinetas": [
+    {
+      "fondo": [
+        120,
+        190,
+        235
+      ],
+      "titulo": "Ciudad Nova vota en 7 días",
+      "texto": "Octavio Ruedas, el alcalde de siempre, contra Tomás Arenas, el aspirante nuevo. En Civitas corren rumores: ve a mirar, verifica y decide si compartir o reportar.",
+      "figuras": [
+        {
+          "tipo": "suelo",
+          "color": [
+            96,
+            170,
+            110
+          ]
+        },
+        {
+          "tipo": "sol",
+          "x": 0.56,
+          "y": 0.33
+        },
+        {
+          "tipo": "edificio",
+          "x": -0.5,
+          "y": 0.0,
+          "ancho": 0.26,
+          "alto": 0.26,
+          "color": [
+            196,
+            120,
+            90
+          ]
+        },
+        {
+          "tipo": "edificio",
+          "x": 0.0,
+          "y": 0.0,
+          "ancho": 0.3,
+          "alto": 0.3,
+          "color": [
+            90,
+            110,
+            160
+          ],
+          "rotulo": "ALCALDÍA"
+        },
+        {
+          "tipo": "edificio",
+          "x": 0.48,
+          "y": 0.0,
+          "ancho": 0.24,
+          "alto": 0.22,
+          "color": [
+            170,
+            150,
+            90
+          ]
+        },
+        {
+          "tipo": "podio",
+          "x": -0.22,
+          "y": 0.0
+        },
+        {
+          "tipo": "persona",
+          "x": -0.22,
+          "y": 0.0,
+          "alto": 0.21,
+          "color": [
+            60,
+            70,
+            120
+          ]
+        },
+        {
+          "tipo": "podio",
+          "x": 0.24,
+          "y": 0.0
+        },
+        {
+          "tipo": "persona",
+          "x": 0.24,
+          "y": 0.0,
+          "alto": 0.2,
+          "color": [
+            214,
+            80,
+            70
+          ]
+        },
+        {
+          "tipo": "pancarta",
+          "x": -0.6,
+          "y": 0.12
+        },
+        {
+          "tipo": "pancarta",
+          "x": 0.62,
+          "y": 0.12
+        }
+      ]
+    },
+    {
+      "fondo": [
+        250,
+        222,
+        150
+      ],
+      "titulo": "Convivencia · pulsera izquierda",
+      "texto": "Qué tan bien se llevan los vecinos. Sube al compartir lo que es verdad y al reportar los bulos. Baja si compartes mentiras (las que más dividen, más) o pasas un día entero sin cerrar misiones.",
+      "figuras": [
+        {
+          "tipo": "suelo",
+          "color": [
+            110,
+            176,
+            104
+          ]
+        },
+        {
+          "tipo": "banderines",
+          "x": -0.6,
+          "y": 0.34,
+          "x1": 0.6
+        },
+        {
+          "tipo": "edificio",
+          "x": -0.52,
+          "y": 0.0,
+          "ancho": 0.24,
+          "alto": 0.22,
+          "color": [
+            214,
+            140,
+            90
+          ]
+        },
+        {
+          "tipo": "edificio",
+          "x": 0.52,
+          "y": 0.0,
+          "ancho": 0.24,
+          "alto": 0.24,
+          "color": [
+            120,
+            160,
+            200
+          ]
+        },
+        {
+          "tipo": "persona",
+          "x": -0.2,
+          "y": 0.0,
+          "alto": 0.2,
+          "color": [
+            214,
+            80,
+            70
+          ]
+        },
+        {
+          "tipo": "persona",
+          "x": -0.06,
+          "y": 0.0,
+          "alto": 0.19,
+          "color": [
+            60,
+            120,
+            190
+          ]
+        },
+        {
+          "tipo": "persona",
+          "x": 0.08,
+          "y": 0.0,
+          "alto": 0.2,
+          "color": [
+            240,
+            190,
+            60
+          ]
+        },
+        {
+          "tipo": "persona",
+          "x": 0.22,
+          "y": 0.0,
+          "alto": 0.18,
+          "color": [
+            90,
+            170,
+            110
+          ]
+        },
+        {
+          "tipo": "flor",
+          "x": -0.36,
+          "y": 0.0
+        },
+        {
+          "tipo": "flor",
+          "x": 0.36,
+          "y": 0.0
+        },
+        {
+          "tipo": "nota",
+          "x": 0.0,
+          "y": 0.3
+        },
+        {
+          "tipo": "nota",
+          "x": 0.14,
+          "y": 0.27
+        }
+      ]
+    },
+    {
+      "fondo": [
+        170,
+        214,
+        240
+      ],
+      "titulo": "Confianza · pulsera derecha",
+      "texto": "Cuánto le cree la gente a lo que se publica. Sube al acertar el veredicto: compartir lo verdadero, reportar lo falso. Baja al fallar, y un poco si dejas pasar el tiempo sin atender misiones.",
+      "figuras": [
+        {
+          "tipo": "suelo",
+          "color": [
+            96,
+            150,
+            120
+          ]
+        },
+        {
+          "tipo": "periodico",
+          "x": 0.0,
+          "y": 0.02,
+          "titular": "VERIFICADO",
+          "bajada": "Compartir lo cierto, reportar lo falso"
+        },
+        {
+          "tipo": "persona",
+          "x": -0.52,
+          "y": 0.0,
+          "alto": 0.2,
+          "color": [
+            60,
+            120,
+            190
+          ]
+        },
+        {
+          "tipo": "persona",
+          "x": 0.54,
+          "y": 0.0,
+          "alto": 0.19,
+          "color": [
+            214,
+            80,
+            70
+          ]
+        }
+      ]
+    },
+    {
+      "fondo": [
+        70,
+        60,
+        92
+      ],
+      "titulo": "Desinformación · barra de arriba",
+      "texto": "Cuántos bulos circulan. Más baja es mejor. Sube al compartir un bulo (y a veces el bulo vuelve al día siguiente). Baja al reportar lo falso.",
+      "figuras": [
+        {
+          "tipo": "suelo",
+          "color": [
+            52,
+            50,
+            66
+          ]
+        },
+        {
+          "tipo": "luna",
+          "x": 0.56,
+          "y": 0.33,
+          "color": [
+            230,
+            230,
+            210
+          ]
+        },
+        {
+          "tipo": "edificio",
+          "x": -0.46,
+          "y": 0.0,
+          "ancho": 0.26,
+          "alto": 0.26,
+          "color": [
+            80,
+            76,
+            104
+          ],
+          "luz": true
+        },
+        {
+          "tipo": "edificio",
+          "x": 0.44,
+          "y": 0.0,
+          "ancho": 0.26,
+          "alto": 0.3,
+          "color": [
+            70,
+            70,
+            96
+          ],
+          "luz": true
+        },
+        {
+          "tipo": "humo",
+          "x": -0.1,
+          "y": 0.2,
+          "escala": 0.1
+        },
+        {
+          "tipo": "humo",
+          "x": 0.12,
+          "y": 0.26,
+          "escala": 0.08
+        },
+        {
+          "tipo": "persona",
+          "x": -0.14,
+          "y": 0.0,
+          "alto": 0.2,
+          "color": [
+            40,
+            40,
+            52
+          ]
+        },
+        {
+          "tipo": "persona",
+          "x": 0.02,
+          "y": 0.0,
+          "alto": 0.19,
+          "color": [
+            40,
+            40,
+            52
+          ]
+        },
+        {
+          "tipo": "persona",
+          "x": 0.18,
+          "y": 0.0,
+          "alto": 0.2,
+          "color": [
+            40,
+            40,
+            52
+          ]
+        },
+        {
+          "tipo": "pancarta",
+          "x": 0.56,
+          "y": 0.0,
+          "caida": true
+        }
+      ]
+    },
+    {
+      "fondo": [
+        236,
+        226,
+        200
+      ],
+      "titulo": "El medidor y los finales",
+      "texto": "El número de arriba mezcla todo. Desde 60 la ciudad mejora por etapas; desde 40 hacia abajo se hunde. Al acabar el día 7, eso decide quién gana.",
+      "figuras": [
+        {
+          "tipo": "suelo",
+          "color": [
+            120,
+            150,
+            110
+          ]
+        },
+        {
+          "tipo": "edificio",
+          "x": -0.46,
+          "y": 0.0,
+          "ancho": 0.26,
+          "alto": 0.28,
+          "color": [
+            120,
+            170,
+            200
+          ]
+        },
+        {
+          "tipo": "banderines",
+          "x": -0.66,
+          "y": 0.36,
+          "x1": -0.24
+        },
+        {
+          "tipo": "flor",
+          "x": -0.26,
+          "y": 0.0
+        },
+        {
+          "tipo": "persona",
+          "x": -0.2,
+          "y": 0.0,
+          "alto": 0.19,
+          "color": [
+            240,
+            190,
+            60
+          ]
+        },
+        {
+          "tipo": "podio",
+          "x": 0.0,
+          "y": 0.0
+        },
+        {
+          "tipo": "edificio",
+          "x": 0.46,
+          "y": 0.0,
+          "ancho": 0.26,
+          "alto": 0.28,
+          "color": [
+            84,
+            80,
+            96
+          ]
+        },
+        {
+          "tipo": "fuego",
+          "x": 0.3,
+          "y": 0.0,
+          "alto": 0.14
+        },
+        {
+          "tipo": "humo",
+          "x": 0.5,
+          "y": 0.34,
+          "escala": 0.09
+        },
+        {
+          "tipo": "persona",
+          "x": 0.22,
+          "y": 0.0,
+          "alto": 0.19,
+          "color": [
+            40,
+            40,
+            52
+          ]
+        }
+      ]
+    },
+    {
+      "tipo": "foco",
+      "elemento": "panel_turno",
+      "titulo": "De quién es el turno",
+      "texto": "Aquí ves quién juega ahora y cuál es su misión actual."
+    },
+    {
+      "tipo": "foco",
+      "elemento": "minimapa",
+      "titulo": "El minimapa",
+      "texto": "La ruta cian te lleva al destino amarillo. Con N abres el mapa grande."
+    },
+    {
+      "tipo": "foco",
+      "elemento": "telefono_ui",
+      "titulo": "El teléfono",
+      "texto": "Ábrelo con Tab. Las misiones y todo lo que pasa en la ciudad llegan aquí. Con M sigues u ocultas la ruta."
+    },
+    {
+      "tipo": "foco",
+      "elemento": "brazalete",
+      "titulo": "Tus pulseras",
+      "texto": "Convivencia y Confianza: las mismas que llevas en las muñecas. Con B ves qué significa cada una."
+    },
+    {
+      "tipo": "foco",
+      "elemento": "medidor",
+      "titulo": "Confianza y desinformación",
+      "texto": "El medidor dice cómo va Ciudad Nova y hacia qué final camina. Debajo, la barra de desinformación: más baja = mejor."
+    },
+    {
+      "tipo": "foco",
+      "elemento": "reloj",
+      "titulo": "El reloj",
+      "texto": "Día y hora. La semana dura 7 días: al terminar el séptimo, la ciudad vota."
+    },
+    {
+      "tipo": "foco",
+      "elemento": "dinero",
+      "titulo": "Tu dinero",
+      "texto": "Lo que ganas con las misiones y los trabajos. Sirve para comprar en las tiendas."
+    },
+    {
+      "tipo": "foco",
+      "elemento": "aviso_e",
+      "titulo": "Presiona E",
+      "texto": "Cuando veas este aviso abajo, la tecla E sirve para entrar a lugares, comprar y trabajar."
+    }
+  ]
+}
