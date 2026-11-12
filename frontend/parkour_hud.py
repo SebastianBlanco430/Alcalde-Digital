@@ -2,10 +2,11 @@
 # panel de pausa y panel de resultado. Solo muestra datos; las reglas viven en backend/logica/parkour_calculos.py.
 # Todo se entiende con texto (no solo con color). Anclado con diseno_adaptable para que quepa en cualquier aspecto.
 
-from ursina import Entity, Text, camera
+from ursina import Entity, Text, camera, color
 
 from backend.logica import parkour_calculos as pk
-from frontend import diseno_adaptable, estilo, minimapa_calculos as mm, parkour_minimapa, tipografia
+from frontend import diseno_adaptable, estilo, materiales as mat, minimapa_calculos as mm, parkour_minimapa, tipografia
+from frontend import parkour_visual_calculos as pvc
 from frontend.componentes import BotonPrimario, BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb
 
 DURACION_AVISO = 2.2
@@ -100,12 +101,84 @@ class HudParkour(Entity):
         self.caidas = _texto(self.izquierda, "", 16, estilo.COLOR_TEXTO_TENUE, (x0, 0.392), origen=(-0.5, 0))
         diseno_adaptable.anclar(self.izquierda, "izquierda")
 
-        self.aviso = _texto(self, "", 24, estilo.COLOR_ACENTO, (0, 0.30), negrita=True)
+        self.aviso = _texto(self, "", 24, estilo.COLOR_ACENTO, (0, 0.325), negrita=True)
         self.ayuda = _texto(self, AYUDA, 14, estilo.COLOR_TEXTO_TENUE, (0, -0.46))
 
         self.plano = PlanoAlturas(self)
         self.pausa = self._panel_pausa()
         self.resultado = None
+        self.visual = pvc.visual_activo()          # ALCALDE_PARKOUR_VISUAL=0: HUD de antes
+        self._destello_estado = None               # (tono, alfa_max, duracion, edad)
+        self._aviso_edad = 9.0
+        self._tema_aplicado = None
+        self._nivel_pistas = None
+        if self.visual:
+            self._decorar()
+
+    # -- Aspecto nuevo (aditivo): paneles tras el tiempo y el aviso, barra de progreso, leyenda de tipos y destello --
+
+    def _decorar(self):
+        def quad(padre, x, y, sx, sy, tono, alfa, z):
+            return Entity(parent=padre, model="quad", position=(x, y, z), scale=(sx, sy),
+                          color=color.rgba(tono[0] / 255, tono[1] / 255, tono[2] / 255, alfa))
+
+        self.fondo_tiempo = quad(self, 0, 0.418, 0.40, 0.125, (6, 8, 20), 0.62, 0.02)
+        self.linea_tema = quad(self, 0, 0.358, 0.40, 0.006, mat.NEON_CIAN, 1.0, 0.015)
+        self.barra_fondo = quad(self, 0, 0.372, 0.36, 0.011, (30, 36, 60), 0.9, 0.015)
+        self.barra_relleno = quad(self, -0.18, 0.372, 0.0001, 0.011, estilo.COLOR_ACENTO, 1.0, 0.012)
+        self.barra_relleno.origin = (-0.5, 0)
+        self.pastilla_aviso = quad(self, 0, 0.325, 0.74, 0.062, (6, 8, 20), 0.72, 0.02)
+        self.pastilla_aviso.enabled = False
+        self._aviso_escala = tuple(self.aviso.scale)
+        self._progreso = -1.0
+        self.destello_cuadro = quad(self, 0, 0, 3.2, 1.2, (255, 255, 255), 0.0, 0.9)
+        self.destello_cuadro.enabled = False
+        # Leyenda de tipos: cada tipo tiene color Y patrón en el mundo; aquí además su nombre.
+        self.leyenda = Entity(parent=self)
+        x0 = -diseno_adaptable.aspecto() / 2 + MARGEN
+        quad(self.leyenda, x0 + 0.14, -0.092, 0.31, 0.034 * 6 + 0.03, (6, 8, 20), 0.5, 0.02)
+        for i, clave in enumerate(pvc.CLAVES):
+            e = pvc.ESTILOS[clave]
+            y = -0.02 - 0.034 * i
+            quad(self.leyenda, x0 + 0.012, y - 0.0, 0.026, 0.02, e["borde"], 1.0, 0.012)
+            quad(self.leyenda, x0 + 0.012, y - 0.0, 0.016, 0.011, e["acento"] if clave != "fija" else e["panel"], 1.0, 0.01)
+            _texto(self.leyenda, e["nombre"], 13, estilo.COLOR_TEXTO_TENUE, (x0 + 0.04, y), origen=(-0.5, 0))
+        diseno_adaptable.anclar(self.leyenda, "izquierda")
+
+    def destello(self, tono, alfa=0.38, duracion=0.45):
+        if self.visual:
+            self._destello_estado = [tono, alfa, duracion, 0.0]
+
+    # Avanza destello y asentado del aviso (también con el nivel terminado, para que no queden congelados).
+    def avanzar(self, dt):
+        if not self.visual:
+            return
+        if self._destello_estado is not None:
+            tono, alfa, dur, edad = self._destello_estado
+            edad += dt
+            a = pvc.alfa_destello(edad, dur, alfa)
+            self._destello_estado[3] = edad
+            self.destello_cuadro.enabled = a > 0
+            if a > 0:
+                self.destello_cuadro.color = color.rgba(tono[0] / 255, tono[1] / 255, tono[2] / 255, a)
+            else:
+                self._destello_estado = None
+        self._aviso_edad += dt
+        k = pvc.escala_aviso(self._aviso_edad)
+        self.aviso.scale = tuple(v * k for v in self._aviso_escala)
+        self.pastilla_aviso.enabled = bool(self.aviso.text)
+
+    def _actualizar_visual(self, sim, nivel):
+        if self._tema_aplicado != nivel.id:
+            self._tema_aplicado = nivel.id
+            acento = mat.tema(nivel.tema)["acento"]
+            self.linea_tema.color = color.rgb32(*acento)
+            ini, meta = nivel.plataformas[nivel.inicio], nivel.plataformas[nivel.meta]
+            self._pistas = ((ini.x, ini.z), (meta.x, meta.z))
+        p = pvc.progreso_hacia_meta(sim.x, sim.z, *self._pistas)
+        if abs(p - self._progreso) > 0.004:
+            self._progreso = p
+            self.barra_relleno.scale_x = max(0.0001, 0.36 * p)
 
     # -- Paneles --
 
@@ -170,9 +243,12 @@ class HudParkour(Entity):
 
     # -- Frame --
 
-    def avisar(self, texto):
+    def avisar(self, texto, tono=None):
         self.aviso.text = texto
         self._aviso_restante = DURACION_AVISO
+        if self.visual:
+            self.aviso.color = rgb(tono or estilo.COLOR_ACENTO)
+            self._aviso_edad = 0.0
 
     @staticmethod
     def _poner(texto, cadena):
@@ -189,6 +265,9 @@ class HudParkour(Entity):
         self._poner(self.caidas, f"Caídas: {sim.caidas}")
         self._poner(self.nivel_txt, nivel.nombre)
         self.plano.actualizar(sim.x, sim.z, sim.y)
+        if self.visual:
+            self._actualizar_visual(sim, nivel)
+            self.avanzar(dt)
         if self._aviso_restante > 0:
             self._aviso_restante -= dt
             if self._aviso_restante <= 0:

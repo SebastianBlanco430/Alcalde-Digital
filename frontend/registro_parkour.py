@@ -16,6 +16,7 @@
 # (sin partida: no hay GameState, así que no otorga evidencia; Esc > Salir vuelve al menú de inicio).
 
 import os
+import sys
 
 from backend.datos import parkour_loader
 from backend.logica import parkour_calculos
@@ -58,7 +59,8 @@ def registrar(gestor, conexion, escena_mundo):
     from frontend.escenas.escena_parkour import EscenaParkour
 
     # `conexion.flujo` es None hasta que empieza la partida: se lee al terminar el nivel, no aquí.
-    escena = EscenaParkour(game_state=lambda: getattr(conexion.flujo, "game_state", None))
+    escena = EscenaParkour(game_state=lambda: getattr(conexion.flujo, "game_state", None),
+                           jugador=lambda: conexion.flujo.jugador_activo() if conexion.flujo else None)
     gestor.registrar(PARKOUR, escena)
     _estado.update(conexion=conexion, escena=escena)
 
@@ -94,5 +96,10 @@ def registrar(gestor, conexion, escena_mundo):
     nivel_dev = os.environ.get(VARIABLE_DESARROLLO)
     if nivel_dev:
         from ursina import invoke
-        invoke(lambda: gestor.cambiar_a(PARKOUR, nivel_id=nivel_dev, salir=salir_de_parkour),
-               delay=RETRASO_DESARROLLO)
+        def arranque_dev():
+            try:
+                gestor.cambiar_a(PARKOUR, nivel_id=nivel_dev, salir=salir_de_parkour)
+            except ValueError as error:
+                print(f"Aviso: no se pudo abrir el parkour de desarrollo {nivel_dev!r}: {error}", file=sys.stderr)
+
+        invoke(arranque_dev, delay=RETRASO_DESARROLLO)

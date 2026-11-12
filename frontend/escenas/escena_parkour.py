@@ -23,6 +23,8 @@ from frontend.camara_tercera_persona import CamaraTerceraPersona
 from frontend.componentes import destruir_arbol, rgb
 from frontend.escenas.escena_base import Escena
 from frontend import parkour_minimapa
+from frontend import parkour_skin_calculos as psc
+from frontend import parkour_visual_calculos as pvc
 from frontend.parkour_hud import HudParkour
 from frontend.parkour_vista import MundoParkour
 
@@ -34,10 +36,11 @@ JUGANDO, PAUSA, FIN = "jugando", "pausa", "fin"
 
 class EscenaParkour(Escena):
 
-    def __init__(self, game_state=None, al_terminar=None):
+    def __init__(self, game_state=None, al_terminar=None, jugador=None):
         super().__init__(parent=scene)
         self._game_state = game_state or (lambda: None)
         self._al_terminar = al_terminar
+        self._jugador = jugador or (lambda: None)      # jugador activo (su skin .glb); None = sin partida
         self.hud = HudParkour(al_continuar=self.reanudar, al_reiniciar=self.reiniciar, al_salir=self._salir)
         self.camara = CamaraTerceraPersona(parent=self, suelo=lambda x, z: self._y_camara)
         self.camara.objetivo = lambda: (self.sim.x, self.sim.z)
@@ -51,15 +54,17 @@ class EscenaParkour(Escena):
         self._salto = False
         self._y_camara = 0.0
         self._guardado = None
+        self._fov_extra = 0.0         # grados de FOV extra suavizados (aspecto nuevo: al caer rápido o saltar)
 
     # -- Gestor de escenas --
 
     def al_entrar(self, nivel_id="sector_1", reiniciar=False, salir=None, **_):
         nivel = parkour_loader.cargar_nivel(nivel_id)
-        if self.nivel is None or self.nivel.id != nivel.id:
+        jugador = self._jugador_activo()
+        if self.nivel is None or self.nivel.id != nivel.id or self._skin_cambio(jugador):
             if self.mundo is not None:
                 destruir_arbol(self.mundo)
-            self.mundo = MundoParkour(nivel, parent=self)
+            self.mundo = MundoParkour(nivel, jugador=jugador, parent=self)
         self.nivel = nivel
         self._salir_a = salir
         previa = self._partidas.get(nivel.id)
@@ -83,10 +88,23 @@ class EscenaParkour(Escena):
         self.hud.plano.fijar(alturas)
         self.hud.plano.actualizar(self.sim.x, self.sim.z, self.sim.y)
 
+    def _jugador_activo(self):
+        try:
+            return self._jugador()
+        except Exception:
+            return None
+
+    # ¿Otro jugador/rol que el del mundo ya construido? (la skin se rehace; la partida de la simulación se conserva)
+    def _skin_cambio(self, jugador):
+        if self.mundo is None or not psc.skin_activa():
+            return False
+        return self.mundo.clave_pedida != psc.datos_de_skin(jugador)
+
     def al_salir(self):
         parkour_minimapa.limpiar()
         mouse.locked = False
         self.camara.bloquear(False)
+        self._fov_extra = self.camara.fov_extra = 0.0
         self.camara.restaurar_camara()
         self.hud.mostrar_pausa(False)
         self.hud.enabled = False
@@ -164,6 +182,10 @@ class EscenaParkour(Escena):
     # -- Frame --
 
     def update(self):
+        if self.sim is not None and self.estado == FIN and self.mundo is not None and self.mundo.visual:
+            self.mundo.sincronizar(self.sim, min(time.dt, DT_MAX))      # que los efectos de la meta terminen de animarse
+            self.hud.avanzar(min(time.dt, DT_MAX))
+            return
         if self.sim is None or self.estado != JUGANDO:
             return
         dt = min(time.dt, DT_MAX)
@@ -174,6 +196,7 @@ class EscenaParkour(Escena):
             eventos += self.sim.paso(dt / pasos, mx, mz, salto=self._salto and i == 0)
         self._salto = False
         self._seguir_con_camara(dt)
+        self._ajustar_fov(dt)
         parkour_minimapa.actualizar_altura(self.sim.y)
         self.mundo.orientar_avatar(mx, mz, dt)
         self.mundo.sincronizar(self.sim, dt)
@@ -185,21 +208,34 @@ class EscenaParkour(Escena):
         if alto is not None:
             self._y_camara += (alto - self._y_camara) * (1 - math.exp(-RAPIDEZ_CAMARA_Y * dt))
 
+    # FOV extra suave (solo con el aspecto nuevo): se abre un poco al caer rápido y al subir; no toca los controles.
+    def _ajustar_fov(self, dt):
+        if not self.mundo.visual:
+            return
+        v = self.sim.vertical
+        meta = pvc.fov_extra_objetivo(v.vy, v.en_aire)
+        self._fov_extra = pvc.suavizar_fov(self._fov_extra, meta, dt)
+        self.camara.fov_extra = self._fov_extra
+
     def _procesar(self, eventos):
         for evento in eventos:
+            self.mundo.reaccionar(evento, self.sim)
             if evento == "caida":
-                self.hud.avisar(f"Caíste: +{self.nivel.penalizacion_caida_s:g} s")
+                self.hud.destello(mat.NEON_ROJO)
+                self.hud.avisar(f"Caíste: +{self.nivel.penalizacion_caida_s:g} s", mat.NEON_ROJO)
                 self._y_camara = self.sim.y
                 self.camara.colocar_ya()
                 self.mundo.marcar_checkpoint(self.sim.checkpoint)
             elif evento.startswith("checkpoint:"):
-                self.hud.avisar("¡Checkpoint!")
+                self.hud.destello(mat.NEON_VERDE, 0.28)
+                self.hud.avisar("¡Checkpoint!", mat.NEON_VERDE)
                 self.mundo.marcar_checkpoint(self.sim.checkpoint)
             elif evento.startswith("interruptor:"):
-                self.hud.avisar("¡Interruptor activado! Aparecen plataformas")
+                self.hud.avisar("¡Interruptor activado! Aparecen plataformas", mat.NEON_MAGENTA)
             elif evento.startswith("interruptor_apagado:"):
                 self.hud.avisar("El interruptor se apagó")
             elif evento == "meta":
+                self.hud.destello(mat.NEON_AMARILLO, 0.4)
                 self._terminar()
 
     def _terminar(self):
