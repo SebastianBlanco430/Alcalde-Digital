@@ -9,7 +9,7 @@
 #   ColaAvisosCausa                   ColaAvisos con tope de pendientes (sin spam)
 #   contenido_final_semana(...)       lo que pinta la pantalla final a partir de flujo.resumen_final()
 #
-# CUÁNDO CORRE EL TIEMPO (decisión, docs/PLAN_FINAL.md §8): solo cuando el jugador MANDA sobre su personaje en el mundo.
+# CUÁNDO CORRE EL TIEMPO (decisión, docs/PLAN_FINAL.md §9): solo cuando el jugador MANDA sobre su personaje en el mundo.
 # No corre: sin reloj (ALCALDE_RELOJ=0), en línea, con la partida terminada, en pausa, en cinemáticas (entrar / salir de
 # un edificio), con el mapa grande abierto, con un panel modal (inventario, tienda, Archivo de casos, diálogos), con el
 # teléfono abierto, durante un fundido y mientras la misión está en el minijuego o cerrándose. Los interiores, el
@@ -17,6 +17,7 @@
 # que avanza el reloj no corre, así que tampoco gastan la semana. Conducir (bici, moto) SÍ gasta tiempo: es moverse.
 
 from backend.datos import finales_textos
+from frontend import dilemas_calculos as dc
 from frontend import veredicto_calculos as vc
 
 HORA_AMANECER = 6.0
@@ -88,18 +89,25 @@ class AvisosFin:
         return [nuevos[-1][1]] if nuevos else []
 
 
+# Frase corta por indicador y signo para el aviso (cabe en 4 líneas aun con los tres indicadores al máximo).
+_FRASE_CORTA = {("convivencia", 1): "más convivencia", ("convivencia", -1): "menos convivencia",
+                ("confianza", 1): "más confianza", ("confianza", -1): "menos confianza",
+                ("desinformacion", 1): "más rumores", ("desinformacion", -1): "menos rumores"}
+
+
 def _cambios(aviso):
+    """Lo que cambió en la ciudad, en palabras y sin cifras («algo menos confianza; un poco más rumores»)."""
     partes = []
-    for nombre, etiqueta in ETIQUETAS_INDICADOR.items():
+    for nombre in ETIQUETAS_INDICADOR:
         delta = (aviso.get("deltas") or {}).get(nombre)
         if delta:
-            partes.append(f"{etiqueta} {vc._con_signo(delta)}")
-    return " · ".join(partes)
+            partes.append(f"{dc.cuantia(delta)} {_FRASE_CORTA[(nombre, 1 if delta > 0 else -1)]}")
+    return "; ".join(partes)
 
 
 def texto_efecto(aviso):
     """Texto de un aviso de causa-efecto (dict de FlujoConTiempo): el mensaje y, entre paréntesis, lo que cambió en la
-    ciudad: «Ayer compartiste sin verificar «…»: hoy el bulo volvió a circular. (Desinformación +3 · Confianza −2)».
+    ciudad: «Ayer compartiste sin verificar «…»: hoy el bulo volvió a circular. (algo menos confianza; algo más rumores)».
     "" si el aviso no trae mensaje."""
     if not isinstance(aviso, dict):
         return ""
@@ -150,8 +158,8 @@ def contenido_final_semana(resumen, indicadores=None, nivel_ambiente=None):
     barras_ciudad = [(etiqueta, _entero(indicadores[nombre]), nombre != "desinformacion")
                      for nombre, etiqueta in (("convivencia", "Convivencia"), ("confianza", "Confianza en Civitas"),
                                               ("desinformacion", "Desinformación")) if nombre in indicadores]
-    lineas = [f"Misiones acertadas: {int(resumen.get('pasadas', 0))} · falladas: {int(resumen.get('falladas', 0))}",
-              f"Índice de la ciudad: {vc._numero(resumen['indice'])} de 100"]
+    # Punto 7: consecuencias, no números; la cifra del índice ya no se muestra (el dato sigue en el resumen del flujo).
+    lineas = [f"Misiones acertadas: {int(resumen.get('pasadas', 0))} · falladas: {int(resumen.get('falladas', 0))}"]
     critico = resumen.get("grupo_critico")
     if critico in finales_textos.NOMBRES_GRUPOS:
         lineas.append(f"{finales_textos.NOMBRES_GRUPOS[critico]} dejó de confiar: por eso la ciudad no levanta.")

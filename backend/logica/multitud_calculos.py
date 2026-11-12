@@ -50,7 +50,7 @@ PESO_LUGAR = {
     "Praça da Sé": 6.0, "Mercado Municipal": 5.0, "Feira da Ladeira": 5.0, "Estação do Teleférico": 4.0,
     "Estação Alto do Morro": 3.5, "Rodoviária": 4.0, "Parque do Povo": 4.0, "Escola de Samba": 3.0,
     "Supermercado Dois Irmãos": 3.0, "Padaria Pão Quente": 3.0, "Igreja Nossa Senhora da Esperança": 3.0,
-    "Escola Municipal Paulo Freire": 3.0, "Campo de Várzea": 3.0, "Ponto de Mototáxi da Entrada": 2.5,
+    "Escola Bairro Esperança": 3.0, "Campo de Várzea": 3.0, "Ponto de Mototáxi da Entrada": 2.5,
     "Hospital Santa Casa": 2.0, "Mirante do Alto": 1.5, "Morro da Esperança": 1.5, "Prefeitura": 2.5,
     "Universidade de Ciudad Nova": 2.0, "Rádio Comunitária": 2.0,
 }

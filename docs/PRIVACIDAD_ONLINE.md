@@ -82,6 +82,14 @@ Para borrarlo:
 - Manual: cierra el juego y ejecuta `rm ~/.alcalde_digital/ajustes.json` (o borra la carpeta
   `~/.alcalde_digital`). Se vuelve a crear con valores por defecto.
 
+### 6 bis. Otros archivos locales (añadido 2026-11-12, versión 1.1)
+
+Además de `ajustes.json`, el juego escribe en la misma carpeta `~/.alcalde_digital`: `partida.json` (guardado
+de la partida local: alias de los jugadores, rol, posición, teléfono y dinero **del juego**, misiones, reloj
+y decisiones; sin cifrar) y `cache/` (caché del mundo generado). Ninguno sale del equipo ni se envía al modo
+online. Se borran con `rm -r ~/.alcalde_digital` o desactivando el guardado con `ALCALDE_SIN_GUARDADO=1`. Detalle y
+pendientes en `docs/AVISOS_LEGALES_Y_ACTIVOS.md`.
+
 ## 7. Menores de edad
 
 El juego no pide edad, no tiene chat libre ni compras. Aun así, el modo online conecta tu equipo con el de

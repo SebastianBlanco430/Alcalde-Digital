@@ -44,6 +44,7 @@ EFECTOS_RETARDADOS = True
 
 GRUPOS = ("policia", "ciudadanos", "instituciones")     # los de GameState.confianza
 PREFIJO_EVENTO = "retardado:"
+MAX_MENSAJE = 400                                       # caracteres: un guardado manipulado no mete textos enormes
 MAX_EFECTOS = 256                                       # tope de la cola (un guardado dañado no la infla)
 
 _VERSION = 1
@@ -86,7 +87,10 @@ def crear_efecto(clave, mensaje, deltas=None, confianza=None, origen=""):
         raise ValueError("Un efecto retardado necesita una clave (texto no vacío).")
     if not isinstance(mensaje, str) or not mensaje.strip():
         raise ValueError(f"El efecto {clave!r} necesita un mensaje de causa-efecto para el jugador.")
-    return Efecto(clave.strip(), mensaje.strip(), _tabla(deltas, NOMBRES_INDICADORES, "Indicador"),
+    mensaje = mensaje.strip()
+    if len(mensaje) > MAX_MENSAJE:                      # se recorta (no se rechaza): un guardado viejo debe seguir cargando
+        mensaje = mensaje[:MAX_MENSAJE - 1].rstrip() + "…"
+    return Efecto(clave.strip(), mensaje, _tabla(deltas, NOMBRES_INDICADORES, "Indicador"),
                   _tabla(confianza, GRUPOS, "Grupo"), str(origen or ""))
 
 

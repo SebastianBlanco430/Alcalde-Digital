@@ -122,6 +122,8 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
         if reloj_partida.activo():       # reloj de 7 días, efectos retardados y ambiente (backend/logica/flujo_tiempo.py)
             from backend.logica.flujo_tiempo import FlujoConTiempo
             flujo = FlujoConTiempo(flujo)
+            from backend.logica import dilemas      # dilemas jugables con consecuencia retardada (ALCALDE_DILEMAS=0 los apaga)
+            flujo = dilemas.envolver(flujo)
         return flujo
 
     transicion = Transicion(duracion_transicion, duracion_transicion)

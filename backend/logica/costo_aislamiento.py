@@ -37,10 +37,10 @@ TOPE_PUNTOS = 16
 INDICADORES_AFECTADOS = ("convivencia", "confianza")
 GRUPOS_AFECTADOS = ("ciudadanos", "instituciones")
 
-AVISO_INICIO = ("Llevas un día sin participar en la vida de la ciudad: la gente nota tu ausencia y la convivencia y la "
-                "confianza empiezan a bajar.")
-AVISO_TOPE = ("Tu ausencia ya le costó a la ciudad todo lo que podía costarle. No bajará más por esto, pero tampoco se "
-              "recupera sola: hay que volver a participar.")
+AVISO_INICIO = ("Ha pasado un día entero sin verte por la ciudad: en el barrio ya se comenta tu ausencia y la convivencia "
+                "y la confianza aflojan un poco.")
+AVISO_TOPE = ("La ciudad ya se acostumbró a tu ausencia: la convivencia y la confianza no bajarán más por esto, aunque "
+              "tampoco se levantan solas. Cuando vuelvas a la calle, se empezará a notar.")
 MENSAJE_EFECTO = "Nadie respondió por la ciudad: la convivencia y la confianza se resienten."
 
 _VERSION = 1

@@ -7,7 +7,7 @@
 
 import sys
 
-from backend.logica import guardado, mundo_config
+from backend.logica import guardado, guardado_aviso, mundo_config
 
 INTERVALO = 10.0        # s entre dos autoguardados
 
@@ -35,9 +35,37 @@ def _crear_vigia(escena_mundo):
             self._resta = INTERVALO
             self._clave = None
             self.guardados = 0
+            self._aviso = None
+            self._resta_aviso = 0.0
 
         def update(self):
             self.avanzar(time.dt)
+            self._avanzar_aviso(time.dt)
+
+        # Aviso de privacidad (solo la primera vez que se guarda): se muestra unos segundos y no vuelve.
+        def _avisar(self):
+            try:
+                if not guardado_aviso.aviso_pendiente():
+                    return
+                from frontend.hud import AvisoGenerico
+                if self._aviso is None:
+                    self._aviso = AvisoGenerico(parent=escena_mundo.hud)
+                    self._aviso.y_base = 0.2
+                self._aviso.mostrar(guardado_aviso.TEXTO_AVISO)
+                self._resta_aviso = 9.0
+                guardado_aviso.marcar_aviso_visto()
+            except Exception as error:     # el aviso nunca debe romper el juego
+                guardado_aviso.marcar_aviso_visto()
+                print(f"[guardado] aviso no mostrado ({type(error).__name__}: {error})", file=sys.stderr)
+
+        def _avanzar_aviso(self, dt):
+            if self._aviso is None:
+                return
+            if self._resta_aviso > 0.0:
+                self._resta_aviso -= dt
+                self._aviso.avanzar(dt)
+                if self._resta_aviso <= 0.0:
+                    self._aviso.ocultar()
 
         def avanzar(self, dt):
             flujo = escena_mundo.flujo
@@ -48,6 +76,8 @@ def _crear_vigia(escena_mundo):
                     self._clave = "fin"
                     guardado.borrar()             # la partida acabó: no hay nada que continuar
                 return
+            if guardado_aviso.autoguardado_suspendido_para(id(flujo)):    # la borró desde Ajustes: no se reescribe
+                return
             mision = flujo.mision_actual()
             clave = (id(flujo), flujo.sesion.numero_turno(), getattr(mision, "id", None))
             self._resta -= dt
@@ -55,6 +85,7 @@ def _crear_vigia(escena_mundo):
                 if guardar_ahora(escena_mundo):
                     self.guardados += 1
                     self._clave = clave
+                    self._avisar()
                 self._resta = INTERVALO
 
     return Autoguardado(parent=escena_mundo.hud)
@@ -89,6 +120,17 @@ def registrar(gestor, conexion, escena_mundo):
             conexion.flujo = flujo
             conexion._volver_al_mundo()
 
+        try:
+            from frontend import partida_ajustes
+            def borrar_desde_ajustes():
+                flujo = escena_mundo.flujo
+                if flujo is not None and getattr(escena_mundo, "online", None) is None:
+                    guardado_aviso.suspender_autoguardado(id(flujo))     # la partida en curso no se reescribe
+                return guardado_aviso.borrar_partida()
+
+            partida_ajustes.registrar(borrar_desde_ajustes)        # sección «Partida» de Ajustes: «Borrar partida guardada»
+        except Exception as error:
+            print(f"[guardado] sección de Ajustes no instalada ({type(error).__name__}: {error})", file=sys.stderr)
         conexion.continuar_partida = continuar
         conexion.autoguardado = _crear_vigia(escena_mundo)
         inicio = gestor._escenas.get(INICIO)

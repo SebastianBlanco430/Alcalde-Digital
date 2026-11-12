@@ -5,7 +5,7 @@
 #     («Se acabó la semana · Día 7 · 24:00» / «No quedan misiones · Día 4 · 10:15»);
 #   - la confianza de los tres grupos (solo con GameState);
 #   - CÓMO TERMINÓ LA CIUDAD: convivencia, confianza y desinformación en barras (en desinformación, alto = malo);
-#   - el resumen (misiones acertadas y falladas, índice de la ciudad) y «Volver al menú».
+#   - el resumen (misiones acertadas y falladas; sin cifra del índice: consecuencias, no números) y «Volver al menú».
 # Solo pinta: qué final sale lo decide el backend. Sin reloj (ALCALDE_RELOJ=0) se usan los paneles de siempre.
 
 from ursina import Entity, Text
