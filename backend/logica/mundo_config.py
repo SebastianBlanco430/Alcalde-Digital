@@ -5,11 +5,12 @@
 # MAPA_GRANDE = True   -> el mapa extenso (~900 x 650 m): CiudadGrande (frontend/ciudad_chunks.py) con terreno, casas y
 #                         props por chunks de 64 m que se construyen y se sueltan según dónde está el jugador.
 # La variable de entorno ALCALDE_MAPA_GRANDE=1/0 manda sobre la constante (se lee en cada llamada, así las pruebas
-# pueden cambiarla). Por defecto está ENCENDIDA (integración final): ALCALDE_MAPA_GRANDE=0 vuelve al mundo chico de siempre.
+# pueden cambiarla). Desde 2026-11-12 el dueño pidió dejar ACTIVO EL MAPA PEQUEÑO por defecto (antes: grande, desde la
+# integración final): ALCALDE_MAPA_GRANDE=1 vuelve a encender el mapa extenso.
 
 import os
 
-MAPA_GRANDE = True
+MAPA_GRANDE = False
 
 # -- Vista en modo grande (el mundo chico conserva FIN_NIEBLA = 260 y PLANO_LEJANO = 500) --
 FIN_NIEBLA_GRANDE = 330.0      # m a los que la niebla llega a su máximo

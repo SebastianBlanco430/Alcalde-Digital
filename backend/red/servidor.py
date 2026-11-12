@@ -25,7 +25,7 @@ from backend.logica.misiones import RADIO_INTERACCION     # m: distancia a la pu
 
 
 def _construir_mundo(semilla):
-    """El mismo mundo que el juego local (backend/logica/mundo_config: ALCALDE_MAPA_GRANDE; por defecto el mapa grande)."""
+    """El mismo mundo que el juego local (backend/logica/mundo_config: ALCALDE_MAPA_GRANDE; por defecto el mapa pequeño)."""
     try:
         from backend.logica import mundo_config
         grande = mundo_config.mapa_grande_activo()
