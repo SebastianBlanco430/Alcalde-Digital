@@ -1,0 +1,409 @@
+{
+  "version": 1,
+  "_nota": "Dilemas de uso consciente de redes: ninguna opción es gratis. SOLO DATOS: todavía no los lee ningún módulo (esquema y forma de conectarlos en docs/PLAN_FINAL.md, sección 8). Cada opción trae una consecuencia inmediata y otra retardada (24-48 h de juego) cuyo mensaje empieza con {cuando} («Ayer» / «Hace dos días»), igual que MENSAJES_RETARDO de backend/datos/noticias_mision.py. deltas = indicadores de la ciudad (convivencia, confianza, desinformacion); confianza = grupos del GameState (policia, ciudadanos, instituciones). Personas y lugares ficticios.",
+  "dilemas": [
+    {
+      "id": "foto_cumple_dani",
+      "titulo": "La foto del cumple",
+      "tema": "privacidad_ajena",
+      "dia_min": 1,
+      "dia_max": 5,
+      "situacion": "Fiesta sorpresa de Dani en la vereda. Tu foto quedó preciosa: la torta de doña Marta, media cuadra riéndose... y, al fondo, el número de la casa y el letrero de la calle. Doña Marta vende tortas por encargo y hoy todo el mundo mira Civitas. Dani no contesta: sigue bailando.",
+      "opciones": [
+        {
+          "id": "publicar_ya",
+          "etiqueta": "Publicarla ahora, tal cual",
+          "inmediato": {
+            "texto": "La foto vuela: doña Marta recibe seis encargos de torta antes de medianoche.",
+            "deltas": {"convivencia": 4},
+            "confianza": {"ciudadanos": 1}
+          },
+          "retardado": {
+            "horas": 36,
+            "clave": "dilema_foto_cumple_publicar",
+            "mensaje": "{cuando} subiste la foto del cumple de Dani con la dirección a la vista: hoy lo buscan en su puerta dos desconocidos «que vieron la fiesta».",
+            "deltas": {"convivencia": -3, "confianza": -2},
+            "confianza": {"ciudadanos": -2}
+          }
+        },
+        {
+          "id": "esperar_permiso",
+          "etiqueta": "Esperar a Dani y recortar el fondo",
+          "inmediato": {
+            "texto": "Dani contesta al día siguiente. La foto sale recortada, cuando ya todos hablan de otra cosa.",
+            "deltas": {"convivencia": 1},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 24,
+            "clave": "dilema_foto_cumple_esperar",
+            "mensaje": "{cuando} esperaste el permiso de Dani para publicar su cumple: nadie sabe dónde vive, pero la foto llegó tarde y doña Marta se quedó sin encargos esta semana.",
+            "deltas": {"confianza": 2, "convivencia": -1},
+            "confianza": {"ciudadanos": 1}
+          }
+        }
+      ],
+      "nota_diseno": "Visibilidad que ayuda a una vecina contra un dato ajeno expuesto. Publicar rinde ya y cobra después; esperar protege y pierde el momento."
+    },
+    {
+      "id": "aviso_corte_agua",
+      "titulo": "Mañana no hay agua (dicen)",
+      "tema": "aviso_util_fuente_dudosa",
+      "dia_min": 1,
+      "dia_max": 6,
+      "situacion": "Son las nueve de la noche y llega un reenviado sin firma: «Mañana cortan el agua en todo el morro desde las 6». La oficina del acueducto ya cerró y la radio está con música. Si es cierto, hay que llenar baldes esta noche. Si no, vas a poner a medio barrio en fila en la llave pública.",
+      "opciones": [
+        {
+          "id": "compartir_sin_confirmar",
+          "etiqueta": "Compartirlo con un «sin confirmar»",
+          "inmediato": {
+            "texto": "Media cuadra llena baldes y ollas; la otra media te pregunta de dónde lo sacaste.",
+            "deltas": {"convivencia": 2, "desinformacion": 3},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 24,
+            "clave": "dilema_corte_agua_compartir",
+            "mensaje": "{cuando} compartiste sin confirmar el corte de agua: fue cierto solo en la parte alta. Arriba te lo agradecen con los baldes llenos; abajo ya te dicen «el alarmista».",
+            "deltas": {"convivencia": 2, "confianza": -2},
+            "confianza": {"ciudadanos": -1}
+          }
+        },
+        {
+          "id": "esperar_oficina",
+          "etiqueta": "Esperar a que abra la oficina",
+          "inmediato": {
+            "texto": "No reenvías nada. La noche pasa tranquila y sin filas en la llave pública.",
+            "deltas": {"confianza": 1},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 24,
+            "clave": "dilema_corte_agua_esperar",
+            "mensaje": "{cuando} esperaste a confirmar el corte de agua: no pasaste un dato a medias, pero la parte alta amaneció sin una olla llena y el aviso oficial salió a las 7.",
+            "deltas": {"convivencia": -3, "confianza": 2, "desinformacion": -1},
+            "confianza": {"instituciones": 1}
+          }
+        }
+      ],
+      "nota_diseno": "El aviso es medio cierto: ninguna de las dos acierta del todo. Compartir ayuda a unos y alarma a otros; esperar es limpio y deja a gente sin agua."
+    },
+    {
+      "id": "domingo_sin_pantalla",
+      "titulo": "Un domingo sin pantalla",
+      "tema": "desconexion",
+      "dia_min": 2,
+      "dia_max": 6,
+      "situacion": "Domingo. Tienes ciento doce mensajes sin leer y cero ganas. Tu abuela cocina y pide «una sola comida sin aparatos». Pero hoy es el mutirão de la escalera y los detalles siempre cambian a última hora en el grupo de la cuadra.",
+      "opciones": [
+        {
+          "id": "apagar_todo",
+          "etiqueta": "Apagar el celular todo el día",
+          "inmediato": {
+            "texto": "Almuerzo largo, sobremesa y siesta. Tu abuela dice que hace años no te veía la cara.",
+            "deltas": {"convivencia": 4},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 24,
+            "clave": "dilema_domingo_apagar",
+            "mensaje": "{cuando} apagaste el celular el día entero: descansaste de verdad, pero el mutirão cambió de hora y te esperaron toda la tarde con la escalera a medio pintar.",
+            "deltas": {"convivencia": -4, "confianza": -1},
+            "confianza": {"ciudadanos": -2}
+          }
+        },
+        {
+          "id": "seguir_conectado",
+          "etiqueta": "Seguir conectado como siempre",
+          "inmediato": {
+            "texto": "Te enteras de todo al minuto. El feijão se te enfría dos veces.",
+            "deltas": {"convivencia": -2, "confianza": 1},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 24,
+            "clave": "dilema_domingo_conectado",
+            "mensaje": "{cuando} seguiste pegado al celular en tu día libre: llegaste puntual al mutirão, y tu abuela todavía cuenta que almorzó con tu coronilla.",
+            "deltas": {"convivencia": 2},
+            "confianza": {"ciudadanos": 1}
+          }
+        },
+        {
+          "id": "solo_grupo_cuadra",
+          "etiqueta": "Silenciar todo menos el grupo de la cuadra",
+          "inmediato": {
+            "texto": "Comes casi en paz: el grupo de la cuadra vibra once veces y miras tres.",
+            "deltas": {"convivencia": 2},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 24,
+            "clave": "dilema_domingo_silenciar",
+            "mensaje": "{cuando} dejaste sonar solo el grupo de la cuadra: llegaste al mutirão a la hora nueva, aunque el descanso te quedó a medias y tu abuela te cobró cada mirada al bolsillo.",
+            "deltas": {"convivencia": -1},
+            "confianza": {"ciudadanos": 2}
+          }
+        }
+      ],
+      "nota_diseno": "Mensaje de equilibrio. Apagar todo descansa hoy y cuesta mañana (es la peor suma); seguir igual cumple con el barrio y falla en casa; filtrar es lo que mejor suma, pero tampoco sale gratis."
+    },
+    {
+      "id": "video_balanza_feira",
+      "titulo": "La balanza de la feria",
+      "tema": "denunciar_exponiendo",
+      "dia_min": 1,
+      "dia_max": 5,
+      "situacion": "En la Feira da Ladeira grabaste sin querer una discusión: una balanza marca de más y doña Cida, clienta de toda la vida, reclama a gritos. El video prueba lo de la balanza. También muestra la cara de doña Cida fuera de sí y a un niño llorando al fondo.",
+      "opciones": [
+        {
+          "id": "publicar_video",
+          "etiqueta": "Publicar el video",
+          "inmediato": {
+            "texto": "En una hora lo vio medio barrio. La administración de la feria promete revisar todas las balanzas.",
+            "deltas": {"confianza": 3, "convivencia": -4},
+            "confianza": {"instituciones": 1}
+          },
+          "retardado": {
+            "horas": 36,
+            "clave": "dilema_balanza_publicar",
+            "mensaje": "{cuando} publicaste el video de la balanza: hoy la feria pesa bien, y a doña Cida le gritan «la del video» aunque tenía razón.",
+            "deltas": {"confianza": 2, "convivencia": -2},
+            "confianza": {"ciudadanos": -1}
+          }
+        },
+        {
+          "id": "llevar_a_administracion",
+          "etiqueta": "Guardarlo y llevarlo a la administración",
+          "inmediato": {
+            "texto": "Entregas el video en la oficina de la feria. Te dan un recibo y un «ya lo miramos».",
+            "deltas": {"convivencia": 1},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 48,
+            "clave": "dilema_balanza_reservar",
+            "mensaje": "{cuando} llevaste el video de la balanza a la administración en vez de publicarlo: nadie quedó señalado, pero la queja duerme en un cajón y la balanza sigue pesando de más.",
+            "deltas": {"confianza": -3, "convivencia": 1},
+            "confianza": {"instituciones": -1}
+          }
+        }
+      ],
+      "nota_diseno": "Lo público arregla rápido y marca a una persona; lo discreto cuida a la persona y no arregla nada."
+    },
+    {
+      "id": "colecta_kaua",
+      "titulo": "La colecta de Kauã",
+      "tema": "ayuda_urgente_sin_verificar",
+      "dia_min": 2,
+      "dia_max": 5,
+      "situacion": "Piden ayuda para la operación de Kauã, el hijo del mototaxista: la colecta cierra esta noche y la cuenta está a nombre de un primo que no conoces. La familia está en el hospital, sin señal. Si es cierta, cada hora cuenta. Si no, le estarías prestando tu nombre a una estafa.",
+      "opciones": [
+        {
+          "id": "compartir_con_tu_nombre",
+          "etiqueta": "Compartirla ya con tu nombre",
+          "inmediato": {
+            "texto": "Tu publicación suma cuarenta aportes en una tarde. Varios escriben «si viene de alguien del barrio, es en serio».",
+            "deltas": {"convivencia": 4, "desinformacion": 2},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 36,
+            "clave": "dilema_colecta_compartir",
+            "mensaje": "{cuando} compartiste la colecta de Kauã sin poder confirmarla: era cierta y alcanzó, pero hoy circulan dos copias con otra cuenta y ya nadie sabe cuál es la buena.",
+            "deltas": {"convivencia": 2, "desinformacion": 3, "confianza": -2},
+            "confianza": {"ciudadanos": 1}
+          }
+        },
+        {
+          "id": "confirmar_en_el_hospital",
+          "etiqueta": "Ir mañana al hospital a confirmar",
+          "inmediato": {
+            "texto": "No compartes nada todavía. La colecta cierra esta noche con lo que hubo.",
+            "deltas": {"confianza": 1, "convivencia": -2},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 36,
+            "clave": "dilema_colecta_confirmar",
+            "mensaje": "{cuando} esperaste a confirmar la colecta de Kauã: era cierta. Tu aviso con la cuenta comprobada frenó las copias falsas, pero la plata no alcanzó y la familia ahora rifa una nevera.",
+            "deltas": {"confianza": 3, "desinformacion": -2, "convivencia": -2},
+            "confianza": {"ciudadanos": -1}
+          }
+        }
+      ],
+      "nota_diseno": "Verificar tiene un costo real (tiempo que alguien no tiene); compartir a ciegas ayuda hoy y abre la puerta a las copias."
+    },
+    {
+      "id": "pelo_en_el_pan",
+      "titulo": "Un pelo en el pan",
+      "tema": "resena_publica",
+      "dia_min": 1,
+      "dia_max": 5,
+      "situacion": "Te salió un pelo en el pan de la Padaria Pão Quente. Largo. Rubio. El panadero es calvo. Es la primera vez en años y el hombre le fía a media cuadra, pero otros vecinos compran ahí todos los días y no saben nada.",
+      "opciones": [
+        {
+          "id": "publicar_resena",
+          "etiqueta": "Publicar la reseña con foto",
+          "inmediato": {
+            "texto": "Ciento cuatro reacciones y un debate muy serio sobre de quién es el pelo.",
+            "deltas": {"confianza": 2, "convivencia": -3},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 24,
+            "clave": "dilema_pelo_resena",
+            "mensaje": "{cuando} publicaste lo del pelo en el pan: hoy toda la panadería estrenó gorro, vendió la mitad y el panadero ya no te fía.",
+            "deltas": {"confianza": 2, "convivencia": -2},
+            "confianza": {"ciudadanos": -1}
+          }
+        },
+        {
+          "id": "decirlo_en_privado",
+          "etiqueta": "Decírselo en voz baja al panadero",
+          "inmediato": {
+            "texto": "El panadero se pone rojo, te cambia el pan y te regala una rosca.",
+            "deltas": {"convivencia": 2},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 48,
+            "clave": "dilema_pelo_privado",
+            "mensaje": "{cuando} le contaste lo del pelo solo al panadero: te quedaste con rosca y con amigo, pero nadie más se enteró y hoy a tu vecina le salió otro. Rubio también.",
+            "deltas": {"convivencia": 1, "confianza": -3},
+            "confianza": {"ciudadanos": -1}
+          }
+        }
+      ],
+      "nota_diseno": "El dilema liviano del lote: franqueza pública contra lealtad de vecino. Sirve para enseñar la mecánica antes de los dilemas duros."
+    },
+    {
+      "id": "captura_de_la_rifa",
+      "titulo": "La captura de la rifa",
+      "tema": "transparencia_y_datos_de_terceros",
+      "dia_min": 2,
+      "dia_max": 5,
+      "situacion": "En el grupo privado de la asociación, el tesorero escribe que «prestó» la plata de la rifa para arreglar su moto y que la repone el viernes. Tienes la captura. En ella salen también los nombres y teléfonos de doce vecinos.",
+      "opciones": [
+        {
+          "id": "publicar_captura",
+          "etiqueta": "Publicar la captura en Civitas",
+          "inmediato": {
+            "texto": "La captura corre sola. El tesorero convoca asamblea esa misma noche... y tres vecinos reciben llamadas raras.",
+            "deltas": {"confianza": 3, "convivencia": -5, "desinformacion": 1},
+            "confianza": {"instituciones": 1}
+          },
+          "retardado": {
+            "horas": 48,
+            "clave": "dilema_rifa_publicar",
+            "mensaje": "{cuando} publicaste la captura de la rifa con nombres y teléfonos: la plata apareció con recibo, y el grupo de la asociación quedó mudo. Nadie escribe por miedo a salir en otra captura.",
+            "deltas": {"confianza": 2, "convivencia": -3},
+            "confianza": {"ciudadanos": -2}
+          }
+        },
+        {
+          "id": "esperar_asamblea",
+          "etiqueta": "Guardarla y plantearlo en la asamblea",
+          "inmediato": {
+            "texto": "No publicas nada. Le escribes al tesorero que el sábado vas a preguntar por la rifa.",
+            "deltas": {"convivencia": 1},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 48,
+            "clave": "dilema_rifa_asamblea",
+            "mensaje": "{cuando} guardaste la captura de la rifa para la asamblea: nadie quedó expuesto, pero el cuento se adelantó como chisme, sin pruebas, y ya va en que «se robaron todo».",
+            "deltas": {"desinformacion": 3, "confianza": -2, "convivencia": 1},
+            "confianza": {"ciudadanos": 1}
+          }
+        }
+      ],
+      "nota_diseno": "Rendición de cuentas contra la confianza de un grupo privado y los datos de doce personas. Callar tampoco es neutro: el vacío lo llena el chisme."
+    },
+    {
+      "id": "extrano_en_la_escuela",
+      "titulo": "El «tipo raro» de la escuela",
+      "tema": "alerta_de_seguridad",
+      "dia_min": 2,
+      "dia_max": 6,
+      "situacion": "Reenvían una foto borrosa: «Ojo, tipo raro rondando la Escola Municipal Paulo Freire, mira las casas y anota cosas». La escuela ya cerró por hoy. Si es un peligro, los padres deberían saberlo antes de mañana. Si no lo es, alguien va a pasar un mal rato por una foto.",
+      "opciones": [
+        {
+          "id": "reenviar_alerta",
+          "etiqueta": "Reenviar la alerta a los padres",
+          "inmediato": {
+            "texto": "En veinte minutos hay un grupo nuevo, «Vigilancia Paulo Freire», con sesenta personas y mucha mayúscula.",
+            "deltas": {"convivencia": -2, "desinformacion": 4},
+            "confianza": {"policia": -1}
+          },
+          "retardado": {
+            "horas": 24,
+            "clave": "dilema_escuela_reenviar",
+            "mensaje": "{cuando} reenviaste la alerta del «tipo raro» de la escuela: hoy los padres hacen turnos en el portón y ya se saben los nombres, pero el señor era el lector del medidor de la luz y no quiere volver a esta calle.",
+            "deltas": {"convivencia": 3, "confianza": -3},
+            "confianza": {"ciudadanos": -1}
+          }
+        },
+        {
+          "id": "avisar_escuela_y_guardia",
+          "etiqueta": "Avisar solo a la escuela y a la guardia",
+          "inmediato": {
+            "texto": "Mandas la foto a la dirección y a la guardia municipal. Nadie contesta hasta mañana.",
+            "deltas": {"confianza": 1},
+            "confianza": {"policia": 1}
+          },
+          "retardado": {
+            "horas": 24,
+            "clave": "dilema_escuela_avisar",
+            "mensaje": "{cuando} pasaste la foto del «tipo raro» solo a la escuela y a la guardia: lo aclararon en una mañana, era el lector de la luz. Nadie quedó señalado, pero tres madres te reclaman que sabías y no avisaste.",
+            "deltas": {"confianza": 2, "desinformacion": -1, "convivencia": -3},
+            "confianza": {"ciudadanos": -1}
+          }
+        }
+      ],
+      "nota_diseno": "El miedo también organiza a la gente (turnos, vecinos que se conocen) y a la vez señala a un inocente. El canal correcto es más justo y se siente como silencio."
+    },
+    {
+      "id": "ensayo_en_vivo",
+      "titulo": "Ensayo en vivo",
+      "tema": "visibilidad_y_consentimiento",
+      "dia_min": 1,
+      "dia_max": 5,
+      "situacion": "Ensayo de la Escola de Samba. Tienes buena señal y la batería suena como nunca: un directo llenaría el próximo ensayo, y la rifa del vestuario lo necesita. Pero la coreografía nueva es la sorpresa del desfile, y dos bailarinas te pidieron no salir en redes.",
+      "opciones": [
+        {
+          "id": "transmitir_en_vivo",
+          "etiqueta": "Transmitir en vivo",
+          "inmediato": {
+            "texto": "Trescientas personas mirando y una lluvia de «¿cuándo es el próximo?».",
+            "deltas": {"convivencia": 4},
+            "confianza": {"ciudadanos": 1}
+          },
+          "retardado": {
+            "horas": 48,
+            "clave": "dilema_ensayo_directo",
+            "mensaje": "{cuando} transmitiste el ensayo en vivo: hoy vino el doble de gente y la rifa del vestuario se agotó, pero la comparsa vecina ya ensaya el paso nuevo y dos bailarinas no te saludan.",
+            "deltas": {"convivencia": -2, "confianza": -2},
+            "confianza": {}
+          }
+        },
+        {
+          "id": "solo_fecha_y_tambores",
+          "etiqueta": "Publicar solo la fecha y los tambores",
+          "inmediato": {
+            "texto": "Una foto de tambores, la fecha y la hora. Doce reacciones, tres de tu familia.",
+            "deltas": {"convivencia": 1},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 48,
+            "clave": "dilema_ensayo_fecha",
+            "mensaje": "{cuando} publicaste solo la fecha del ensayo y los tambores: la sorpresa del desfile sigue guardada y las bailarinas te lo agradecen, pero vino poca gente y la rifa del vestuario no alcanzó.",
+            "deltas": {"confianza": 2, "convivencia": -1},
+            "confianza": {"ciudadanos": 1}
+          }
+        }
+      ],
+      "nota_diseno": "Las redes sí sirven (llenan el ensayo y la rifa). Lo que se decide es cuánto mostrar y con permiso de quién."
+    }
+  ]
+}

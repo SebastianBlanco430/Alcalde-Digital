@@ -61,6 +61,7 @@ class Multitud(Entity):
         self._mundo = mundo
         self._reloj = reloj or _tiempo.time
         self._hora = hora
+        self.densidad = None                         # gancho: callable(agentes, activos | None) -> [bool] (registro_ambiente_npc)
         self.poblacion = mc.crear_poblacion(mundo, cantidad, semilla)
         self.agentes = self.poblacion.agentes
         n = len(self.agentes)
@@ -170,6 +171,8 @@ class Multitud(Entity):
         if self._hora is not None:
             hora = self._hora()
             activos = [mc.activo_a_la_hora(a, hora) for a in self.agentes]
+        if self.densidad is not None:                # densidad por el ambiente de la ciudad y la hora de la partida
+            activos = self.densidad(self.agentes, activos)
         eventos = self.asignador.actualizar(distancias, activos, self._en_vista, MAX_PROMOCIONES)
         self.reasignaciones += len(eventos)
         for evento in eventos:

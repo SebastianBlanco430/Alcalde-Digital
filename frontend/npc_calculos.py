@@ -7,6 +7,7 @@
 # casco de tinta del contorno y NO se recolorean. Cada modelo declara qué piezas (nombre del nodo, índice de Geom)
 # son piel, camiseta, pantalón, extras o pelo; frontend/npc_color.py las recolorea conservando las bandas de luz.
 
+import os
 import random
 
 # Los cuatro modelos de los personajes principales, como (archivo, rol de rostro). El rol decide el hueso de
@@ -15,6 +16,15 @@ MODELOS_NPC = (("periodista.glb", "periodista"), ("smoking.glb", "candidato"),
                ("brasilena.glb", "influencer"), ("ciudadano.glb", "ciudadano"))
 
 ESCALA_MIN, ESCALA_MAX = 0.94, 1.06      # variación de altura respecto a la escala del modelo
+
+# Modelos NUEVOS (npc_hombre_01..03 y npc_mujer_01..02, frontend/npc_nuevos_calculos.py): con la bandera en True los
+# peatones y la multitud (índices por debajo de INDICE_PRIMER_NOMBRADO) salen del reparto nuevo (5 nuevos + ciudadano
+# + brasileña); False = los 4 de siempre. Los NPC con nombre (vendedores, dependientes, mototaxistas: índices desde
+# 100) conservan su modelo: su nombre y su género se eligieron mirando los 4 modelos de siempre.
+# ALCALDE_NPC_NUEVOS=0 en el entorno la apaga sin tocar el código.
+USAR_MODELOS_NUEVOS = os.environ.get("ALCALDE_NPC_NUEVOS", "1").strip().lower() not in ("0", "false", "no")
+INDICE_PRIMER_NOMBRADO = 100
+ARCHIVOS_NUEVOS = frozenset(f"npc_{nombre}.glb" for nombre in ("hombre_01", "hombre_02", "hombre_03", "mujer_01", "mujer_02"))
 
 # Piezas recoloreables de cada modelo: grupo -> lista de (nombre de nodo, índice de Geom).
 # "piel" cambia con el tono de piel del peatón; "camiseta", "pantalon" y "extra" con la paleta de ropa.
@@ -130,8 +140,15 @@ def _a_unidad(rgb):
 # Plan completo del NPC `indice`: modelo, rol de rostro, escala relativa, colores por grupo (0-1), mochila y fase.
 # `aspecto`: dict de peatones_calculos.aspecto_peaton (piel y pelo en 0-255); lo pone quien llama para no
 # duplicar su azar. Determinista y sin tocar otros generadores.
-def plan_npc(indice, semilla, aspecto):
-    archivo, rol = modelo_npc(indice, semilla)
+# `modelo`: (archivo, rol) forzado (None = lo decide el reparto: el nuevo si la bandera está activa, o el de siempre).
+def plan_npc(indice, semilla, aspecto, modelo=None):
+    if modelo is None and USAR_MODELOS_NUEVOS and 0 <= indice < INDICE_PRIMER_NOMBRADO:
+        from frontend import npc_nuevos_calculos as nn       # aquí dentro: ese módulo importa este
+        modelo = nn.modelo_variado(indice, semilla)
+    if modelo is not None and modelo[0] in ARCHIVOS_NUEVOS:
+        from frontend import npc_nuevos_calculos as nn
+        return nn.plan_nuevo(indice, semilla, aspecto, modelo)
+    archivo, rol = modelo or modelo_npc(indice, semilla)
     azar = random.Random(semilla * 4099 + indice * 131 + 17)
     colores = {"piel": _a_unidad(aspecto["piel"]), "pantalon": azar.choice(PANTALONES)}
     if archivo == "smoking.glb":
@@ -169,6 +186,9 @@ def objetivos_recolor(plan):
 # no recibe bigote ni barba; el resto usa los rasgos del peatón tal cual (menos la gorra, que no cabe sobre el
 # peinado de peinado "afro"/"mono", ya resuelto en rasgos_peaton).
 def rasgos_para_modelo(archivo, rasgos):
+    if archivo in ARCHIVOS_NUEVOS:
+        from frontend import npc_nuevos_calculos as nn
+        return nn.rasgos_nuevo(archivo, rasgos)
     rasgos = dict(rasgos)
     if archivo == "brasilena.glb":
         rasgos.update(peinado=None, gorra=None, bigote=False, barba=None)

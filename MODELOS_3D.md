@@ -574,6 +574,64 @@ crear, `crear_npc` devuelve el `Personaje` procedural y avisa una vez por stderr
 - Limitaciones: la camiseta del ciudadano tiene bordes de triángulo y alguna costura de piel visible de cerca; el Actor sigue sin niebla ni
   sombras del juego; los NPC no se sientan ni saludan (solo Idle/Caminar).
 
+### NPC nuevos: npc_hombre_01..03 y npc_mujer_01..02 (2026-11-11)
+Cinco modelos low-poly más para peatones y multitud, en `assets/modelos/personajes/` (290 KB los hombres, 199 KB las mujeres; los 4 de
+siempre no se tocaron). Bandera `npc_calculos.USAR_MODELOS_NUEVOS = True` (o `ALCALDE_NPC_NUEVOS=0` en el entorno para apagarla): con
+ella los NPC de índice < 100 (peatones 0-11 y variantes de la multitud 16-23) salen de un reparto de 7 por bloque barajado: **los 5
+nuevos + ciudadano + brasileña**. Los NPC con nombre (vendedor, dependientes, mototaxistas: índices ≥ 100) conservan su modelo, porque
+`comercios_mundo.indice_vestido` elige nombre y género mirando periodista/brasileña.
+- **Cómo son los .glb** (inspeccionados a mano): sin texturas, sin materiales, **sin animaciones** y sin casco de tinta; color PLANO por
+  vértice para cada zona. Hombres: una malla (`Cube.023`, 2152 triángulos) con el MISMO esqueleto del periodista (Rigify `DEF-*`, 160
+  huesos, muchos sin padre). Mujeres: cuerpo (`Cylinder`, 1430) + cabello (`Cabello_Liso`/`Cabello_Cola`), con el esqueleto de la
+  brasileña (`Hips/Spine/Head`, 37 huesos). El nodo del esqueleto trae una escala (0,908 / 0,898 / 0,881 / 0,862 / 0,852) que da la
+  altura de cada uno (1,80 / 1,78 / 1,76 / 1,68 / 1,66 m).
+- **Carga** (`frontend/npc_nuevos_modelo.py`, una vez por modelo; cada NPC es una copia `Actor(base)`, caché compartida
+  `personaje_modelo._bases`): se quita la escala del nodo del esqueleto (el modelo queda en las medidas del periodista/brasileña, así
+  el rostro por código, la mochila y la marcha sirven tal cual) y esa escala pasa al Actor (`plan["escala_base"]`, por la variación
+  0,94-1,06 de siempre). Luego se hornean bandas de luz de cómic en el color de vértice (3 tonos según la normal) y se añade un casco
+  de tinta (Geom extra inflado 1,1 cm por la normal suavizada, material «Contorno»: la multitud lo quita en sus figuras lejanas).
+- **Animación por código** (no traen clips): `npc_postura.hornear_clips_basicos` crea `Idle` (respiración, 48 fotogramas), `Hablar`,
+  `Saludar`, `Caminar` y `Correr` con la cinemática de `animacion_humana_calculos.py`, y después `animacion_humana.hornear_clips` añade
+  la marcha a 6 velocidades, escalón, salto y gestos, igual que a los otros modelos. Todo son `AnimBundle` en memoria que Panda mezcla
+  en C++: nada de huesos por frame en Python. El LOD de siempre (cara a 22 m, cuerpo congelado a 45 m) y el skinning por GPU funcionan
+  (99 huesos por malla, tope del shader 128).
+- **Recolor** por zonas: `npc_nuevos_calculos.DATOS` dice qué color original es piel, camiseta, pantalón, pelo y zapatos de cada modelo;
+  cada copia se pinta con la piel y el pelo del peatón y paletas de ropa (suela y calcetín conservan su color). El .glb y la base no
+  cambian (hay prueba). Cara por código con los rasgos del peatón; los hombres admiten peinado, gorra, bigote y barba; las mujeres
+  conservan su cabello (sin peinado, gorra, bigote ni barba). Mochila (40 %) ajustada a la espalda de cada modelo.
+- **Postura emocional** (gancho para la conducta; `frontend/npc_postura.py` + `npc_postura_calculos.py`):
+  `npc.aplicar_postura(estado)` con `'sociable'`, `'neutro'`, `'aislado'` (encorvado, cabeza gacha, braceo corto), `'celular'` (cabeza
+  gacha y antebrazos al frente) y `'enojado'` (torso adelante, codos abiertos). Devuelve True si el cuerpo la puede mostrar;
+  `npc.postura()` dice la actual; lo desconocido cuenta como `'neutro'`. Para el muñeco procedural de respaldo usar
+  `npc_postura.aplicar(npc, estado)` (devuelve False, no lanza). Por dentro: variantes horneadas de `Idle` y de la marcha hasta 3 m/s
+  por estado (`Idle_aislado`, `HumMarcha1_celular`...) y un intermediario (`ActorConPostura`) entre el `AnimadorHumano` y el Actor que
+  reparte el peso entre la postura que sale y la que entra (0,45 s) con las dos al mismo fotograma; las piernas no cambian, así que
+  los pies no patinan. **También funciona en los NPC con los 4 modelos de siempre**: para ellos se carga una base aparte con las
+  variantes (`npc_postura.POSTURAS_EN_MODELOS_DE_SIEMPRE`; la base de los personajes jugables no se toca).
+- **Anclajes**: `npc.ancla_cabeza()` = Entity hija del NPC 24 cm sobre la coronilla (para globos de texto; sube con los pies, no gira
+  con el cuerpo); `npc.ancla_muneca("i")` = nodo en la muñeca izquierda que sigue al hueso de la mano (para la cinta de Bonfim; `"d"`
+  la derecha; None si no hay hueso; origen en la muñeca, eje Y hacia los dedos, medidas del esqueleto sin escalar).
+- **Respaldo**: si un .glb nuevo falta o no carga se avisa UNA vez por modelo por stderr y ese NPC usa uno de los 4 de siempre; si
+  tampoco, el muñeco procedural (`crear_npc`, como antes).
+- **Cambios en código existente** (mínimos): `npc_calculos.py` (bandera, `plan_npc(..., modelo=None)`, rama en `rasgos_para_modelo`),
+  `npc_modelo.py` (ramas en `_crear_actor`, `_escala_modelo`, `_poner_rostro`, `_poner_mochila`, `crear_npc`; métodos nuevos
+  `aplicar_postura`, `postura`, `ancla_cabeza`, `ancla_muneca`, `_mezclar`, `_elevar`). `personaje_modelo.py` y `peatones.py` no cambiaron.
+- **Rendimiento** (esta Mac, ventana real, sin vsync, 50 NPC caminando todos a menos de 12 m de la cámara, la mitad con postura):
+  87-94 FPS con el reparto nuevo vs 73-80 FPS con los 4 de siempre (los nuevos tienen 4-6 veces menos triángulos). Carga única por
+  modelo: ~0,3 s los hombres y ~0,17 s las mujeres (hornear clips); copia por NPC ~5-9 ms. No medido: Windows ni GPU integrada ajena.
+- **Pruebas**: `tests/test_npc_nuevos_calculos.py` (22, puras) y `tests/test_npc_nuevos_humo.py` (subproceso offscreen con
+  `tests/humo_npc_nuevos.py`: respaldo, carga única, altura, pies, orientación, recolor, base intacta, caminar/parar, las 5 posturas en
+  los 7 modelos del reparto, anclas, LOD, bandera apagada, 50 NPC y limpieza).
+- **Limitaciones**: las mujeres están modeladas sobre tacones (de pie quedan algo inclinadas, como la brasileña); las variantes de postura
+  no cubren correr (> 3 m/s), escalón ni salto (ahí suena la postura neutra); el `Idle` con postura de los 4 modelos de siempre es el de
+  código, no el del artista; el Actor sigue sin niebla ni sombras del juego; no hay sentado.
+- **Autoría y licencia (a confirmar por el equipo):** los cinco .glb solo declaran `asset.generator = "Khronos glTF Blender I/O v5.2.40"`;
+  no traen `copyright`, licencia ni autor en `asset` ni en `extras`, y el `README.md` del paquete de origen (`npcs_favela_ursina`)
+  tampoco los indica. Por tanto la autoría y la licencia NO constan. Autor/a: [COMPLETAR: nombre o «creación propia del equipo»].
+  Licencia: [COMPLETAR: p. ej. «creación propia, uso interno de aprendizaje» o la licencia de origen si se partió de un modelo/rig de
+  terceros]. Del paquete solo se copiaron los .glb (no su `demo_npcs.py`, ni `obj_estatico/`). *Anotación de trabajo, no sustituye
+  revisión legal.*
+
 ---
 
 ## 5. Favela viva y de cómic (2026-10-21, rama favela-borderlands)

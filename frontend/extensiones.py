@@ -14,6 +14,7 @@ MODULOS = (
     "frontend.registro_consecuencias",     # Ola 3, subagente D
     "frontend.registro_guardado",          # A5: autoguardado de la partida local y «Continuar» en el menú
     "frontend.registro_veredicto",         # A2d paso 3: avisos de «+R$» y del veredicto al cerrar una misión
+    "frontend.registro_ambiente_npc",      # plan final 3-5: alimenta ambiente_vivo; conducta, densidad y globos de los NPC
 )
 
 

@@ -6,6 +6,9 @@
 #   misiones    SistemaMisiones.a_dict(): la misión activa y su estado, las completadas y sus veredictos
 #   game_state  GameState.a_dict() (confianza, relaciones, flags y el ArbolImpactos) o None si la partida no lo tiene
 #   mapa        "grande" | "chico" y la semilla del mundo: un guardado de otro mapa o de otra semilla NO se carga
+#   reloj, efectos_retardados, aislamiento, ambiente   OPCIONALES (plan final): las pone FlujoConTiempo.tiempo_a_dict()
+#               si el flujo tiene reloj. Un guardado sin ellas (anterior al reloj) carga igual, en el día 1 a las 08:00;
+#               VERSION sigue en 1 porque el formato solo creció con claves que el código viejo ignora.
 #
 # CUÁNDO: solo en un punto seguro, con el jugador en el mundo (`se_puede_guardar`): no durante el minijuego ni con la
 # misión recién completada sin terminar. Así al cargar no hay que reconstruir un lote de noticias a medias.
@@ -62,7 +65,7 @@ def capturar(flujo, mapa, semilla):
         return None
     sesion = flujo.sesion
     game_state = getattr(flujo, "game_state", None)
-    return {
+    datos = {
         "version": VERSION,
         "mapa": mapa,
         "semilla": semilla,
@@ -71,6 +74,11 @@ def capturar(flujo, mapa, semilla):
         "misiones": flujo.misiones_a_dict(),
         "game_state": game_state.a_dict() if game_state is not None else None,
     }
+    # Claves OPCIONALES del tiempo (reloj, efectos_retardados, aislamiento, ambiente): solo si el flujo las tiene.
+    tiempo = getattr(flujo, "tiempo_a_dict", None)
+    if callable(tiempo):
+        datos.update(tiempo())
+    return datos
 
 
 # -- Disco ------------------------------------------------------------------------------------------------------------
@@ -168,6 +176,10 @@ def restaurar(datos, estado_partida, fabrica_flujo, escala_mundo=1.0, mapa=None,
         restaurar_gs = getattr(flujo, "restaurar_game_state", None)
         if guardado_gs is not None and restaurar_gs is not None:
             restaurar_gs(guardado_gs)
+        # Tiempo (claves opcionales): un guardado anterior al reloj no las trae y la partida sigue desde el día 1.
+        restaurar_tiempo = getattr(flujo, "restaurar_tiempo", None)
+        if callable(restaurar_tiempo):
+            restaurar_tiempo(datos)
     except (KeyError, TypeError, AttributeError) as error:
         raise ValueError(f"Guardado incompleto o dañado: {type(error).__name__}: {error}") from error
     if flujo.jugador_activo() is None:

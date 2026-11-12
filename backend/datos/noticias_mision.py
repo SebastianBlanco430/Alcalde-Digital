@@ -145,3 +145,62 @@ def construir_cartas_mision(catalogo):
     if problemas:
         raise ValueError("Árboles de noticias de misión no isomorfos: " + "; ".join(problemas))
     return CartasMision(arbol_noticias, arbol_stats, {n.mision_id: n.id for n in noticias})
+
+
+# -- Consecuencias RETARDADAS de la carta de misión (plan final; las aplica backend/logica/efectos_retardados.py) ----------
+# Además del efecto inmediato de PLANTILLA_DELTAS, la decisión sobre el rumor de la misión deja una consecuencia que llega
+# entre 1 y 2 días de juego después (24-48 h del reloj de la partida), con un mensaje de causa-efecto. Es ADITIVO: nada de
+# lo de arriba cambia, y con el reloj o los efectos retardados apagados estas tablas no se leen.
+#
+#   decisión sobre el rumor          clave             indicadores (base, dificultad «facil»)      grupo de la misión
+#   compartir un rumor FALSO         rebrote           desinformación +3, confianza -2            -1,0
+#   reportar un rumor FALSO          verificado        confianza +2, desinformación -1            +1,0
+#   compartir un rumor VERDADERO     buena_fuente      convivencia +1,5                           +0,5
+#   reportar un rumor VERDADERO      falsa_alarma      confianza -1,5                             -0,5
+#   compartir un rumor FALSO de una misión de DATOS PERSONALES (MISIONES_DATOS_PERSONALES)
+#                                    datos_expuestos   convivencia -4, confianza -2               -1,5
+# La base se multiplica por ESCALA_RETARDO según la dificultad (facil x1, media x1,5, dificil x2) y llega a las
+# RETARDO_HORAS de la dificultad (facil 24 h, media 36 h, dificil 48 h). «datos_expuestos» llega siempre a las 48 h.
+# Son a propósito más chicas que el efecto inmediato (≈ un tercio): el eco de una decisión, no un segundo castigo.
+
+CLAVE_RETARDO = {
+    (False, "compartir"): "rebrote", (False, "reportar"): "verificado",
+    (True, "compartir"): "buena_fuente", (True, "reportar"): "falsa_alarma",
+}
+# clave -> ((convivencia, confianza, desinformacion), delta de confianza del GRUPO de la misión)
+CONSECUENCIAS_RETARDADAS = {
+    "rebrote": ((0, -2, +3), -1.0),
+    "verificado": ((0, +2, -1), +1.0),
+    "buena_fuente": ((+1.5, 0, 0), +0.5),
+    "falsa_alarma": ((0, -1.5, 0), -0.5),
+    "datos_expuestos": ((-4, -2, 0), -1.5),
+}
+ESCALA_RETARDO = {"facil": 1.0, "media": 1.5, "dificil": 2.0}
+RETARDO_HORAS = {"facil": 24.0, "media": 36.0, "dificil": 48.0}
+RETARDO_DATOS_HORAS = 48.0
+# Lotes sin carta de misión: |delta de desinformación del lote| que equivale a una consecuencia plena.
+DELTA_LOTE_PLENO = 15.0
+
+# Misiones cuyo rumor trata de datos personales de los vecinos (cuentas, documentos, teléfonos): difundirlo sin comprobar
+# los expone. Solo ids que existen en backend/datos/misiones_semilla.py (lo vigila tests/test_efectos_retardados.py).
+MISIONES_DATOS_PERSONALES = frozenset({"generica_mutirao", "generica_lanhouse"})
+
+# {cuando} = «Ayer» / «Hace dos días»; {rumor} = el rumor de la misión, recortado.
+MENSAJES_RETARDO = {
+    "rebrote": "{cuando} compartiste sin verificar «{rumor}»: hoy el bulo volvió a circular y hay más desinformación.",
+    "verificado": "{cuando} frenaste a tiempo «{rumor}»: hoy la gente confía más en lo que se publica.",
+    "buena_fuente": "{cuando} compartiste algo cierto («{rumor}»): hoy los vecinos lo comentan y se organizan.",
+    "falsa_alarma": "{cuando} reportaste como falso algo cierto («{rumor}»): hoy quien lo publicó desconfía de la red.",
+    "datos_expuestos": ("{cuando} reenviaste sin comprobar «{rumor}», con nombres y teléfonos de vecinos: hoy se sienten "
+                        "expuestos y la convivencia se resiente."),
+}
+
+
+# ({indicador: delta}, delta del grupo) de la consecuencia `clave` con esa dificultad. ValueError si la clave no existe.
+def consecuencia_retardada(clave, dificultad="facil"):
+    if clave not in CONSECUENCIAS_RETARDADAS:
+        raise ValueError(f"Consecuencia retardada desconocida: {clave!r}; válidas: {tuple(CONSECUENCIAS_RETARDADAS)}.")
+    base, delta_grupo = CONSECUENCIAS_RETARDADAS[clave]
+    escala = ESCALA_RETARDO.get(dificultad, 1.0)
+    deltas = {nombre: round(valor * escala, 2) for nombre, valor in zip(_CLAVES, base) if valor}
+    return deltas, round(delta_grupo * escala, 2)
