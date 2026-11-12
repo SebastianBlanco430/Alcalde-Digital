@@ -14,6 +14,12 @@ MODULOS = (
     "frontend.registro_consecuencias",     # Ola 3, subagente D
     "frontend.registro_guardado",          # A5: autoguardado de la partida local y «Continuar» en el menú
     "frontend.registro_veredicto",         # A2d paso 3: avisos de «+R$» y del veredicto al cerrar una misión
+    "frontend.registro_ambiente_npc",      # plan final 3-5: alimenta ambiente_vivo; conducta, densidad y globos de los NPC
+    "frontend.registro_manillas",          # plan final 6: manillas de Bonfim (brazalete del HUD, leyenda B y cintas en los NPC)
+    "frontend.registro_reloj",             # plan final 1: chip «Día N · hh:mm», enganche de avanzar_tiempo y pantalla final de la semana
+    "frontend.registro_dilemas",           # plan final 7: dilemas jugables (mensaje en el teléfono, tecla K, panel modal)
+    "frontend.registro_minijuegos",         # minijuegos de verificar (6 pantallas distintas; ALCALDE_MINIJUEGOS=0 las apaga)
+    "frontend.registro_ciudad_viva",       # plan final 5: la ciudad cambia de aspecto con los indicadores (luz, cielo, niebla, basura, flores...)
 )
 
 

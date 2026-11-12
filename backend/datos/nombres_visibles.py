@@ -33,7 +33,7 @@ LUGARES = {
     "Biblioteca do Parque": "Biblioteca del parque",
     "Jornal do Morro": "Periódico del cerro",
     "Fofoca da Laje": "Chisme de la azotea",
-    "Zap do Morro": "WhatsApp del cerro",
+    "Zap do Morro": "chat del cerro",
     # Mapa grande
     "Posto de Saúde Vila Nova": "Puesto de salud Vila Nova",
     "Ponto de Mototáxi da Entrada": "Parada de mototaxis de la entrada",
@@ -43,7 +43,7 @@ LUGARES = {
     "Oficina do Seu Zé": "Taller de don Zé",
     "Bar do Cabo": "Bar del Cabo",
     "Igreja Nossa Senhora da Esperança": "Iglesia Nuestra Señora de la Esperanza",
-    "Escola Municipal Paulo Freire": "Escuela municipal Paulo Freire",
+    "Escola Bairro Esperança": "Escuela Barrio Esperanza",
     "Salão da Dona Lu": "Peluquería de doña Lu",
     "Campo de Várzea": "Cancha de barrio",
     "Feira da Ladeira": "Feria de la cuesta",
@@ -65,7 +65,7 @@ CORTOS = {
     "Oficina do Seu Zé": "Taller",
     "Bar do Cabo": "Bar",
     "Igreja Nossa Senhora da Esperança": "Iglesia",
-    "Escola Municipal Paulo Freire": "Escuela",
+    "Escola Bairro Esperança": "Escuela",
     "Salão da Dona Lu": "Peluquería",
     "Campo de Várzea": "Cancha",
     "Feira da Ladeira": "Feria",
@@ -75,7 +75,7 @@ CORTOS = {
 
 # Palabras y frases sueltas; la traducción toma la mayúscula del texto («Mutirão (Trabajo...)», «mutirão (trabajo...)»).
 TERMINOS = {
-    "corrente do zap": "cadena de WhatsApp",
+    "corrente do zap": "cadena del chat",
     "mutirão": "trabajo comunitario voluntario",
     "ensaio": "ensayo",
     "feira": "feria",
@@ -83,7 +83,7 @@ TERMINOS = {
     "sinuca": "billar",
     "laje": "azotea",
     "morro": "cerro",
-    "zap": "WhatsApp",
+    "zap": "chat",
     "praça": "plaza",
     "bom dia": "buenos días",
     "dica do dia": "consejo del día",

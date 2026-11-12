@@ -108,7 +108,7 @@ COLORES_LUGAR = {
     "Oficina do Seu Zé": (230, 170, 40),
     "Bar do Cabo": (190, 90, 50),
     "Igreja Nossa Senhora da Esperança": (120, 150, 200),
-    "Escola Municipal Paulo Freire": (60, 130, 220),
+    "Escola Bairro Esperança": (60, 130, 220),
     "Salão da Dona Lu": (210, 80, 140),
     "Campo de Várzea": (90, 170, 70),
     "Feira da Ladeira": (230, 120, 90),

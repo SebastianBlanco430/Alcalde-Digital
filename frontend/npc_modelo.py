@@ -7,6 +7,10 @@
 # copia del Actor (frontend/npc_color.py); el .glb original y los personajes principales no cambian. El casco
 # de tinta, el pelo del modelo y las bandas de luz se conservan. Cada modelo se carga UNA vez (caché de
 # personaje_modelo._bases) y cada NPC es una copia.
+#
+# Desde 2026-11 hay además cinco modelos nuevos (npc_hombre_01..03, npc_mujer_01..02): el plan los marca con "nuevo" y
+# su carga y su recolor van en frontend/npc_nuevos_modelo.py. Todos los NPC tienen postura emocional y anclajes
+# (aplicar_postura, ancla_cabeza, ancla_muneca; frontend/npc_postura.py).
 
 import sys
 import zlib
@@ -16,6 +20,9 @@ from panda3d.core import Mat4, Vec3, CS_zup_right, getDefaultCoordinateSystem
 
 from frontend import modelo_calculos as mc
 from frontend import npc_calculos as nc
+from frontend import npc_nuevos_calculos as nn
+from frontend import npc_nuevos_modelo as nnm
+from frontend import npc_postura
 from frontend import rostro_calculos as rc
 from frontend.npc_color import agregar_camiseta, recolorear_actor
 from frontend.personaje import Personaje
@@ -54,10 +61,13 @@ class PersonajeNPC(PersonajeModelo):
         self._congelado = False       # cuerpo congelado por estar lejos de la cámara
         self._cerca = True            # ¿está lo bastante cerca de la cámara para animarle la cara?
         self._t_lod = plan["fase"] * nc.INTERVALO_LOD
+        self._postura = npc_postura.instalar(self)    # posturas emocionales (None si el modelo no trae esas variantes)
 
     # Copia del Actor del rol con la ropa y la piel del plan.
     def _crear_actor(self, rol):
-        actor = _cargar_actor(rol)
+        if self._plan.get("nuevo"):       # npc_hombre_*/npc_mujer_*: carga, clips y recolor propios (npc_nuevos_modelo.py)
+            return nnm.crear_actor(self._plan)
+        actor = npc_postura.cargar_actor_de_siempre(rol) or _cargar_actor(rol)     # con variantes de postura si se puede
         try:
             recolorear_actor(actor, nc.objetivos_recolor(self._plan))
             tipo = self._plan.get("camiseta_nueva")
@@ -68,10 +78,11 @@ class PersonajeNPC(PersonajeModelo):
         return actor
 
     def _escala_modelo(self, rol):
-        return mc.escala_para_rol(rol) * self._plan["escala"]
+        return self._plan.get("escala_base", mc.escala_para_rol(rol)) * self._plan["escala"]
 
     # Cara por código con los rasgos del peatón (peinado, gafas, gorra...), ajustada a la cabeza del modelo.
     def _poner_rostro(self, rol, nombre):
+        rol = self._plan.get("rol_rostro", rol)       # los modelos nuevos usan la cabeza de un modelo conocido
         descriptor = rc.descriptor_peaton(self._rasgos, self._aspecto["piel"], self._aspecto["pelo"])
         piezas = rc.piezas_rostro(descriptor)
         if rol in rc.AJUSTE_ROSTRO_POR_ROL:
@@ -121,13 +132,43 @@ class PersonajeNPC(PersonajeModelo):
         except Exception as error:
             _avisar(f"no se pudo ajustar la animación del cuerpo ({error})")
 
+    # -- Ganchos para la conducta: postura emocional y anclajes (frontend/npc_postura.py) --
+
+    # Cambia la postura del cuerpo: 'sociable', 'neutro', 'aislado' (encorvado, cabeza gacha), 'celular' (cabeza gacha
+    # y antebrazos al frente) o 'enojado'. Devuelve False si este modelo no la puede mostrar (queda como estaba).
+    def aplicar_postura(self, estado):
+        return npc_postura.aplicar(self, estado)
+
+    def postura(self):
+        return npc_postura.estado_de(self)
+
+    # Entity sobre la cabeza (para globos de texto) y nodo en la muñeca ("i"/"d", para una manilla; None si no hay hueso).
+    def ancla_cabeza(self):
+        return npc_postura.ancla_cabeza(self)
+
+    def ancla_muneca(self, lado="i"):
+        return npc_postura.ancla_muneca(self, lado)
+
+    # El cambio de postura avanza con la mezcla de clips (también durante las cinemáticas).
+    def _mezclar(self, dt):
+        super()._mezclar(dt)
+        if getattr(self, "_postura", None) is not None:
+            self._postura.avanzar(dt)
+
+    # El ancla de la cabeza sube con los pies (ver PersonajeModelo._elevar).
+    def _elevar(self):
+        super()._elevar()
+        ancla = getattr(self, "_ancla_cabeza", None)
+        if ancla is not None:
+            ancla.y = npc_postura.y_ancla_cabeza(self)
+
     # Mochila colgada del hueso de la espalda (si el plan trae una). Nunca lanza.
     def _poner_mochila(self):
         color = self._plan.get("mochila")
         if color is None:
             return
         try:
-            hueso_nombre, centro = nc.ESPALDA_POR_ROL[self._plan["rol"]]
+            hueso_nombre, centro = nn.espalda(self._plan) if self._plan.get("nuevo") else nc.ESPALDA_POR_ROL[self._plan["rol"]]
             hueso = self.actor.exposeJoint(None, "modelRoot", hueso_nombre)
             if hueso is None:
                 return
@@ -144,6 +185,8 @@ class PersonajeNPC(PersonajeModelo):
 def crear_npc(indice, semilla, aspecto, rasgos, color_ropa, **opciones):
     try:
         plan = nc.plan_npc(indice, semilla, aspecto)
+        if plan.get("nuevo") and not nnm.disponible(plan):      # modelo nuevo que no carga: uno de los 4 de siempre
+            plan = nc.plan_npc(indice, semilla, aspecto, modelo=nc.modelo_npc(indice, semilla))
         return PersonajeNPC(f"Peatón {indice}", plan, aspecto, rasgos, **opciones)
     except Exception as error:
         _avisar(f"peatón {indice}: no se pudo crear el modelo ({error}); se usa el muñeco procedural")

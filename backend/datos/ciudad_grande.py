@@ -58,7 +58,7 @@ COORDENADAS_GRANDES.update({
     "Oficina do Seu Zé": (-210, -190),
     "Bar do Cabo": (270, -300),
     "Igreja Nossa Senhora da Esperança": (-200, 20),
-    "Escola Municipal Paulo Freire": (-230, 200),
+    "Escola Bairro Esperança": (-230, 200),
     "Salão da Dona Lu": (-360, -70),
     "Campo de Várzea": (-350, 100),
     "Feira da Ladeira": (-400, 230),
@@ -75,7 +75,7 @@ _EDIFICIOS_NUEVOS = (
     ("Oficina do Seu Zé", 14, 12, 6, "Oficina do Seu Zé", "casa3"),
     ("Bar do Cabo", 10, 9, 6, "Bar do Cabo", "casa1"),
     ("Igreja Nossa Senhora da Esperança", 14, 12, 9, "Igreja Nossa Senhora da Esperança", "casa4"),
-    ("Escola Municipal Paulo Freire", 16, 12, 8, "Escola Municipal Paulo Freire", "casa2"),
+    ("Escola Bairro Esperança", 16, 12, 8, "Escola Bairro Esperança", "casa2"),
     ("Salão da Dona Lu", 10, 9, 6, "Salão da Dona Lu", "casa3"),
     ("Estação Alto do Morro", 14, 10, 8, "Estação Alto do Morro", "casa4"),
 )

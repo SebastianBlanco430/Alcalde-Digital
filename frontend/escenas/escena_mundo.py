@@ -129,6 +129,9 @@ class EscenaMundo(Escena):
         self.punto_de_mision = None
         self.texto_turno_fn = None       # hook: callable(jugador) -> texto del panel de turno (None = «Turno de ...»)
         self.sanear_nombre = None        # hook: callable(nombre) -> nombre visible (None = tal cual)
+        # hook: callable(flujo) -> bool que pinta la pantalla final de la semana (frontend/registro_reloj.py); True = ya
+        # la pintó y no se usan los paneles de siempre. None (o False) = los paneles de siempre.
+        self.pintar_final = None
         self.vehiculos = None
         if VEHICULOS:
             from frontend.vehiculo_mundo import IntegracionVehiculos
@@ -380,7 +383,10 @@ class EscenaMundo(Escena):
         if self.flujo.partida_terminada() and not self._cinematica:
             leer_final = getattr(self.flujo, "final_partida", None)
             final = leer_final() if callable(leer_final) else None
-            if final is not None:
+            if self.pintar_final is not None and self.pintar_final(self.flujo):
+                self.hud.panel_fin.ocultar()
+                self.panel_final.ocultar()
+            elif final is not None:
                 self.hud.panel_fin.ocultar()
                 self.panel_final.mostrar(final, self._sesion.estado_partida.indicadores())
             else:

@@ -43,7 +43,7 @@ FACHADAS = {
     "Salão da Dona Lu": Fachada(((226, 100, 160), (252, 236, 244)), ("barbero",)),
     "Posto de Saúde Vila Nova": Fachada(((246, 250, 250), (46, 160, 130)), ("cruz",), friso=(46, 160, 130)),
     "Igreja Nossa Senhora da Esperança": Fachada(None, ("campanario",), friso=(120, 150, 200)),
-    "Escola Municipal Paulo Freire": Fachada(((60, 130, 220), (250, 240, 200)), ("mastil",), friso=(60, 130, 220)),
+    "Escola Bairro Esperança": Fachada(((60, 130, 220), (250, 240, 200)), ("mastil",), friso=(60, 130, 220)),
     "Ponto de Mototáxi da Entrada": Fachada(((240, 150, 40), (36, 36, 40)), ("llantas",)),
 }
 

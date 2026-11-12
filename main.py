@@ -118,6 +118,12 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
             from backend.logica.flujo_gamestate import FlujoConGameState
             # consecuencias (ALCALDE_CONSECUENCIAS): carta de misión, veredicto -> confianza y final de la partida (A2d)
             flujo = FlujoConGameState(flujo, consecuencias=economia_config.CONSECUENCIAS)
+        from backend.logica import reloj_partida
+        if reloj_partida.activo():       # reloj de 7 días, efectos retardados y ambiente (backend/logica/flujo_tiempo.py)
+            from backend.logica.flujo_tiempo import FlujoConTiempo
+            flujo = FlujoConTiempo(flujo)
+            from backend.logica import dilemas      # dilemas jugables con consecuencia retardada (ALCALDE_DILEMAS=0 los apaga)
+            flujo = dilemas.envolver(flujo)
         return flujo
 
     transicion = Transicion(duracion_transicion, duracion_transicion)

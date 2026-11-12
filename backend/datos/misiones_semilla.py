@@ -226,8 +226,8 @@ MISIONES_MAPA_GRANDE = (
     ),
     Mision(
         "generica_escola", None, "Clases suspendidas",
-        "Dicen que la Escola Municipal Paulo Freire cierra mañana. Compruébalo en persona.",
-        "Escola Municipal Paulo Freire",
+        "Dicen que la Escuela Barrio Esperanza cierra mañana. Compruébalo en persona.",
+        "Escola Bairro Esperança",
         pago=45, dificultad="facil",
         es_verdadera=True, grupo="ciudadanos",
         rumor="Mañana no habrá clases en la escuela por una jornada de formación docente.",
@@ -345,8 +345,8 @@ MISIONES_EXTRA_GRANDE = (
     ),
     Mision(
         "periodista_escola", "periodista", "Notas filtradas",
-        "Filtran una «lista de reprobados» de la Escola Municipal Paulo Freire. Confírmalo allí.",
-        "Escola Municipal Paulo Freire",
+        "Filtran una «lista de reprobados» de la Escuela Barrio Esperanza. Confírmalo allí.",
+        "Escola Bairro Esperança",
         pago=90, dificultad="dificil",
         es_verdadera=False, grupo="instituciones",
         rumor="Circula la lista con los nombres de los alumnos reprobados del año.",
