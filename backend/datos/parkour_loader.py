@@ -3,6 +3,8 @@
 # español que nombra el nivel y el campo, para arreglar el JSON sin depurar.
 
 import json
+import math
+import re
 from pathlib import Path
 
 from backend.logica.parkour_calculos import (Arista, Interruptor, MEDALLAS, Nivel, Plataforma, TIPOS,
@@ -10,6 +12,9 @@ from backend.logica.parkour_calculos import (Arista, Interruptor, MEDALLAS, Nive
 
 CARPETA = Path(__file__).resolve().parent / "parkour"
 TEMAS = ("corrupto", "digital")
+LIMITE_XZ = 5000.0           # |x|, |z| máximos (m): evita rejillas/mallas de tamaño absurdo en el frontend
+LIMITE_Y = 1000.0            # |y| máximo (m)
+ID_VALIDO = re.compile(r"[A-Za-z0-9_]+")
 CAMPOS_PUNTUACION = ("maximo", "tiempo_referencia_s", "peso_tiempo", "peso_eficiencia")
 
 
@@ -20,11 +25,17 @@ def _falla(nivel, mensaje):
 def _numero(nivel, valor, campo, minimo=None, maximo=None):
     if isinstance(valor, bool) or not isinstance(valor, (int, float)):
         _falla(nivel, f"{campo} debe ser un número (llegó {valor!r}).")
+    if not math.isfinite(valor):
+        _falla(nivel, f"{campo} debe ser un número finito (llegó {valor!r}).")
     if minimo is not None and valor < minimo:
         _falla(nivel, f"{campo} debe ser >= {minimo} (llegó {valor!r}).")
     if maximo is not None and valor > maximo:
         _falla(nivel, f"{campo} debe ser <= {maximo} (llegó {valor!r}).")
     return float(valor)
+
+
+def _coord(nivel, valor, campo, limite=LIMITE_XZ):
+    return _numero(nivel, valor, campo, minimo=-limite, maximo=limite)
 
 
 def _texto(nivel, valor, campo):
@@ -48,8 +59,8 @@ def _plataforma(nivel, d):
     else:
         movimiento = None
     return Plataforma(
-        id=id_p, x=_numero(nivel, d.get("x"), f"{id_p}.x"), y=_numero(nivel, d.get("y"), f"{id_p}.y"),
-        z=_numero(nivel, d.get("z"), f"{id_p}.z"),
+        id=id_p, x=_coord(nivel, d.get("x"), f"{id_p}.x"), y=_coord(nivel, d.get("y"), f"{id_p}.y", LIMITE_Y),
+        z=_coord(nivel, d.get("z"), f"{id_p}.z"),
         ancho=_numero(nivel, d.get("ancho"), f"{id_p}.ancho", minimo=0.5),
         fondo=_numero(nivel, d.get("fondo"), f"{id_p}.fondo", minimo=0.5),
         tipo=tipo, movimiento=movimiento,
@@ -97,8 +108,8 @@ def nivel_desde_dict(datos):
                 _falla(nid, f"la plataforma {destino!r} debe declarar requiere={id_i!r} (lo activa ese interruptor).")
         duracion = d.get("duracion_s")
         interruptores[id_i] = Interruptor(
-            id=id_i, x=_numero(nid, d.get("x"), f"{id_i}.x"), y=_numero(nid, d.get("y"), f"{id_i}.y"),
-            z=_numero(nid, d.get("z"), f"{id_i}.z"), activa=activa,
+            id=id_i, x=_coord(nid, d.get("x"), f"{id_i}.x"), y=_coord(nid, d.get("y"), f"{id_i}.y", LIMITE_Y),
+            z=_coord(nid, d.get("z"), f"{id_i}.z"), activa=activa,
             radio=_numero(nid, d.get("radio", 0.9), f"{id_i}.radio", minimo=0.2),
             duracion_s=None if duracion is None else _numero(nid, duracion, f"{id_i}.duracion_s", minimo=1.0))
     for p in plataformas.values():
@@ -142,7 +153,7 @@ def nivel_desde_dict(datos):
     nivel = Nivel(
         id=nid, nombre=str(datos.get("nombre", nid)), tema=tema, inicio=inicio, meta=meta,
         plataformas=plataformas, aristas=tuple(aristas), interruptores=interruptores,
-        y_muerte=_numero(nid, datos.get("y_muerte", -8.0), "y_muerte"),
+        y_muerte=_numero(nid, datos.get("y_muerte", -8.0), "y_muerte", minimo=-LIMITE_Y, maximo=LIMITE_Y),
         penalizacion_caida_s=_numero(nid, datos.get("penalizacion_caida_s", 3.0), "penalizacion_caida_s", minimo=0.0),
         puntuacion=dict(puntuacion), medallas={k: float(v) for k, v in medallas.items()},
         recompensa=dict(recompensa), descripcion=str(datos.get("descripcion", "")))
@@ -158,6 +169,8 @@ def listar_niveles(carpeta=None):
 
 # Carga un nivel por id. ValueError si no existe o es inválido.
 def cargar_nivel(nivel_id, carpeta=None):
+    if not isinstance(nivel_id, str) or not ID_VALIDO.fullmatch(nivel_id):
+        raise ValueError(f"Nivel de parkour {nivel_id!r}: id inválido (solo letras, números y guion bajo).")
     ruta = Path(carpeta or CARPETA) / f"{nivel_id}.json"
     if not ruta.is_file():
         raise ValueError(f"Nivel de parkour {nivel_id!r} inexistente; disponibles: {listar_niveles(carpeta)}.")
