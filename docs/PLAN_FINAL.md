@@ -543,3 +543,7 @@ días, guardado viejo/nuevo/dañado, pureza de los módulos) y `test_equilibrio_
 `simulacion_estrategias.py`. Dilemas: `test_dilemas.py` (carga, calendario, plazo/ignorar, efectos, guardado, bandera y equilibrio),
 `test_registro_dilemas.py` (redacción sin números, panel con escena falsa, el reloj se detiene) y `test_dilemas_ventana.py`
 (ventana real, `scripts/humo_dilemas.py`; se salta sin GL), además de `test_dilemas_extra.py` (contenido del JSON).
+
+---
+## ACTUALIZACIÓN 2026-11-12 (minijuegos, nota 53)
+- Las 47 misiones de verificar tienen 6 minijuegos distintos (rastrear, comparar, ordenar cadena, chat, señales, contrarreloj), con respaldo a la pantalla de siempre y `ALCALDE_MINIJUEGOS=0` para apagarlos. Ver [[53 Minijuegos de verificar]]. Sin commit.

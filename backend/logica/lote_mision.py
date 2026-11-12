@@ -44,6 +44,9 @@ class LoteMision:
         # Decisiones sin deltas (p. ej. isomorfismo roto): no cuentan como decisiones, pero agotan
         # el lote para que la misión no quede atascada repitiendo noticias inservibles.
         self.descartadas = 0
+        # Veces que cerrar_lote (minijuegos) llamó a estado.decidir sobre este lote, haya o no alcanzado a registrarse: si decidir
+        # falla tras mutar el estado, `decisiones` sigue en 0 y esto avisa de que el estado ya se tocó (no repetir la misión).
+        self.intentos_decidir = 0
         self._sin_noticias = False
         # Carta de misión: decisión tomada sobre ella ("compartir" / "reportar") o None si aún no se decidió (o no hay).
         self.decision_mision = None

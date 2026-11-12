@@ -57,6 +57,9 @@ class ConexionFlujo:
         self.saltadores = []
         self.flujo = None
         self._trabajo_en_curso = None      # {"jugador", "trabajo", "nombre"} del turno de trabajo abierto
+        # Minijuegos de verificar (frontend/registro_minijuegos.py): callable(contexto) -> nombre de escena o None. None = siempre
+        # la escena de juego de siempre (también en línea y con ALCALDE_MINIJUEGOS=0).
+        self.selector_escena = None
 
     # Inicio: "Empezar" lleva a la selección de roles.
     def ir_a_seleccion(self):
@@ -81,6 +84,8 @@ class ConexionFlujo:
 
         def abrir_juego():
             try:
+                if self._abrir_minijuego(contexto):
+                    return
                 self._gestor.cambiar_a(
                     JUEGO, jugador=contexto["jugador"], estado=contexto["estado"],
                     mision=contexto["mision"], al_terminar=self.terminar_mision,
@@ -94,6 +99,33 @@ class ConexionFlujo:
                 raise
 
         self._con_transicion(abrir_juego)
+
+    # Minijuegos de verificar (aditivo): si `selector_escena` elige una escena de minijuego para la misión, la abre con los MISMOS datos
+    # que la escena de juego (más `al_respaldo`, que reabre la misión en la escena de juego si el minijuego falla) y devuelve True.
+    # Sin selector, sin elección o ante cualquier fallo devuelve False y el llamador abre la escena de juego de siempre.
+    def _abrir_minijuego(self, contexto, **extra):
+        selector = getattr(self, "selector_escena", None)
+        if selector is None:
+            return False
+        try:
+            nombre = selector(contexto)
+        except Exception:            # noqa: BLE001  un selector roto nunca bloquea la misión
+            return False
+        if not nombre or nombre == JUEGO:
+            return False
+        datos = dict(jugador=contexto["jugador"], estado=contexto["estado"], mision=contexto["mision"],
+                     al_terminar=self.terminar_mision, grafo_social=self._grafo_social, **extra)
+        respaldo_abierto = []
+
+        def respaldo():
+            self._gestor.cambiar_a(JUEGO, **datos)
+            respaldo_abierto.append(True)
+
+        try:
+            self._gestor.cambiar_a(nombre, al_respaldo=respaldo, **datos)
+        except Exception:            # noqa: BLE001
+            return bool(respaldo_abierto)      # True: el respaldo ya abrió la escena de juego; False: la abre el llamador
+        return True
 
     # Juego: terminó el lote; se cierra la misión, pasa el turno y se vuelve al mundo.
     # Si el cambio de escena de vuelta falla no hay nada que revertir ni colgado: el modelo
@@ -250,6 +282,8 @@ class ConexionFlujo:
 
         def abrir_juego():
             try:
+                if self._abrir_minijuego(contexto, marco=True, lugar=titulo):
+                    return
                 self._gestor.cambiar_a(
                     JUEGO, jugador=jugador, estado=contexto["estado"], mision=mision,
                     al_terminar=self.terminar_mision, grafo_social=self._grafo_social,
@@ -269,6 +303,8 @@ class ConexionFlujo:
 
         def abrir_juego():
             try:
+                if self._abrir_minijuego(contexto, marco=True, lugar=titulo):
+                    return
                 self._gestor.cambiar_a(
                     JUEGO, jugador=jugador, estado=contexto["estado"], mision=mision,
                     al_terminar=self.terminar_mision, grafo_social=self._grafo_social,
