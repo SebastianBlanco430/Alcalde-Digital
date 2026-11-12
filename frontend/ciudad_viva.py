@@ -25,7 +25,9 @@ import math
 import sys
 
 from backend.logica import ciudad_viva_calculos as cv
-from frontend import ambiente_vivo
+from backend.logica import etapas_final
+from frontend import ambiente_vivo, estilo
+from frontend.contorno_calculos import realzar_color
 from frontend.azar_fijo import azar_de
 from frontend.props_mundo import Malla, caja, icosfera, prisma
 
@@ -308,6 +310,154 @@ def mesh_capuchon(v):
     return d.mesh()
 
 
+# -- Capas de los finales por etapas: fuego, rodadores y fiesta (docs/PLAN_FINALES_HISTORIA.md §2.2) ---------------------------
+# Misma línea que el resto: low-poly, color plano sin sombreado y contorno de tinta. El contorno es el casco invertido de
+# siempre, pero metido en la MISMA malla (las caras del casco van al revés, así el recorte de caras traseras deja ver solo
+# el borde): una entidad por pieza, sin atributos de render nuevos.
+
+GROSOR_TINTA_ETAPA = 0.035       # m por lado del casco de tinta de estas piezas
+SALES_ETAPA = {"fuego": 13.0, "rodadores": 14.0, "fiesta": 15.0}
+ROJO_FUEGO = realzar_color(estilo.ESTADO_ERROR)
+NARANJA_FUEGO = realzar_color((240, 130, 40))
+AMARILLO_FUEGO = realzar_color(estilo.ACENTO_PRIMARIO)
+HUMO = (92, 92, 102)
+MADERA_QUEMADA = (48, 38, 34)
+SECO = realzar_color((158, 118, 70))
+SECO_OSCURO = realzar_color((104, 76, 46))
+POSTE_FIESTA = (70, 56, 44)
+ALTO_FIESTA = 4.1                # m a los que cuelgan los banderines que cruzan la calle
+PASO_CALLE_ETAPA = 26.0          # m entre dos sitios de rodador / de fiesta a lo largo de una calle
+VELOCIDAD_RODADOR = 3.2          # m/s
+CONFETI_POR_NUBE = 14
+NUBES_CONFETI = 3
+ALTO_CONFETI = 5.0               # m desde los que cae el confeti
+SEGUNDOS_CONFETI = 5.0           # s de una caída
+
+
+class DibujoTinta(Dibujo):
+    """Dibujo cuyos sólidos llevan contorno de tinta (casco invertido en la misma malla)."""
+
+    def solido(self, forma, posicion, escala=1.0, giro=0.0, color=(255, 255, 255), degradado=(0.9, 1.05), inclinacion=0.0,
+               apoyado=False):
+        """`apoyado`: el sólido nace en su base (prisma) y no en su centro; el casco baja un grosor para envolverlo."""
+        if isinstance(escala, (int, float)):
+            escala = (escala, escala, escala)
+        g = GROSOR_TINTA_ETAPA
+        desde = len(self.vertices)
+        base = (posicion[0], posicion[1] - (g if apoyado else 0.0), posicion[2])
+        self.agregar(forma, base, tuple(e + 2 * g for e in escala), giro, estilo.TINTA, (1.0, 1.0), 0.0, inclinacion)
+        for i in range(desde, len(self.vertices), 3):           # caras al revés: solo se ve el borde
+            self.vertices[i + 1], self.vertices[i + 2] = self.vertices[i + 2], self.vertices[i + 1]
+            self.colores[i + 1], self.colores[i + 2] = self.colores[i + 2], self.colores[i + 1]
+        self.agregar(forma, posicion, escala, giro, color, degradado, 0.0, inclinacion)
+
+    def banderin(self, x, y, ancho, alto, color):
+        """Banderín triangular plano (mira a ±z) con borde de tinta: tinta en medio y el color a cada lado."""
+        b = 0.045
+        self.tri((x - ancho - b, y + b, 0.0), (x + ancho + b, y + b, 0.0), (x, y - alto - 2 * b, 0.0), estilo.TINTA)
+        for z in (-0.012, 0.012):
+            self.tri((x - ancho, y, z), (x + ancho, y, z), (x, y - alto, z), color)
+
+
+def mesh_fuego(v):
+    """Hoguera de cómic: leños cruzados, llamas en tres tonos planos (rojo, naranja, amarillo) y tres bocanadas de humo."""
+    d = DibujoTinta()
+    for giro in (25 + 40 * v, -50 + 40 * v):
+        d.solido(caja(), (0, 0.08, 0), (0.95, 0.14, 0.16), giro, MADERA_QUEMADA)
+    cono = prisma(5, 0.5, 0.03)
+    for k in range(3):                                   # llamas rojas de fuera
+        a = 2 * math.pi * (k + 0.25 * v) / 3
+        d.solido(cono, (0.26 * math.cos(a), 0.1, 0.26 * math.sin(a)), (0.46, 0.85 + 0.2 * azar_de(k, v + 1.3), 0.46), 40 * k,
+                 ROJO_FUEGO, (1.0, 1.0), apoyado=True)
+    d.solido(cono, (0, 0.12, 0), (0.5, 1.35, 0.5), 18 * v, NARANJA_FUEGO, (1.0, 1.0), apoyado=True)
+    for k in range(3):                                   # lenguas amarillas, entre las rojas
+        a = 2 * math.pi * (k + 0.5 + 0.25 * v) / 3
+        d.agregar(cono, (0.34 * math.cos(a), 0.12, 0.34 * math.sin(a)), (0.24, 0.5 + 0.15 * azar_de(k, v + 7.7), 0.24), 30 * k,
+                  AMARILLO_FUEGO, (1.0, 1.0))
+    for k, (y, r) in enumerate(((1.6, 0.34), (2.0, 0.27), (2.35, 0.19))):
+        d.solido(icosfera(1), (0.14 * (k - 1) + 0.08 * v, y, 0.1 * (1 - k)), (r, r * 0.8, r), 50 * k, _tono(HUMO, 1.0 + 0.12 * k),
+                 (0.95, 1.05))
+    return d.mesh()
+
+
+def mesh_rodador(v):
+    """Arbusto seco que rueda: bola de pocas caras con ramas que la atraviesan. Origen en el centro (radio ≈ 0,5 m)."""
+    d = DibujoTinta()
+    d.solido(icosfera(0), (0, 0, 0), (0.86, 0.8, 0.86), 20 * v, SECO, (0.85, 1.05))
+    for k in range(7):
+        giro = 360 * azar_de(k, v + 2.2)
+        inc = 180 * azar_de(k + 5.0, v) - 90
+        d.agregar(caja(), (0, 0, 0), (0.05, 0.05, 1.12), giro, SECO_OSCURO, (1.0, 1.0), 0.0, inc)
+    return d.mesh()
+
+
+def mesh_fiesta(largo, v=0):
+    """Cuerda de banderines grandes de `largo` m (centrada, a lo largo de x) entre dos postes: cruza la calle de acera a acera."""
+    d = DibujoTinta()
+    medio = largo / 2.0
+    for lado in (-medio, medio):
+        d.solido(prisma(6, 0.5, 0.5), (lado, -0.5, 0), (0.14, ALTO_FIESTA + 0.6, 0.14), 0, POSTE_FIESTA, (0.9, 1.05), apoyado=True)
+        d.solido(icosfera(0), (lado, ALTO_FIESTA + 0.2, 0), 0.3, 0, AMARILLO_FUEGO, (1.0, 1.0))
+    comba = 0.05 * largo + 0.25
+    n = max(12, int(largo * 1.5))
+
+    def punto(t):
+        return (-medio + largo * t, ALTO_FIESTA - comba * 4.0 * t * (1.0 - t))
+
+    pts = [punto(i / n) for i in range(n + 1)]
+    for a, b in zip(pts, pts[1:]):
+        d.quad((a[0], a[1] + 0.02, 0), (b[0], b[1] + 0.02, 0), (b[0], b[1] - 0.02, 0), (a[0], a[1] - 0.02, 0), estilo.TINTA)
+        d.quad((a[0], a[1], -0.02), (b[0], b[1], -0.02), (b[0], b[1], 0.02), (a[0], a[1], 0.02), estilo.TINTA)
+    cuantos = max(5, int(largo / 0.8))
+    for k in range(cuantos):
+        x, y = punto((k + 0.5) / cuantos)
+        d.banderin(x, y, 0.26, 0.5, realzar_color(PALETA_BANDERINES[(k + v) % len(PALETA_BANDERINES)]))
+    return d.mesh()
+
+
+def mesh_confeti(largo, v):
+    """Una «nube» plana de papelitos de colores repartidos sobre la calle (cae entera y vuelve a empezar)."""
+    d = Dibujo()
+    for k in range(CONFETI_POR_NUBE):
+        x = (azar_de(k, v + 0.5) - 0.5) * largo
+        z = (azar_de(k + 3.0, v + 1.5) - 0.5) * 9.0
+        y = (azar_de(k + 6.0, v + 2.5) - 0.5) * 1.2
+        a = 2 * math.pi * azar_de(k + 9.0, v)
+        ux, uz = 0.09 * math.cos(a), 0.09 * math.sin(a)
+        alto = 0.06 + 0.05 * azar_de(k, v + 4.0)
+        c = realzar_color(PALETA_BANDERINES[(k + v) % len(PALETA_BANDERINES)])
+        d.quad((x - ux, y - alto, z - uz), (x + ux, y - alto * 0.4, z + uz), (x + ux, y + alto, z + uz), (x - ux, y + alto * 0.4, z - uz), c)
+    return d.mesh()
+
+
+def sitios_de_etapa(mundo, sitios):
+    """Sitios fijos de las capas de etapa: fuego sobre parte de los puntos de basura (basura ardiendo), y rodadores y fiesta
+    en el eje de las calles, cada PASO_CALLE_ETAPA m. Determinista."""
+    suelo = mundo.altura
+    out = {"fuego": [], "rodadores": [], "fiesta": []}
+    for p in sitios["basura"]:
+        if p.extra % 5 == 0:
+            out["fuego"].append(_punto(p.x, p.z, cv.azar_sitio(p.x, p.z, SALES_ETAPA["fuego"]), p.y, p.giro, p.extra // 5))
+    for (ax, az), (bx, bz) in _segmentos(mundo):
+        dx, dz = bx - ax, bz - az
+        largo = math.hypot(dx, dz)
+        if largo < 12.0:
+            continue
+        ux, uz = dx / largo, dz / largo
+        n = max(1, int(round(largo / PASO_CALLE_ETAPA)))
+        for k in range(n):
+            t = (k + 0.5) / n
+            x, z = ax + dx * t, az + dz * t
+            if not _libre(mundo, x, z):
+                continue
+            recorrido = max(8.0, min(18.0, 0.7 * largo / n))
+            out["rodadores"].append(_punto(x, z, cv.azar_sitio(x, z, SALES_ETAPA["rodadores"]), suelo(x, z) + 0.5,
+                                           math.degrees(math.atan2(ux, uz)), (ux, uz, recorrido)))
+            out["fiesta"].append(_punto(x, z, cv.azar_sitio(x, z, SALES_ETAPA["fiesta"]), suelo(x, z),
+                                        math.degrees(math.atan2(ux, uz)), 0))      # su +z local = la calle; la cuerda la cruza
+    return out
+
+
 # -- Piscinas ----------------------------------------------------------------------------------------------------------------
 
 
@@ -563,6 +713,9 @@ def crear_controlador(escena, atmosfera=True, capas=True):
             self._version_capas = None
             self._cantidades = None
             self._animando = False
+            self.con_etapas = etapas_final.activo()      # capas de los finales por etapas (ALCALDE_ETAPAS_FINAL=0 las quita)
+            self._grupos_etapa = []                      # [(capa, Grupo)] que se animan cada frame
+            self._t_etapa = 0.0
             self.grupos = {}
             self.raiz = Entity(parent=self, name="ciudad_viva_raiz")
             self.raiz.ignore = True
@@ -659,6 +812,59 @@ def crear_controlador(escena, atmosfera=True, capas=True):
                                                         _coloca_uniforme, _fija_uniforme))
             variantes("sentados", "bancos", lambda v: (lambda: mesh_sentados(v)), 3, 3, s["bancos"], 45)
             variantes("corro", "corros", lambda v: (lambda: mesh_corro(v)), 2, 2, s["corros"], 60)
+            if self.con_etapas:
+                self._crear_capas_etapa(mundo, s, variantes)
+
+        def _crear_capas_etapa(self, mundo, s, variantes):
+            """Fuego, rodadores y fiesta: mismas piscinas con sitios fijos; su cantidad sale de la ETAPA."""
+            from ursina.shaders import unlit_shader
+            raiz = self.raiz
+            e = sitios_de_etapa(mundo, s)
+            largo = float(mundo.ancho_calle) + 1.2
+            variantes("fuego", "fuego", lambda v: (lambda: mesh_fuego(v)), 2, 5, e["fuego"], 55)
+            self.grupos["rodador"] = ("rodadores", Grupo(raiz, "rodador", lambda: mesh_rodador(0), 5, e["rodadores"], 60,
+                                                         _coloca_uniforme, _fija_uniforme))
+            self.grupos["fiesta"] = ("fiesta", Grupo(raiz, "fiesta", lambda: mesh_fiesta(largo), 5, e["fiesta"], 75,
+                                                     _coloca_uniforme, _fija_uniforme))
+            for k, entidad in enumerate(self.grupos["fiesta"][1].entidades):      # confeti: nubes hijas que caen en bucle
+                entidad.confeti = []
+                for j in range(NUBES_CONFETI):
+                    nube = Entity(parent=entidad, model=mesh_confeti(largo, k * NUBES_CONFETI + j), shader=unlit_shader, unlit=True,
+                                  y=ALTO_CONFETI, name=f"viva_confeti_{k}_{j}")
+                    nube.ignore = True
+                    entidad.confeti.append(nube)
+            self._suelo = mundo.altura
+            self._grupos_etapa = [(capa, g) for nombre, (capa, g) in self.grupos.items() if capa in etapas_final.CAPAS_ETAPA]
+
+        def _animar_etapa(self, dt):
+            """Parpadeo del fuego, rodar de los arbustos y caída del confeti: solo las ranuras ocupadas (≤ 20)."""
+            self._t_etapa += dt
+            t = self._t_etapa
+            for capa, grupo in self._grupos_etapa:
+                ranuras = grupo.ranuras
+                for k, sitio in enumerate(ranuras.sitio):
+                    if sitio is None:
+                        continue
+                    e = grupo.entidades[k]
+                    es = max(0.001, cv.escala_fundida(ranuras.f[k]))
+                    if capa == "fuego":
+                        ancho = es * (1.0 + 0.07 * math.sin(t * 11.0 + k * 2.1))
+                        e.scale = (ancho, es * (1.0 + 0.16 * math.sin(t * 8.3 + k * 1.7)), ancho)
+                    elif capa == "rodadores":
+                        dato = grupo.sitios[sitio]
+                        ux, uz, recorrido = dato.extra
+                        fase = (t * VELOCIDAD_RODADOR / recorrido + k * 0.37) % 1.0
+                        avance = (fase - 0.5) * recorrido
+                        x, z = dato.x + ux * avance, dato.z + uz * avance
+                        e.position = (x, self._suelo(x, z) + 0.5 + 0.22 * abs(math.sin(t * 4.0 + k)), z)
+                        e.rotation_x = (t * 230.0 + k * 50.0) % 360.0
+                        e.scale = es * min(1.0, 7.0 * fase, 7.0 * (1.0 - fase))          # nace y se va sin salto
+                    else:
+                        for j, nube in enumerate(e.confeti):
+                            fase = (t / SEGUNDOS_CONFETI + j / NUBES_CONFETI + k * 0.21) % 1.0
+                            nube.y = 0.4 + ALTO_CONFETI * (1.0 - fase)
+                            nube.scale = max(0.001, min(1.0, 8.0 * fase, 8.0 * (1.0 - fase)))
+                            nube.rotation_y = 25.0 * math.sin(t * 0.6 + j * 2.0)
 
         def _repartir(self, x, z):
             animando = False
@@ -688,7 +894,7 @@ def crear_controlador(escena, atmosfera=True, capas=True):
                 movio = self._pos_capas is None or math.hypot(x - self._pos_capas[0], z - self._pos_capas[1]) >= MOVIMIENTO_CAPAS
                 version = ambiente_vivo.version()
                 if movio or version != self._version_capas or self._animando:
-                    self._cantidades = cv.cantidades(amb)
+                    self._cantidades = cv.cantidades(amb, ambiente_vivo.etapa() if self.con_etapas else None)
                     self._pos_capas, self._version_capas = (x, z), version
                     self._repartir(x, z)
             if self._animando:
@@ -696,6 +902,8 @@ def crear_controlador(escena, atmosfera=True, capas=True):
                 for _, grupo in self.grupos.values():
                     animando = grupo.avanzar(dt) or animando
                 self._animando = animando
+            if self._grupos_etapa:
+                self._animar_etapa(dt)
 
         # -- Informe (pruebas y depuración) --
 

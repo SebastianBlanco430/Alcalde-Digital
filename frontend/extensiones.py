@@ -20,6 +20,7 @@ MODULOS = (
     "frontend.registro_dilemas",           # plan final 7: dilemas jugables (mensaje en el teléfono, tecla K, panel modal)
     "frontend.registro_minijuegos",         # minijuegos de verificar (6 pantallas distintas; ALCALDE_MINIJUEGOS=0 las apaga)
     "frontend.registro_ciudad_viva",       # plan final 5: la ciudad cambia de aspecto con los indicadores (luz, cielo, niebla, basura, flores...)
+    "frontend.registro_etapas_final",      # finales por etapas: medidor, fuego/fiesta, NPC, tinte y música según el índice (-3..+3)
 )
 
 

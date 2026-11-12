@@ -47,7 +47,7 @@
 import os
 import sys
 
-from backend.logica import ambiente_ciudad, confianza_misiones, costo_aislamiento, efectos_retardados, reloj_partida
+from backend.logica import ambiente_ciudad, confianza_misiones, costo_aislamiento, efectos_retardados, etapas_final, reloj_partida
 from backend.logica.estado_partida import NOMBRES_INDICADORES
 from backend.logica.misiones import SIN_MISION
 
@@ -57,7 +57,8 @@ FINAL_PONDERADO = True  # el final con GameState mezcla confianza por grupo e in
 PESO_CIUDAD = 0.5       # peso del índice de la ciudad en el final ponderado (0 = solo grupos, como antes)
 
 _PROPIOS = ("_flujo", "reloj", "cola_efectos", "aislamiento", "ambiente_suave", "avisos_retardados",
-            "ultimo_aviso_retardado")
+            "ultimo_aviso_retardado", "_indice_etapas", "_t_indice_etapas", "_etapa_vista")
+PERIODO_INDICE_ETAPAS = 0.5     # s reales entre dos lecturas del índice para el ambiente (finales por etapas)
 
 
 # Final a partir de los TRES indicadores de la ciudad, para partidas sin GameState (sin confianza por grupo). Reglas
@@ -131,6 +132,9 @@ class FlujoConTiempo:
         self.ambiente_suave = ambiente_ciudad.AmbienteSuave()
         self.avisos_retardados = []
         self.ultimo_aviso_retardado = None
+        self._indice_etapas = None          # último índice leído para el ambiente (finales por etapas)
+        self._t_indice_etapas = 0.0
+        self._etapa_vista = None            # última etapa (con histéresis) que se vio durante la partida
 
     # -- Tiempo --
 
@@ -206,7 +210,29 @@ class FlujoConTiempo:
             return self.ambiente_suave.ambiente()
         game_state = self._game_state()
         confianzas = game_state.confianzas() if game_state is not None else None
-        return self.ambiente_suave.actualizar(dt, estado.indicadores(), confianzas)
+        if not etapas_final.activo():
+            return self.ambiente_suave.actualizar(dt, estado.indicadores(), confianzas)
+        return self.ambiente_suave.actualizar(dt, estado.indicadores(), confianzas, indice=self._leer_indice_etapas(dt))
+
+    # Finales por etapas: el índice (el real o el forzado) que mueve la salud del ambiente, leído como mucho cada
+    # PERIODO_INDICE_ETAPAS s, y la etapa con histéresis que se lleva vista (la usa el final).
+    def _leer_indice_etapas(self, dt):
+        self._t_indice_etapas -= dt
+        if self._indice_etapas is None or self._t_indice_etapas <= 0:
+            self._t_indice_etapas = PERIODO_INDICE_ETAPAS
+            self._indice_etapas = etapas_final.indice_de_flujo(self)
+            if self._indice_etapas is not None:
+                self._etapa_vista = etapas_final.etapa_de_indice(self._indice_etapas, self._etapa_vista)
+        return self._indice_etapas
+
+    # Con las etapas activas el final lo decide la ETAPA del índice (el forzado, si lo hay), no los umbrales de siempre ni
+    # la regla del grupo crítico. Añade "etapa" al dict.
+    def _final_por_etapa(self, final):
+        if not etapas_final.activo():
+            return final
+        forzado = etapas_final.indice_forzado()
+        etapa = etapas_final.etapa_de_indice(final["indice"] if forzado is None else forzado, self._etapa_vista)
+        return dict(final, final=etapas_final.final_de_etapa(etapa), etapa=etapa)
 
     # -- Misiones: programar la consecuencia y contar la participación --
 
@@ -270,7 +296,7 @@ class FlujoConTiempo:
         estado = self._estado_partida()
         if estado is not None and final_ponderado_activo():
             final = ponderar_final(final, estado.indicadores())
-        return dict(final, **self._datos_fin())
+        return dict(self._final_por_etapa(final), **self._datos_fin())
 
     def resumen_final(self):
         final = self.final_partida()
@@ -280,7 +306,7 @@ class FlujoConTiempo:
         indicadores = estado.indicadores() if estado is not None else {n: 50 for n in NOMBRES_INDICADORES}
         pasadas = getattr(self._flujo, "misiones_pasadas", lambda: [])()
         falladas = getattr(self._flujo, "misiones_falladas", lambda: [])()
-        return dict(evaluar_final_indicadores(indicadores, len(pasadas), len(falladas)), **self._datos_fin())
+        return dict(self._final_por_etapa(evaluar_final_indicadores(indicadores, len(pasadas), len(falladas))), **self._datos_fin())
 
     # -- Guardado --
 

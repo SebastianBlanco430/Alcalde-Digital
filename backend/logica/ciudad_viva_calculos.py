@@ -17,6 +17,7 @@ from types import SimpleNamespace
 from typing import NamedTuple
 
 from backend.logica import ambiente_ciudad as ac
+from backend.logica import etapas_final
 from backend.logica.azar_fijo import azar_de
 
 # -- Luz, cielo y niebla ----------------------------------------------------------------------------------------------
@@ -110,8 +111,10 @@ def cambio_apreciable(a, b, tol_color=1.0, tol_fin=1.0, tol_fuerza=0.01):
 CAPAS = ("basura", "grafitis", "carteles", "flores", "marchitas", "guirnaldas", "apagados", "bancos", "corros")
 
 
-def cantidades(amb):
+def cantidades(amb, etapa=None):
     """Fracción (0..1) de los sitios de cada capa que deben estar «encendidos» con ese Ambiente. Continuo en el Ambiente.
+    Con `etapa` (finales por etapas, -3..+3) se añaden las capas que dependen de la ETAPA y no de la salud:
+    fuego, rodadores y fiesta (backend/logica/etapas_final.cantidades_etapa). Sin `etapa`, el dict de siempre.
       basura       bolsas, papeles y cajas en aceras y plazas                      (limpieza baja)
       grafitis     pintadas en las paredes de las calles                          (limpieza baja)
       carteles     carteles torcidos de «sin conexión»                            (salud baja)
@@ -124,7 +127,9 @@ def cantidades(amb):
     s = _recortar(amb.salud)
     limpieza = ac.limpieza(amb)
     actividad = ac.actividad_plazas(amb)
+    por_etapa = {} if etapa is None else etapas_final.cantidades_etapa(etapa)
     return {
+        **por_etapa,
         "basura": suave(limpieza, 0.62, 0.12),
         "grafitis": suave(limpieza, 0.45, 0.05),
         "carteles": suave(s, 0.35, 0.05),

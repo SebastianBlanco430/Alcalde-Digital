@@ -25,12 +25,17 @@ import os
 import sys
 
 from backend.logica import ambiente_ciudad as ac
+from backend.logica import etapas_final
 
 _suave = ac.AmbienteSuave()
 _sesion = None              # la sesión con la que se alimentó por última vez (otra partida = se fija sin interpolar)
 _flujo = None
 _version = 0
 _avisado = False
+_etapa = 0                  # etapa de los finales por etapas (-3..+3); la fija frontend/etapas_final_vista.py
+_indice = None              # último índice leído (finales por etapas)
+_t_indice = 0.0             # s que faltan para volver a leerlo
+PERIODO_INDICE = 0.5
 
 
 def obtener():
@@ -106,6 +111,34 @@ def leer_fuentes(escena_mundo):
     return indicadores, confianzas
 
 
+def _leer_indice(dt, flujo, nuevo):
+    """Índice de los finales por etapas (None con la bandera apagada o sin resumen): se relee como mucho cada 0,5 s."""
+    global _indice, _t_indice
+    if not etapas_final.activo():
+        _indice = None
+        return None
+    _t_indice -= dt
+    if nuevo or _t_indice <= 0:
+        _t_indice = PERIODO_INDICE
+        _indice = etapas_final.indice_de_flujo(flujo)
+    return _indice
+
+
+def etapa():
+    """Etapa vigente de los finales por etapas (-3..+3; 0 = la ciudad de siempre)."""
+    return _etapa
+
+
+def fijar_etapa(e):
+    """Cambia la etapa; si cambia de verdad sube la versión para que ciudad_viva reparta de nuevo sus capas."""
+    global _etapa, _version
+    e = max(etapas_final.ETAPA_MIN, min(etapas_final.ETAPA_MAX, int(e)))
+    if e != _etapa:
+        _etapa = e
+        _version += 1
+    return _etapa
+
+
 def alimentar(dt, escena_mundo):
     """Un paso de `dt` s reales con la partida de `escena_mundo`. Devuelve el Ambiente. Nunca lanza: si la lectura falla
     avisa una vez por stderr y deja el ambiente como estaba."""
@@ -116,14 +149,16 @@ def alimentar(dt, escena_mundo):
         if indicadores is None:
             return _suave.ambiente()
         fijos = indicadores_fijos()
-        if fijos is not None:
-            indicadores, confianzas = fijos, None
         sesion = getattr(escena_mundo, "_sesion", None)
+        indice = _leer_indice(max(0.0, float(dt)), _flujo, sesion is not _sesion)
+        if fijos is not None:                     # indicadores fijos de depuración: mandan salvo que se fuerce el índice
+            indicadores, confianzas = fijos, None
+            indice = etapas_final.indice_forzado() if etapas_final.activo() else None
         if sesion is not _sesion:                 # otra partida (o carga de guardado): empieza en su valor real
             _sesion = sesion
-            _suave.fijar(indicadores, confianzas)
+            _suave.fijar(indicadores, confianzas, indice)
         else:
-            _suave.actualizar(max(0.0, float(dt)), indicadores, confianzas)
+            _suave.actualizar(max(0.0, float(dt)), indicadores, confianzas, indice)
         _version += 1
     except Exception as error:
         if not _avisado:
@@ -141,8 +176,11 @@ def fijar(indicadores, confianzas=None):
 
 def reiniciar():
     """Vuelve al estado de arranque (pruebas)."""
-    global _suave, _sesion, _flujo, _version, _avisado
+    global _suave, _sesion, _flujo, _version, _avisado, _etapa, _indice, _t_indice
     _suave = ac.AmbienteSuave()
     _sesion = _flujo = None
     _version = 0
     _avisado = False
+    _etapa = 0
+    _indice = None
+    _t_indice = 0.0

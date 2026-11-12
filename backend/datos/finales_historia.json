@@ -1,0 +1,229 @@
+{
+  "_nota": "Textos y datos de los finales por etapas (docs/PLAN_FINALES_HISTORIA.md). Se edita sin tocar código: backend/logica/etapas_final.py lo carga. Los candidatos son ficticios.",
+  "candidatos": {
+    "actual": {"nombre": "Octavio Ruedas", "partido": "Partido de la Tradición", "papel": "alcalde actual"},
+    "aspirante": {"nombre": "Tomás Arenas", "partido": "independiente", "papel": "aspirante"}
+  },
+  "medidor": {"titulo": "Confianza de Ciudad Nova"},
+  "etapas": {
+    "-3": {"nombre": "Ciudad en crisis III", "aviso": "La ciudad está al borde del colapso. Casi nadie sale a la calle."},
+    "-2": {"nombre": "Ciudad en crisis II", "aviso": "El miedo se toma las calles. Cada rumor compartido lo empeora."},
+    "-1": {"nombre": "Ciudad en crisis I", "aviso": "Algo se rompe en Ciudad Nova: hay fuego en las esquinas."},
+    "0": {"nombre": "Ciudad en vilo", "aviso": "Ciudad Nova vuelve a la calma tensa de siempre."},
+    "1": {"nombre": "Ciudad que florece I", "aviso": "Los vecinos vuelven a la calle: Ciudad Nova empieza a florecer."},
+    "2": {"nombre": "Ciudad que florece II", "aviso": "La plaza se llena de gente. Un aspirante camina entre los vecinos."},
+    "3": {"nombre": "Ciudad que florece III", "aviso": "¡Fiesta en Ciudad Nova! La confianza se celebra en la calle."}
+  },
+  "tinte": {
+    "-2": [0.55, 0.40, 0.20, 0.12],
+    "-3": [0.65, 0.20, 0.10, 0.20],
+    "3": [0.55, 0.75, 1.0, 0.10]
+  },
+  "vineta": {"-3": 0.45},
+  "npc_por_etapa": {
+    "-3": ["jibaro", "extorsionador", "raponero"],
+    "-2": ["jibaro", "extorsionador", "raponero"],
+    "-1": ["jibaro", "extorsionador", "raponero"],
+    "0": [],
+    "1": ["florista", "panadero", "escobita"],
+    "2": ["florista", "panadero", "escobita", "arenas"],
+    "3": ["florista", "panadero", "escobita", "arenas", "musico"]
+  },
+  "npc": {
+    "jibaro": {
+      "nombre": "Jíbaro", "bando": "malo", "modelo": 1, "color": [44, 46, 58], "prop": "capucha",
+      "frases": ["Aquí nadie pregunta nada. Siga derecho.", "Cuando nadie confía en nadie, a mí me va bien.", "¿Usted vio algo? Yo tampoco."]
+    },
+    "extorsionador": {
+      "nombre": "Extorsionador", "bando": "malo", "modelo": 2, "color": [70, 40, 44], "prop": "capucha",
+      "frases": ["La cuota de esta cuadra subió. Avísele a los vecinos.", "Nadie va a venir a ayudarlos: ya no se creen ni entre ustedes.", "Paga la tienda, paga la panadería. Así es ahora."]
+    },
+    "raponero": {
+      "nombre": "Raponero", "bando": "malo", "modelo": 0, "color": [52, 58, 50], "prop": "capucha",
+      "frases": ["Bonito celular… guárdelo bien.", "Con las calles vacías todo es más fácil.", "No me mire tanto."]
+    },
+    "florista": {
+      "nombre": "Florista", "bando": "bueno", "modelo": 3, "color": [214, 70, 160], "prop": "canasta",
+      "frases": ["¡Flores frescas! Hace rato no vendía tantas.", "Con la calle tranquila, vuelvo a sacar el puesto.", "Llévele una a quien le contó la verdad."]
+    },
+    "panadero": {
+      "nombre": "Panadero", "bando": "bueno", "modelo": 5, "color": [240, 240, 232], "prop": "bandeja",
+      "frases": ["¡Pan caliente! Hoy fío, que hay confianza.", "Ya nadie llega con cuentos raros a la panadería.", "Buen día, vecino. ¿Lo de siempre?"]
+    },
+    "escobita": {
+      "nombre": "Escobita", "bando": "bueno", "modelo": 6, "color": [250, 140, 60], "prop": "escoba",
+      "frases": ["Da gusto barrer una calle que la gente cuida.", "Menos basura, menos rumores. Así sí.", "Buenos días. Cuidado, que está recién barrido."]
+    },
+    "musico": {
+      "nombre": "Músico", "bando": "bueno", "modelo": 7, "color": [60, 120, 190], "prop": "guitarra",
+      "frases": ["¡Esta va por Ciudad Nova!", "Hacía años no tocaba en la calle.", "Pida una canción, que hoy es fiesta."]
+    },
+    "arenas": {
+      "nombre": "Tomás Arenas", "bando": "bueno", "modelo": 4, "color": [44, 138, 214], "prop": "banda",
+      "frases": ["¡Gracias por informarte antes de compartir!", "Una ciudad que verifica es una ciudad que decide mejor.", "No me crean a mí: pregunten, comparen, revisen.", "Gracias por escuchar a sus vecinos antes que al rumor."]
+    }
+  },
+  "cinematicas": {
+    "saltar": "Saltar",
+    "continuar": "Continuar",
+    "malo": [
+      {
+        "fondo": [70, 62, 60], "titulo": "Octavio Ruedas, reelegido",
+        "texto": "El Partido de la Tradición gana otra vez. Entre rumores y miedo, casi nadie fue a votar.",
+        "sonido": "mision_fallo",
+        "figuras": [
+          {"tipo": "suelo", "color": [48, 44, 46]},
+          {"tipo": "periodico", "x": 0.0, "y": 0.02, "titular": "RUEDAS, REELEGIDO", "bajada": "Cuatro años más de lo mismo"},
+          {"tipo": "persona", "x": -0.52, "y": 0.0, "alto": 0.20, "color": [40, 40, 52]},
+          {"tipo": "persona", "x": 0.54, "y": 0.0, "alto": 0.19, "color": [52, 44, 48]}
+        ]
+      },
+      {
+        "fondo": [96, 52, 40], "titulo": "Las calles arden",
+        "texto": "Cada cadena reenviada sin revisar fue una chispa. Ahora nadie sabe a quién creerle.",
+        "figuras": [
+          {"tipo": "suelo", "color": [44, 36, 38]},
+          {"tipo": "edificio", "x": -0.52, "ancho": 0.20, "alto": 0.30, "color": [58, 46, 50], "luz": false},
+          {"tipo": "edificio", "x": -0.22, "ancho": 0.16, "alto": 0.22, "color": [66, 50, 50], "luz": false},
+          {"tipo": "edificio", "x": 0.30, "ancho": 0.22, "alto": 0.34, "color": [54, 44, 50], "luz": false},
+          {"tipo": "edificio", "x": 0.58, "ancho": 0.14, "alto": 0.20, "color": [66, 50, 50], "luz": false},
+          {"tipo": "humo", "x": -0.36, "y": 0.26, "escala": 0.10},
+          {"tipo": "humo", "x": 0.10, "y": 0.22, "escala": 0.12},
+          {"tipo": "fuego", "x": -0.36, "y": 0.0, "alto": 0.16},
+          {"tipo": "fuego", "x": 0.06, "y": 0.0, "alto": 0.20},
+          {"tipo": "fuego", "x": 0.46, "y": 0.0, "alto": 0.13}
+        ]
+      },
+      {
+        "fondo": [84, 66, 70], "titulo": "La plaza protesta",
+        "texto": "Los vecinos salen con pancartas. Piden respuestas, pero ya no se ponen de acuerdo ni en las preguntas.",
+        "figuras": [
+          {"tipo": "suelo", "color": [50, 46, 52]},
+          {"tipo": "edificio", "x": 0.0, "ancho": 0.34, "alto": 0.26, "color": [62, 54, 62], "luz": false},
+          {"tipo": "persona", "x": -0.50, "y": 0.0, "alto": 0.20, "color": [40, 40, 52]},
+          {"tipo": "pancarta", "x": -0.50, "y": 0.22, "giro": -6},
+          {"tipo": "persona", "x": -0.30, "y": 0.0, "alto": 0.18, "color": [56, 46, 52]},
+          {"tipo": "persona", "x": -0.12, "y": 0.0, "alto": 0.21, "color": [44, 48, 60]},
+          {"tipo": "pancarta", "x": -0.12, "y": 0.23, "giro": 5},
+          {"tipo": "persona", "x": 0.10, "y": 0.0, "alto": 0.19, "color": [60, 44, 46]},
+          {"tipo": "persona", "x": 0.30, "y": 0.0, "alto": 0.20, "color": [40, 44, 50]},
+          {"tipo": "pancarta", "x": 0.30, "y": 0.22, "giro": -4},
+          {"tipo": "persona", "x": 0.50, "y": 0.0, "alto": 0.18, "color": [52, 50, 60]}
+        ]
+      },
+      {
+        "fondo": [58, 58, 70], "titulo": "Las protestas no cambiaron nada",
+        "texto": "La plaza quedó vacía. Las pancartas, en el suelo. El despacho del alcalde, con la luz de siempre.",
+        "figuras": [
+          {"tipo": "suelo", "color": [44, 44, 54]},
+          {"tipo": "edificio", "x": 0.0, "ancho": 0.34, "alto": 0.26, "color": [52, 50, 62], "luz": true},
+          {"tipo": "pancarta", "x": -0.44, "y": 0.012, "giro": 82, "caida": true},
+          {"tipo": "pancarta", "x": -0.16, "y": 0.012, "giro": 96, "caida": true},
+          {"tipo": "pancarta", "x": 0.36, "y": 0.012, "giro": 88, "caida": true}
+        ]
+      },
+      {
+        "fondo": [40, 40, 56], "titulo": "Compartir sin verificar también decide",
+        "texto": "Un ciudadano, una influencer y un detective miran la ciudad apagada. Cada rumor que dejaron pasar pesó en este resultado. La próxima vez: revisar antes de reenviar.",
+        "figuras": [
+          {"tipo": "suelo", "color": [30, 30, 42]},
+          {"tipo": "luna", "x": 0.50, "y": 0.30, "color": [200, 205, 225]},
+          {"tipo": "edificio", "x": -0.56, "ancho": 0.14, "alto": 0.16, "color": [50, 50, 68], "luz": false, "lejos": true},
+          {"tipo": "edificio", "x": -0.36, "ancho": 0.12, "alto": 0.22, "color": [54, 54, 72], "luz": false, "lejos": true},
+          {"tipo": "edificio", "x": 0.26, "ancho": 0.16, "alto": 0.18, "color": [50, 50, 68], "luz": false, "lejos": true},
+          {"tipo": "persona", "x": -0.14, "y": -0.03, "alto": 0.24, "color": [24, 24, 36]},
+          {"tipo": "persona", "x": 0.0, "y": -0.03, "alto": 0.26, "color": [24, 24, 36]},
+          {"tipo": "persona", "x": 0.14, "y": -0.03, "alto": 0.23, "color": [24, 24, 36]}
+        ]
+      }
+    ],
+    "bueno": [
+      {
+        "fondo": [120, 190, 235], "titulo": "Tomás Arenas gana la alcaldía",
+        "texto": "Un aspirante independiente, casi desconocido hace una semana. Ganó donde la gente se informó antes de votar.",
+        "sonido": "mision_exito",
+        "figuras": [
+          {"tipo": "suelo", "color": [96, 170, 110]},
+          {"tipo": "periodico", "x": 0.0, "y": 0.02, "titular": "ARENAS GANA LA ALCALDÍA", "bajada": "Ciudad Nova votó informada"},
+          {"tipo": "persona", "x": -0.52, "y": 0.0, "alto": 0.20, "color": [214, 80, 70]},
+          {"tipo": "persona", "x": 0.54, "y": 0.0, "alto": 0.19, "color": [60, 120, 190]}
+        ]
+      },
+      {
+        "fondo": [70, 80, 120], "titulo": "La vieja maquinaria se queda a oscuras",
+        "texto": "En la sede del Partido de la Tradición se apagan las luces. Los rumores ya no encuentran quién los reenvíe.",
+        "figuras": [
+          {"tipo": "suelo", "color": [60, 66, 92]},
+          {"tipo": "luna", "x": -0.50, "y": 0.30, "color": [235, 235, 215]},
+          {"tipo": "edificio", "x": 0.0, "ancho": 0.40, "alto": 0.30, "color": [58, 60, 84], "luz": false, "rotulo": "PARTIDO DE LA TRADICIÓN"},
+          {"tipo": "edificio", "x": -0.48, "ancho": 0.16, "alto": 0.18, "color": [84, 92, 130], "luz": true},
+          {"tipo": "edificio", "x": 0.50, "ancho": 0.18, "alto": 0.22, "color": [84, 92, 130], "luz": true}
+        ]
+      },
+      {
+        "fondo": [150, 210, 240], "titulo": "Calles limpias",
+        "texto": "Vuelven las floristas y los panaderos. Los vecinos barren juntos lo que dejó la semana.",
+        "figuras": [
+          {"tipo": "suelo", "color": [110, 180, 116]},
+          {"tipo": "sol", "x": 0.52, "y": 0.30, "color": [245, 196, 40]},
+          {"tipo": "edificio", "x": -0.50, "ancho": 0.20, "alto": 0.26, "color": [240, 150, 90], "luz": true},
+          {"tipo": "edificio", "x": 0.42, "ancho": 0.22, "alto": 0.22, "color": [110, 170, 220], "luz": true},
+          {"tipo": "persona", "x": -0.22, "y": 0.0, "alto": 0.20, "color": [214, 70, 160]},
+          {"tipo": "flor", "x": -0.14, "y": 0.0},
+          {"tipo": "flor", "x": -0.09, "y": 0.0},
+          {"tipo": "flor", "x": -0.04, "y": 0.0},
+          {"tipo": "persona", "x": 0.16, "y": 0.0, "alto": 0.21, "color": [240, 240, 232]},
+          {"tipo": "flor", "x": 0.62, "y": 0.0}
+        ]
+      },
+      {
+        "fondo": [130, 200, 240], "titulo": "Música en la calle",
+        "texto": "Los músicos salen a tocar y los banderines cruzan de farol a farol.",
+        "figuras": [
+          {"tipo": "suelo", "color": [110, 180, 116]},
+          {"tipo": "banderines", "x": -0.66, "x1": 0.66, "y": 0.36},
+          {"tipo": "edificio", "x": -0.54, "ancho": 0.18, "alto": 0.24, "color": [240, 200, 70], "luz": true},
+          {"tipo": "edificio", "x": 0.54, "ancho": 0.18, "alto": 0.26, "color": [214, 80, 70], "luz": true},
+          {"tipo": "persona", "x": -0.18, "y": 0.0, "alto": 0.21, "color": [60, 120, 190]},
+          {"tipo": "nota", "x": -0.10, "y": 0.24},
+          {"tipo": "persona", "x": 0.02, "y": 0.0, "alto": 0.20, "color": [90, 160, 100]},
+          {"tipo": "nota", "x": 0.10, "y": 0.28},
+          {"tipo": "persona", "x": 0.22, "y": 0.0, "alto": 0.22, "color": [180, 90, 170]},
+          {"tipo": "nota", "x": 0.30, "y": 0.23}
+        ]
+      },
+      {
+        "fondo": [110, 185, 240], "titulo": "Fiesta en la plaza",
+        "texto": "Arenas sube al podio y lo primero que hace es dar las gracias: «Esta alcaldía la ganó la gente que pregunta».",
+        "sonido": "mision_exito",
+        "figuras": [
+          {"tipo": "suelo", "color": [110, 180, 116]},
+          {"tipo": "banderines", "x": -0.66, "x1": 0.66, "y": 0.38},
+          {"tipo": "confeti"},
+          {"tipo": "podio", "x": 0.0, "y": 0.0},
+          {"tipo": "persona", "x": 0.0, "y": 0.07, "alto": 0.20, "color": [44, 138, 214]},
+          {"tipo": "persona", "x": -0.56, "y": 0.0, "alto": 0.18, "color": [214, 80, 70]},
+          {"tipo": "persona", "x": -0.40, "y": 0.0, "alto": 0.20, "color": [240, 200, 70]},
+          {"tipo": "persona", "x": -0.24, "y": 0.0, "alto": 0.19, "color": [90, 160, 100]},
+          {"tipo": "persona", "x": 0.24, "y": 0.0, "alto": 0.20, "color": [180, 90, 170]},
+          {"tipo": "persona", "x": 0.40, "y": 0.0, "alto": 0.18, "color": [240, 140, 60]},
+          {"tipo": "persona", "x": 0.56, "y": 0.0, "alto": 0.20, "color": [240, 240, 235]}
+        ]
+      },
+      {
+        "fondo": [140, 205, 240], "titulo": "Informarse también decide",
+        "texto": "El ciudadano, la influencer y el detective, juntos frente a una ciudad encendida. Preguntar, comparar y verificar antes de compartir: así se cuida una ciudad.",
+        "figuras": [
+          {"tipo": "suelo", "color": [96, 170, 110]},
+          {"tipo": "sol", "x": -0.50, "y": 0.30, "color": [245, 196, 40]},
+          {"tipo": "edificio", "x": -0.50, "ancho": 0.14, "alto": 0.16, "color": [240, 150, 90], "luz": true, "lejos": true},
+          {"tipo": "edificio", "x": 0.30, "ancho": 0.16, "alto": 0.20, "color": [110, 170, 220], "luz": true, "lejos": true},
+          {"tipo": "edificio", "x": 0.52, "ancho": 0.12, "alto": 0.14, "color": [240, 200, 70], "luz": true, "lejos": true},
+          {"tipo": "persona", "x": -0.14, "y": -0.03, "alto": 0.24, "color": [214, 80, 70]},
+          {"tipo": "persona", "x": 0.0, "y": -0.03, "alto": 0.26, "color": [240, 200, 70]},
+          {"tipo": "persona", "x": 0.14, "y": -0.03, "alto": 0.23, "color": [60, 120, 190]}
+        ]
+      }
+    ]
+  }
+}

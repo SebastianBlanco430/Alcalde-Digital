@@ -138,12 +138,17 @@ def nivel_con_histeresis(salud, nivel_anterior=None):
     return nivel_de_salud(salud)
 
 
-def calcular_ambiente(indicadores, confianzas=None, nivel_anterior=None):
-    """El Ambiente de esos indicadores. `nivel_anterior` activa la histéresis del nivel (pásale amb.nivel del anterior)."""
+def calcular_ambiente(indicadores, confianzas=None, nivel_anterior=None, indice=None):
+    """El Ambiente de esos indicadores. `nivel_anterior` activa la histéresis del nivel (pásale amb.nivel del anterior).
+    `indice` (0-100, el índice del final; finales por etapas): si se da, la salud es indice / 100 en vez de salir de
+    bienestar - conflictos; el resto se calcula igual. Sin `indice`, todo exactamente como siempre."""
     ind = _leer_indicadores(indicadores)
     derivados = derivar(ind, confianzas)
     bienestar, conflictos = derivados["bienestar"], derivados["conflictos"]
-    salud = _recortar((bienestar - conflictos + 100.0) / 200.0)
+    if indice is None:
+        salud = _recortar((bienestar - conflictos + 100.0) / 200.0)
+    else:
+        salud = _recortar(float(indice) / 100.0)
     sociabilidad = 0.02 + 0.90 * salud ** 1.5
     neutro = 0.06 + 0.30 * (1.0 - abs(2.0 * salud - 1.0))
     resto = max(0.0, 1.0 - sociabilidad - neutro)
@@ -263,6 +268,15 @@ def ambiente_a_dict(amb):
 #
 # La PRIMERA llamada a actualizar() fija los valores sin interpolar (no hay «antes» desde el que venir). Si la partida
 # gana o pierde el GameState a mitad (no pasa en el juego), las confianzas se fijan de golpe esa vez.
+def _leer_indice(indice):
+    """Índice 0-100 validado (None = sin índice)."""
+    if indice is None:
+        return None
+    if isinstance(indice, bool) or not isinstance(indice, (int, float)) or not math.isfinite(indice):
+        raise ValueError(f"índice inválido: {indice!r}; se esperaba un número entre 0 y 100.")
+    return _recortar(float(indice), 0.0, 100.0)
+
+
 class AmbienteSuave:
 
     def __init__(self, tau=TAU_SEGUNDOS):
@@ -271,6 +285,7 @@ class AmbienteSuave:
         self._tau = float(tau)
         self._indicadores = None        # {indicador: valor suavizado} o None antes de la primera actualización
         self._confianzas = None         # {grupo: valor suavizado} o None sin GameState
+        self._indice = None             # índice 0-100 suavizado (finales por etapas) o None = salud de siempre
         self._ambiente = AMBIENTE_INICIAL
 
     def ambiente(self):
@@ -284,18 +299,20 @@ class AmbienteSuave:
         return {"indicadores": dict(self._indicadores) if self._indicadores is not None else None,
                 "confianzas": dict(self._confianzas) if self._confianzas is not None else None}
 
-    def fijar(self, indicadores, confianzas=None):
+    def fijar(self, indicadores, confianzas=None, indice=None):
         self._indicadores = _leer_indicadores(indicadores)
         self._confianzas = _leer_confianzas(confianzas)
-        self._ambiente = calcular_ambiente(self._indicadores, self._confianzas)
+        self._indice = _leer_indice(indice)
+        self._ambiente = calcular_ambiente(self._indicadores, self._confianzas, indice=self._indice)
         return self._ambiente
 
-    def actualizar(self, dt, indicadores, confianzas=None):
+    def actualizar(self, dt, indicadores, confianzas=None, indice=None):
         if isinstance(dt, bool) or not isinstance(dt, (int, float)) or not math.isfinite(dt) or dt < 0:
             raise ValueError(f"dt inválido: {dt!r}; se esperaba un número de segundos >= 0.")
         objetivo, objetivo_grupos = _leer_indicadores(indicadores), _leer_confianzas(confianzas)
+        objetivo_indice = _leer_indice(indice)
         if self._indicadores is None:
-            return self.fijar(objetivo, objetivo_grupos)
+            return self.fijar(objetivo, objetivo_grupos, objetivo_indice)
         paso = 1.0 - math.exp(-min(float(dt), DT_MAX) / self._tau)
         for nombre in NOMBRES_INDICADORES:
             self._indicadores[nombre] += (objetivo[nombre] - self._indicadores[nombre]) * paso
@@ -304,7 +321,11 @@ class AmbienteSuave:
         else:
             for grupo in GRUPOS:
                 self._confianzas[grupo] += (objetivo_grupos[grupo] - self._confianzas[grupo]) * paso
-        self._ambiente = calcular_ambiente(self._indicadores, self._confianzas, self._ambiente.nivel)
+        if objetivo_indice is None or self._indice is None:      # aparece o desaparece el índice: se fija de golpe esa vez
+            self._indice = objetivo_indice
+        else:
+            self._indice += (objetivo_indice - self._indice) * paso
+        self._ambiente = calcular_ambiente(self._indicadores, self._confianzas, self._ambiente.nivel, indice=self._indice)
         return self._ambiente
 
     # -- Serialización (JSON) --

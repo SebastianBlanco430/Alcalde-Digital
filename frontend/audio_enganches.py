@@ -28,6 +28,10 @@ PERFIL_ESCENA = {
     INTERIOR: ("musica_interior", 0.7, None, 0.0),
     JUEGO: ("musica_interior", 0.6, None, 0.0),
 }
+# Finales por etapas (backend/logica/etapas_final.py): la etapa cambia la música y el ambiente del MUNDO. None = el de siempre.
+BUCLES_AMBIENTE = ("ambiente_favela", "ambiente_plaza", "ambiente_caos")
+_perfil_mundo_etapa = None      # {"musica", "volumen_musica", "bucles": {nombre: volumen}} o None
+_motor = None                   # el EnganchesAudio instalado (para aplicar el cambio de etapa al instante)
 VARIACION_PITCH = (1.0, 1.05, 0.96, 1.03, 0.93, 1.07)       # los pasos y clics no suenan idénticos
 ESPERA_HOVER = 0.06          # s mínimos entre dos «hover»
 FUNDIDO_MUSICA = 1.4
@@ -56,6 +60,7 @@ class EnganchesAudio:
         self._indice_pitch = 0
         self._ajustes = None
         self._reloj = None
+        self._bucles_puestos = set()      # bucles de ambiente que este observador ha encendido
 
     # -- Un frame --
 
@@ -77,15 +82,26 @@ class EnganchesAudio:
     def _cambio_de_escena(self, nombre):
         anterior = self._escena
         self._escena = nombre
-        musica, vol_musica, ambiente, vol_ambiente = PERFIL_ESCENA.get(nombre, (None, 0.0, None, 0.0))
-        self.audio.musica(musica, volumen=vol_musica, fundido=FUNDIDO_MUSICA)
-        for bucle in ("ambiente_favela",):
-            if bucle == ambiente:
-                self.audio.bucle(bucle, vol_ambiente, 1.0, fundido=2.0)
-            else:
-                self.audio.parar_bucle(bucle, fundido=1.0)
+        self._aplicar_perfil(nombre)
         if anterior == MUNDO:
             self._soltar_movimiento()
+
+    # Música y bucles de ambiente de la escena `nombre`. En el MUNDO manda el perfil de la etapa si hay uno puesto
+    # (fijar_perfil_mundo_etapa): así al volver de un interior suena el de la etapa y no el de siempre.
+    def _aplicar_perfil(self, nombre):
+        musica, vol_musica, ambiente, vol_ambiente = PERFIL_ESCENA.get(nombre, (None, 0.0, None, 0.0))
+        bucles = {ambiente: vol_ambiente} if ambiente is not None else {}
+        if nombre == MUNDO and _perfil_mundo_etapa is not None:
+            musica, vol_musica = _perfil_mundo_etapa["musica"], _perfil_mundo_etapa["volumen_musica"]
+            bucles = _perfil_mundo_etapa["bucles"]
+        self.audio.musica(musica, volumen=vol_musica, fundido=FUNDIDO_MUSICA)
+        for bucle in BUCLES_AMBIENTE:
+            if bucle in bucles:
+                self.audio.bucle(bucle, bucles[bucle], 1.0, fundido=2.0)
+                self._bucles_puestos.add(bucle)
+            elif bucle == "ambiente_favela" or bucle in self._bucles_puestos:      # los de etapa solo se paran si se pusieron
+                self.audio.parar_bucle(bucle, fundido=1.0)
+                self._bucles_puestos.discard(bucle)
 
     def _soltar_movimiento(self):
         self.audio.parar_bucle("motor_moto", 0.3)
@@ -281,10 +297,31 @@ def _conectar_ajustes(audio):
         audio_modulo._avisar_una_vez("ajustes", f"no se pudo conectar Ajustes con el audio ({error}).")
 
 
+# Finales por etapas: fija el perfil de audio del MUNDO para esa etapa (música tensa, de fiesta, bucle de caos o de plaza;
+# backend/logica/etapas_final.perfil_audio) y, si el mundo es la escena activa, lo aplica ya con fundido. `None` (o la
+# etapa 0) vuelve al perfil de siempre. Nunca lanza.
+def fijar_perfil_mundo_etapa(etapa):
+    global _perfil_mundo_etapa
+    try:
+        from backend.logica import etapas_final
+        perfil = None if etapa is None else etapas_final.perfil_audio(etapa)
+        if perfil is not None and perfil == etapas_final.perfil_audio(0):
+            perfil = None
+        if perfil == _perfil_mundo_etapa:
+            return
+        _perfil_mundo_etapa = perfil
+        if _motor is not None and _motor._escena == MUNDO:
+            _motor._aplicar_perfil(MUNDO)
+    except Exception as error:
+        audio_modulo._avisar_una_vez("etapas", f"no se pudo cambiar el audio de la etapa ({error}).")
+
+
 def instalar(gestor, audio=None, suscribir_ajustes=True):
+    global _motor
     from ursina import Entity, mouse, time
 
     motor = EnganchesAudio(gestor, audio=audio, raton=mouse)
+    _motor = motor
 
     class _Reloj(Entity):
         def update(self):
