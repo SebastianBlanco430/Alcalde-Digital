@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "_nota": "Eventos de la bandeja de Civitas (tecla L). Los juega backend/logica/habitos_digitales.py. Mecánica común: el jugador MARCA los elementos del mensaje o de la foto (lo sospechoso de una estafa; lo que delata en una publicación) y luego DECIDE. Lo bien que marcó y lo que decidió tienen consecuencias en dinero, confianza, indicadores y avisos retardados. Hay mensajes legítimos: reportarlo todo también es un error. Los textos «explicacion» se ven al terminar, junto a cada elemento.",
+  "estafas": [
+    {
+      "id": "premio_pix",
+      "titulo": "¡Ganaste el sorteo del barrio!",
+      "remitente": "+55 21 98871-0417 (no está en tus contactos)",
+      "mensaje": "CIVITAS PREMIOS: ganaste R$ 500 en el sorteo del barrio. Para liberar el premio paga la tasa de R$ 15 por Pix antes de las 20:00 en civitas-premios.top/liberar",
+      "legitimo": false,
+      "monto": 15,
+      "etiquetas": {"seguir": "Pagar la tasa por Pix", "ignorar": "Ignorarlo", "reportar": "Reportarlo en Civitas"},
+      "elementos": [
+        {"id": "remitente", "texto": "Número que no tienes guardado", "sospechoso": true, "explicacion": "Un premio de verdad no llega de un número suelto: lo anuncia la organización por su canal de siempre."},
+        {"id": "dominio", "texto": "Enlace civitas-premios.top", "sospechoso": true, "explicacion": "No es la dirección de Civitas: copian el nombre y le cambian el final."},
+        {"id": "tasa", "texto": "Pagar para recibir un premio", "sospechoso": true, "explicacion": "Ningún premio te pide pagar antes. Esa tasa ES la estafa."},
+        {"id": "reloj", "texto": "«Antes de las 20:00»", "sospechoso": true, "explicacion": "La prisa es para que no lo pienses ni preguntes a nadie."},
+        {"id": "idioma", "texto": "Escrito en portugués", "sospechoso": false, "explicacion": "En Ciudad Nova todo el mundo escribe en portugués: eso no dice nada."}
+      ]
+    },
+    {
+      "id": "codigo_prima",
+      "titulo": "«¿Me pasas un código?»",
+      "remitente": "Prima Bia (pero el número no es el que tienes guardado)",
+      "mensaje": "Holaa primo!! Te mandé un código de 6 números por SMS sin querer ¿me lo pasas? Es urgente, porfa",
+      "legitimo": false,
+      "monto": 0,
+      "etiquetas": {"seguir": "Mandarle el código", "ignorar": "No contestar", "reportar": "Llamar a Bia y reportar el perfil"},
+      "elementos": [
+        {"id": "codigo", "texto": "Te pide un código que te llegó por SMS", "sospechoso": true, "explicacion": "Ese código es la llave de tu cuenta. Quien lo tiene, entra como si fueras tú."},
+        {"id": "numero", "texto": "El número no coincide con el de Bia", "sospechoso": true, "explicacion": "Usan la foto y el nombre de alguien que quieres. El número los delata."},
+        {"id": "urgencia", "texto": "«Es urgente»", "sospechoso": true, "explicacion": "La urgencia vuelve a aparecer: es para que no llames a confirmar."},
+        {"id": "emojis", "texto": "Usa muchos emojis", "sospechoso": false, "explicacion": "Bia también los usa. Los emojis no dicen si es ella: el número sí."}
+      ]
+    },
+    {
+      "id": "reunion_escuela",
+      "titulo": "Reunión en la escuela",
+      "remitente": "Escuela Barrio Esperanza (número guardado desde marzo)",
+      "mensaje": "Buenas tardes, familias. Reunión de padres el jueves a las 18:00 en el patio. Tema: el paseo de fin de año. No pedimos dinero ni datos por este medio.",
+      "legitimo": true,
+      "monto": 0,
+      "etiquetas": {"seguir": "Confirmar que vas", "ignorar": "No contestar", "reportar": "Reportarlo como estafa"},
+      "elementos": [
+        {"id": "guardado", "texto": "Número guardado desde hace meses", "sospechoso": false, "explicacion": "Es el canal de siempre de la escuela: eso da confianza."},
+        {"id": "sin_dinero", "texto": "Dice que no pide dinero ni datos", "sospechoso": false, "explicacion": "Un aviso real no te pide nada: solo informa."},
+        {"id": "fecha", "texto": "Fecha, hora y lugar concretos", "sospechoso": false, "explicacion": "Se puede comprobar en persona. Las estafas evitan los detalles verificables."}
+      ]
+    },
+    {
+      "id": "trabajo_likes",
+      "titulo": "Trabajo desde casa",
+      "remitente": "Recrutadora Jéssica (perfil creado hace 3 días)",
+      "mensaje": "VAGA URGENTE! Gana R$ 300 por día dando likes a videos desde casa. Solo paga R$ 10 de inscripción y empiezas HOY. Cupos limitados!!!",
+      "legitimo": false,
+      "monto": 10,
+      "etiquetas": {"seguir": "Pagar la inscripción", "ignorar": "Ignorarlo", "reportar": "Reportar el perfil"},
+      "elementos": [
+        {"id": "sueldo", "texto": "R$ 300 al día por dar likes", "sospechoso": true, "explicacion": "Demasiado bueno: nadie paga eso por un trabajo sin esfuerzo."},
+        {"id": "inscripcion", "texto": "Pagar para empezar a trabajar", "sospechoso": true, "explicacion": "Un trabajo de verdad te paga a ti. Si pagas para entrar, el negocio eres tú."},
+        {"id": "perfil", "texto": "Perfil creado hace 3 días", "sospechoso": true, "explicacion": "Las cuentas nuevas sin historia son las que más se usan para engañar."},
+        {"id": "cupos", "texto": "«Cupos limitados»", "sospechoso": true, "explicacion": "Otra vez la prisa: que decidas antes de preguntar."},
+        {"id": "videos", "texto": "Habla de videos y likes", "sospechoso": false, "explicacion": "Que hable de redes no lo vuelve falso; lo falso es el pago por adelantado."}
+      ]
+    },
+    {
+      "id": "banco_bloqueo",
+      "titulo": "Tu cuenta será bloqueada",
+      "remitente": "BANCO NOVA (SMS)",
+      "mensaje": "AVISO: su cuenta será BLOQUEADA hoy por actividad sospechosa. Confirme su clave y el código de su tarjeta en bancco-nova-seguro.com para evitar el bloqueo.",
+      "legitimo": false,
+      "monto": 25,
+      "etiquetas": {"seguir": "Entrar y confirmar la clave", "ignorar": "Ignorarlo", "reportar": "Llamar al banco y reportar el SMS"},
+      "elementos": [
+        {"id": "dominio", "texto": "bancco-nova-seguro.com (con doble c)", "sospechoso": true, "explicacion": "Una letra de más y un «seguro» pegado: dirección falsa."},
+        {"id": "clave", "texto": "Pide tu clave y el código de la tarjeta", "sospechoso": true, "explicacion": "Ningún banco pide la clave por mensaje. Nunca."},
+        {"id": "amenaza", "texto": "Amenaza con bloquear «hoy»", "sospechoso": true, "explicacion": "El miedo y la prisa juntos: la receta de casi todas las estafas."},
+        {"id": "nombre_banco", "texto": "Usa el nombre de un banco real", "sospechoso": false, "explicacion": "El nombre se copia fácil: no prueba nada, ni a favor ni en contra."}
+      ]
+    },
+    {
+      "id": "rifa_dona_marta",
+      "titulo": "La rifa de doña Marta",
+      "remitente": "Doña Marta (número guardado, vecina de la esquina)",
+      "mensaje": "Mijo, estoy vendiendo números de la rifa para el techo de la guardería, a R$ 5. Si quieres uno, pásate por la casa y te lo doy en mano con el talonario.",
+      "legitimo": true,
+      "monto": 5,
+      "etiquetas": {"seguir": "Comprarle un número en persona", "ignorar": "No contestar", "reportar": "Reportarlo como estafa"},
+      "elementos": [
+        {"id": "vecina", "texto": "Una vecina que conoces, su número de siempre", "sospechoso": false, "explicacion": "La conoces y puedes verla en persona: el canal es de fiar."},
+        {"id": "en_mano", "texto": "Paga en persona, con talonario", "sospechoso": false, "explicacion": "Nada de enlaces ni transferencias a ciegas: se comprueba cara a cara."},
+        {"id": "dinero", "texto": "Pide dinero", "sospechoso": false, "explicacion": "Pedir dinero no es estafa por sí solo; lo que importa es quién, cómo y si se puede comprobar."}
+      ]
+    }
+  ],
+  "publicaciones": [
+    {
+      "id": "selfie_uniforme",
+      "titulo": "Selfie camino a clase",
+      "descripcion": "Tu selfie de la mañana para Civitas. Texto: «Todos los días a las 6:40 por la ladera». Etiqueta de ubicación activada.",
+      "elementos": [
+        {"id": "uniforme", "texto": "El uniforme con el nombre de la escuela", "sensible": true, "dato": "tu escuela", "explicacion": "Dice dónde pasas la mañana: cualquiera sabe dónde encontrarte.", "retardado": "{cuando} publicaste tu selfie con el uniforme: un perfil falso escribió a tu familia «desde la escuela» pidiendo datos."},
+        {"id": "ubicacion", "texto": "La etiqueta de ubicación exacta", "sensible": true, "dato": "tu calle", "explicacion": "Marca el punto exacto del mapa: tu calle queda en Civitas para siempre.", "retardado": "{cuando} publicaste la ubicación exacta de tu calle: hoy un desconocido preguntó por ti en la esquina."},
+        {"id": "horario", "texto": "«Todos los días a las 6:40»", "sensible": true, "dato": "tu horario", "explicacion": "Una rutina publicada es un mapa de cuándo estás sola o solo.", "retardado": "{cuando} contaste tu horario de cada mañana: alguien lo usó para seguirte hasta la escuela."},
+        {"id": "sonrisa", "texto": "Tu cara de sueño", "sensible": false, "explicacion": "Es tu foto y tu decisión: mostrar tu cara no es el problema."},
+        {"id": "cielo", "texto": "El amanecer sobre el morro", "sensible": false, "explicacion": "El paisaje lo ve todo el barrio: no delata nada."}
+      ]
+    },
+    {
+      "id": "casa_pintada",
+      "titulo": "La casa recién pintada",
+      "descripcion": "Por fin pintaron la fachada. La foto muestra la puerta con el número, las llaves colgadas en la cerradura y la moto de tu tío con la placa a la vista.",
+      "elementos": [
+        {"id": "numero", "texto": "El número de la casa", "sensible": true, "dato": "tu dirección", "explicacion": "Con el número y la foto, cualquiera llega a tu puerta.", "retardado": "{cuando} publicaste el número de tu casa: llegaron dos paquetes que nadie pidió y un «técnico» quiso entrar."},
+        {"id": "llaves", "texto": "Las llaves en la cerradura", "sensible": true, "dato": "tus llaves", "explicacion": "Una foto nítida de una llave basta para copiarla.", "retardado": "{cuando} se vieron tus llaves en Civitas: tu familia tuvo que cambiar la cerradura por las dudas."},
+        {"id": "placa", "texto": "La placa de la moto", "sensible": true, "dato": "la placa de la moto", "explicacion": "La placa identifica al dueño: se usa para clonarla o para multas falsas.", "retardado": "{cuando} se vio la placa de la moto de tu tío: le llegó una multa de un lugar donde nunca estuvo."},
+        {"id": "pintura", "texto": "La pared amarilla", "sensible": false, "explicacion": "El color de la fachada no dice nada que no vea quien pasa."},
+        {"id": "maceta", "texto": "Las macetas de la ventana", "sensible": false, "explicacion": "Decoración: no expone a nadie."}
+      ]
+    },
+    {
+      "id": "viaje_familia",
+      "titulo": "¡Nos vamos de viaje!",
+      "descripcion": "Foto de los pasajes sobre la mesa. Texto: «Casa sola hasta el domingo». Los pasajes muestran el nombre completo y el código de reserva.",
+      "elementos": [
+        {"id": "casa_sola", "texto": "«Casa sola hasta el domingo»", "sensible": true, "dato": "que tu casa está sola", "explicacion": "Avisar que no hay nadie es invitar a entrar.", "retardado": "{cuando} contaste que tu casa estaba sola: un vecino vio a dos tipos probando la puerta."},
+        {"id": "reserva", "texto": "Nombre completo y código de reserva", "sensible": true, "dato": "tus datos de viaje", "explicacion": "Con el código cualquiera puede cambiar o cancelar tu viaje.", "retardado": "{cuando} se vio tu código de reserva: alguien cambió el asiento de tu mamá y casi pierde el bus."},
+        {"id": "mochila", "texto": "La mochila de viaje", "sensible": false, "explicacion": "Una mochila no dice cuándo ni dónde."},
+        {"id": "mate", "texto": "El termo de café en la mesa", "sensible": false, "explicacion": "Detalle de la foto: no expone a nadie."}
+      ]
+    }
+  ]
+}

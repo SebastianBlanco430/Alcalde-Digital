@@ -2,9 +2,12 @@
 # El ancla del catálogo (backend/datos/comercios_semilla.py) dice dónde quiere estar el comercio; aquí se mira la
 # huella del puesto (un rectángulo de ~2,6 x 2,4 m con el dependiente de pie en su origen) y, si pisa un edificio,
 # el asfalto de una calle, unas escaleras o un obstáculo, se prueba girarlo y, si hace falta, correrlo unos
-# metros. El decorado no tiene colisión: esto solo evita que se vea metido en una casa o en medio de la calle.
+# metros. Esto evita que se vea metido en una casa o en medio de la calle; la colisión del puesto ya colocado la da
+# obstaculos_puesto() (mostrador y pared del fondo; el frente, donde se habla con el dependiente, queda libre).
 
 import math
+
+from backend.logica.mundo_ciudad import Obstaculo
 
 ANCHO_PUESTO = 2.6               # m a lo largo del mostrador
 ATRAS_PUESTO = 0.95              # m de la espalda del dependiente al fondo del puesto
@@ -33,6 +36,21 @@ def _distancia_segmento(x, z, a, b):
 def punto_local(x, z, rumbo, da, df):
     s, c = math.sin(math.radians(rumbo)), math.cos(math.radians(rumbo))
     return (x + c * da + s * df, z - s * da + c * df)
+
+
+# Colisión de un puesto colocado: una fila de círculos en el mostrador (delante del dependiente) y otra en la pared del
+# fondo. El cliente se queda delante del mostrador, a ~1,6 m del dependiente: dentro del radio de la E (2,4 m).
+FILAS_COLISION_PUESTO = ((0.85, 0.36), (-0.95, 0.30))     # (hacia delante, radio) de cada fila
+COLUMNAS_COLISION_PUESTO = (-1.0, 0.0, 1.0)              # m a lo largo del mostrador
+
+
+def obstaculos_puesto(x, z, rumbo):
+    obstaculos = []
+    for df, radio in FILAS_COLISION_PUESTO:
+        for da in COLUMNAS_COLISION_PUESTO:
+            px, pz = punto_local(x, z, rumbo, da, df)
+            obstaculos.append(Obstaculo("puesto", round(px, 3), round(pz, 3), radio=radio))
+    return obstaculos
 
 
 # Puntos que cubren la huella del puesto (esquinas y rejilla): (x, z).

@@ -3,8 +3,9 @@
 # «E: Subir al teleférico» y la cabina del TRAYECTO ANIMADO que lleva frontend/viaje_rapido.py (cámara sobre el barrio ~40 s,
 # saltable con Espacio). El trazado y los tiempos son datos puros de backend/datos/teleferico.py.
 #
-# Rendimiento: cable, torres y postes en UNA malla fundida (~60 cajas, sin colisión, 1 Entity); cada cabina es una Entity con
-# su malla (unos cientos de vértices). Las cabinas se mueven en update() con dos asignaciones de posición.
+# Rendimiento: cable, torres y postes en UNA malla fundida (~60 cajas, 1 Entity); cada cabina es una Entity con su malla (unos
+# cientos de vértices). Las cabinas se mueven en update() con dos asignaciones de posición. Colisión: las dos patas de cada
+# torre (obstaculos_de_torres, origen «teleferico»); los postes de embarque no, son el punto donde se pulsa E.
 # Solo existe con el mapa grande y economia_config.TRANSPORTE (ver frontend/transporte_mundo.py).
 
 import math
@@ -14,6 +15,7 @@ from ursina import Entity, Text
 
 from backend.datos import teleferico as td
 from backend.logica import viaje_rapido
+from backend.logica.mundo_ciudad import Obstaculo
 from backend.logica.perfil_economia import perfil_de
 from frontend import viaje_calculos as vc
 from frontend.comercios_mundo import _Local
@@ -80,6 +82,21 @@ def dibujar_cable(malla, trazado, suelo):
         L.caja(SEPARACION_CABLES, y - 0.02, 0, 0.3, 0.22, 0.5, ACERO)
 
 
+# Las dos patas de cada torre intermedia como círculos (las de los extremos están sobre el techo de la estación).
+def obstaculos_de_torres(trazado):
+    obstaculos = []
+    torres = trazado.torres
+    for i, (x, _y, z) in enumerate(torres):
+        if i in (0, len(torres) - 1):
+            continue
+        rumbo = trazado.rumbo(max(0.0, trazado._acum[i] / trazado.largo - 1e-4))
+        L = _Local(None, x, 0.0, z, rumbo)
+        for da in (-1.5, 1.5):
+            px, _py, pz = L.p(da, 0, 0)
+            obstaculos.append(Obstaculo("torre_teleferico", round(px, 3), round(pz, 3), radio=0.45))
+    return obstaculos
+
+
 def dibujar_cabina(malla):
     """Cabina colgante con el origen en el agarre del cable (la cabina cuelga hacia -y): percha, caja roja con franja
     crema, ventanas azules y techo."""
@@ -120,6 +137,8 @@ class TelefericoVista(Entity):
         self.trazado = td.construir_trazado(mundo)
         malla = Malla()
         dibujar_cable(malla, self.trazado, mundo.altura)
+        if hasattr(mundo, "agregar_obstaculos"):
+            mundo.agregar_obstaculos(obstaculos_de_torres(self.trazado), origen="teleferico")
         self.postes = []
         for estacion in viaje_rapido.ESTACIONES.values():
             x, z, rumbo = viaje_rapido.posicion_de_estacion(mundo, estacion.id)

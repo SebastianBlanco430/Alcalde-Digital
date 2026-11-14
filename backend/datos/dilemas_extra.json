@@ -467,6 +467,140 @@
         "confianza": {"ciudadanos": -1}
       },
       "nota_diseno": "Las redes sí sirven (llenan el ensayo y la rifa). Lo que se decide es cuánto mostrar y con permiso de quién."
+    },
+    {
+      "id": "meme_de_lucas",
+      "titulo": "El meme de Lucas",
+      "tema": "ciberacoso",
+      "bandera": "ALCALDE_CIBERACOSO",
+      "dia_min": 1,
+      "dia_max": 5,
+      "situacion": "En el grupo del curso circula un meme con la cara de Lucas, el nuevo, pegada a un burro. Ya van cuarenta risas y alguien pide «el video de cuando se cayó». Lucas está en el grupo y no escribe nada desde ayer.",
+      "opciones": [
+        {
+          "id": "reenviar_meme",
+          "etiqueta": "Reírte y reenviarlo a otro grupo",
+          "inmediato": {
+            "texto": "Tu reenvío suma risas y dos grupos más lo comparten. Por un rato eres el gracioso del curso.",
+            "deltas": {"convivencia": 2},
+            "confianza": {"ciudadanos": 1}
+          },
+          "retardado": {
+            "horas": 36,
+            "clave": "dilema_meme_lucas_reenviar",
+            "mensaje": "{cuando} reenviaste el meme de Lucas: hoy no fue a clase y su mamá vino a la escuela con las capturas. Tu nombre sale en tres de ellas.",
+            "deltas": {"convivencia": -6, "confianza": -3},
+            "confianza": {"ciudadanos": -2, "instituciones": -1}
+          }
+        },
+        {
+          "id": "callar_meme",
+          "etiqueta": "No reírte ni decir nada",
+          "inmediato": {
+            "texto": "No te ríes, pero tampoco escribes. El meme sigue arriba del todo en el grupo.",
+            "deltas": {},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 24,
+            "clave": "dilema_meme_lucas_callar",
+            "mensaje": "{cuando} viste el meme de Lucas y no dijiste nada: ya hay otro, peor, y Lucas se salió del grupo. Nadie lo defendió.",
+            "deltas": {"convivencia": -3},
+            "confianza": {"ciudadanos": -1}
+          }
+        },
+        {
+          "id": "apoyar_y_reportar",
+          "etiqueta": "Escribirle a Lucas y reportar el meme con captura",
+          "inmediato": {
+            "texto": "Le escribes a Lucas «eso no está bien, ¿estás ok?» y reportas el meme. Alguien del grupo te llama aguafiestas.",
+            "deltas": {"convivencia": -1},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 36,
+            "clave": "dilema_meme_lucas_apoyar",
+            "mensaje": "{cuando} reportaste el meme de Lucas y le escribiste: la escuela habló con el curso, el meme se borró y hoy Lucas se sentó con ustedes en el recreo.",
+            "deltas": {"convivencia": 6, "confianza": 3},
+            "confianza": {"ciudadanos": 2, "instituciones": 1}
+          }
+        }
+      ],
+      "ignorar": {
+        "horas": 24,
+        "clave": "dilema_meme_de_lucas_ignorado",
+        "mensaje": "{cuando} dejaste sin mirar el grupo del curso: el meme de Lucas siguió creciendo y ya circula por todo el barrio.",
+        "deltas": {"convivencia": -3, "confianza": -1},
+        "confianza": {"ciudadanos": -1}
+      },
+      "nota_diseno": "Ciberacoso: reenviar es participar y callar también pesa. Apoyar cuesta un rato de popularidad y lo cambia todo."
+    },
+    {
+      "id": "grupo_contra_ana",
+      "titulo": "Un grupo para reírse de Ana",
+      "tema": "ciberacoso",
+      "bandera": "ALCALDE_CIBERACOSO",
+      "dia_min": 2,
+      "dia_max": 6,
+      "situacion": "Te agregan a un grupo nuevo, «Fans de la Ana jaja», hecho para burlarse de cómo habla Ana, la de la panadería. Hay audios imitándola y una foto suya tomada sin que se diera cuenta. Te piden «uno tuyo».",
+      "opciones": [
+        {
+          "id": "mandar_audio",
+          "etiqueta": "Mandar un audio imitándola",
+          "inmediato": {
+            "texto": "Tu audio es el más escuchado del grupo. Te llueven emojis de risa.",
+            "deltas": {"convivencia": 1},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 48,
+            "clave": "dilema_grupo_ana_audio",
+            "mensaje": "{cuando} mandaste un audio al grupo contra Ana: alguien se lo reenvió a ella. Hoy no abrió la panadería y su mamá dice que no quiere salir de casa.",
+            "deltas": {"convivencia": -7, "confianza": -3},
+            "confianza": {"ciudadanos": -2}
+          }
+        },
+        {
+          "id": "salir_callado",
+          "etiqueta": "Salirte del grupo sin decir nada",
+          "inmediato": {
+            "texto": "Te sales. Nadie lo nota mucho; el grupo sigue sin ti.",
+            "deltas": {},
+            "confianza": {}
+          },
+          "retardado": {
+            "horas": 24,
+            "clave": "dilema_grupo_ana_salir",
+            "mensaje": "{cuando} te saliste del grupo contra Ana: tú no participaste, pero el grupo creció y la foto suya ya la vio media escuela.",
+            "deltas": {"convivencia": -2},
+            "confianza": {}
+          }
+        },
+        {
+          "id": "pruebas_y_adulto",
+          "etiqueta": "Guardar capturas, apoyar a Ana y avisar a un adulto",
+          "inmediato": {
+            "texto": "Guardas las capturas, le cuentas a la orientadora y le escribes a Ana que no está sola. Dos del grupo te dejan de hablar.",
+            "deltas": {"convivencia": -1},
+            "confianza": {"instituciones": 1}
+          },
+          "retardado": {
+            "horas": 36,
+            "clave": "dilema_grupo_ana_pruebas",
+            "mensaje": "{cuando} llevaste las capturas del grupo contra Ana: la escuela cerró el grupo, hubo una charla con las familias y Ana volvió a la panadería con su sonrisa de siempre.",
+            "deltas": {"convivencia": 6, "confianza": 4},
+            "confianza": {"ciudadanos": 2, "instituciones": 2}
+          }
+        }
+      ],
+      "ignorar": {
+        "horas": 24,
+        "clave": "dilema_grupo_contra_ana_ignorado",
+        "mensaje": "{cuando} no hiciste nada con el grupo contra Ana: te siguen llegando sus audios y tu nombre aparece entre los miembros.",
+        "deltas": {"convivencia": -3},
+        "confianza": {"ciudadanos": -1}
+      },
+      "nota_diseno": "Ciberacoso en grupo: salirse no basta para cortarlo. Las pruebas y un adulto de confianza sí."
     }
   ]
 }

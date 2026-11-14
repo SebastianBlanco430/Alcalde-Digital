@@ -3,6 +3,8 @@
 # La pantalla (frontend/escenas/escena_ajustes.py) solo dibuja y conecta; todo lo que se puede probar sin
 # ventana vive aquí.
 
+from frontend import daltonismo_calculos
+
 MAX_DISPOSITIVOS = 40
 LARGO_MAX_DISPOSITIVO = 120
 ETIQUETA_PREDETERMINADO = "Predeterminado del sistema"
@@ -76,6 +78,12 @@ def opciones_dispositivo(dispositivos, guardado=None):
     if guardado and guardado not in dispositivos:
         opciones.append((guardado + ETIQUETA_NO_CONECTADO, guardado))
     return opciones
+
+
+# Filas de Accesibilidad que tienen efecto con este modo de filtro. Con «Sin filtro» la intensidad no cambia la
+# imagen; «Simular» solo tiene sentido para un tipo de visión (no para «Sin filtro» ni «Alto contraste»).
+def filas_daltonismo_activas(modo):
+    return {"intensidad": modo != "ninguno", "simular_daltonismo": daltonismo_calculos.se_puede_simular(modo)}
 
 
 # Índice de `valor` en una lista de opciones [(etiqueta, valor)]; 0 si no está.

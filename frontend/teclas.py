@@ -25,9 +25,10 @@ TECLAS_MUNDO_EXTRA = ("g", "1", "2", "3", "4", "5", "6", "7", "8", "9")     # sa
 # Asignaciones elegidas para las funciones nuevas (libres en el mundo al 2026-11-08).
 TECLA_ARCHIVO_CASOS = "j"
 TECLA_DILEMAS = "k"             # abre el mensaje de dilema pendiente (frontend/registro_dilemas.py)
+TECLA_HABITOS = "l"             # bandeja de Civitas: estafas, publicar y feed (frontend/registro_habitos.py)
 
 # Libres razonables para funciones futuras en el mundo.
-TECLAS_LIBRES = ("f1", "f2", "f5", "f6", "l")
+TECLAS_LIBRES = ("f1", "f2", "f5", "f6")
 
 
 # Teclas de una sola letra/fn realmente ocupadas en el mundo (sin las combinadas como wasd/flechas).

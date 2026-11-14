@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 from backend.logica import navegacion
 from backend.logica.azar_fijo import azar_de
+from backend.logica.mundo_ciudad import Obstaculo
 
 G = 9.81
 BICICLETA = "bicicleta"
@@ -85,6 +86,7 @@ TIPOS = (BICICLETA, MOTO)
 DT_MAXIMO = 0.05                 # tope por frame, como el controlador del jugador
 RADIO_AVISO = 2.6                # m: a esta distancia aparece «E para montar»
 RADIO_BAJAR = 1.4                # m a un lado del vehículo donde aparece el piloto al bajar
+RADIO_APARCADO = 0.28            # m: cada uno de los dos círculos de colisión de un vehículo aparcado
 PENDIENTE_VEHICULO = 0.55        # m/m: más empinado que esto (≈29°) no se sube (rampa de arena muy fuerte)
 
 
@@ -383,12 +385,16 @@ def extremo_de_miembro(angulo1, angulo2, l1, l2):
 # y ninguna debe estar sobre una escalera (los vehículos no suben peldaños). El mapa puede no tener escaleras().
 def posicion_valida(mapa, x, z, rumbo, perfil):
     puntos = [(x, z)] + list(puntos_de_contacto(x, z, rumbo, perfil.semi_largo))
-    escaleras = getattr(mapa, "escaleras", None)
-    lista = escaleras() if callable(escaleras) else []
+    # con índice (MundoCiudad.hay_escalera_en) solo se miran las escaleras de la celda, no las 364 del mapa grande
+    hay_escalera = getattr(mapa, "hay_escalera_en", None)
+    if hay_escalera is None:
+        escaleras = getattr(mapa, "escaleras", None)
+        lista = escaleras() if callable(escaleras) else []
+        hay_escalera = lambda px, pz: any(e.contiene(px, pz) for e in lista)     # noqa: E731
     for px, pz in puntos:
         if not mapa.es_transitable(px, pz):
             return False
-        if any(e.contiene(px, pz) for e in lista):
+        if hay_escalera(px, pz):
             return False
     return True
 
@@ -630,6 +636,14 @@ def indice_cercano(posiciones, x, z, radio=RADIO_AVISO):
         if d <= mejor_d:
             mejor, mejor_d = i, d
     return mejor
+
+
+# Colisión de un vehículo aparcado: dos círculos finos a lo largo de su rumbo (es una bici o una moto). Los entrega
+# frontend/vehiculo_mundo.py a MundoCiudad.agregar_obstaculos (origen «vehiculos») cada vez que alguien monta o baja.
+def obstaculos_aparcado(x, z, rumbo, perfil):
+    fx, fz = vector_adelante(rumbo)
+    d = max(0.0, perfil.semi_largo - RADIO_APARCADO)
+    return [Obstaculo("vehiculo", x + fx * lado * d, z + fz * lado * d, radio=RADIO_APARCADO) for lado in (-1, 1)]
 
 
 # Dónde aparece el piloto al bajar: a la izquierda del vehículo si cabe, si no a la derecha, delante o detrás; el

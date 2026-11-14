@@ -182,6 +182,41 @@ def obstaculo_circulo(cx, cz, radio, y_min, y_max):
     return ("circulo", cx, cz, radio, y_min, y_max)
 
 
+# Rejilla 2D de los obstáculos de cámara (rendimiento): distancia_libre_analitica recorría las ~550 cajas del mapa chico
+# en cada frame aunque el tramo pivote -> cámara mide unos metros. Con la rejilla solo mira las de las celdas que toca la
+# caja del tramo. Devuelve los candidatos EN EL ORDEN ORIGINAL: el resultado depende del orden en casos límite, así sale
+# idéntico al recorrido completo (hay prueba). Se usa en lugar de la lista: también vale `len()` y `bool()`.
+CELDA_INDICE_CAMARA = 8.0
+
+
+class IndiceCamara:
+
+    def __init__(self, obstaculos, celda=CELDA_INDICE_CAMARA):
+        self.obstaculos = list(obstaculos)
+        self.celda = celda
+        self._celdas = {}
+        for i, obs in enumerate(self.obstaculos):
+            rx, rz = (obs[3], obs[4]) if obs[0] == "caja" else (obs[3], obs[3])
+            for clave in self._cubiertas(obs[1] - rx, obs[1] + rx, obs[2] - rz, obs[2] + rz):
+                self._celdas.setdefault(clave, []).append(i)
+
+    def __len__(self):
+        return len(self.obstaculos)
+
+    def _cubiertas(self, x0, x1, z0, z1):
+        c = self.celda
+        for i in range(math.floor(x0 / c), math.floor(x1 / c) + 1):
+            for j in range(math.floor(z0 / c), math.floor(z1 / c) + 1):
+                yield (i, j)
+
+    # Obstáculos cuya celda toca la caja [x0, x1] x [z0, z1] ensanchada `margen`, en el orden original.
+    def candidatos(self, x0, x1, z0, z1, margen=0.0):
+        indices = set()
+        for clave in self._cubiertas(x0 - margen, x1 + margen, z0 - margen, z1 + margen):
+            indices.update(self._celdas.get(clave, ()))
+        return [self.obstaculos[i] for i in sorted(indices)]
+
+
 # Intervalo [t0, t1] del rayo o + t·d dentro de la franja [lo, hi] de UN eje (None = nunca dentro).
 def _franja(o, d, lo, hi):
     if abs(d) < 1e-12:
@@ -234,6 +269,8 @@ def distancia_libre_analitica(pivote, destino, obstaculos, margen=0.4, minimo=0.
     x0, x1 = sorted((pivote[0], destino[0]))
     z0, z1 = sorted((pivote[2], destino[2]))
     y0, y1 = sorted((pivote[1], destino[1]))
+    if isinstance(obstaculos, IndiceCamara):
+        obstaculos = obstaculos.candidatos(x0, x1, z0, z1, margen)
     libre = largo
     for obs in obstaculos:
         if obs[0] == "caja":

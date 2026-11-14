@@ -69,6 +69,10 @@ class VehiculoAparcado:
 
 class MundoVehiculos(Entity):
 
+    # Los aparcados chocan (MundoCiudad.agregar_obstaculos, origen «vehiculos»): se rehace al montar, bajar o recortar.
+    # En línea los vehículos ajenos se mueven sin pasar por aquí, así que online_vehiculos la apaga.
+    colision = True
+
     def __init__(self, mundo, n=8, semilla=7, **opciones):
         super().__init__(**opciones)
         self.mundo = mundo
@@ -83,6 +87,19 @@ class MundoVehiculos(Entity):
         self._reutilizado = False
         for p in vc.puntos_de_aparcamiento(mundo, n=n, semilla=semilla):
             self.colocar(p)
+        self.sincronizar_colision()
+
+    # Entrega al modelo la colisión de los vehículos quietos (el que se conduce no: chocaría consigo mismo).
+    def sincronizar_colision(self):
+        agregar = getattr(self.mundo, "agregar_obstaculos", None)
+        if agregar is None:
+            return
+        obstaculos = []
+        if self.colision:
+            for v in self.vehiculos:
+                if v is not self.conducido:
+                    obstaculos += vc.obstaculos_aparcado(v.estado.x, v.estado.z, v.estado.rumbo, v.perfil)
+        agregar(obstaculos, origen="vehiculos")
 
     # Deja solo los `n` primeros vehículos (online: el protocolo v4 admite N_VEHICULOS_MAX = 24; los primeros n son los
     # mismos en todos los equipos porque puntos_de_aparcamiento elige de forma incremental).
@@ -94,6 +111,7 @@ class MundoVehiculos(Entity):
             sobrante.modelo.enabled = False
             from frontend.componentes import destruir_arbol       # destroy() no destruye a los hijos
             destruir_arbol(sobrante.modelo)
+        self.sincronizar_colision()
 
     def colocar(self, aparcado):
         modelo = VehiculoModelo(aparcado.tipo, aparcado.indice, parent=self)
@@ -149,6 +167,7 @@ class MundoVehiculos(Entity):
         vehiculo.estado.inclinacion = vehiculo.modelo.inclinable.rotation_z * math.pi / 180
         self.conducido = vehiculo
         self.marcador.poner(None)
+        self.sincronizar_colision()
         return vehiculo
 
     # Baja: devuelve la posición (x, z) donde queda el piloto a pie (junto al vehículo, en suelo transitable).
@@ -174,6 +193,7 @@ class MundoVehiculos(Entity):
         self.conducido = None
         self.piloto = None
         self.avatar = None
+        self.sincronizar_colision()
         return (x, z)
 
     # Un paso de conducción con la entrada (h, v) en [-1, 1]. Devuelve (x, z) del vehículo; actualiza el modelo.

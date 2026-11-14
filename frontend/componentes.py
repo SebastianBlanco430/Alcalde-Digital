@@ -7,6 +7,7 @@
 #   panel_tinta     panel con borde de tinta y sombra plana (estilo del juego).
 #   BotonPrimario / BotonSecundario / BotonPeligro  botones con borde de tinta, hover, pulsado, foco.
 
+import os
 import sys
 
 from panda3d.core import TextNode
@@ -14,8 +15,13 @@ from ursina import Button, Entity, Text, color, destroy
 from ursina.models.procedural.quad import Quad
 
 from backend.datos.nombres_visibles import glosar_texto
+from frontend import diseno_adaptable_calculos as calc_adaptable
 from frontend import estilo, tipografia
 from frontend.texto import envolver_texto
+
+# Bandera reversible: los botones de tinta encogen (y si no basta recortan con «…») el texto que no cabe.
+# ALCALDE_ENCAJAR_BOTONES=0 deja el comportamiento de antes (el texto largo se sale del botón).
+ENCAJAR_TEXTO_BOTON = os.environ.get("ALCALDE_ENCAJAR_BOTONES") != "0"
 
 # La versión pygame usaba una ventana de 800x600; sus medidas en píxeles se
 # convierten a unidades de camera.ui dividiendo entre esta altura.
@@ -324,9 +330,12 @@ class BotonTinta(BotonAccion):
 
     VARIANTE = "secundario"
     ALTO_FOCO_PX = 3
+    ESPACIO_TEXTO = 0.88          # fracción del ancho del botón que puede ocupar el texto
+    ESCALA_TEXTO_MIN = 0.7        # lo más que se encoge la letra antes de recortar con «…»
 
     def __init__(self, texto, al_clic=None, ancho=a_unidades(220), alto=a_unidades(56),
                  habilitado=True, tamano_fuente_px=22, **opciones):
+        self._tamano_texto = None     # se fija al final: mientras Button construye, el texto aún no se encaja
         self._paleta = ESTILOS_BOTON[self.VARIANTE]
         super().__init__(texto, al_clic=al_clic, ancho=ancho, alto=alto, habilitado=habilitado,
                          tamano_fuente_px=tamano_fuente_px, **opciones)
@@ -357,6 +366,41 @@ class BotonTinta(BotonAccion):
         self._presionado = False
         self._foco = False
         self.fijar_habilitado(habilitado)
+        self._tamano_texto = escala_fuente(tamano_fuente_px)
+        self.encajar_texto()
+
+    # Ursina genera la propiedad `text` por clase con la función de Button: se redefine aquí para que cada texto
+    # nuevo («Borrar partida guardada», «Esperando a: …») se vuelva a encajar en el botón.
+    def _fijar_texto(self, valor):
+        Button.text_setter(self, valor)
+        if getattr(self, "_tamano_texto", None) is not None:
+            self.encajar_texto()
+
+    text = property(Button.text_getter, _fijar_texto)
+
+    # Encoge la letra hasta que el texto quepa en ESPACIO_TEXTO del ancho; si ni a ESCALA_TEXTO_MIN cabe, lo recorta
+    # con «…» (docs/DISENO.md §3: ningún texto se sale de su caja). Se mide en coordenadas de mundo, así vale
+    # igual dentro de un panel escalado por diseno_adaptable.
+    def encajar_texto(self):
+        entidad = self.text_entity
+        if not ENCAJAR_TEXTO_BOTON or entidad is None or not entidad.text or self._tamano_texto is None:
+            return
+        self.text_size = self._tamano_texto
+        if self.world_scale_x <= 0:
+            return
+        nodo = TextNode("medida_boton")
+        nodo.setFont(entidad.font)
+        por_unidad = entidad.size * entidad.world_scale_x / self.world_scale_x
+
+        def medir(cadena):
+            return nodo.calcWidth(cadena) * por_unidad
+        ancho = medir(entidad.text)
+        if ancho <= self.ESPACIO_TEXTO:
+            return
+        escala = max(self.ESCALA_TEXTO_MIN, self.ESPACIO_TEXTO / ancho)
+        self.text_size = self._tamano_texto * escala
+        if ancho * escala > self.ESPACIO_TEXTO:
+            entidad.text = calc_adaptable.recortar_con_elipsis(entidad.text, medir, self.ESPACIO_TEXTO / escala)
 
     def fijar_habilitado(self, valor):
         self._habilitado = bool(valor)

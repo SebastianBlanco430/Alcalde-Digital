@@ -27,6 +27,7 @@ from frontend.online_ui import FocoOnline, SelectorSimple, crear_texto, fijar, t
 PAGINA_PRINCIPAL, PAGINA_CREAR, PAGINA_UNIRSE, PAGINA_CONECTANDO = "principal", "crear", "unirse", "conectando"
 ANCHO_PANEL, ALTO_PANEL = 1.16, 0.86
 X_ETIQUETA, X_CAMPO, ANCHO_CAMPO = -0.52, 0.12, 0.62
+ANCHO_ERROR = ANCHO_PANEL / 2 - 0.04 - X_ETIQUETA     # de la etiqueta al filo derecho: los errores de red son largos
 Z = -0.004
 
 
@@ -88,9 +89,8 @@ class EscenaOnlineMenu(Escena):
         self.nota_cifrado = crear_texto(g, " ", 0, -0.30, 17, estilo.ESTADO_AVISO, origen=(0, 0.5))
         texto_envuelto(self.nota_cifrado, lobby.AVISO_SIN_CIFRAR, 0.95, 17)
         self.nota_cifrado.origin = (0, 0.5)
-        self.nota_privacidad = crear_texto(g, " ", 0, -0.39, 16, estilo.COLOR_TEXTO_TENUE, origen=(0, 0.5))
-        texto_envuelto(self.nota_privacidad, lobby.AVISO_PRIVACIDAD, 0.95, 16)
-        self.nota_privacidad.origin = (0, 0.5)
+        # El aviso que mandaba a leer docs/PRIVACIDAD_ONLINE.md ya no se muestra (caía bajo el panel y apuntaba a un
+        # archivo del repositorio); el documento sigue en docs/ y «Olvidar» sigue en Ajustes > Online.
         self.controles[PAGINA_PRINCIPAL] = [self.btn_crear, self.btn_unirse, self.btn_atras_p]
 
     def _construir_crear(self):
@@ -214,7 +214,7 @@ class EscenaOnlineMenu(Escena):
         self.controles[PAGINA_CREAR] = [self.c_alias, self.c_ambito, self.c_puerto] + (
             [self.c_confirma] if abierto else []) + [self.c_atras, self.c_crear]
         primero = next(iter(f.errores.values()), "")
-        fijar(self.c_error, primero)
+        texto_envuelto(self.c_error, primero, ANCHO_ERROR, 18, max_lineas=2)
         self.c_alias.marcar_error("alias" in f.errores and bool(self.c_alias.texto))
         self.c_puerto.marcar_error("puerto" in f.errores)
         self.c_crear.fijar_habilitado(f.valido)
@@ -224,7 +224,7 @@ class EscenaOnlineMenu(Escena):
         if not self._construido:
             return None
         f = self.formulario_unirse()
-        fijar(self.u_error, next(iter(f.errores.values()), ""))
+        texto_envuelto(self.u_error, next(iter(f.errores.values()), ""), ANCHO_ERROR, 18, max_lineas=2)
         self.u_alias.marcar_error("alias" in f.errores and bool(self.u_alias.texto))
         self.u_destino.marcar_error("destino" in f.errores and bool(self.u_destino.texto))
         self.u_codigo.marcar_error("codigo" in f.errores and bool(self.u_codigo.texto))
@@ -251,7 +251,7 @@ class EscenaOnlineMenu(Escena):
         try:
             sesion = self.servicios.abrir_como_anfitrion(v["alias"], v["ambito"], v["puerto"], v["abierto"])
         except (OSError, ValueError, RuntimeError, TimeoutError) as error:
-            fijar(self.c_error, f"No se pudo abrir la sala: {error}")
+            texto_envuelto(self.c_error, f"No se pudo abrir la sala: {error}", ANCHO_ERROR, 18, max_lineas=2)
             return None
         self._recordar(v["alias"], None)
         self._empezar_conexion(sesion, "tu sala")
@@ -265,7 +265,7 @@ class EscenaOnlineMenu(Escena):
         try:
             sesion = self.servicios.abrir_como_cliente(v["alias"], v["host"], v["puerto"], v["codigo"])
         except (OSError, ValueError, RuntimeError) as error:
-            fijar(self.u_error, f"No se pudo conectar: {error}")
+            texto_envuelto(self.u_error, f"No se pudo conectar: {error}", ANCHO_ERROR, 18, max_lineas=2)
             return None
         self._recordar(v["alias"], lobby.formatear_destino(v["host"], v["puerto"]))
         self._empezar_conexion(sesion, sesion.destino)

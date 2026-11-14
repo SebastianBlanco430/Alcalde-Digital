@@ -71,7 +71,7 @@ class ResultadoMinijuego:
 
     def a_dict(self):
         return {"minijuego": self.minijuego, "aciertos": self.aciertos, "total": self.total,
-                "completado": self.completado, "bien": self.bien, "detalle": self.detalle}
+                "completado": self.completado, "bien": self.bien, "detalle": self.detalle, "umbral": self.umbral}
 
 
 def contraria(decision):

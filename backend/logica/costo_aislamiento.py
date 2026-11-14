@@ -4,7 +4,7 @@
 #
 # REGLA
 #   - «Participar» = cerrar una misión (FlujoConTiempo.completar_mision / revisar_misiones_digitales llaman a participar()).
-#   - Pasadas GRACIA_HORAS = 24 h de juego (6 min reales) desde la última participación, se acumulan PUNTOS_POR_HORA = 0,25
+#   - Pasadas GRACIA_HORAS = 24 h de juego (4,5 min reales) desde la última participación, se acumulan PUNTOS_POR_HORA = 0,25
 #     puntos por hora de juego. Se cobran en puntos ENTEROS (un punto cada 4 h): cada punto resta 1 a los indicadores
 #     «convivencia» y «confianza» y, con GameState, 1 a la confianza de «ciudadanos» e «instituciones».
 #   - TOPE_PUNTOS = 16 en TODA la partida: ignorar siempre deja convivencia y confianza en 34 (de 50) y el índice de

@@ -17,7 +17,7 @@ import threading
 
 from ursina import Entity, Mesh, Text, application, camera, color, time, window
 
-from frontend import estilo
+from frontend import diseno_adaptable, estilo
 from frontend.componentes import escala_fuente, rgb
 from frontend.telemetria_calculos import EstadisticasFps, leer_nvidia, lineas_panel
 
@@ -90,6 +90,8 @@ class PanelTelemetria(Entity):
         except AttributeError:
             self._renderer = "desconocido"
         self.position = (-window.aspect_ratio / 2 + 0.015, 0.32)
+        # pegado al borde izquierdo aunque la ventana cambie de proporción (F11, 4:3, ultra ancho)
+        diseno_adaptable.anclar(self, "izquierda")
         self.fondo = Entity(parent=self, model="quad", origin=(-0.5, 0.5), color=color.rgba32(*estilo.TINTA, 205),
                             z=0.01)
         self.texto = Text("", parent=self, origin=(-0.5, 0.5), position=(0.012, -0.01), scale=escala_fuente(13),

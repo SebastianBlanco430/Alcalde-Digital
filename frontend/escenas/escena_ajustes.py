@@ -13,7 +13,9 @@
 # EXTENSIÓN (sin editar este archivo):
 #   registrar_seccion(nombre, constructor)  añade (o reemplaza si el nombre existe) una pestaña. `constructor(seccion)`
 #       recibe una `Seccion` vacía y la rellena con sus métodos: anadir_texto, anadir_deslizador, anadir_selector,
-#       anadir_interruptor, anadir_boton, anadir_muestras. `seccion.gestor` es el GestorAjustes (backend.logica.ajustes).
+#       anadir_interruptor, anadir_boton, anadir_muestras (y cambiar_texto para ayudas que dependen del valor).
+#       Selector, Deslizador e Interruptor tienen fijar_habilitado(valor) para atenuar filas sin efecto.
+#       `seccion.gestor` es el GestorAjustes (backend.logica.ajustes).
 #       El constructor puede devolver una función `al_mostrar()` que se llama cada vez que se abre la pestaña.
 #   registrar_dispositivos(lista)           el módulo de audio entrega aquí los nombres de las salidas disponibles.
 #   registrar_prueba_sonido(callback)       (opcional) muestra un botón «Probar sonido» en Audio.
@@ -40,6 +42,9 @@ X_CONTROL = 0.30                      # centro de la zona del control
 ANCHO_CONTROL = 0.64
 ALTO_FILA = 0.09
 Y_CONTENIDO = 0.215                   # borde superior del área de contenido
+Y_FONDO_CONTENIDO = -0.34             # borde inferior: debajo solo va el pie (botones y nota)
+FACTOR_FILA_MIN = 0.86                # cuánto se pueden juntar las filas si no caben (control de 46 px a la vista)
+X_NOTA, ANCHO_NOTA = -0.115, 0.31     # la nota va en el hueco del pie entre «Restablecer» y «Atrás»
 Z_TEXTO = -0.004
 
 
@@ -103,6 +108,11 @@ class Fila(Entity):
     def fijar_foco(self, valor):
         self.resalte.enabled = bool(valor)
 
+    # Una fila que no tiene efecto (p. ej. «Intensidad» sin filtro) se ve tenue; el foco la salta.
+    def atenuar(self, valor):
+        if self.etiqueta is not None:
+            self.etiqueta.color = rgb(estilo.COLOR_TEXTO_TENUE if valor else estilo.COLOR_TEXTO)
+
 
 # Deslizador 0..1 (ratón: clic y arrastre; teclado: izquierda/derecha).
 class Deslizador(Entity):
@@ -110,11 +120,13 @@ class Deslizador(Entity):
     ANCHO_PISTA = 0.46
     ALTO_PISTA = 0.026
 
-    def __init__(self, fila, valor, al_cambiar, formato=calc.formato_porcentaje, **opciones):
+    def __init__(self, fila, valor, al_cambiar, formato=calc.formato_porcentaje, paso=calc.PASO_DESLIZADOR,
+                 **opciones):
         super().__init__(parent=fila, **opciones)
         self.fila = fila
         self._al_cambiar = al_cambiar
         self._formato = formato
+        self._paso = paso
         self.valor = 0.0
         self._arrastrando = False
         self._habilitado = True
@@ -129,6 +141,8 @@ class Deslizador(Entity):
         self.zona = Entity(parent=self, model="quad", collider="box", color=color.clear,
                            scale=(self.ANCHO_PISTA + 0.05, 0.085), position=(self.x_centro, 0, -0.012))
         self.texto_valor = _texto(self, "0 %", x0 + self.ANCHO_PISTA + 0.04, 0, 22)
+        # del valor al borde derecho del panel (deja el margen del filo)
+        self.ancho_valor = ANCHO_PANEL / 2 - 0.03 - self.texto_valor.x
         self._x0 = x0
         self.fijar_valor(valor)
 
@@ -138,6 +152,13 @@ class Deslizador(Entity):
     def esta_habilitado(self):
         return self._habilitado
 
+    def fijar_habilitado(self, valor):
+        self._habilitado = bool(valor)
+        self._arrastrando = False
+        self.zona.collider = "box" if self._habilitado else None
+        self.texto_valor.color = rgb(estilo.COLOR_TEXTO if self._habilitado else estilo.COLOR_TEXTO_TENUE)
+        self.fila.atenuar(not self._habilitado)
+
     def fijar_foco(self, valor):
         self.fila.fijar_foco(valor)
 
@@ -145,7 +166,7 @@ class Deslizador(Entity):
         pass
 
     def ajustar(self, direccion):
-        self.fijar_valor(calc.mover_valor(self.valor, calc.PASO_DESLIZADOR, direccion), avisar=True)
+        self.fijar_valor(calc.mover_valor(self.valor, self._paso, direccion), avisar=True)
 
     def fijar_valor(self, valor, avisar=False):
         valor = max(0.0, min(1.0, float(valor)))
@@ -155,6 +176,8 @@ class Deslizador(Entity):
         self.relleno.x = self._x0 + ancho / 2
         self.nudo.x = self._x0 + ancho
         self.texto_valor.text = self._formato(valor)
+        diseno_adaptable.ajustar_texto(self.texto_valor, self.ancho_valor, escala_base=escala_fuente(22),
+                                       escala_min=0.7, max_lineas=1)
         if avisar and self._al_cambiar is not None:
             self._al_cambiar(valor)
 
@@ -182,6 +205,7 @@ class Selector(Entity):
         self.fila = fila
         self._al_cambiar = al_cambiar
         self._habilitado = True
+        self._motivo = None           # texto que se ve en lugar del valor mientras está deshabilitado
         self.opciones = list(opciones) or [("—", None)]
         self.indice = 0
         ancho_flecha = 0.075
@@ -209,11 +233,24 @@ class Selector(Entity):
     def esta_habilitado(self):
         return self._habilitado
 
+    # Deshabilitado: flechas apagadas, fila tenue y, si hay `motivo`, se lee en lugar del valor
+    # («Solo en el mapa grande»). El valor guardado no cambia.
+    def fijar_habilitado(self, valor, motivo=None):
+        self._habilitado = bool(valor)
+        self._motivo = None if self._habilitado else motivo
+        self.flecha_izq.fijar_habilitado(self._habilitado)
+        self.flecha_der.fijar_habilitado(self._habilitado)
+        self.zona.collider = "box" if self._habilitado else None
+        self.texto.color = rgb(estilo.COLOR_TEXTO if self._habilitado else estilo.COLOR_TEXTO_TENUE)
+        self.fila.atenuar(not self._habilitado)
+        self.fijar_indice(self.indice)
+
     def fijar_foco(self, valor):
         self.fila.fijar_foco(valor)
 
     def manejar_clic(self):
-        self.ajustar(1)
+        if self._habilitado:
+            self.ajustar(1)
 
     def valor(self):
         return self.opciones[self.indice][1]
@@ -227,16 +264,18 @@ class Selector(Entity):
 
     def fijar_indice(self, indice, avisar=False):
         self.indice = max(0, min(len(self.opciones) - 1, indice))
-        etiqueta = self.opciones[self.indice][0]
+        etiqueta = self._motivo or self.opciones[self.indice][0]
         self.texto.text = etiqueta
         self.texto.scale = escala_fuente(21)
         # el texto largo se encoge para caber (nunca se sale del recuadro)
         diseno_adaptable.ajustar_texto(self.texto, self.ancho_centro - 0.03, escala_base=escala_fuente(21),
-                                       escala_min=0.6)
+                                       escala_min=0.6, max_lineas=1)
         if avisar and self._al_cambiar is not None:
             self._al_cambiar(self.opciones[self.indice][1])
 
     def ajustar(self, direccion):
+        if not self._habilitado:
+            return
         self.fijar_indice(calc.ciclar(self.indice, direccion, len(self.opciones)), avisar=True)
 
     def update(self):
@@ -266,14 +305,22 @@ class Interruptor(BotonSecundario):
         self._valor = bool(valor)
         self.text = self._texto_de(self._valor)
 
-    def _alternar(self):
-        self.fijar_valor(not self._valor)
-        if self._al_cambiar is not None:
-            self._al_cambiar(self._valor)
-
     def fijar_foco(self, valor):
         super().fijar_foco(valor)
         self.fila.fijar_foco(valor)
+
+    def fijar_habilitado(self, valor):
+        super().fijar_habilitado(valor)
+        fila = getattr(self, "fila", None)
+        if fila is not None:
+            fila.atenuar(not self._habilitado)
+
+    def _alternar(self):
+        if not self._habilitado:
+            return
+        self.fijar_valor(not self._valor)
+        if self._al_cambiar is not None:
+            self._al_cambiar(self._valor)
 
     def ajustar(self, direccion):
         self._alternar()
@@ -289,13 +336,30 @@ class Seccion(Entity):
         self.pantalla = pantalla
         self.filas_foco = []          # cada elemento: lista de controles de una fila
         self._y = Y_CONTENIDO
+        self._filas = []              # todas las filas en orden, para compactar()
         self._al_mostrar = []         # callbacks sin argumentos al abrir la pestaña
         self.controles = {}           # clave -> control (para refrescar valores desde el gestor)
 
     def _nueva_fila(self, etiqueta, alto=ALTO_FILA):
         fila = Fila(etiqueta, self._y - alto / 2, alto=alto, parent=self)
         self._y -= alto
+        self._filas.append(fila)
         return fila
+
+    # Si las filas no caben hasta Y_FONDO_CONTENIDO (Audio con «Probar sonido» y el aviso de salidas), se juntan
+    # por igual sin bajar de FACTOR_FILA_MIN: así ninguna invade la nota ni los botones del pie.
+    def compactar(self):
+        usado = Y_CONTENIDO - self._y
+        disponible = Y_CONTENIDO - Y_FONDO_CONTENIDO
+        if usado <= disponible:
+            return
+        factor = max(FACTOR_FILA_MIN, disponible / usado)
+        y = Y_CONTENIDO
+        for fila in self._filas:
+            alto = fila.alto * factor
+            fila.y = y - alto / 2
+            y -= alto
+        self._y = y
 
     def en_mostrar(self, callback):
         self._al_mostrar.append(callback)
@@ -310,13 +374,20 @@ class Seccion(Entity):
                        estilo.COLOR_TEXTO_TENUE if tenue else estilo.COLOR_TEXTO)
         diseno_adaptable.ajustar_texto(texto, ANCHO_PANEL - 0.2, escala_base=escala_fuente(px), escala_min=0.7,
                                        max_lineas=2)
+        texto.px_base = px
         return texto
 
-    # Deslizador ligado a `clave` de los ajustes (0..1). Devuelve el control.
-    def anadir_deslizador(self, etiqueta, clave, formato=calc.formato_porcentaje):
+    # Cambia el contenido de un texto de anadir_texto y lo vuelve a encajar (ayudas que dependen del valor).
+    def cambiar_texto(self, texto, contenido):
+        texto.text = contenido
+        diseno_adaptable.ajustar_texto(texto, ANCHO_PANEL - 0.2, escala_base=escala_fuente(texto.px_base),
+                                       escala_min=0.7, max_lineas=2)
+
+    # Deslizador ligado a `clave` de los ajustes (0..1). Devuelve el control. `paso` = lo que mueven las flechas.
+    def anadir_deslizador(self, etiqueta, clave, formato=calc.formato_porcentaje, paso=calc.PASO_DESLIZADOR):
         fila = self._nueva_fila(etiqueta)
         control = Deslizador(fila, getattr(self.gestor.actual, clave),
-                             lambda v: self.gestor.cambiar(**{clave: v}), formato)
+                             lambda v: self.gestor.cambiar(**{clave: v}), formato, paso)
         self.controles[clave] = control
         self.filas_foco.append([control])
         return control
@@ -375,12 +446,21 @@ def _seccion_accesibilidad(s):
     modos = [(dalt_nombre, m) for m, dalt_nombre in
              ((m, modelo_ajustes.NOMBRES_MODO[m]) for m in modelo_ajustes.MODOS_DALTONISMO)]
     s.anadir_selector("Filtro de color", "modo_daltonismo", modos)
-    s.anadir_deslizador("Intensidad", "intensidad")
-    s.anadir_interruptor("Simular la visión", "simular_daltonismo")
+    intensidad = s.anadir_deslizador("Intensidad", "intensidad")
+    simular = s.anadir_interruptor("Simular la visión", "simular_daltonismo")
     s.anadir_muestras(dalt.MUESTRAS)
-    s.anadir_texto("El filtro cambia los colores de TODA la pantalla (mundo e interfaz) en vivo. "
-                   "Corrige para distinguir mejor rojos, verdes y azules; «Simular» muestra cómo lo ve "
-                   "alguien con ese tipo de daltonismo.")
+    s.anadir_texto("El filtro cambia los colores de toda la pantalla en vivo. Corrige para distinguir "
+                   "rojos, verdes y azules; «Simular» muestra cómo lo ve alguien con ese daltonismo.")
+
+    # Sin filtro, la intensidad no cambia nada; «Simular» solo existe para los tipos de visión.
+    def atenuar_filas(ajustes, cambiadas):
+        if "modo_daltonismo" not in cambiadas:
+            return
+        activas = calc.filas_daltonismo_activas(ajustes.modo_daltonismo)
+        intensidad.fijar_habilitado(activas["intensidad"])
+        simular.fijar_habilitado(activas["simular_daltonismo"])
+
+    s.gestor.suscribir(atenuar_filas)
 
 
 def _seccion_audio(s):
@@ -436,8 +516,8 @@ class PantallaAjustes(Entity):
         self.panel = panel_tinta(self.raiz, ANCHO_PANEL, ALTO_PANEL, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
         anadir_filo(self.panel, ANCHO_PANEL, ALTO_PANEL, estilo.RADIO_PANEL_PX)
         self.titulo = _texto(self.raiz, "Ajustes", 0, 0.385, 38, estilo.COLOR_TEXTO, origen=(0, 0), titulo=True)
-        self.nota = _texto(self.raiz, "Atrás descarta los cambios sin guardar.", -ANCHO_PANEL / 2 + 0.05, -0.322,
-                           17, estilo.COLOR_TEXTO_TENUE)
+        self.nota = _texto(self.raiz, "", X_NOTA, -0.385, 17, estilo.COLOR_TEXTO_TENUE, origen=(0, 0))
+        self._fijar_nota("Atrás descarta los cambios sin guardar.")
 
         alto_boton = a_unidades(52)
         self.boton_restablecer = BotonSecundario(
@@ -481,6 +561,7 @@ class PantallaAjustes(Entity):
             except Exception as error:     # una sección rota no debe tumbar la pantalla
                 print(f"[ajustes] la sección {nombre!r} falló: {error}")
                 seccion.anadir_texto("Esta sección no se pudo cargar.")
+            seccion.compactar()
             self.secciones[nombre] = seccion
         self._version_registro = _registro.version
         self.seccion_actual = None
@@ -537,7 +618,13 @@ class PantallaAjustes(Entity):
     def restablecer(self):
         self.gestor.restablecer()
         self.refrescar_controles()
-        self.nota.text = "Valores por defecto (pulsa Guardar para conservarlos)."
+        self._fijar_nota("Valores por defecto (pulsa Guardar para conservarlos).")
+
+    # La nota vive en el hueco del pie: se parte en dos líneas y se encoge un poco si no cabe.
+    def _fijar_nota(self, contenido):
+        self.nota.text = contenido
+        diseno_adaptable.ajustar_texto(self.nota, ANCHO_NOTA, escala_base=escala_fuente(17), escala_min=0.85,
+                                       max_lineas=2)
 
     def guardar_y_cerrar(self):
         ok = self.gestor.guardar()
@@ -551,7 +638,7 @@ class PantallaAjustes(Entity):
         if self._cerrando:
             return
         self._cerrando = True
-        self.nota.text = "Atrás descarta los cambios sin guardar."
+        self._fijar_nota("Atrás descarta los cambios sin guardar.")
         if self._al_cerrar is not None:
             self._al_cerrar(guardado)
 

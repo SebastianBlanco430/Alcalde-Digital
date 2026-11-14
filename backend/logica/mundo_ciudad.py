@@ -23,6 +23,7 @@
 # (Terreno.caminable) tampoco son transitables: hacen de muro, salvo sobre una Escalera.
 
 import math
+import os
 from dataclasses import dataclass
 
 from backend.datos.modelos_edificios import modelo_de
@@ -41,6 +42,34 @@ MARGEN_BORDE_TERRENO = 3.0       # m que se dejan sin pisar antes de que termine
 # celdas que toca su caja ensanchada por radio_jugador (fuera de ella no puede chocar). False = la lista entera.
 INDICE_COLISIONES = True
 CELDA_COLISIONES = 8.0           # m de lado de cada celda
+# Colisión del decorado que el modelo no conoce (vallas, bancos, farolas... de frontend/props_mundo.py; torres del
+# teleférico; puestos). El cliente los entrega con agregar_obstaculos(). False (o ALCALDE_COLISION_PROPS=0) = el
+# decorado se atraviesa como antes.
+COLISION_DECORADO = True
+
+
+# Índice de escaleras por celdas (rendimiento): es_transitable en un talud, perfil_escalera_en (jugador, 2 por frame) y
+# los vehículos (posicion_valida: 3 puntos por intento) recorrían TODAS las escaleras (364 en el mapa grande). El índice
+# devuelve las de la celda en su orden original: el resultado es idéntico. ALCALDE_ESCALERAS_INDICE=0 = la lista entera.
+ESCALERAS_INDICE = True
+CELDA_ESCALERAS = 8.0
+
+
+def escaleras_indice_activo():
+    valor = os.environ.get("ALCALDE_ESCALERAS_INDICE", "").strip().lower()
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(ESCALERAS_INDICE)
+
+
+def colision_decorado_activa():
+    """¿El decorado entregado con agregar_obstaculos() choca? ALCALDE_COLISION_PROPS=1/0 manda sobre la constante."""
+    valor = os.environ.get("ALCALDE_COLISION_PROPS", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(COLISION_DECORADO)
 DISTANCIA_ENTRADA = 1.2          # m delante de la puerta donde se para el personaje
 LADOS_PUERTA = ("n", "s", "e", "o")
 # Rumbo (rotation_y, grados) con el que se ENTRA por cada cara: hacia dentro del edificio.
@@ -270,6 +299,7 @@ class MundoCiudad:
             self._validar_edificio(edificio)
             self._por_lugar[edificio.lugar] = edificio
 
+        self._extra = {}                 # origen -> obstáculos del decorado del cliente (ver agregar_obstaculos)
         self._fisicos = [e.como_obstaculo() for e in self._edificios] + self._obstaculos
         self._celdas = _indexar(self._fisicos, radio_jugador) if INDICE_COLISIONES else None
         self.terreno = terreno           # objeto con altura(x, z); None = mundo plano
@@ -280,6 +310,7 @@ class MundoCiudad:
         self._limites = self._calcular_limites(margen_edificios)
         self._limites_recorribles = self._calcular_limites_recorribles()
         self._perfiles_escalera = None   # perfiles de peldaños (se arman al primer uso, ver perfiles_escaleras)
+        self._celdas_escaleras = None    # {celda: (índices de escalera,)} (se arma al primer uso, ver escaleras_en)
 
         for edificio in self._edificios:
             if not self._puerta_libre(edificio):
@@ -294,6 +325,37 @@ class MundoCiudad:
 
     def escaleras(self):
         return list(self._escaleras)
+
+    # Obstáculos que el modelo no conoce pero que el cliente dibuja con cuerpo (decorado de props_mundo, torres del
+    # teleférico, puestos). Solo cambian es_transitable: obstaculos() (lo que se dibuja y lo que firma la huella de
+    # la sala online) queda igual. `origen` agrupa: volver a llamar con el mismo origen REEMPLAZA esa lista, así es
+    # idempotente si la ciudad 3D se reconstruye. Se descarta lo que tape un punto de entrada o un spawn (nunca deja
+    # una puerta inalcanzable). Devuelve cuántos quedaron; 0 con la bandera apagada.
+    def agregar_obstaculos(self, obstaculos, origen="decorado"):
+        if not colision_decorado_activa():
+            return 0
+        protegidos = [e.punto_entrada() for e in self._edificios] + list(self.spawns.values())
+        libres = [o for o in obstaculos
+                  if not any(o.choca(x, z, self.radio_jugador) for x, z in protegidos)]
+        viejos = self._extra.get(origen, [])
+        self._extra[origen] = libres
+        # Incremental: rehacer la rejilla entera costaba ~24 ms en el mapa grande (6000 obstáculos) en cada montar/bajar.
+        # Solo se tocan las celdas de lo que sale y de lo que entra (el orden dentro de una celda no cambia el resultado).
+        fuera = {id(o) for o in viejos}
+        self._fisicos = [o for o in self._fisicos if id(o) not in fuera] + libres
+        if self._celdas is not None:
+            for celda in _indexar(viejos, self.radio_jugador):
+                if celda in self._celdas:
+                    self._celdas[celda] = [o for o in self._celdas[celda] if id(o) not in fuera]
+            for celda, lista in _indexar(libres, self.radio_jugador).items():
+                self._celdas.setdefault(celda, []).extend(lista)
+        return len(libres)
+
+    # Lo que agregar_obstaculos() añadió (por origen o todo): pruebas y depuración.
+    def obstaculos_extra(self, origen=None):
+        if origen is not None:
+            return list(self._extra.get(origen, ()))
+        return [o for lista in self._extra.values() for o in lista]
 
     # Muros de contención de los taludes (la colisión no los usa: el talud ya bloquea el paso).
     def muros(self):
@@ -348,10 +410,31 @@ class MundoCiudad:
     def perfil_escalera_en(self, x, z):
         if self.terreno is None:
             return None
-        for perfil in self.perfiles_escaleras():
-            if perfil.escalera.contiene(x, z):
-                return perfil
+        perfiles = self.perfiles_escaleras()
+        for k in self._indices_escaleras_en(x, z):
+            if perfiles[k].escalera.contiene(x, z):
+                return perfiles[k]
         return None
+
+    # ¿Hay alguna escalera bajo (x, z)? (con o sin terreno; la usan es_transitable y los vehículos)
+    def hay_escalera_en(self, x, z):
+        return any(self._escaleras[k].contiene(x, z) for k in self._indices_escaleras_en(x, z))
+
+    # Índices (en orden) de las escaleras que pueden contener (x, z): las de su celda, o todas sin índice.
+    def _indices_escaleras_en(self, x, z):
+        if not escaleras_indice_activo():
+            return range(len(self._escaleras))
+        if self._celdas_escaleras is None:
+            celdas = {}
+            for k, e in enumerate(self._escaleras):
+                m = e.ancho / 2
+                for i in range(math.floor((min(e.ax, e.bx) - m) / CELDA_ESCALERAS),
+                               math.floor((max(e.ax, e.bx) + m) / CELDA_ESCALERAS) + 1):
+                    for j in range(math.floor((min(e.az, e.bz) - m) / CELDA_ESCALERAS),
+                                   math.floor((max(e.az, e.bz) + m) / CELDA_ESCALERAS) + 1):
+                        celdas.setdefault((i, j), []).append(k)
+            self._celdas_escaleras = {c: tuple(v) for c, v in celdas.items()}
+        return self._celdas_escaleras.get((math.floor(x / CELDA_ESCALERAS), math.floor(z / CELDA_ESCALERAS)), ())
 
     # -- Delegación al mapa (lo que usa el GPS) --
 
@@ -427,7 +510,7 @@ class MundoCiudad:
         if not (xmin <= x <= xmax and zmin <= z <= zmax):
             return False
         if (self.terreno is not None and not self.terreno.caminable(x, z)
-                and not any(e.contiene(x, z) for e in self._escaleras)):
+                and not self.hay_escalera_en(x, z)):
             return False
         candidatos = self._fisicos if self._celdas is None else self._celdas.get(_celda(x, z), ())
         return not any(o.choca(x, z, self.radio_jugador) for o in candidatos)

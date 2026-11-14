@@ -2,7 +2,8 @@
 # de él cuelgan el fin por tiempo, los efectos retardados y el costo de aislamiento (backend/logica/flujo_tiempo.py).
 #
 # ESCALA. La partida empieza el día 1 a las 08:00 y termina al COMPLETAR el día 7 (24:00 del día 7). Cada hora de juego
-# dura SEGUNDOS_REALES_POR_HORA = 15 s reales: 1 día = 6 min y la partida entera (160 h de juego) = 40 min reales.
+# dura SEGUNDOS_REALES_POR_HORA = 11,25 s reales: 1 día = 4,5 min y la partida entera (160 h de juego) = 30 min reales
+# (tope pedido para la entrega; antes eran 15 s y 40 min).
 # ALCALDE_SEG_POR_HORA=<n> cambia la escala (p. ej. 2 para probar la semana en ~5 min); se lee al crear cada reloj.
 #
 # CUÁNDO CORRE (decisión): solo con el MUNDO ACTIVO. El reloj no lee ningún reloj real: avanza únicamente cuando alguien
@@ -35,7 +36,7 @@ RELOJ = True
 DIAS = 7
 HORAS_POR_DIA = 24.0
 HORA_INICIO = 8.0                   # el día 1 empieza a las 08:00
-SEGUNDOS_REALES_POR_HORA = 15.0     # 1 día = 6 min reales; partida ≈ 40 min
+SEGUNDOS_REALES_POR_HORA = 11.25    # 1 día = 4,5 min reales; partida (160 h) = 30 min
 DT_MAX = 0.5                        # s reales: tope de un paso de avanzar()
 
 _VERSION = 1

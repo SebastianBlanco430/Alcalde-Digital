@@ -8,6 +8,7 @@
 # marcador {cuando} en los mensajes retardados y que todo efecto se pueda crear con efectos_retardados.crear_efecto.
 
 import json
+import os
 from collections import namedtuple
 from pathlib import Path
 
@@ -96,6 +97,15 @@ def _dilema(crudo):
                   _retardado(ignorar, f"{ident}.ignorar") if ignorar is not None else None)
 
 
+# Un dilema puede traer "bandera": "ALCALDE_X" (p. ej. los de ciberacoso, ALCALDE_CIBERACOSO). Con esa variable en 0 el
+# dilema no se carga (se valida igual: un JSON roto sigue fallando). Sin bandera, siempre se carga.
+def _encendido(crudo):
+    bandera = crudo.get("bandera") if isinstance(crudo, dict) else None
+    if not isinstance(bandera, str) or not bandera.startswith("ALCALDE_"):
+        return True
+    return os.environ.get(bandera, "").strip().lower() not in ("0", "false", "no", "off")
+
+
 # Todos los dilemas válidos (tupla, en el orden del archivo). ValueError si el archivo no existe, no es JSON o algo no
 # cuadra. Los ids de dilema y las claves de efecto no se pueden repetir.
 def cargar_dilemas(ruta=None):
@@ -109,10 +119,11 @@ def cargar_dilemas(ruta=None):
     if not isinstance(datos, dict) or datos.get("version") != VERSION or not isinstance(datos.get("dilemas"), list):
         raise ValueError(f"{ruta.name}: formato desconocido (se esperaba version {VERSION} y una lista «dilemas»).")
     dilemas = tuple(_dilema(d) for d in datos["dilemas"])
+    encendidos = {d.get("id") for d in datos["dilemas"] if _encendido(d)}
     ids = [d.id for d in dilemas]
     if len(set(ids)) != len(ids):
         raise ValueError(f"{ruta.name}: ids de dilema repetidos.")
     claves = [o.retardado.clave for d in dilemas for o in d.opciones] + [d.ignorar.clave for d in dilemas if d.ignorar]
     if len(set(claves)) != len(claves):
         raise ValueError(f"{ruta.name}: claves de efecto repetidas.")
-    return dilemas
+    return tuple(d for d in dilemas if d.id in encendidos)

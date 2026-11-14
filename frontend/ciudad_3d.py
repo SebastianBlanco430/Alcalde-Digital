@@ -56,7 +56,9 @@ from frontend.favela_detalles import LETRAS_CARTEL, construir_favela_detalles, l
 from frontend.geometria_mundo import ENTIERRO_BASE, apoyo_de_caja, medidas_losa, medidas_zocalo
 from frontend.muros_contencion import construir_muros
 from frontend.piezas import MASCARA_LUZ, encender_luz, lineas_sueltas, pieza, silenciar
-from frontend.props_mundo import cinta_con_tono, construir_props_mundo, construir_props_y_contorno
+from frontend.props_mundo import (
+    cinta_con_tono, colocar_props, construir_props_mundo, construir_props_y_contorno, obstaculos_de_props,
+)
 from frontend import suelo_calculos as sc
 from frontend.suelo_favela import (cinta_asfalto_gastado, malla_calles_arena, malla_plaza_pintada,
                                    textura_del_camino, textura_del_grano)
@@ -645,10 +647,14 @@ class Ciudad3D(Entity):
                       scale=(0.05, 0.05, math.hypot(horizontal, q[1] - p[1])))
 
     # Decorado nuevo (árboles variados, arbustos, farolas, bancos, vallas, carteles, jardineras y la
-    # fuente de la Praça da Sé): dos mallas únicas hechas en props_mundo, sin colisión. La de luces
-    # (focos de las farolas) va sin sombreado y fuera del mapa de sombras.
+    # fuente de la Praça da Sé): dos mallas únicas hechas en props_mundo. La de luces (focos de las farolas) va sin
+    # sombreado y fuera del mapa de sombras. Lo que tiene cuerpo se entrega al modelo como colisión (solo en este
+    # cliente: el anfitrión online valida con su propio mundo, más permisivo, y la huella de la sala no cambia).
     def _construir_decorado(self):
-        opaca, luces, contorno = construir_props_y_contorno(self._mundo)
+        props = colocar_props(self._mundo)
+        if hasattr(self._mundo, "agregar_obstaculos"):
+            self._mundo.agregar_obstaculos(obstaculos_de_props(props), origen="props")
+        opaca, luces, contorno = construir_props_y_contorno(self._mundo, props)
         if opaca is not None:
             pieza(parent=self, model=opaca, name="decorado")
         if contorno is not None and CONTORNO_TINTA and CASAS_VIVAS:

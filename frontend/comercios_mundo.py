@@ -6,9 +6,10 @@
 #
 # Rendimiento: ningún tornillo es una Entity. Todos los puestos se funden en UNA malla (props_mundo.Malla, normales
 # planas y color por vértice, con luz y sombras) y solo hay un Text por letrero y un NPC por dependiente.
-# Sin colisión nueva: el decorado no choca con nada; la colocación (frontend/comercios_calculos.py) evita que un
-# puesto pise edificios, asfalto, escaleras u obstáculos con la huella de ~2,6 x 2,4 m (gira el puesto o lo corre
-# unos metros desde su ancla si hace falta).
+# Colisión: el mostrador y el fondo de cada puesto chocan (comercios_calculos.obstaculos_puesto, entregado al modelo con
+# agregar_obstaculos, origen «puestos»; bandera ALCALDE_COLISION_PROPS). La colocación (frontend/comercios_calculos.py)
+# evita que un puesto pise edificios, asfalto, escaleras u obstáculos con la huella de ~2,6 x 2,4 m (gira el puesto o
+# lo corre unos metros desde su ancla si hace falta).
 
 import math
 import sys
@@ -18,7 +19,7 @@ from ursina import Text
 from backend.datos.comercios_semilla import CATALOGO_COMERCIOS
 from backend.logica.comercios import resolver_comercios
 from backend.logica.perfil_economia import perfil_de
-from frontend.comercios_calculos import Ocupacion, elegir_puesto, huellas_mercadito
+from frontend.comercios_calculos import Ocupacion, elegir_puesto, huellas_mercadito, obstaculos_puesto
 from frontend.componentes import rgb
 from frontend.props_mundo import Malla, anillo, caja, icosfera, prisma
 from frontend.tienda_calculos import ControlTienda
@@ -551,6 +552,9 @@ def instalar(economia, comercios=None, crear_npc=None):
         puestos.append((orden, comercio, px, pz, prumbo))
     for orden, comercio, px, pz, prumbo in puestos:
         dibujar_puesto(malla, comercio.id, px, suelo(px, pz), pz, prumbo)
+    if hasattr(mundo, "agregar_obstaculos"):
+        mundo.agregar_obstaculos([o for _o, _c, px, pz, prumbo in puestos for o in obstaculos_puesto(px, pz, prumbo)],
+                                 origen="puestos")
     registrados = []
     usados = {INDICE_NPC_BASE - 1}                      # el 100 es Seu Zé
     mesh = malla.mesh()

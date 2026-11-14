@@ -17,6 +17,7 @@
 # esperan la cámara de siempre).
 
 import math
+import os
 
 from ursina import Entity, Vec3, camera, mouse, raycast, scene, time
 
@@ -35,6 +36,9 @@ DISTANCIA_MIN_COLISION = 1.2  # la cámara nunca se mete más cerca del pivote q
 # el raycast no basta: DISTANCIA_MIN_COLISION (1.2 m) dejaba la cámara DENTRO del muro cuando el jugador
 # estaba a menos de ~1.6 m de él. False = comportamiento de antes.
 CAMARA_ANALITICA = True
+# Rejilla para la colisión analítica del mapa chico (camara_calculos.IndiceCamara): mismo resultado, menos cajas por
+# frame. ALCALDE_CAMARA_REJILLA=0 vuelve a recorrer la lista entera. El mapa grande ya pasa solo las cajas cercanas.
+CAMARA_REJILLA = os.environ.get("ALCALDE_CAMARA_REJILLA") != "0"
 MINIMO_ANALITICO = 0.3        # m: lo más cerca del pivote que la colisión analítica deja la cámara
 # AVATAR PEGADO A LA PARED (aditivo): con la cámara a menos de DISTANCIA_OCULTAR_AVATAR del pivote (el jugador de
 # espaldas junto a una fachada) la cámara quedaba DENTRO del torso y tapaba la pantalla; se oculta ese avatar y se
@@ -61,6 +65,8 @@ class CamaraTerceraPersona(Entity):
         super().__init__(**opciones)
         self.raiz_colisiones = raiz_colisiones
         self.obstaculos = obstaculos_de_camara(obstaculos) if hasattr(obstaculos, "obstaculos") else list(obstaculos or [])
+        if CAMARA_REJILLA and self.obstaculos:
+            self.obstaculos = cc.IndiceCamara(self.obstaculos)
         self.suelo = suelo or (lambda x, z: 0.0)
         self.yaw = 0.0
         self.pitch = PITCH_INICIAL

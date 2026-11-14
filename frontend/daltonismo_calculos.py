@@ -144,9 +144,17 @@ def matriz_simulacion_3x3(modo, intensidad=1.0):
     return IDENTIDAD
 
 
+# ¿Este modo es un tipo de visión que se pueda simular? «Alto contraste» y «Sin filtro» no lo son.
+def se_puede_simular(modo):
+    modo = _modo_valido(modo)
+    return modo in SIMULACION or modo == "acromatopsia"
+
+
 # Parámetros listos para el shader: (matriz 3x3, desplazamiento) según corrija o simule.
+# «Simular» con un modo que no se puede simular (alto contraste) aplicaba la identidad y el filtro parecía
+# apagado: ahí se ignora y se corrige como siempre.
 def parametros(modo, intensidad=1.0, simular=False):
-    if simular:
+    if simular and se_puede_simular(modo):
         return matriz_simulacion_3x3(modo, intensidad), SIN_DESPLAZAMIENTO
     return matriz_3x3(modo, intensidad), desplazamiento(modo, intensidad)
 

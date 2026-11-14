@@ -124,6 +124,12 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
             flujo = FlujoConTiempo(flujo)
             from backend.logica import dilemas      # dilemas jugables con consecuencia retardada (ALCALDE_DILEMAS=0 los apaga)
             flujo = dilemas.envolver(flujo)
+            # estafas, publicar y tiempo de pantalla (ALCALDE_ESTAFAS / ALCALDE_PUBLICAR_FOTO / ALCALDE_TIEMPO_PANTALLA)
+            from backend.logica import habitos_digitales
+            flujo = habitos_digitales.envolver(flujo)
+        # lo bien que se verificó en un minijuego da propina y confianza (ALCALDE_CONSECUENCIA_GRADUADA=0 lo apaga)
+        from backend.logica import consecuencia_graduada
+        flujo = consecuencia_graduada.envolver(flujo)
         return flujo
 
     transicion = Transicion(duracion_transicion, duracion_transicion)

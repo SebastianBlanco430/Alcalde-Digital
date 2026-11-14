@@ -5,7 +5,7 @@
 
 from ursina import Text
 
-from frontend import estilo
+from frontend import diseno_adaptable, estilo
 from frontend.componentes import (
     BotonPrimario, BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb,
 )
@@ -44,6 +44,9 @@ class EscenaInicio(Escena):
         self.texto_subtitulo = Text(
             SUBTITULO, parent=self.placa_subtitulo, origin=(0, 0), position=(0, 0, -0.001),
             scale=escala_fuente(21), color=rgb(estilo.COLOR_TEXTO))
+        # el subtítulo casi llena la placa: con otra fuente o escala no debe salirse de ella
+        diseno_adaptable.ajustar_texto(self.texto_subtitulo, ancho_sub - 0.04, escala_base=escala_fuente(21),
+                                       escala_min=0.8, max_lineas=1)
 
         # Con «En línea» hay un botón más: se compacta la columna (alto y paso menores) para que Salir quepa.
         alto_b = self.ALTO_BOTON if al_online is None else a_unidades(50)
@@ -87,7 +90,7 @@ class EscenaInicio(Escena):
             tamano_fuente_px=26, parent=self, position=(-self.X_PAREJA, self.Y_BOTON), enabled=False)
         self.texto_continuar = Text(
             "", parent=self, origin=(0, 0), position=(-self.X_PAREJA, self.Y_BOTON + alto_b / 2 + a_unidades(16), -0.001),
-            scale=escala_fuente(15), color=rgb(estilo.COLOR_TEXTO), enabled=False)
+            scale=escala_fuente(16), color=rgb(estilo.COLOR_TEXTO), enabled=False)
         self._botones_base = self.botones
         self._al_continuar = None
         self._resumen_guardado = None
@@ -115,8 +118,12 @@ class EscenaInicio(Escena):
         self.boton_continuar.enabled = hay
         self.texto_continuar.enabled = hay
         self.texto_continuar.text = f"Partida guardada: {texto}" if hay else ""
+        if hay:
+            # cabe sobre la pareja de botones (de «Continuar» al centro de «Partida nueva»)
+            diseno_adaptable.ajustar_texto(self.texto_continuar, 2 * self.X_PAREJA, escala_base=escala_fuente(16),
+                                           escala_min=0.8, max_lineas=1)
         self.boton_comenzar.x = self.X_PAREJA if hay else 0
-        self.boton_comenzar.text_entity.text = "Partida nueva" if hay else "Empezar"
+        self.boton_comenzar.text = "Partida nueva" if hay else "Empezar"
         self.botones = ((self.boton_continuar,) + self._botones_base) if hay else self._botones_base
 
     def al_entrar(self, **datos):

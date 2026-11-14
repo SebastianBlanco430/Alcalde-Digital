@@ -40,6 +40,16 @@
 # 7. ALCALDE_SIN_VSYNC=1 (solo para medir; por defecto no cambia nada) quita la sincronía vertical y deja el tope de
 #    60. Con vsync en un monitor de 60 Hz, un frame de algo más de 16,7 ms espera al refresco siguiente y el juego
 #    cae a 30 FPS. En la RTX 3050 (144 Hz) no se notó: hay que medirlo con F3 en un equipo más lento.
+#
+# 8. Solo Windows, TEMPORIZADOR_FINO: el tope de 60 FPS de Panda duerme con Sleep(), que en Windows despierta por
+#    defecto a saltos de hasta 15,6 ms (medido 2026-11-13 en la RTX 3050: Sleep(1) = 7 ms de mediana y 16 ms de
+#    máximo; con timeBeginPeriod(1), 2 ms). Con 5 ms de trabajo por frame el p99 del dt bajó de 19,8 a 18,3 ms (frames
+#    más parejos). Se pide al instalar y se devuelve al salir (atexit). ALCALDE_SIN_TEMPORIZADOR_FINO=1 lo apaga.
+#
+# 9. Solo Windows, SIN_ESTRANGULAR: Windows 11 mete en «EcoQoS» (núcleos de eficiencia, menos frecuencia) a procesos
+#    que cree de fondo, sobre todo en portátiles con el plan «Equilibrado». Se le pide que no lo haga con este proceso
+#    (SetProcessInformation, ProcessPowerThrottling). ALCALDE_SIN_ANTI_ESTRANGULAMIENTO=1 lo apaga.
+#    macOS y Linux no ejecutan nada de 8 ni de 9.
 
 import __main__
 import os
@@ -57,6 +67,8 @@ ENTRADA_CAMARA = "camera_world_position"
 ORDEN_TAREA_CAMARA = 45   # después del update de Ursina (orden 0) y antes de dibujar (igLoop, orden 50)
 PRECARGAR_ESCENAS = True
 BUCLE_RAPIDO = True
+TEMPORIZADOR_FINO = True
+SIN_ESTRANGULAR = True
 
 
 def _variable(nombre):
@@ -296,9 +308,55 @@ def _instalar_bucle_rapido():
     base._update_task = base.task_mgr.add(_update_rapido, "update", sort=orden)
 
 
+def temporizador_fino_activo():
+    return (sys.platform == "win32" and TEMPORIZADOR_FINO and not _variable("ALCALDE_SIN_TEMPORIZADOR_FINO")
+            and not _todo_apagado())
+
+
+def sin_estrangular_activo():
+    return (sys.platform == "win32" and SIN_ESTRANGULAR and not _variable("ALCALDE_SIN_ANTI_ESTRANGULAMIENTO")
+            and not _todo_apagado())
+
+
+# Ajustes del proceso solo para Windows (ver 8 y 9). Devuelve los nombres de los que se aplicaron. Nunca lanza.
+def ajustes_windows():
+    aplicados = []
+    if temporizador_fino_activo():
+        try:
+            import atexit
+            import ctypes
+            winmm = ctypes.windll.winmm
+            if winmm.timeBeginPeriod(1) == 0:          # TIMERR_NOERROR
+                atexit.register(winmm.timeEndPeriod, 1)
+                aplicados.append("temporizador_fino")
+        except Exception as error:      # noqa: BLE001
+            print(f"[rendimiento] sin temporizador de 1 ms ({error}).", file=sys.stderr)
+    if sin_estrangular_activo():
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class _Estrangulamiento(ctypes.Structure):    # PROCESS_POWER_THROTTLING_STATE
+                _fields_ = [("Version", wintypes.ULONG), ("ControlMask", wintypes.ULONG),
+                            ("StateMask", wintypes.ULONG)]
+            # Versión 1; se controla EXECUTION_SPEED (1) y se deja en 0: «no estrangular la velocidad».
+            estado = _Estrangulamiento(1, 1, 0)
+            kernel = ctypes.windll.kernel32
+            kernel.GetCurrentProcess.restype = wintypes.HANDLE
+            kernel.SetProcessInformation.argtypes = (wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD)
+            kernel.SetProcessInformation.restype = wintypes.BOOL
+            proceso = kernel.GetCurrentProcess()
+            if kernel.SetProcessInformation(proceso, 4, ctypes.byref(estado), ctypes.sizeof(estado)):  # 4 = PowerThrottling
+                aplicados.append("sin_estrangular")
+        except Exception as error:      # noqa: BLE001
+            print(f"[rendimiento] no se pudo pedir sin EcoQoS ({error}).", file=sys.stderr)
+    return aplicados
+
+
 # Lo llama main.crear_aplicacion() con la ventana ya abierta. Devuelve el silenciador (o None). Nunca lanza:
 # si algo falla, se avisa y el juego sigue como siempre.
 def instalar():
+    ajustes_windows()
     try:
         if camara_en_la_raiz_activa():
             from ursina import application

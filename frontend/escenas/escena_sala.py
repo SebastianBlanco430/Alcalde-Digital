@@ -31,6 +31,10 @@ ALTO_FILA = 0.070
 ANCHO_TABLA = 1.60
 X_COL = {"alias": -0.77, "rol": -0.40, "listo": -0.08, "conexion": 0.22, "ping": 0.50}
 X_DER = 0.46                       # centro de la columna derecha (código y cómo entrar)
+# Anchos útiles de los textos que cambian en vivo (hasta el siguiente elemento): nada se monta encima de otro.
+ANCHO_ESTADO = 0.55                # de t_estado al botón de ayuda
+ANCHO_AVISO = 1.58                 # todo el panel
+ANCHO_COL = {"conexion": X_COL["ping"] - X_COL["conexion"] - 0.02, "ping": ANCHO_TABLA / 2 - X_COL["ping"] - 0.02}
 COLOR_NIVEL = {lobby.NIVEL_BUENO: estilo.ESTADO_EXITO, lobby.NIVEL_ACEPTABLE: estilo.ESTADO_AVISO,
                lobby.NIVEL_ALTO: estilo.ESTADO_ERROR, lobby.NIVEL_SIN_DATO: estilo.COLOR_TEXTO_TENUE}
 REFRESCO_S = 0.5
@@ -43,8 +47,8 @@ class FilaJugador(Entity):
         super().__init__(**kw)
         self.panel = panel_tinta(self, ANCHO_TABLA, ALTO_FILA - 0.010, estilo.COLOR_TARJETA, estilo.RADIO_CHIP_PX,
                                  sombra=False, borde_px=2, position=(0, 0, 0))
-        self.t_alias = crear_texto(self, " ", X_COL["alias"], 0.010, 20, z=-0.01)
-        self.t_sub = crear_texto(self, " ", X_COL["alias"], -0.020, 14, estilo.COLOR_TEXTO_TENUE, z=-0.01)
+        self.t_alias = crear_texto(self, " ", X_COL["alias"], 0.011, 20, z=-0.01)
+        self.t_sub = crear_texto(self, " ", X_COL["alias"], -0.017, 16, estilo.COLOR_TEXTO_TENUE, z=-0.01)
         self.t_rol = crear_texto(self, " ", X_COL["rol"], 0, 19, z=-0.01)
         self.t_listo = crear_texto(self, " ", X_COL["listo"], 0, 19, z=-0.01)
         self.t_conexion = crear_texto(self, " ", X_COL["conexion"], 0, 19, z=-0.01)
@@ -69,8 +73,10 @@ class FilaJugador(Entity):
         fijar(self.t_listo, c.texto_listo)
         self.t_listo.color = rgb(estilo.ESTADO_EXITO if c.listo else estilo.COLOR_TEXTO_TENUE)
         fijar(self.t_conexion, c.texto_conexion)
+        ajustar_ancho(self.t_conexion, ANCHO_COL["conexion"], 19)
         self.t_conexion.color = rgb(estilo.ESTADO_EXITO if c.conectado else estilo.ESTADO_ERROR)
         fijar(self.t_ping, c.texto_ping)
+        ajustar_ancho(self.t_ping, ANCHO_COL["ping"], 19)
         self.t_ping.color = rgb(COLOR_NIVEL[c.nivel_ping])
 
 
@@ -129,12 +135,12 @@ class EscenaSala(Escena):
         self.btn_copiar = BotonSecundario("Copiar", al_clic=self.copiar_acceso, ancho=0.34, alto=a_unidades(38),
                                           tamano_fuente_px=17, parent=self.caja_codigo,
                                           position=(X_DER + 0.18, 0.17, -0.003))
-        self.t_copiado = crear_texto(self.caja_codigo, " ", xi, 0.115, 15, estilo.ESTADO_EXITO)
+        self.t_copiado = crear_texto(self.caja_codigo, " ", xi, 0.115, 16, estilo.ESTADO_EXITO)
         self.t_cifrado = crear_texto(self.raiz, " ", X_DER - 0.37, 0.04, 16, estilo.ESTADO_AVISO, origen=(-0.5, 0.5))
         texto_envuelto(self.t_cifrado, "Aviso: " + lobby.AVISO_SIN_CIFRAR, 0.74, 16, max_lineas=2)
         self.t_cifrado.origin = (-0.5, 0.5)
         self.btn_ayuda = BotonSecundario("Ayuda: cortafuegos de macOS", al_clic=self.alternar_ayuda, ancho=0.44,
-                                         alto=a_unidades(34), tamano_fuente_px=15, parent=self.raiz,
+                                         alto=a_unidades(34), tamano_fuente_px=16, parent=self.raiz,
                                          position=(0.60, 0.395, -0.003))
         # La ayuda se abre como un cuadro sobre la tabla (no empuja nada)
         self.caja_ayuda = Entity(parent=self.raiz, enabled=False, z=-0.02)
@@ -284,6 +290,7 @@ class EscenaSala(Escena):
         latencia = sesion.cliente.latencia_ms
         m.latencia_ms = latencia
         fijar(self.t_estado, m.texto_estado)
+        ajustar_ancho(self.t_estado, ANCHO_ESTADO, 20)
         for rol, tarjeta in self.tarjetas.items():
             dueno = m.rol_de(rol)
             tarjeta.marcar_tomado(None if dueno is None else dueno[:11].rstrip())
@@ -307,3 +314,4 @@ class EscenaSala(Escena):
         self.btn_iniciar.fijar_habilitado(m.puede_iniciar)
         aviso = self._aviso_local or m.aviso
         fijar(self.t_aviso, aviso)
+        ajustar_ancho(self.t_aviso, ANCHO_AVISO, 17)

@@ -5,14 +5,15 @@ echo "===================================================="
 echo "Configurando entorno para Alcalde Digital"
 echo "===================================================="
 
-cd "$(dirname "$0")" || exit 1
+cd "$(dirname "$0")" || { echo "[ERROR] No se pudo entrar a la carpeta del proyecto."; exit 1; }
 
 # Ursina 8.3.0 exige Python 3.12+ y panda3d solo publica ruedas hasta 3.14:
 # se busca un interprete 3.12 a 3.14 en vez de fiarse de lo que sea "python3".
 VERSION_OK='import sys; sys.exit(0 if (3, 12) <= sys.version_info[:2] < (3, 15) else 1)'
 
 PY=""
-for candidato in python3.14 python3.13 python3.12 python3; do
+# Igual que setup.bat, al final se prueba tambien "python" (algunas distros y pyenv solo traen ese nombre).
+for candidato in python3.14 python3.13 python3.12 python3 python; do
     if command -v "$candidato" >/dev/null 2>&1 && "$candidato" -c "$VERSION_OK" 2>/dev/null; then
         PY="$candidato"
         break
@@ -25,6 +26,8 @@ if [ -z "$PY" ]; then
     echo "ruedas para Python 3.15, asi que esa version tampoco sirve."
     echo "Instala Python 3.12 a 3.14 desde https://www.python.org/downloads/"
     echo "o con Homebrew: brew install python@3.13"
+    echo "En Linux: sudo apt install python3.12 python3.12-venv (o el paquete de tu distro)."
+    echo "Luego vuelve a correr setup.sh."
     exit 1
 fi
 
@@ -32,8 +35,9 @@ echo "Usando el interprete: $PY ($("$PY" --version))"
 
 if [ ! -d "venv" ]; then
     echo "Creando el entorno virtual venv..."
-    if ! "$PY" -m venv venv; then
+    if ! "$PY" -m venv venv || [ ! -x "./venv/bin/python" ]; then
         echo "[ERROR] No se pudo crear el entorno virtual."
+        echo "Si quedo una carpeta venv a medias, borrala (rm -rf venv) y vuelve a correr setup.sh."
         exit 1
     fi
 else
@@ -60,7 +64,8 @@ fi
 
 echo "Instalando dependencias de requirements.txt dentro del entorno virtual..."
 if ! ./venv/bin/python -m pip install -r requirements.txt; then
-    echo "[ERROR] No se pudieron instalar las dependencias de requirements.txt. Revisa tu conexion a internet."
+    echo "[ERROR] No se pudieron instalar las dependencias de requirements.txt."
+    echo "Revisa tu conexion a internet."
     exit 1
 fi
 
@@ -71,3 +76,4 @@ echo "    ./venv/bin/python main.py"
 echo "Para correr los tests:"
 echo "    ./venv/bin/python -m pytest"
 echo "===================================================="
+exit 0

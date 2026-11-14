@@ -1,5 +1,5 @@
 # Sección «Partida» de la pantalla de Ajustes (y por tanto del menú de pausa): botón «Borrar partida guardada» con
-# confirmación de DOS pasos (1.º pulsación: «¿Seguro? Pulsa otra vez»; 2.º: borra; «Cancelar» vuelve atrás).
+# confirmación de DOS pasos (1.º pulsación: «Sí, borrar» y el aviso de debajo; 2.º: borra; «Cancelar» vuelve atrás).
 # Entra por escena_ajustes.registrar_seccion (sin editar la escena); la llama registro_guardado.registrar().
 # La lógica de los dos pasos es pura (ConfirmarBorrado) y se prueba sin ventana. El texto lleva el mensaje completo
 # (no se apoya solo en el color), así que no depende del filtro de daltonismo.
@@ -8,7 +8,8 @@ from backend.logica import guardado_aviso
 
 NOMBRE_SECCION = "Partida"
 TEXTO_BORRAR = "Borrar partida guardada"
-TEXTO_CONFIRMAR = "¿Seguro? Pulsa otra vez"
+# corto para que quepa en el botón: el mensaje de debajo ya pide «Pulsa de nuevo para borrar»
+TEXTO_CONFIRMAR = "Sí, borrar"
 INFO = ("Tu partida se guarda solo en este equipo, en un archivo de tu carpeta de usuario. Si la borras, «Continuar» "
         "desaparece y no se puede recuperar.")
 MENSAJES = {
@@ -50,8 +51,13 @@ def construir_seccion(s, borrar=None):
     cancelar = None
 
     def refrescar(clave=""):
-        boton.text = estado.texto_boton()
-        mensaje.text = MENSAJES.get(clave, "")
+        boton.text = estado.texto_boton()          # el botón de tinta encoge el texto largo («¿Seguro? …»)
+        # cambiar_texto lo vuelve a encajar en el panel; un doble de pruebas sin él solo asigna el texto
+        cambiar = getattr(s, "cambiar_texto", None)
+        if cambiar is not None:
+            cambiar(mensaje, MENSAJES.get(clave, "") or " ")
+        else:
+            mensaje.text = MENSAJES.get(clave, "")
         if cancelar is not None:
             cancelar.enabled = estado.armado
 

@@ -19,15 +19,25 @@ ESCENA_ERROR_RED = "online_error"
 def _seccion_online(s):
     gestor = s.gestor
     actual = gestor.actual
-    s.anadir_texto("El alias y el último anfitrión se guardan solos al crear o unirte a una sala.", tenue=False)
-    texto = s.anadir_texto(f"Alias: {actual.nombre_en_linea or '(sin definir)'}   ·   "
-                           f"Último anfitrión: {actual.ultimo_host or '(ninguno)'}")
+    s.anadir_texto("El alias y el último anfitrión se guardan solo en este equipo al crear o unirte a una sala.",
+                   tenue=False)
+    texto = s.anadir_texto(_datos_guardados(actual))
+
+    # Se rehace al abrir la pestaña: el alias pudo cambiar en el menú en línea desde que se construyó.
+    def refrescar():
+        s.cambiar_texto(texto, _datos_guardados(gestor.actual))
 
     def olvidar():
         gestor.cambiar(nombre_en_linea="", ultimo_host="")
-        texto.text = "Alias: (sin definir)   ·   Último anfitrión: (ninguno)"
+        refrescar()
     s.anadir_boton("Datos guardados", "Olvidar", olvidar)
     s.anadir_texto("El tráfico en línea no va cifrado: usa red local o una VPN.")
+    return refrescar
+
+
+def _datos_guardados(ajustes):
+    return (f"Alias: {ajustes.nombre_en_linea or '(sin definir)'}   ·   "
+            f"Último anfitrión: {ajustes.ultimo_host or '(ninguno)'}")
 
 
 def registrar(gestor, mundo, semilla, al_inicio, al_empezar=None, servicios=None):

@@ -1,10 +1,11 @@
 # Decorado del mundo 3D (Ursina): árboles variados, arbustos con flores, farolas, bancos, vallas,
 # carteles, jardineras y una fuente en la Praça da Sé; además cintas de calle con ruido de color.
 #
-# Todo es DECORADO PURO: ninguna pieza tiene colisión (el backend no los conoce y no se toca), por
-# eso se colocan siempre FUERA de las calles, de las huellas de los edificios y de las casas, de las
-# escaleras, de los muros y de los pasos plaza -> puerta, y a distancia de los obstáculos que ya
-# existen. La fuente central, en cambio, ocupa el centro de la plaza y se puede atravesar.
+# Se colocan siempre FUERA de las calles, de las huellas de los edificios y de las casas, de las escaleras, de los
+# muros y de los pasos plaza -> puerta, y a distancia de los obstáculos que ya existen. El modelo (backend) no los
+# conoce; desde 2026-11-13 los que tienen cuerpo chocan: obstaculos_de_props() los traduce a círculos que la ciudad 3D
+# entrega a MundoCiudad.agregar_obstaculos (bandera ALCALDE_COLISION_PROPS). Sin colisión a propósito: la fuente
+# central (está en el cruce de las calles de la plaza: peatones y rutas pasan por ahí) y los carteles (un poste fino).
 #
 # Rendimiento: ningún prop es una Entity. Cada pieza (cubo, esfera baja, prisma) es una plantilla de
 # triángulos que se copia con su posición, escala, giro y color directamente en UNA malla con
@@ -20,6 +21,7 @@ import math
 from functools import lru_cache
 from typing import NamedTuple
 
+from backend.logica.mundo_ciudad import Obstaculo
 from frontend.azar_fijo import azar_de, ruido_suave
 
 # -- Colocación -----------------------------------------------------------------------------------
@@ -541,6 +543,35 @@ def colocar_props(mundo):
 # -- Armado ---------------------------------------------------------------------------------------
 
 
+# Cuerpo de cada tipo para la colisión: (radio del círculo, separación entre círculos a lo largo del prop). Los bancos,
+# jardineras y vallas giran con cualquier ángulo y las cajas del modelo son alineadas a los ejes: se cubren con una
+# fila de círculos a lo largo. Los radios siguen a las piezas que se ven (tronco, poste, asiento), no a la copa.
+CUERPO_PROP = {"arbol": (0.45, None), "arbusto": (0.45, None), "farola": (0.22, None), "caneca": (0.28, None),
+               "banco": (0.32, 0.55), "jardinera": (0.38, 0.4), "valla": (0.14, 0.4)}
+LARGO_PROP = {"banco": 1.7, "jardinera": 1.5}     # m a lo largo (la valla usa su `tam`, que es su largo)
+
+
+# Obstáculos (círculos) de una lista de Prop: lo que no se debe atravesar. Puro: se prueba sin ventana.
+def obstaculos_de_props(props):
+    obstaculos = []
+    for prop in props:
+        cuerpo = CUERPO_PROP.get(prop.tipo)
+        if cuerpo is None:
+            continue
+        radio, paso = cuerpo
+        if paso is None:
+            escala = prop.tam if prop.tipo in ("arbol", "arbusto") else 1.0
+            obstaculos.append(Obstaculo(prop.tipo, prop.x, prop.z, radio=round(radio * min(1.0, escala), 3)))
+            continue
+        largo = prop.tam if prop.tipo == "valla" else LARGO_PROP[prop.tipo]
+        n = max(1, int(round(largo / paso)))
+        for k in range(n + 1):
+            d = -largo / 2 + radio + (largo - 2 * radio) * k / n if largo > 2 * radio else 0.0
+            px, _, pz = _desplazar(prop.x, prop.z, d, 0, prop.giro, 0)
+            obstaculos.append(Obstaculo(prop.tipo, round(px, 3), round(pz, 3), radio=radio))
+    return obstaculos
+
+
 # Dibuja un Prop en las mallas `m` (opaca) y `luz` (focos).
 def dibujar(prop, m, luz, suelo=None):
     x, y, z, g, s, v = prop.x, prop.y, prop.z, prop.giro, prop.tam, prop.variante
@@ -603,9 +634,9 @@ class MallaContorno(Malla):
 
 # Las tres mallas del decorado: (opaca, luces, contorno) como Mesh (None si no hay nada). La de contorno lleva el casco
 # de tinta de los árboles; va en una Entity aparte que solo dibuja caras traseras.
-def construir_props_y_contorno(mundo):
+def construir_props_y_contorno(mundo, props=None):
     opaca, luz, contorno = Malla(), Malla(), MallaContorno()
-    for prop in colocar_props(mundo):
+    for prop in (colocar_props(mundo) if props is None else props):
         dibujar(prop, opaca, luz, mundo.altura)
         if prop.tipo in CONTORNO_PROPS:
             dibujar(prop, contorno, Malla(), mundo.altura)

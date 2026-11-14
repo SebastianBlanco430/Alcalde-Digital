@@ -19,6 +19,7 @@ from ursina import Entity, Text, color, time
 from backend.datos import minijuegos_asignacion as asignacion
 from backend.datos import minijuegos_casos
 from backend.datos.nombres_visibles import glosar_texto
+from backend.logica import consecuencia_graduada
 from backend.logica import minijuegos as mj
 from backend.logica.lote_mision import LoteMision
 from frontend import diseno_adaptable, estilo, tipografia
@@ -165,6 +166,12 @@ class EscenaMinijuego(Escena):
         self.banner = Entity(parent=self, z=-0.1)
         panel_tinta(self.banner, ANCHO_BANNER, ALTO_BANNER, tono=estilo.COLOR_PANEL, position=(0, Y_BANNER, 0))
         titulo = "Verificaste bien" if bien else "Se te escapó algo"
+        # Con la consecuencia graduada, el título adelanta la propina (lo mismo que aplicará el flujo al cerrar).
+        graduacion = consecuencia_graduada.calcular(resultado.a_dict(), self.mision) if consecuencia_graduada.activo() else None
+        if graduacion is not None and graduacion.propina > 0:
+            titulo += f"  ·  propina R$ {graduacion.propina}"
+        elif graduacion is not None and graduacion.retardado is not None:
+            titulo += "  ·  por poco"
         tono = estilo.ESTADO_EXITO if bien else estilo.ESTADO_AVISO
         x0 = -ANCHO_BANNER / 2 + a_unidades(18)
         marca = "[OK] " if bien else "[!] "
@@ -199,6 +206,10 @@ class EscenaMinijuego(Escena):
                 self.cerrado = False
                 self._respaldo(error)
                 return
+        # Lo bien que se verificó viaja con el resultado: backend/logica/consecuencia_graduada lo convierte en propina,
+        # confianza y, si se pasó raspando, dudas al día siguiente. Sin ese envoltorio la clave se ignora.
+        if isinstance(entrega, dict):
+            entrega = dict(entrega, minijuego=self.resultado.a_dict())
         self._entrega = entrega
         if self.grafo_social is not None:
             self._mostrar_grafo_o_entregar()
