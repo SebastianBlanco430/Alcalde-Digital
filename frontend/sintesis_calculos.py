@@ -423,6 +423,43 @@ def ambiente_favela():
     return normalizar(quitar_continua(x), PICO_BUCLES)
 
 
+# Envolvente de «sílabas» sin periodo: tramos de duración al azar (0,09-0,42 s) con un nivel al azar cada uno, unidos
+# con rampas de coseno. A diferencia de abs(sin), no marca ningún ritmo fijo que el oído pueda seguir.
+def _silabas_irregulares(rng, n, minimo=0.35):
+    salida = []
+    nivel = rng.uniform(minimo, 1.0)
+    while len(salida) < n:
+        largo = n_muestras(rng.uniform(0.09, 0.42))
+        siguiente = rng.uniform(minimo, 1.0) if rng.random() < 0.8 else minimo * 0.6
+        for i in range(largo):
+            t = 0.5 - 0.5 * math.cos(math.pi * i / max(largo, 1))
+            salida.append(nivel + (siguiente - nivel) * t)
+        nivel = siguiente
+    return salida[:n]
+
+
+# Versión 2 del ambiente (ALCALDE_AMBIENTE_V2): el murmullo de la v1 latía a 6,2 Hz (abs(sin(3,1 Hz))) sobre un viento
+# grave fuerte y, junto con los pasos, sonaba a locomotora. Aquí el murmullo son tres grupos de voces con sílabas
+# irregulares e independientes y el viento va más bajo. Mismos ladridos y radio.
+def ambiente_favela_v2():
+    rng = _rng("ambiente_favela_v2")
+    largo, cruce = 16.0, 1.5
+    n = n_muestras(largo + cruce)
+    viento = pasa_bajos(pasa_bajos(ruido(rng, n), 600), 380)
+    oleadas = [0.55 + 0.45 * math.sin(2 * math.pi * 0.19 * i / TASA + 1.1) * math.sin(2 * math.pi * 0.07 * i / TASA)
+               for i in range(n)]
+    x = [v * o * 3.0 for v, o in zip(viento, oleadas)]
+    for banda in ((200, 1200), (260, 1500), (320, 1800)):
+        voz = pasa_banda(ruido(rng, n), *banda)
+        mezclar(x, por(voz, _silabas_irregulares(rng, n)), 0, 0.3)
+    ladrido = pasa_bajos(_ladrido(rng), 1800)
+    for t in (4.0, 4.32, 4.62, 11.8, 12.15):
+        mezclar(x, ladrido, n_muestras(t), 0.22)
+    mezclar(x, _radio(rng, 3.0), n_muestras(7.5), 0.09)
+    x = hacer_bucle(x, largo, cruce)
+    return normalizar(quitar_continua(x), PICO_BUCLES)
+
+
 # ------------------------------------------------------------------ música ambiente
 
 # Progresión en la menor (aire de cómic/Borderlands): Am | F | Dm | E, repetida 3 veces (12 compases).
@@ -592,6 +629,7 @@ CATALOGO = {
     "motor_moto": (motor_moto, True),
     "bici_cadena": (bici_cadena, True),
     "ambiente_favela": (ambiente_favela, True),
+    "ambiente_favela_v2": (ambiente_favela_v2, True),
     "musica_ambiente": (musica_ambiente, True),
     "musica_interior": (musica_interior, True),
 }

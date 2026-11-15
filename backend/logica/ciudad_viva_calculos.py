@@ -13,6 +13,7 @@
 # cálida y se adorna; hacia abajo, fría, gris, sucia y con faroles apagados.
 
 import math
+import os
 from types import SimpleNamespace
 from typing import NamedTuple
 
@@ -174,6 +175,53 @@ def fundir(actual, objetivo, dt, segundos=SEGUNDOS_FUNDIDO):
 def escala_fundida(f):
     """Escala visual (0..1) de un fundido f en 0..1: sale suave (smoothstep), no lineal."""
     return f * f * (3.0 - 2.0 * f)
+
+
+# -- Fuego vivo (ALCALDE_FUEGO_VIVO) ---------------------------------------------------------------------------------
+# Antes todas las hogueras latían igual (dos senos fijos, solo escala) y se veían mecánicas. Ahora cada sitio tiene su
+# tamaño, su fase y sus frecuencias (de su número fijo `u`), el ritmo suma tres senos que no son múltiplos entre sí
+# (no se repite a la vista), la llama se mece un poco y el color parpadea entre naranja y amarillo con la escala de
+# color de la entidad (p3d_ColorScale, que el unlit_shader ya multiplica). Mismo número de entidades.
+FUEGO_VIVO = True
+TAMANO_FUEGO = (0.8, 1.25)          # escala base por sitio
+
+
+def fuego_vivo_activo():
+    valor = os.environ.get("ALCALDE_FUEGO_VIVO", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(FUEGO_VIVO)
+
+
+# Halo aditivo de las hogueras: +1 draw call por fuego visible, así que va APAGADO (ALCALDE_FUEGO_BRILLO=1 lo enciende).
+FUEGO_BRILLO = False
+
+
+def fuego_brillo_activo():
+    valor = os.environ.get("ALCALDE_FUEGO_BRILLO", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(FUEGO_BRILLO)
+
+
+def parpadeo_fuego(t, u, es=1.0):
+    """(escala_xz, escala_y, giro extra en grados, (r, g, b) de escala de color) de una hoguera en el instante `t` (s),
+    para el sitio de número fijo `u` en [0, 1) y el fundido `es` (0..1)."""
+    a, b = azar_de(u * 7.31, 1.7), azar_de(u * 3.97, 5.3)
+    base = es * (TAMANO_FUEGO[0] + (TAMANO_FUEGO[1] - TAMANO_FUEGO[0]) * a)
+    f1, f2, f3 = 7.1 + 2.3 * a, 11.7 + 3.1 * b, 17.9 + 4.3 * a * b
+    fase = 6.283 * b
+    pulso = 0.55 * math.sin(t * f1 + fase) + 0.30 * math.sin(t * f2 + 2.1 * fase) + 0.15 * math.sin(t * f3 + 0.7)
+    ancho = base * (1.0 + 0.06 * math.sin(t * f2 * 0.83 + fase))
+    alto = base * (1.0 + 0.17 * pulso)
+    giro = 7.0 * math.sin(t * (1.3 + 0.6 * a) + fase)
+    calor = 0.5 + 0.5 * pulso
+    color = (1.0, 0.86 + 0.14 * calor, 0.78 + 0.22 * calor)
+    return ancho, alto, giro, color
 
 
 # -- Sitios -----------------------------------------------------------------------------------------------------------

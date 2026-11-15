@@ -19,6 +19,23 @@ from frontend import ajustes_calculos as calc_ajustes
 from frontend import pixelado_calculos as calc
 
 NOMBRE_SECCION = "Gráficos"
+# Con la fila «Pantalla completa» no cabe la ayuda de abajo (la pestaña ya iba justa de alto): sus teclas pasan a la
+# segunda línea de la descripción de la calidad (que ya dice que los menús no se pixelan).
+TEXTO_AYUDA_TECLAS = "Solo el mundo se pixela. Mapa grande (N): + / - zoom y R giro."
+
+
+# Descripción de la calidad, con la ayuda de teclas detrás si la fila de pantalla completa ocupa su sitio.
+def texto_descripcion(preset, con_ayuda):
+    texto = calc.descripcion_preset(preset) or ""
+    if con_ayuda:
+        texto = f"{texto} {TEXTO_AYUDA_TECLAS}".strip()
+    return texto or " "
+
+
+# La fila sale solo si el gestor de pantalla completa está activo (frontend/pantalla_completa.py).
+def pantalla_completa_en_ajustes():
+    from frontend import pantalla_completa
+    return pantalla_completa.activo()
 
 
 def opciones_preset():
@@ -45,22 +62,30 @@ def motivo_zoom_inactivo():
 # `s` = escena_ajustes.Seccion (o un doble con los mismos métodos anadir_*).
 def construir_seccion(s):
     selector = s.anadir_selector("Calidad", "preset_grafico", opciones_preset())
-    descripcion = s.anadir_texto(calc.descripcion_preset(s.gestor.actual.preset_grafico) or " ", alto=0.075)
+    con_pantalla = pantalla_completa_en_ajustes()
+    descripcion = s.anadir_texto(texto_descripcion(s.gestor.actual.preset_grafico, con_pantalla), alto=0.075)
     deslizador = s.anadir_deslizador("Pixelado del mundo", "pixel_scale", calc.formato_pixel,
                                      paso=calc.paso_deslizador())
     zoom = s.anadir_selector("Zoom del minimapa", "minimapa_zoom", opciones_zoom())
     s.anadir_selector("Giro del minimapa", "minimapa_rotacion", opciones_rotacion())
     s.anadir_selector("Detalle del minimapa", "minimapa_densidad", opciones_densidad())
-    s.anadir_texto("Solo el mundo se pixela; los menús y el HUD siguen nítidos. "
-                   "En el mapa grande (N): + / - zoom y R giro.", alto=0.075)
+    interruptor = None
+    if con_pantalla:
+        # Pantalla completa (frontend/pantalla_completa.py, F11 igual) en el sitio de la fila de ayuda.
+        interruptor = s.anadir_interruptor("Pantalla completa (F11)", "pantalla_completa")
+    else:
+        s.anadir_texto("Solo el mundo se pixela; los menús y el HUD siguen nítidos. "
+                       "En el mapa grande (N): + / - zoom y R giro.", alto=0.075)
 
     # El deslizador cambia el preset a «Personalizada» (y un preset mueve el deslizador): se mantienen a la par.
     def sincronizar(ajustes, cambiadas):
+        if interruptor is not None and "pantalla_completa" in cambiadas:
+            interruptor.fijar_valor(ajustes.pantalla_completa)      # F11 con la pantalla de Ajustes abierta
         if not cambiadas & {"preset_grafico", "pixel_scale"}:
             return
         selector.fijar_indice(calc_ajustes.indice_de_valor(selector.opciones, ajustes.preset_grafico))
         deslizador.fijar_valor(ajustes.pixel_scale)
-        s.cambiar_texto(descripcion, calc.descripcion_preset(ajustes.preset_grafico) or " ")
+        s.cambiar_texto(descripcion, texto_descripcion(ajustes.preset_grafico, con_pantalla))
 
     s.gestor.suscribir(sincronizar, llamar_ya=False)
 

@@ -425,6 +425,7 @@ class EscenaSeleccionRol(Escena):
         boton = self.boton_seleccionar
         base = escala_fuente(26)
         boton.text_size = base
+        boton.highlight_text_size = base
         entidad = boton.text_entity
         if entidad is None:
             return
@@ -434,6 +435,7 @@ class EscenaSeleccionRol(Escena):
         util = self.ANCHO_SELECCIONAR * 0.86
         if medido > util:
             boton.text_size = base * util / medido
+            boton.highlight_text_size = boton.text_size      # que el hover no lo devuelva al tamaño base
 
     # Pinta la candidata y habilita «Seleccionar» (con su nombre) solo si hay una.
     def _actualizar_candidata(self):

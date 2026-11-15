@@ -112,7 +112,7 @@
         150
       ],
       "titulo": "Convivencia · pulsera izquierda",
-      "texto": "Qué tan bien se llevan los vecinos. Sube al compartir lo que es verdad y al reportar los bulos. Baja si compartes mentiras (las que más dividen, más) o pasas un día entero sin cerrar misiones.",
+      "texto": "Qué tan bien se llevan los vecinos. Sube al compartir lo que es verdad y al reportar las noticias falsas. Baja si compartes mentiras (las que más dividen, más) o pasas un día entero sin cerrar misiones.",
       "figuras": [
         {
           "tipo": "suelo",
@@ -273,7 +273,7 @@
         92
       ],
       "titulo": "Desinformación · barra de arriba",
-      "texto": "Cuántos bulos circulan. Más baja es mejor. Sube al compartir un bulo (y a veces el bulo vuelve al día siguiente). Baja al reportar lo falso.",
+      "texto": "Cuántas noticias falsas circulan. Más baja es mejor. Sube al compartir una mentira (y a veces vuelve al día siguiente). Baja al reportar lo falso.",
       "figuras": [
         {
           "tipo": "suelo",

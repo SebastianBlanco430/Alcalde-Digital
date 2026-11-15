@@ -12,6 +12,7 @@
 # de otro color, bici vieja de colores con cesta y caja de carga, moto de reparto / mototaxi con baúl.
 
 import math
+import os
 from dataclasses import dataclass, field
 
 from frontend import contorno_calculos as cc
@@ -271,6 +272,29 @@ def rueda_bicicleta(acento, tacos=14, n_radios=10):
     return piezas
 
 
+# Guardabarros continuo de la moto (ALCALDE_GUARDABARROS_CONTINUO): con 4 y 5 segmentos en un radio de 0,39 m
+# quedaban huecos de ~9 cm entre cajas de 9 cm y se veían piezas sueltas. Con 8 y 9 el paso angular baja de
+# ~13° y las cajas se solapan como en la bici: una sola pieza. Va en el mismo Geom fundido (0 draw calls más).
+GUARDABARROS_CONTINUO = True
+LARGO_SEGMENTO_GUARDABARROS = 0.09       # largo de cada caja (2 × 0,045)
+
+
+def pasos_guardabarros_moto():
+    valor = os.environ.get("ALCALDE_GUARDABARROS_CONTINUO", "").strip().lower()
+    activo = bool(GUARDABARROS_CONTINUO)
+    if valor in ("1", "true", "si", "sí", "on"):
+        activo = True
+    elif valor in ("0", "false", "no", "off"):
+        activo = False
+    return (8, 9) if activo else (4, 5)
+
+
+# Separación entre centros de dos segmentos seguidos de un guardabarros (para comprobar que se solapan).
+def separacion_segmentos(desde, hasta, radio, pasos):
+    paso = math.radians(abs(hasta - desde) / max(pasos - 1, 1))
+    return 2 * radio * math.sin(paso / 2)
+
+
 # Guardabarros: arco de cajas finas sobre la rueda entre dos ángulos (grados desde la parte alta, + hacia adelante).
 def guardabarros(centro, desde, hasta, color, radio=RUEDA_B + 0.05, ancho=0.06, pasos=7):
     piezas = []
@@ -455,7 +479,8 @@ def construir_moto(paleta, indice=0):
         caja((0.20, 0.34, -0.38), (0.06, 0.012, 0.03), METAL_OSCURO),                     # estribos del pasajero
         caja((-0.20, 0.34, -0.38), (0.06, 0.012, 0.03), METAL_OSCURO),
     ] + tanque
-    cuadro += guardabarros(EJE_TRAS_M, -95, -15, oscuro, radio=RUEDA_M + 0.07, ancho=0.085, pasos=4)
+    pasos_tras, pasos_del = pasos_guardabarros_moto()
+    cuadro += guardabarros(EJE_TRAS_M, -95, -15, oscuro, radio=RUEDA_M + 0.07, ancho=0.085, pasos=pasos_tras)
 
     p = PIVOTE_MANUBRIO_M
     manubrio = [
@@ -481,7 +506,7 @@ def construir_moto(paleta, indice=0):
         # tablero
         caja((0.0, 1.03, 0.43), (0.06, 0.03, 0.04), METAL_OSCURO),
     ]
-    manubrio += guardabarros(EJE_DEL_M, -15, 85, parche, radio=RUEDA_M + 0.07, ancho=0.08, pasos=5)
+    manubrio += guardabarros(EJE_DEL_M, -15, 85, parche, radio=RUEDA_M + 0.07, ancho=0.08, pasos=pasos_del)
     manubrio = _relativas(manubrio, p)
 
     rueda_del = rueda_moto(acento, disco=True)

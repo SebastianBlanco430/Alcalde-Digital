@@ -85,6 +85,7 @@ class Ajustes:
     # --- Gráficos ---
     preset_grafico: str = PRESET_GRAFICO_POR_DEFECTO   # retro | nitido | normal | personalizado
     pixel_scale: float = 0.0                # 0 = resolución nativa (sin pase gráfico), 1 = pixelado máximo
+    pantalla_completa: bool = False         # ventana sin borde del tamaño del monitor (F11 la alterna también)
     # --- Minimapa ---
     minimapa_zoom: float = 1.0              # uno de MINIMAPA_ZOOMS (1 = lo de siempre)
     minimapa_rotacion: str = "camara"       # camara = gira con la cámara (arriba = adelante) | norte = norte arriba
@@ -113,6 +114,7 @@ class Ajustes:
         if not isinstance(self.preset_grafico, str) or self.preset_grafico not in PRESETS_GRAFICOS:
             self.preset_grafico = PRESET_GRAFICO_POR_DEFECTO
         self.pixel_scale = _acotar(self.pixel_scale, 0.0, 1.0, 0.0)
+        self.pantalla_completa = _booleano(self.pantalla_completa, False)
         zoom = _acotar(self.minimapa_zoom, MINIMAPA_ZOOMS[0], MINIMAPA_ZOOMS[-1], 1.0)
         self.minimapa_zoom = min(MINIMAPA_ZOOMS, key=lambda z: abs(z - zoom))
         if not isinstance(self.minimapa_rotacion, str) or self.minimapa_rotacion not in MODOS_ROTACION_MINIMAPA:

@@ -222,6 +222,11 @@ class EnganchesAudio:
             self.audio.efecto("aterrizaje", 0.9)
         if getattr(escena, "en_pausa", False):
             return
+        # Partida terminada: el controlador deja de mover y no pone la velocidad a 0; sin esto los pasos seguirían.
+        activo = getattr(controlador, "activo", None)
+        if callable(activo) and not activo():
+            self._pasos.reiniciar()
+            return
         if self._pasos.avanzar(velocidad, dt, en_aire):
             superficie = self._superficie(escena, jugador)
             variante = 1 + self._pasos.lado

@@ -386,6 +386,9 @@ class BotonTinta(BotonAccion):
         if not ENCAJAR_TEXTO_BOTON or entidad is None or not entidad.text or self._tamano_texto is None:
             return
         self.text_size = self._tamano_texto
+        # Ursina vuelve a `highlight_text_size` al pasar el mouse (por defecto, el tamaño original sin encoger):
+        # se iguala al tamaño encajado para que el texto no se salga del botón en hover.
+        self.highlight_text_size = self.text_size
         if self.world_scale_x <= 0:
             return
         nodo = TextNode("medida_boton")
@@ -399,6 +402,7 @@ class BotonTinta(BotonAccion):
             return
         escala = max(self.ESCALA_TEXTO_MIN, self.ESPACIO_TEXTO / ancho)
         self.text_size = self._tamano_texto * escala
+        self.highlight_text_size = self.text_size
         if ancho * escala > self.ESPACIO_TEXTO:
             entidad.text = calc_adaptable.recortar_con_elipsis(entidad.text, medir, self.ESPACIO_TEXTO / escala)
 

@@ -44,11 +44,11 @@ LADO_MUNECA = {"convivencia": "i", "confianza": "d"}
 INDICADORES_HUD = INDICADORES_JUGADOR if pulseras_jugador_activo() else m.INDICADORES
 # Qué mide cada pulsera, en una frase (leyenda con B; mismos textos que el tutorial).
 QUE_MIDE = {
-    "convivencia": "Pulsera izquierda: qué tan bien se llevan los vecinos. Sube al compartir lo que es verdad y al reportar los bulos.",
+    "convivencia": "Pulsera izquierda: qué tan bien se llevan los vecinos. Sube al compartir lo que es verdad y al reportar las noticias falsas.",
     "confianza": "Pulsera derecha: cuánto le cree la gente a lo que se publica. Sube al acertar el veredicto.",
 }
 ETIQUETAS_CORTAS = {
-    "convivencia": "Conviv.", "confianza": "Confianza", "desinformacion": "Bulos", "bienestar": "Bienestar",
+    "convivencia": "Conviv.", "confianza": "Confianza", "desinformacion": "Mentiras", "bienestar": "Bienestar",
     "conflictos": "Roces",
 }
 MARGEN_HISTERESIS = 2.0              # puntos de bondad que hay que pasar del umbral para cambiar de nivel

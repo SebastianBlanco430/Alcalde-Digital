@@ -56,7 +56,7 @@ ESTILO_NIVEL = {
 _FRASES = {
     "convivencia": ("los vecinos se buscan", "hay trato cordial", "cada quien por su lado", "nadie se saluda"),
     "confianza": ("se cree en lo que se publica", "se confía con cautela", "se duda de todo", "nadie cree a nadie"),
-    "desinformacion": ("casi no corren bulos", "algún bulo suelto", "los bulos corren", "manda el rumor"),
+    "desinformacion": ("casi no corren mentiras", "alguna mentira suelta", "las mentiras corren", "manda el rumor"),
     "bienestar": ("la red suma a la vida", "uso sano de la red", "la red cansa", "la red aísla"),
     "conflictos": ("calles en calma", "roces menores", "discusiones a diario", "la calle está crispada"),
 }

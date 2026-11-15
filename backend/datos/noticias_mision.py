@@ -39,7 +39,7 @@ PASO_GRAVEDAD = 0.1
 MAX_POR_PLANTILLA = 99
 
 # Deltas (convivencia, confianza, desinformacion) por (es_verdadera, dificultad): (al compartir, al reportar). Dentro de
-# [-15, +15] como el mazo. Compartir un bulo desinforma y resta confianza; reportarlo la sube. Compartir algo cierto ayuda;
+# [-15, +15] como el mazo. Compartir una noticia falsa desinforma y resta confianza; reportarlo la sube. Compartir algo cierto ayuda;
 # reportarlo (falso positivo) penaliza poco.
 _CLAVES = ("convivencia", "confianza", "desinformacion")
 PLANTILLA_DELTAS = {
@@ -187,7 +187,7 @@ MISIONES_DATOS_PERSONALES = frozenset({"generica_mutirao", "generica_lanhouse"})
 
 # {cuando} = «Ayer» / «Hace dos días»; {rumor} = el rumor de la misión, recortado.
 MENSAJES_RETARDO = {
-    "rebrote": "{cuando} compartiste sin verificar «{rumor}»: hoy el bulo volvió a circular y hay más desinformación.",
+    "rebrote": "{cuando} compartiste sin verificar «{rumor}»: hoy esa noticia falsa volvió a circular y hay más desinformación.",
     "verificado": "{cuando} frenaste a tiempo «{rumor}»: hoy la gente confía más en lo que se publica.",
     "buena_fuente": "{cuando} compartiste algo cierto («{rumor}»): hoy los vecinos lo comentan y se organizan.",
     "falsa_alarma": "{cuando} reportaste como falso algo cierto («{rumor}»): hoy quien lo publicó desconfía de la red.",

@@ -20,7 +20,7 @@ Novedades de la ronda 7:
 - **Trabajos** en minijuegos 2D con **cansancio** (con fatiga >= 100 no se puede trabajar).
 - **Seu Zé**, vendedor de calle: vende una «bolsita de bicarbonato» (R$ 5) con un gesto de pasarla de mano a mano.
   El ítem se describe en el juego como bicarbonato de sodio: «sirve para cocinar y limpiar. No cura nada».
-  Es parte de la ficción sobre bulos de salud.
+  Es parte de la ficción sobre noticias falsas de salud.
 - **Objetos sensibles** `pistola` y `cuchillo_pequeno` en el catálogo (`backend/datos/items_semilla.py`): objetos
   de cintura **sin precio, sin efecto, sin forma de obtenerlos** y ocultos tras `ITEMS_SENSIBLES = False`.
   No se disparan ni se usan; no hay combate en el juego.

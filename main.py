@@ -23,6 +23,7 @@ from backend.logica.sesion import SesionJuego
 from frontend import economia_config, online_config
 from frontend import compat_macos, daltonismo, diseno_adaptable, estilo, medidor_fps, tipografia
 from frontend import gpu_dedicada, rendimiento, telemetria
+from frontend import pantalla_completa      # ajuste «Pantalla completa» y F11 por el almacén de ajustes
 from frontend import audio_enganches      # sonido: observa el juego y dispara efectos/música (frontend/audio.py)
 from frontend import mundo_config      # bandera del mapa grande (MAPA_GRANDE / ALCALDE_MAPA_GRANDE); apagada = el mundo de siempre
 from frontend.componentes import preparar_fuente, rgb
@@ -259,6 +260,7 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     preparar_fuente()
     if ajustes_jugador.AJUSTES:
         daltonismo.instalar(ajustes_jugador.obtener())    # filtro de daltonismo según lo guardado, y en vivo
+        pantalla_completa.instalar(ajustes_jugador.obtener())    # ajuste «Pantalla completa» + F11 sincronizados
 
     gestor = GestorEscenas()
     semilla = leer_semilla()

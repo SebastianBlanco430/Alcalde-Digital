@@ -33,6 +33,7 @@ from backend.logica.vista_chunk import VistaChunk
 from frontend import camara_calculos as cc
 from frontend import estilo, mundo_config, rendimiento
 from frontend import chunks_calculos as calc
+from frontend import favela_calculos as fc
 from frontend.arboles_lowpoly import arbol_bajo, arbusto_bajo
 from frontend.banderas import crear_banderas
 from frontend.calles_chunk import calles_del_chunk, plazas_globales
@@ -564,6 +565,9 @@ class CiudadGrande(Entity):
         self.obstaculos_camara = []
         self._progreso = progreso or (lambda f, t: None)
         self._paso = 0.0
+        # Mercadito y arcos de la cancha chocan (una vez, toda la ciudad): favela_calculos.obstaculos_de_zonas.
+        if fc.colision_zonas_activa() and hasattr(mundo, "agregar_obstaculos"):
+            mundo.agregar_obstaculos(fc.obstaculos_de_zonas(mundo.zonas()), origen="zonas")
 
         self._avance(0.00, "Cielo y luces")
         self.cielo = CieloDegradado(parent=self)

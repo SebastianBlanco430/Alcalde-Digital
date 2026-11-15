@@ -9,7 +9,7 @@
     "-3": {"nombre": "Ciudad en crisis III", "aviso": "La ciudad está al borde del colapso. Casi nadie sale a la calle."},
     "-2": {"nombre": "Ciudad en crisis II", "aviso": "El miedo se toma las calles. Cada rumor compartido lo empeora."},
     "-1": {"nombre": "Ciudad en crisis I", "aviso": "Algo se rompe en Ciudad Nova: hay fuego en las esquinas."},
-    "0": {"nombre": "Ciudad en vilo", "aviso": "Ciudad Nova vuelve a la calma tensa de siempre."},
+    "0": {"nombre": "Ciudad en suspenso", "aviso": "Ciudad Nova vuelve a la calma tensa de siempre."},
     "1": {"nombre": "Ciudad que florece I", "aviso": "Los vecinos vuelven a la calle: Ciudad Nova empieza a florecer."},
     "2": {"nombre": "Ciudad que florece II", "aviso": "La plaza se llena de gente. Un aspirante camina entre los vecinos."},
     "3": {"nombre": "Ciudad que florece III", "aviso": "¡Fiesta en Ciudad Nova! La confianza se celebra en la calle."}

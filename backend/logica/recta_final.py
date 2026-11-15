@@ -12,7 +12,7 @@
 #   desinformación += min(ECO_MAX_COMPARTIR, compartidas_previas // ECO_CADA); cada «reportar» aprovecha la red de
 #   verificación que se fue armando: confianza += min(ECO_MAX_REPORTAR, reportadas_previas // ECO_CADA).
 # EVENTO DE ENTRADA (una sola vez al entrar en la recta), según cómo jugó el equipo hasta entonces:
-#   > 60 % compartir -> «Rumores acumulados» · > 60 % reportar -> «Red de verificadores» · si no -> «Ciudad en vilo».
+#   > 60 % compartir -> «Rumores acumulados» · > 60 % reportar -> «Red de verificadores» · si no -> «Ciudad en suspenso» (clave interna "vilo").
 # MAZO PONDERADO. MazoPonderado ENVUELVE a cualquier mazo (MazoNoticias, MazoSembrado del cooperativo) sin tocarlo: en la
 #   recta las noticias de gravedad alta (ArbolStats) salen más: peso = 1 + PESO_GRAVEDAD · intensidad · (gravedad/100)².
 # DESENLACE al cerrar la partida (sobre los indicadores crudos, para que «tomada» dependa sobre todo de la desinformación):
@@ -62,7 +62,7 @@ EVENTOS_ENTRADA = {
     "verificadores": ("Red de verificadores",
                       "Los vecinos aprendieron a verificar contigo: la recta final empieza con apoyo.",
                       {"confianza": 5, "desinformacion": -3}),
-    "vilo": ("Ciudad en vilo",
+    "vilo": ("Ciudad en suspenso",
              "La ciudad está atenta: desde ahora cada decisión pesa más.",
              {}),
 }

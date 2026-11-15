@@ -33,7 +33,7 @@ Con `ALCALDE_RELOJ=0` el flujo es exactamente el de antes (no se crea el envolto
 ## 1. Reloj de la partida (`reloj_partida.py`)
 
 - La partida empieza el **día 1 a las 08:00** y termina al **completar el día 7** (24:00 del día 7): 160 h de juego.
-- `SEGUNDOS_REALES_POR_HORA = 15`: 1 día = 6 min reales, partida = 40 min. `ALCALDE_SEG_POR_HORA=2` la deja en ~5 min.
+- `SEGUNDOS_REALES_POR_HORA = 11,25`: 1 día = 4,5 min reales, partida = 30 min (antes 15 s y 40 min). `ALCALDE_SEG_POR_HORA=2` la deja en ~5 min.
 - **Decisión: el tiempo corre solo con el mundo activo.** El reloj no lee la hora real; avanza únicamente cuando se llama
   a `avanzar(dt)`. El frontend debe llamarlo una vez por frame con el mundo en primer plano y no llamarlo (o `pausar()`)
   en menús, minijuegos, modales, cinemáticas y pausa. Así leer una carta o trabajar no gasta la semana.
@@ -190,7 +190,7 @@ Tabla de consecuencias (en `backend/datos/noticias_mision.py`; decide la **decis
 - Sin carta de misión (lote sin `decision_mision`): si la desinformación del lote subió, `rebrote` proporcional
   (|delta| / 15); si bajó, `verificado` proporcional; a 24 h y sin grupo.
 - Son a propósito ≈ un tercio del efecto inmediato de `PLANTILLA_DELTAS`.
-- Mensajes: `MENSAJES_RETARDO` («Ayer compartiste sin verificar «…»: hoy el bulo volvió a circular…»).
+- Mensajes: `MENSAJES_RETARDO` («Ayer compartiste sin verificar «…»: hoy esa noticia falsa volvió a circular…»).
 
 ## 6. Equilibrio: costo de aislamiento (`costo_aislamiento.py`)
 
@@ -375,7 +375,7 @@ reloj queda parado en el día 1). `ALCALDE_RELOJ=0` o el juego en línea: no hac
 - **Avisos** (`AvisoGenerico` propio, 4 líneas, ancho 0,9; centro bajo el de veredicto/pagos): «Último día: la semana
   termina esta medianoche.» (a 24 h) y «Quedan 2 horas…» (a 2 h), una vez por partida (`AvisosFin`; «Continuar» no repite
   los ya pasados). Los avisos de efectos retardados salen de `flujo.vaciar_avisos_retardados()` como `texto_efecto` («Ayer
-  compartiste sin verificar «…»: hoy el bulo volvió a circular. (Desinformación +3 · Confianza −2)») por una
+  compartiste sin verificar «…»: hoy esa noticia falsa volvió a circular. (Desinformación +3 · Confianza −2)») por una
   `ColaAvisosCausa` (de uno en uno, 6,5 s cada uno, 1 s entre dos, máximo 4 pendientes: los más viejos se descartan). Con un
   panel abierto esperan. Medido en ventana: los 9 textos más largos posibles caben sin recortarse.
 - **Fin**: al cruzar el día 7 (o al terminar por misiones) el vigía hace un cierre ordenado (baja del vehículo, cierra

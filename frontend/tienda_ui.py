@@ -4,7 +4,7 @@
 # lógica vive en frontend/tienda_calculos.py (ControlTienda); aquí solo se dibuja, y solo cuando cambia la firma.
 # Pantallas 16:9 y 4:3: el ancho se mide en unidades de camera.ui y los textos largos se ajustan (diseno_adaptable).
 
-from ursina import Entity, Text
+from ursina import Circle, Entity, Text
 
 from frontend import diseno_adaptable, estilo, tienda_calculos as calc, tipografia
 from frontend.componentes import destruir_arbol, escala_fuente, modelo_redondeado, panel_tinta, rgb
@@ -23,6 +23,12 @@ def _texto(padre, cadena, px, tono, pos, origen=(-0.5, 0), negrita=False, z=-0.0
 def _caja(padre, ancho, alto, tono, pos, radio=6, z=0.0):
     return Entity(parent=padre, model=modelo_redondeado(ancho, alto, radio), color=rgb(tono) if isinstance(tono, tuple)
                   else tono, scale=(ancho, alto), position=(pos[0], pos[1], z))
+
+
+# Triángulo pequeño que avisa de filas ocultas (Circle(3) nace apuntando arriba).
+def _flecha(padre, pos, arriba=True):
+    return Entity(parent=padre, model=Circle(3), scale=0.014, position=(pos[0], pos[1], -0.01),
+                  rotation_z=0 if arriba else 180, color=rgb(estilo.COLOR_ACENTO))
 
 
 class PanelTienda(Entity):
@@ -105,6 +111,12 @@ class PanelTienda(Entity):
         if len(c.filas) > MAX_FILAS:
             _texto(d, f"{c.seleccion + 1} / {len(c.filas)}", 12, estilo.COLOR_TEXTO_TENUE,
                    (x0 + ancho, ALTO / 2 - 0.082), origen=(0.5, 0))
+            if calc.flechas_activas():
+                # flechas: hay más filas arriba / abajo de las que se ven (no solo el contador)
+                if primera > 0:
+                    _flecha(d, (x0 + ancho / 2, y0 + 0.0075), arriba=True)
+                if primera + MAX_FILAS < len(c.filas):
+                    _flecha(d, (x0 + ancho / 2, y0 - MAX_FILAS * ALTO_FILA - 0.009), arriba=False)
 
     def _pie(self, d):
         c = self.control

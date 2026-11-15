@@ -2,6 +2,7 @@
 # y el mensaje de la última compra sobre un PerfilEconomia. La vista (tienda_ui.py) solo dibuja. La compra es la de
 # backend/logica/dinero.comprar (atómica: dinero, espacio y peso); aquí solo se traducen sus rechazos a mensajes.
 
+import os
 from dataclasses import dataclass
 
 from backend.logica import dinero
@@ -11,6 +12,18 @@ from frontend.inventario_calculos import NOMBRE_TAMANO, texto_peso_item
 DIRECCIONES = {"up arrow": -1, "w": -1, "down arrow": 1, "s": 1}
 TECLAS_COMPRAR = ("enter", "return", "enter (numpad)")
 MENSAJES = {"sin_dinero": "Sin dinero.", "sin_billetera": "No llevas billetera para pagar."}
+# Flechas arriba/abajo en el panel cuando hay más filas de las que caben (tienda_ui.MAX_FILAS). Con las tiendas
+# ampliadas la más larga tiene 13. TIENDA_FLECHAS = False (o ALCALDE_TIENDA_FLECHAS=0): solo el contador «n / total».
+TIENDA_FLECHAS = True
+
+
+def flechas_activas():
+    valor = os.environ.get("ALCALDE_TIENDA_FLECHAS", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(TIENDA_FLECHAS)
 
 
 @dataclass(frozen=True)

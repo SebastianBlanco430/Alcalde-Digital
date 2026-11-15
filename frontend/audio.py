@@ -67,6 +67,8 @@ _cache_dispositivos = None
 def _cargar_openal():
     candidatas = [ctypes.util.find_library("openal"), "/System/Library/Frameworks/OpenAL.framework/OpenAL",
                   "libopenal.so.1", "OpenAL32.dll", "soft_oal.dll"]
+    if openal_panda_activo():
+        candidatas.append(_ruta_openal_panda())
     for candidata in candidatas:
         if not candidata:
             continue
@@ -74,6 +76,34 @@ def _cargar_openal():
             return ctypes.CDLL(candidata)
         except OSError:
             continue
+    return None
+
+
+# En Windows no suele haber OpenAL32.dll en el sistema y la lista de salidas salía vacía (solo «Predeterminado»),
+# aunque el cambio de dispositivo sí funciona. Panda3D trae OpenAL Soft dentro de su plugin de audio
+# (libp3openal_audio.dll, que exporta alcGetString): se usa como último recurso, es la misma DLL que ya carga el
+# motor. OPENAL_PANDA = False (o ALCALDE_OPENAL_PANDA=0) deja la búsqueda de antes.
+OPENAL_PANDA = True
+
+
+def openal_panda_activo():
+    valor = os.environ.get("ALCALDE_OPENAL_PANDA", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(OPENAL_PANDA)
+
+
+def _ruta_openal_panda():
+    try:
+        import panda3d
+    except ImportError:
+        return None
+    for nombre in ("libp3openal_audio.dll", "libp3openal_audio.dylib", "libp3openal_audio.so"):
+        ruta = Path(panda3d.__file__).resolve().parent / nombre
+        if ruta.exists():
+            return str(ruta)
     return None
 
 
@@ -350,7 +380,8 @@ class GestorAudio:
 
     def _cargar(self, canal, nombre):
         gestor = self._gestores.get(canal)
-        ruta = self._ruta(nombre)
+        # el nombre lógico puede sonar con otro archivo (ambiente v2, ver audio_calculos.archivo_de_sonido)
+        ruta = self._ruta(ac.archivo_de_sonido(nombre))
         if gestor is None or ruta is None:
             return None
         from panda3d.core import AudioManager, Filename
@@ -438,6 +469,7 @@ class GestorAudio:
     def bucle(self, nombre, volumen=1.0, pitch=1.0, fundido=0.5, canal=EFECTOS):
         if not self.activo:
             return False
+        volumen *= ac.ganancia_bucle(nombre)
         try:
             actual = self._bucles.get(nombre)
             if actual is not None:

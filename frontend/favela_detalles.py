@@ -661,10 +661,14 @@ def construir_favela_detalles(mundo, casas, bases):
             if cal.tipo == "cartel":
                 textos.append(cal)
         redondos = [o for o in mundo.obstaculos() if o.es_circulo]
+        dibujados = []
         for o in fc.objetos_de_calle(casas, caras):
             if any(math.hypot(o.x - r.cx, o.z - r.cz) < r.radio + 0.9 for r in redondos):
                 continue
             dibujar_objeto(objetos, o, mundo.altura)
+            dibujados.append(o)
+        if fc.colision_calle_activa() and hasattr(mundo, "agregar_obstaculos"):
+            mundo.agregar_obstaculos(fc.obstaculos_objetos_calle(dibujados), origen="calle")
         cuerdas = fc.banderines_de_callejones(casas, caras, bases)
         for p in fc.pasadizos_de_callejones(casas, caras, bases):
             pasadizo(objetos, p)
@@ -685,6 +689,8 @@ def construir_favela_detalles(mundo, casas, bases):
             puesto_talco(objetos, zona, h, rumbo_secreto(zona, mundo))
         elif zona.tipo == "armeria_juguete":
             armeria_juguete(objetos, zona, h, rumbo_secreto(zona, mundo))
+    if fc.colision_zonas_activa() and hasattr(mundo, "agregar_obstaculos"):
+        mundo.agregar_obstaculos(fc.obstaculos_de_zonas(mundo.zonas()), origen="zonas")
     bandera_v, bandera_t, bandera_c = datos_banderines(cuerdas)
     malla_b = Mesh(vertices=bandera_v, triangles=bandera_t, colors=bandera_c) if bandera_v else None
     return objetos.mesh(), pintura.mesh(), tinta.mesh(), malla_b, textos

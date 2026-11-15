@@ -3,6 +3,8 @@
 # La pantalla (frontend/escenas/escena_ajustes.py) solo dibuja y conecta; todo lo que se puede probar sin
 # ventana vive aquí.
 
+import os
+
 from frontend import daltonismo_calculos
 
 MAX_DISPOSITIVOS = 40
@@ -10,6 +12,26 @@ LARGO_MAX_DISPOSITIVO = 120
 ETIQUETA_PREDETERMINADO = "Predeterminado del sistema"
 ETIQUETA_NO_CONECTADO = " (no conectado)"
 PASO_DESLIZADOR = 0.05            # lo que mueven las flechas izquierda/derecha
+# Capas del deslizador (ALCALDE_DESLIZADOR_CAPAS): el relleno iba a la misma profundidad que la cara de la perilla y
+# por delante de su borde, y en los volúmenes (valor a media pista) la barra tapaba la perilla. Con la bandera el
+# relleno va justo encima de la pista y por debajo de la perilla, y deshabilitado se atenúa entero (no solo el texto).
+DESLIZADOR_CAPAS = True
+Z_RELLENO_DESLIZADOR = -0.001     # entre la cara de la pista (0) y el borde de la perilla (-0,005)
+Z_RELLENO_ANTERIOR = -0.006
+TENUE_DESHABILITADO = 0.55        # escala de color de pista, relleno y perilla deshabilitados
+
+
+def deslizador_capas_activo():
+    valor = os.environ.get("ALCALDE_DESLIZADOR_CAPAS", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(DESLIZADOR_CAPAS)
+
+
+def z_relleno_deslizador():
+    return Z_RELLENO_DESLIZADOR if deslizador_capas_activo() else Z_RELLENO_ANTERIOR
 
 
 # Registro ordenado de secciones: (nombre, constructor). Registrar un nombre que ya existe lo REEMPLAZA

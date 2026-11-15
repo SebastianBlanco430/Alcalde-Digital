@@ -3,6 +3,7 @@
 # La usan frontend/audio.py (GestorAudio) y frontend/audio_enganches.py; se prueba sin dispositivo de audio.
 
 import math
+import os
 
 # Pasos: metros por paso. Caminar ~0,8 m; correr ~1,3 m (zancada más larga). Por debajo de VEL_MIN_PASO no hay pasos.
 VEL_MIN_PASO = 0.4
@@ -10,6 +11,12 @@ ZANCADA_CAMINAR = 0.82
 ZANCADA_CORRER = 1.30
 VEL_CAMINAR = 4.8          # m/s de referencia (VELOCIDAD_CAMINAR de la escena)
 VEL_CORRER = 8.5
+# Cadencia máxima (pasos por segundo). El jugador va a 4,8-8,5 m/s, mucho más rápido que una persona real, y con la
+# zancada de arriba salían ~6 pasos/s: ráfagas de ruido pegadas que sonaban a locomotora. Con la cadencia acotada la
+# zancada se alarga sola a esas velocidades. ALCALDE_PASOS_CADENCIA=0 vuelve al ritmo de antes.
+PASOS_CADENCIA = True
+CADENCIA_CAMINAR = 2.4
+CADENCIA_CORRER = 2.9
 
 DISTANCIA_CERCA = 2.0      # m: hasta aquí un sonido 3D suena entero
 DISTANCIA_LEJOS = 45.0     # m: a partir de aquí no se oye
@@ -96,7 +103,49 @@ def volumen_cadena(velocidad, vmax):
 def zancada_para(velocidad):
     t = (velocidad - VEL_CAMINAR) / max(VEL_CORRER - VEL_CAMINAR, 1e-6)
     t = max(0.0, min(1.0, t))
-    return ZANCADA_CAMINAR + (ZANCADA_CORRER - ZANCADA_CAMINAR) * t
+    zancada = ZANCADA_CAMINAR + (ZANCADA_CORRER - ZANCADA_CAMINAR) * t
+    if not cadencia_activa():
+        return zancada
+    cadencia = CADENCIA_CAMINAR + (CADENCIA_CORRER - CADENCIA_CAMINAR) * t
+    return max(zancada, velocidad / cadencia)
+
+
+# Ambiente v2 (ALCALDE_AMBIENTE_V2): el nombre lógico «ambiente_favela» (escenas y perfiles de etapa) suena con el
+# archivo ambiente_favela_v2.wav, sin latido de 6 Hz, y algo más bajo (0,8 -> 0,55 en el mundo normal).
+AMBIENTE_V2 = True
+GANANCIA_AMBIENTE_V2 = 0.55 / 0.8
+
+
+def ambiente_v2_activo():
+    valor = os.environ.get("ALCALDE_AMBIENTE_V2", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(AMBIENTE_V2)
+
+
+# Archivo (sin .wav) que suena para el nombre lógico `nombre`.
+def archivo_de_sonido(nombre):
+    if nombre == "ambiente_favela" and ambiente_v2_activo():
+        return "ambiente_favela_v2"
+    return nombre
+
+
+# Factor de volumen de un bucle según su nombre lógico (1 = sin cambio).
+def ganancia_bucle(nombre):
+    if nombre == "ambiente_favela" and ambiente_v2_activo():
+        return GANANCIA_AMBIENTE_V2
+    return 1.0
+
+
+def cadencia_activa():
+    valor = os.environ.get("ALCALDE_PASOS_CADENCIA", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(PASOS_CADENCIA)
 
 
 # Volumen de un paso: más fuerte al correr.

@@ -20,7 +20,7 @@ FINALES_TEXTOS = {
     "neutro": {
         "titulo": "Ciudad Nova duda",
         "texto": (
-            "La campaña termina con la ciudad partida en dos. Algunos bulos se frenaron a tiempo y otros corrieron "
+            "La campaña termina con la ciudad partida en dos. Algunas mentiras se frenaron a tiempo y otras corrieron "
             "más rápido que su desmentido. En Civitas ya nadie sabe del todo a quién creerle: unos vecinos confían, "
             "otros prefieren callar. Ciudad Nova llega a la elección con más preguntas que certezas, y el próximo "
             "alcalde tendrá que ganarse, paso a paso, la confianza que quedó a medias."

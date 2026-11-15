@@ -380,6 +380,37 @@ def mesh_fuego(v):
     return d.mesh()
 
 
+HUMO_SUAVE = (168, 168, 178)
+BRASA = realzar_color((255, 96, 28))
+
+
+def mesh_fuego_vivo(v):
+    """Hoguera del fuego vivo (ALCALDE_FUEGO_VIVO): misma silueta de cómic que mesh_fuego, pero con llamas de alto,
+    lado e inclinación distintos en cada variante, una base de brasas, lenguas amarillas más altas (se ven por fuera) y
+    humo más claro y redondo que se aclara al subir. Menos triángulos: solo la bocanada de abajo es icosfera(1); las
+    de arriba, icosfera(0) (el humo con casco era lo más caro de la malla)."""
+    d = DibujoTinta()
+    for giro in (25 + 40 * v, -50 + 40 * v):
+        d.solido(caja(), (0, 0.08, 0), (0.95, 0.14, 0.16), giro, MADERA_QUEMADA)
+    d.agregar(prisma(6, 0.5, 0.5), (0, 0.03, 0), (0.7, 0.07, 0.7), 15 * v, BRASA, (1.0, 1.0))
+    cono = prisma(5, 0.5, 0.03)
+    for k in range(3):                                   # llamas rojas de fuera, de alto y lado distintos
+        a = 2 * math.pi * (k + 0.25 * v + 0.15 * azar_de(k, v + 3.1)) / 3
+        r = 0.23 + 0.07 * azar_de(k, v + 4.4)
+        d.solido(cono, (r * math.cos(a), 0.1, r * math.sin(a)), (0.46, 0.75 + 0.4 * azar_de(k, v + 1.3), 0.46),
+                 40 * k + 20 * v, ROJO_FUEGO, (1.0, 1.0), inclinacion=10.0 * (azar_de(k, v + 9.1) - 0.5), apoyado=True)
+    d.solido(cono, (0.03 * v, 0.12, 0), (0.5, 1.2 + 0.35 * azar_de(v, 2.2), 0.5), 18 * v, NARANJA_FUEGO, (1.0, 1.0),
+             apoyado=True)
+    for k in range(3):                                   # lenguas amarillas, entre las rojas y por fuera de ellas
+        a = 2 * math.pi * (k + 0.5 + 0.25 * v) / 3
+        d.agregar(cono, (0.36 * math.cos(a), 0.12, 0.36 * math.sin(a)), (0.26, 0.6 + 0.35 * azar_de(k, v + 7.7), 0.26),
+                  30 * k, AMARILLO_FUEGO, (1.0, 1.0), 0.0, 8.0 * (azar_de(k, v + 5.5) - 0.5))
+    for k, (y, r, forma) in enumerate(((1.6, 0.34, icosfera(1)), (2.05, 0.26, icosfera(0)), (2.4, 0.18, icosfera(0)))):
+        d.solido(forma, (0.14 * (k - 1) + 0.08 * v, y, 0.1 * (1 - k)), (r, r * 0.85, r), 50 * k + 25 * v,
+                 _tono(HUMO_SUAVE, 1.0 + 0.05 * k), (0.95, 1.05))
+    return d.mesh()
+
+
 def mesh_rodador(v):
     """Arbusto seco que rueda: bola de pocas caras con ramas que la atraviesan. Origen en el centro (radio ≈ 0,5 m)."""
     d = DibujoTinta()
@@ -821,7 +852,11 @@ def crear_controlador(escena, atmosfera=True, capas=True):
             raiz = self.raiz
             e = sitios_de_etapa(mundo, s)
             largo = float(mundo.ancho_calle) + 1.2
-            variantes("fuego", "fuego", lambda v: (lambda: mesh_fuego(v)), 2, 5, e["fuego"], 55)
+            self._fuego_vivo = cv.fuego_vivo_activo()
+            malla_fuego = mesh_fuego_vivo if self._fuego_vivo else mesh_fuego
+            variantes("fuego", "fuego", lambda v: (lambda: malla_fuego(v)), 2, 5, e["fuego"], 55)
+            if self._fuego_vivo and cv.fuego_brillo_activo():
+                self._crear_brillo_fuego()
             self.grupos["rodador"] = ("rodadores", Grupo(raiz, "rodador", lambda: mesh_rodador(0), 5, e["rodadores"], 60,
                                                          _coloca_uniforme, _fija_uniforme))
             self.grupos["fiesta"] = ("fiesta", Grupo(raiz, "fiesta", lambda: mesh_fiesta(largo), 5, e["fiesta"], 75,
@@ -836,6 +871,22 @@ def crear_controlador(escena, atmosfera=True, capas=True):
             self._suelo = mundo.altura
             self._grupos_etapa = [(capa, g) for nombre, (capa, g) in self.grupos.items() if capa in etapas_final.CAPAS_ETAPA]
 
+        def _crear_brillo_fuego(self):
+            """Halo aditivo opcional (ALCALDE_FUEGO_BRILLO=1): un quad que mira a la cámara, hijo de cada hoguera. Cuesta
+            +1 draw call por fuego visible (otro estado de render), por eso va apagado por defecto."""
+            from panda3d.core import ColorBlendAttrib
+            from ursina import Entity, color
+            from ursina.shaders import unlit_shader
+            for nombre in ("fuego0", "fuego1"):
+                for k, entidad in enumerate(self.grupos[nombre][1].entidades):
+                    halo = Entity(parent=entidad, model="quad", billboard=True, shader=unlit_shader, unlit=True,
+                                  scale=(1.9, 2.2), y=0.75, color=color.rgba32(255, 120, 40, 90), name=f"viva_brillo_{nombre}_{k}")
+                    halo.ignore = True
+                    halo.setAttrib(ColorBlendAttrib.make(ColorBlendAttrib.MAdd, ColorBlendAttrib.OIncomingAlpha,
+                                                         ColorBlendAttrib.OOne))
+                    halo.setDepthWrite(False)
+                    halo.setBin("fixed", 10)
+
         def _animar_etapa(self, dt):
             """Parpadeo del fuego, rodar de los arbustos y caída del confeti: solo las ranuras ocupadas (≤ 20)."""
             self._t_etapa += dt
@@ -847,7 +898,13 @@ def crear_controlador(escena, atmosfera=True, capas=True):
                         continue
                     e = grupo.entidades[k]
                     es = max(0.001, cv.escala_fundida(ranuras.f[k]))
-                    if capa == "fuego":
+                    if capa == "fuego" and self._fuego_vivo:
+                        dato = grupo.sitios[sitio]
+                        ancho, alto, giro, (r, g, b) = cv.parpadeo_fuego(t, dato.u, es)
+                        e.scale = (ancho, alto, ancho)
+                        e.rotation_y = dato.giro + giro
+                        e.setColorScale(r, g, b, 1.0)
+                    elif capa == "fuego":
                         ancho = es * (1.0 + 0.07 * math.sin(t * 11.0 + k * 2.1))
                         e.scale = (ancho, es * (1.0 + 0.16 * math.sin(t * 8.3 + k * 1.7)), ancho)
                     elif capa == "rodadores":

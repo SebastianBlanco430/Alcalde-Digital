@@ -107,7 +107,7 @@ def _cambios(aviso):
 
 def texto_efecto(aviso):
     """Texto de un aviso de causa-efecto (dict de FlujoConTiempo): el mensaje y, entre paréntesis, lo que cambió en la
-    ciudad: «Ayer compartiste sin verificar «…»: hoy el bulo volvió a circular. (algo menos confianza; algo más rumores)».
+    ciudad: «Ayer compartiste sin verificar «…»: hoy esa noticia falsa volvió a circular. (algo menos confianza; algo más rumores)».
     "" si el aviso no trae mensaje."""
     if not isinstance(aviso, dict):
         return ""

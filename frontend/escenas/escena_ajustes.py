@@ -134,8 +134,9 @@ class Deslizador(Entity):
         self.x_centro = x0 + self.ANCHO_PISTA / 2
         self.pista = panel_tinta(self, self.ANCHO_PISTA, self.ALTO_PISTA, (96, 102, 138), 6,
                                  sombra=False, borde_px=2, position=(self.x_centro, 0, -0.003))
-        self.relleno = Entity(parent=self, model="quad", color=rgb(estilo.ACENTO_SECUNDARIO), z=-0.006,
-                              scale=(0.001, self.ALTO_PISTA * 0.8), position=(x0, 0, -0.006))
+        z_relleno = calc.z_relleno_deslizador()
+        self.relleno = Entity(parent=self, model="quad", color=rgb(estilo.ACENTO_SECUNDARIO), z=z_relleno,
+                              scale=(0.001, self.ALTO_PISTA * 0.8), position=(x0, 0, z_relleno))
         self.nudo = panel_tinta(self, 0.034, 0.062, estilo.ACENTO_PRIMARIO, 6, sombra=False, borde_px=2,
                                 position=(x0, 0, -0.009))
         self.zona = Entity(parent=self, model="quad", collider="box", color=color.clear,
@@ -158,6 +159,15 @@ class Deslizador(Entity):
         self.zona.collider = "box" if self._habilitado else None
         self.texto_valor.color = rgb(estilo.COLOR_TEXTO if self._habilitado else estilo.COLOR_TEXTO_TENUE)
         self.fila.atenuar(not self._habilitado)
+        if calc.deslizador_capas_activo():
+            # pista, relleno y perilla también se ven tenues (la escala de color pasa a las capas de panel_tinta)
+            # (pista y perilla son contenedores sin modelo; el relleno ya usa la escala de color para su tono, así
+            # que a él se le cambia el color)
+            tono = 1.0 if self._habilitado else calc.TENUE_DESHABILITADO
+            for parte in (self.pista, self.nudo):
+                parte.setColorScale(tono, tono, tono, 1.0)
+            r, g, b = estilo.ACENTO_SECUNDARIO[:3]
+            self.relleno.color = rgb((round(r * tono), round(g * tono), round(b * tono)))
 
     def fijar_foco(self, valor):
         self.fila.fijar_foco(valor)

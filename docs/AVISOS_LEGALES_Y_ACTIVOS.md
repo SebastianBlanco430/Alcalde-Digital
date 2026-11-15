@@ -40,7 +40,7 @@ Los ocho dilemas son educativos y de tono equilibrado (ninguna opción es gratis
 | Foto del cumple, captura de la rifa, ensayo en vivo | Enseñan a **no exponer datos de terceros** (dirección, teléfonos, caras de niños). Coherente con el contexto educativo; ninguna instrucción real de vigilancia | Ninguno. Mantener la nota «personas y lugares ficticios» visible en la ficha |
 | Captura de la rifa | Acusa de apropiación de dinero a un personaje (tesorero); es ficticio | Que no coincida con una persona real de una asociación real |
 | Colecta de Kauã | Menor enfermo y posible estafa; tono serio | Evitar cuentas, bancos o plataformas reales de colecta |
-| «Tipo raro» de la escuela | Menores, escuela y señalamiento de un inocente (lector de la luz) | Ver punto 4: nombre de escuela. Tono adecuado; la consecuencia muestra el daño del bulo |
+| «Tipo raro» de la escuela | Menores, escuela y señalamiento de un inocente (lector de la luz) | Ver punto 4: nombre de escuela. Tono adecuado; la consecuencia muestra el daño de la noticia falsa |
 | Pelo en el pan, balanza, corte de agua, domingo sin pantalla | Sin riesgo particular | Ninguno |
 
 Tiendas de apps: no hay contenido generado por usuarios, compras, apuestas ni publicidad. La «rifa» es solo un

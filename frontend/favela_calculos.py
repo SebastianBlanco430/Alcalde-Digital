@@ -10,6 +10,7 @@
 # toca el random del backend.
 
 import math
+import os
 from dataclasses import dataclass
 
 from frontend.azar_fijo import azar_de
@@ -295,6 +296,20 @@ PROBABILIDAD_OBJETO = 0.50      # fracción de las caras abiertas o anchas con u
 # sistema, frontend/vehiculo_mundo.py) y perros. Se omiten DESPUÉS de elegir el tipo, así el resto de objetos
 # queda exactamente donde estaba. Quitar un tipo de esta tupla lo devuelve.
 TIPOS_OCULTOS = ("moto", "perro")
+# Bicis de adorno («bici»): tampoco se pueden montar y se veían feas. Las montables son el tipo «bicicleta» de
+# vehiculo_calculos (otro sistema; el conteo online N_VEHICULOS_MAX no cambia). BICIS_DECORADO = True (o
+# ALCALDE_BICIS_DECORADO=1) las devuelve.
+BICIS_DECORADO = False
+
+
+def tipos_ocultos():
+    valor = os.environ.get("ALCALDE_BICIS_DECORADO", "").strip().lower()
+    mostrar = bool(BICIS_DECORADO)
+    if valor in ("1", "true", "si", "sí", "on"):
+        mostrar = True
+    elif valor in ("0", "false", "no", "off"):
+        mostrar = False
+    return TIPOS_OCULTOS if mostrar else TIPOS_OCULTOS + ("bici",)
 
 
 @dataclass(frozen=True)
@@ -309,9 +324,78 @@ class Objeto:
     casa: int
 
 
+# -- Colisión de lo que queda en la calle (ALCALDE_COLISION_CALLE) --------------------------------------------------
+# Bidones, macetas y cajas del mapa chico, los puestos con toldo del mercadito y los arcos de la cancha se veían
+# sólidos pero se atravesaban. Se entregan como círculos/cajas a MundoCiudad.agregar_obstaculos (rejilla de 8 m, solo
+# en este cliente: ni lo que se dibuja ni la huella de sala cambian; ALCALDE_COLISION_PROPS=0 lo apaga todo). Los
+# objetos de la calle del mapa grande (~3400, generados por chunk) NO: habría que recorrerlos todos de una vez y en
+# callejones de 2,2 m podrían cerrar el paso.
+# Medido (2026-11-15): los 258 objetos del mapa chico tardan ~3,5 ms en entrar a la rejilla (una vez, al cargar; el
+# costo por frame no cambia). Pasa del 1 ms que se fijó como tope, así que van APAGADOS (ALCALDE_COLISION_CALLE=1 los
+# enciende). Mercadito y arcos (16 piezas, ~0,6 ms) van encendidos con su propia bandera, ALCALDE_COLISION_ZONAS.
+COLISION_CALLE = False
+COLISION_ZONAS = True
+TIPOS_CON_COLISION = {"bidon": 0.35, "maceta": 0.3, "caja": 0.4}
+MITAD_PUESTO_MERCADO = (1.15, 0.75)     # m: medio ancho y medio fondo de un puesto con toldo (postes y mostrador)
+RADIO_POSTE_ARCO = 0.15
+
+
+def _bandera(nombre, constante):
+    valor = os.environ.get(nombre, "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(constante)
+
+
+def colision_calle_activa():
+    return _bandera("ALCALDE_COLISION_CALLE", COLISION_CALLE)
+
+
+def colision_zonas_activa():
+    return _bandera("ALCALDE_COLISION_ZONAS", COLISION_ZONAS)
+
+
+# Círculos de los objetos de la calle que se dibujaron (los que tienen cuerpo).
+def obstaculos_objetos_calle(objetos):
+    from backend.logica.mundo_ciudad import Obstaculo
+    return [Obstaculo("objeto_calle", o.x, o.z, radio=TIPOS_CON_COLISION[o.tipo]) for o in objetos
+            if o.tipo in TIPOS_CON_COLISION]
+
+
+# Puestos con toldo del mercadito (misma colocación que favela_detalles.mercadito) y postes de los arcos de la cancha.
+def obstaculos_de_zonas(zonas):
+    from backend.logica.mundo_ciudad import Obstaculo
+    salida = []
+    for zona in zonas:
+        largo_x = zona.ancho >= zona.fondo
+        largo, ancho = (zona.ancho, zona.fondo) if largo_x else (zona.fondo, zona.ancho)
+        if zona.tipo == "mercado":
+            cuantos = max(2, int(largo // 3.2))
+            ma, mf = MITAD_PUESTO_MERCADO
+            for fila in (-1, 1):
+                for k in range(cuantos):
+                    a = -largo / 2 + (k + 0.5) * largo / cuantos
+                    b = fila * (ancho / 2 - 1.3)
+                    cx, cz = (zona.cx + a, zona.cz + b) if largo_x else (zona.cx + b, zona.cz + a)
+                    lx, lz = (2 * ma, 2 * mf) if largo_x else (2 * mf, 2 * ma)
+                    salida.append(Obstaculo("puesto_mercado", cx, cz, ancho=lx, fondo=lz))
+        elif zona.tipo == "cancha":
+            for lado in (-1, 1):
+                a = lado * (largo / 2 + 0.05)
+                for fondo_arco in (0.0, 1.1):
+                    for b in (-1.8, 1.8):
+                        aa = a + lado * fondo_arco
+                        cx, cz = (zona.cx + aa, zona.cz + b) if largo_x else (zona.cx + b, zona.cz + aa)
+                        salida.append(Obstaculo("poste_arco", cx, cz, radio=RADIO_POSTE_ARCO))
+    return salida
+
+
 # Objetos del piso pegados a las paredes que dan a la calle o a pasillos de HUECO_OBJETO_MIN m o más.
 def objetos_de_calle(casas, caras):
     objetos = []
+    ocultos = tipos_ocultos()
     for n, cara in enumerate(caras):
         if cara.largo < 2.0 or (cara.es_callejon and cara.hueco < HUECO_OBJETO_MIN):
             continue
@@ -320,7 +404,7 @@ def objetos_de_calle(casas, caras):
         if _u(s0, 1.7) >= PROBABILIDAD_OBJETO:
             continue
         tipo = TIPOS_OBJETO[int(_u(s0, 2.9) * len(TIPOS_OBJETO)) % len(TIPOS_OBJETO)]
-        if tipo in TIPOS_OCULTOS:
+        if tipo in ocultos:
             continue
         radio = {"bidon": 0.35, "maceta": 0.3, "moto": 0.55, "bici": 0.5, "caja": 0.4, "perro": 0.4}[tipo]
         t = cara.t0 + 0.5 + (cara.largo - 1.0) * _u(s0, 3.3)
