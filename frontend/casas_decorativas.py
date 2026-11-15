@@ -23,6 +23,7 @@ from ursina.shaders import lit_with_shadows_shader
 from backend.datos.modelos_edificios import modelo_de
 from frontend.azar_fijo import azar_de
 from frontend.componentes import rgb
+from frontend import fusion_materiales
 
 TINTE_LADRILLO = (200, 124, 92)     # 2.º piso "a la vista": ladrillo sin revocar en parte de las casas
 
@@ -432,6 +433,7 @@ def construir_casas_favela(padre, casas, alturas=None, contorno=True):
             clave = (casa.modelo,) + estilo + (relieve,)
             if clave not in fuentes:
                 fuentes[clave] = _fuente_viva(casa.modelo, *estilo, texturas, relieve)
+                fusion_materiales.hornear_colores(fuentes[clave])    # menos draw calls (ALCALDE_SIN_FUSION_MATERIALES)
             copia = fuentes[clave].copy_to(raiz)
             copia.set_pos(casa.cx, y + piso * alto_piso, casa.cz)
             copia.set_hpr(-casa.rumbo, 0, 0)
@@ -443,7 +445,7 @@ def construir_casas_favela(padre, casas, alturas=None, contorno=True):
                 inferior = SUBE_CONTORNO_PISO if piso else -BAJA_CONTORNO_SUELO
                 _colocar_casco(casco, m, casa, est, (casa.cx, y + piso * alto_piso, casa.cz), alto_piso, inferior)
     raiz.clear_model_nodes()
-    raiz.flatten_strong()
+    fusion_materiales.aplanar(raiz)      # flatten_strong (con la fusión: sin el tope de 65534 vértices por bloque)
     raiz.reparent_to(lote)
     tinta = None
     if raiz_tinta is not None:

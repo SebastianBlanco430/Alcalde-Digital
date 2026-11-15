@@ -16,6 +16,7 @@ from backend.datos.ciudad_3d import ESCALA_MUNDO, SEMILLA_CASAS, construir_mundo
 from backend.datos.misiones_semilla import CATALOGO_MISIONES, catalogo_de_mundo
 from backend.datos.noticias_semilla import construir_arboles
 from backend.grafos.grafo_social import construir_grafo_social_ejemplo
+from backend.logica import recta_final
 from backend.logica.estado_partida import EstadoPartida
 from backend.red import huellas
 from backend.red.anfitrion import AMBITOS, Anfitrion, calcular_huellas
@@ -51,6 +52,7 @@ def construir_anfitrion(puerto=0, ambito="lan", semilla=SEMILLA_CASAS, abierto=F
         estado, mundo, catalogo, grafo_social=construir_grafo_social_ejemplo(),
         escala_mundo=ESCALA_MUNDO, punto_interaccion=mundo.punto_interaccion,
         radio_interaccion=RADIO_INTERACCION, **{"consecuencias": True, **(partida_opciones or {})})
+    recta_final.preparar_coop(partida)        # recta final en el anfitrión (ALCALDE_SIN_RECTA_FINAL=1 la apaga)
     h_mundo, h_contenido = calcular_huellas(mundo, semilla, catalogo)
     return Anfitrion(partida, mundo, semilla, codigo, h_mundo, h_contenido, ambito=ambito,
                      puerto=puerto, abierto=abierto, **opciones)

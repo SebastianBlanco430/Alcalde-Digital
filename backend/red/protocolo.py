@@ -14,7 +14,9 @@ import math
 # v4 (2026-10, mapa grande): 24 vehículos online (N_VEHICULOS_MAX 8 -> 24; el snapshot `veh` y `montar` admiten 0..23) y el
 # viaje rápido (mototáxi y teleférico): `viaje` (C2H) -> `viaje_ok` / `viaje_no` (H2C). Un equipo con v3 se rechaza con
 # «version» y un texto que dice cuál usa la sala (anfitrion._rechazar_version).
-PROTOCOLO_V = 5
+# v6 (2026-11, recta final): campos OPCIONALES `mult`/`nivel` en «ind» y `desenlace`/`claves` en «fin»
+# (backend/logica/recta_final.py). Ningún campo obligatorio cambia; un equipo con v5 se rechaza con «version».
+PROTOCOLO_V = 6
 JUEGO = "AlcaldeDigital"
 
 DIR_C2H = "c2h"   # cliente -> anfitrión
@@ -215,6 +217,8 @@ ESQUEMAS = {
         "valores": Campo("dic_num", largo=16, largo_item=48, minimo=-1e6, maximo=1e6),
         "autor": _ID,
         "deltas": Campo("dic_num", largo=16, largo_item=48, minimo=-1e6, maximo=1e6),
+        # v6: multiplicador y nivel (0-3) de la recta final en el anfitrión
+        "mult": _n(0.0, 10.0, obligatorio=False), "nivel": _i(0, 3, obligatorio=False),
     }),
     # v5: veredicto de la misión ("pasada" | "fallada" | null), grupo cuya confianza movió, delta y confianza resultante.
     "mision_cerrada": ((DIR_H2C,), {
@@ -230,6 +234,9 @@ ESQUEMAS = {
         # v5: confianza final por grupo y recuento de veredictos (el cliente arma el final con confianza_misiones).
         "confianza": Campo("dic_num", largo=8, largo_item=32, minimo=0.0, maximo=100.0, obligatorio=False),
         "pasadas": _i(0, 10000, obligatorio=False), "falladas": _i(0, 10000, obligatorio=False),
+        # v6: desenlace de la recta final y texto con las decisiones clave
+        "desenlace": _s(16, obligatorio=False, opciones=frozenset(("unida", "dividida", "tomada"))),
+        "claves": _s(600, obligatorio=False),
     }),
     "ping": ((DIR_C2H, DIR_H2C), {"n": _i(0, 2 ** 31), "tt": _n(0.0, 1e9)}),
     "pong": ((DIR_C2H, DIR_H2C), {"n": _i(0, 2 ** 31), "tt": _n(0.0, 1e9)}),

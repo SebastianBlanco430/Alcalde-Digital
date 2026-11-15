@@ -25,9 +25,10 @@
 # Con False (por defecto, y lo que usan las pruebas antiguas) todo queda como antes.
 
 import random
+import sys
 import time
 
-from backend.logica import confianza_misiones
+from backend.logica import confianza_misiones, recta_final
 from backend.logica.lote_mision import LoteMision
 from backend.logica.mazo_noticias import MazoNoticias
 from backend.logica.misiones import EN_MINIJUEGO, RADIO_INTERACCION
@@ -84,6 +85,8 @@ class PartidaCooperativa:
         self.reserva = ReservaMisiones(catalogo)
         self._mapa = mapa
         self._catalogo = list(catalogo)
+        # Recta final: ControladorRectaFinal o None (lo fija recta_final.preparar_coop desde el servidor).
+        self.recta_final = None
         self._grafo = grafo_social
         self._reloj = reloj
         self._gracia = gracia
@@ -348,12 +351,18 @@ class PartidaCooperativa:
                 self._cerrar_mision(id_jugador)
             return None
         deltas = dict(nodo_stats.deltas_compartir if tipo == "compartir" else nodo_stats.deltas_reportar)
+        if self.recta_final is not None:     # recta final (backend/logica/recta_final.py): multiplicador + eco
+            try:
+                deltas = self.recta_final.ajustar(tipo, deltas, nodo, estado)
+            except Exception as error:       # la recta final nunca debe impedir decidir: deltas de siempre
+                print(f"[recta_final] cooperativo: deltas sin ajustar ({error})", file=sys.stderr)
         estado.aplicar_deltas(deltas)
         mano.remove(carta)
         if es_carta_mision:
             self._decision_mision[id_jugador] = tipo
         self._lotes[id_jugador].registrar(tipo, deltas, quedan_noticias=bool(mano))
-        self._emitir("ind", valores=estado.indicadores(), autor=id_jugador, deltas=deltas)
+        self._emitir("ind", valores=estado.indicadores(), autor=id_jugador, deltas=deltas,
+                     **recta_final.campos_ind(self.recta_final))
         if self._lotes[id_jugador].terminada():
             self._cerrar_mision(id_jugador)
         return deltas
@@ -590,6 +599,7 @@ class PartidaCooperativa:
             consecuencia = {"confianza": self._gs.confianzas(),
                             "pasadas": self._veredictos[confianza_misiones.PASADA],
                             "falladas": self._veredictos[confianza_misiones.FALLADA]}
+        consecuencia.update(recta_final.campos_fin(self.recta_final, self.estado_partida.indicadores()))
         self._emitir("fin", indicadores=self.estado_partida.indicadores(),
                      resumen=self._resumen(), motivo=motivo, **consecuencia)
 

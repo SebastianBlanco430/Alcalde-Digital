@@ -56,6 +56,9 @@ class EstadoPartida:
         # de misión (en línea, sin GameState o con las consecuencias apagadas). Lo fija
         # FlujoConGameState; LoteMision lo lee para forzar la carta de la misión.
         self.cartas_mision = None
+        # Recta final (backend/logica/recta_final.py): ControladorRectaFinal o None = decisiones como siempre. Lo fija
+        # recta_final.envolver; con ALCALDE_SIN_RECTA_FINAL=1 queda en None.
+        self.recta_final = None
         self.siguiente_noticia()
 
     # -- Consulta --
@@ -170,7 +173,9 @@ class EstadoPartida:
     # tipo: "compartir" o "reportar" (otro valor lanza ValueError). Retorna una
     # copia de los deltas aplicados, o None si no se aplicó nada (sin noticia
     # activa, o isomorfismo roto: registra un warning y descarta esa noticia).
-    def decidir(self, tipo):
+    # multiplicador (opcional): escala los deltas (recta_final.escalar_deltas). Sin él y sin `recta_final` los deltas
+    # son los de siempre; con `recta_final` los ajusta el controlador (multiplicador del tramo + eco).
+    def decidir(self, tipo, multiplicador=None):
         if tipo not in _DECISIONES_VALIDAS:
             raise ValueError(
                 f"Decisión inválida: {tipo!r}; se esperaba una de {_DECISIONES_VALIDAS}."
@@ -198,6 +203,20 @@ class EstadoPartida:
         else:
             deltas = nodo_stats.deltas_reportar
 
+        if multiplicador is not None or self.recta_final is not None:
+            deltas = self._ajustar_recta_final(tipo, deltas, multiplicador)
         self.aplicar_deltas(deltas)
         self.siguiente_noticia()
         return dict(deltas)
+
+    # Deltas de la decisión con la recta final: el multiplicador explícito manda; si no, el controlador. Si el
+    # controlador falla se usan los deltas de siempre (la recta final nunca debe impedir decidir).
+    def _ajustar_recta_final(self, tipo, deltas, multiplicador):
+        if multiplicador is not None:
+            from backend.logica.recta_final import escalar_deltas
+            return escalar_deltas(deltas, multiplicador)
+        try:
+            return self.recta_final.ajustar(tipo, deltas, self._noticia_actual, self)
+        except Exception as error:
+            _registro.warning("recta final: no se pudieron ajustar los deltas (%s); se usan los de siempre.", error)
+            return deltas

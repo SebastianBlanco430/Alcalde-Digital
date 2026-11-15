@@ -13,6 +13,7 @@
 
 import dataclasses
 import math
+import os
 import time
 
 from panda3d.core import LVecBase4, ScissorEffect, TextNode
@@ -505,8 +506,9 @@ class Minimapa(Entity):
         if abs(yaw_grados - self.geometria.yaw) < 0.05:
             return
         self.geometria.girar(yaw_grados)
-        if not self._local and hud_calculos.diferencia_yaw(yaw_grados, self._yaw_capas) > 1.0:
+        if not self._local and hud_calculos.diferencia_yaw(yaw_grados, self._yaw_capas) > self._umbral_capas():
             self._capas_sucias = True                   # marcadores y zonas se proyectan con el yaw
+        self._girar_capa_extra()
         if self._local:                    # una sola transformación de la capa estática; no se rehace nada
             self._aplicar_capa_local()
             self._firma_ruta = None
@@ -536,6 +538,25 @@ class Minimapa(Entity):
     # del minimapa) y solo se recoloca cada YAW_MIN_MAPA_SUAVE grados. False = lo de siempre.
     GIRO_SUAVE_MAPA = True
     YAW_MIN_MAPA_SUAVE = 6.0
+
+    # Rendimiento (GIRO_SUAVE_CAPAS): marcadores y zonas se rehacían (mallas nuevas) cada grado de giro, es decir casi
+    # cada frame al girar la cámara o al correr. Entre reconstrucciones se gira la capa entera (como las casas) y solo
+    # se rehace cada YAW_MIN_CAPAS_SUAVE grados. False o ALCALDE_SIN_GIRO_SUAVE_CAPAS=1 = lo de siempre (1 grado).
+    GIRO_SUAVE_CAPAS = True
+    YAW_MIN_CAPAS_SUAVE = 6.0
+
+    @classmethod
+    def _giro_suave_capas(cls):
+        return cls.GIRO_SUAVE_CAPAS and os.environ.get("ALCALDE_SIN_GIRO_SUAVE_CAPAS", "").strip() != "1"
+
+    def _umbral_capas(self):
+        return self.YAW_MIN_CAPAS_SUAVE if self._giro_suave_capas() else 1.0
+
+    def _girar_capa_extra(self):
+        if self._local or self.capa_extra is None or self._yaw_capas is None or not self._giro_suave_capas():
+            return
+        delta = (self.geometria.yaw - self._yaw_capas + 180) % 360 - 180
+        self.capa_extra.rotation_z = -delta
 
     def _girar_capas_mapa(self):
         delta = (self.geometria.yaw - self._yaw_mapa + 180) % 360 - 180

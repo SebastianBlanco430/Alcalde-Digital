@@ -123,6 +123,8 @@ def sanear_mensaje(msg, ids_misiones=None, vehiculos=False):
     elif t == "fin":
         salida["resumen"] = saneado.sanear_texto_visible(msg["resumen"], 1000)
         salida["indicadores"] = _sanear_dic(msg["indicadores"])
+        if "claves" in msg:                  # v6: decisiones clave de la recta final
+            salida["claves"] = saneado.sanear_texto_visible(msg["claves"], 600)
     elif t == "ind":
         salida["valores"] = _sanear_dic(msg["valores"])
         salida["deltas"] = _sanear_dic(msg["deltas"])

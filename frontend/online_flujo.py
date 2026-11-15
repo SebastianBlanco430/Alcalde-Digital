@@ -284,6 +284,8 @@ class FlujoEnLinea:
         self._dentro = False            # el jugador está dentro de un edificio (bandera «dentro»)
         self.al_rechazo = None          # callable(motivo): ConexionEnLinea revierte las escenas
         self.ultimo_ind = None          # {"autor", "deltas", "propio", "n"}
+        self.ultimo_rf = None           # recta final del anfitrión: {"mult", "nivel", "n"} (v6)
+        self.desenlace_fin = None       # {"clave", "claves"} al terminar (v6)
         self._n_ind = 0
         self.ultimo_saludo = None       # (id, indice)
         self.ultimo_error = None
@@ -573,6 +575,8 @@ class FlujoEnLinea:
         self._n_ind += 1
         self.ultimo_ind = {"autor": ev["autor"], "deltas": dict(ev["deltas"]),
                            "propio": ev["autor"] == self.tu_id, "n": self._n_ind}
+        if "mult" in ev:                     # v6: recta final calculada en el anfitrión (recta_final_vista lo lee)
+            self.ultimo_rf = {"mult": ev["mult"], "nivel": ev.get("nivel", 0), "n": self._n_ind}
 
     def _ev_mision_cerrada(self, ev):
         actual = self._sistema.mision_actual()
@@ -600,6 +604,8 @@ class FlujoEnLinea:
         if isinstance(ev.get("confianza"), dict):
             self.confianza = dict(ev["confianza"])
             self._datos_final = (dict(ev["confianza"]), ev.get("pasadas", 0), ev.get("falladas", 0))
+        if ev.get("desenlace"):              # v6: desenlace de la recta final (recta_final_vista lo muestra)
+            self.desenlace_fin = {"clave": ev["desenlace"], "claves": ev.get("claves", "")}
         self._fin = True
 
     # Final de la partida (mismo dict que FlujoConGameState.final_partida) con la confianza que mandó el anfitrión; None

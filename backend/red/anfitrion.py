@@ -977,8 +977,10 @@ class Anfitrion:
             return [(para, {"t": "mision", "id": ev["id"], "mano": [str(m["id"]) for m in ev["mano"]][:8],
                             "hechas": hechas})]
         if t == "ind":
-            return [(para, {"t": "ind", "valores": ev["valores"], "autor": ev["autor"],
-                            "deltas": ev["deltas"]})]
+            msg = {"t": "ind", "valores": ev["valores"], "autor": ev["autor"], "deltas": ev["deltas"]}
+            if "mult" in ev:                         # v6: recta final
+                msg.update(mult=ev["mult"], nivel=ev.get("nivel", 0))
+            return [(para, msg)]
         if t == "mision_cerrada":
             # Solo a su dueño: los demás se enteran por «ind» y por las «hechas» de su próxima misión.
             msg = {"t": "mision_cerrada", "id": ev["id"], "siguiente": ev["siguiente"]}
@@ -993,6 +995,8 @@ class Anfitrion:
             msg = {"t": "fin", "indicadores": ev["indicadores"], "resumen": _texto(texto, 1000)}
             if "confianza" in ev:
                 msg.update(confianza=ev["confianza"], pasadas=ev.get("pasadas", 0), falladas=ev.get("falladas", 0))
+            if "desenlace" in ev:                    # v6: recta final
+                msg.update(desenlace=ev["desenlace"], claves=_texto(ev.get("claves", ""), 600))
             return [(para, msg)]
         if t == "sala_cerrada":
             self._sala_cerrada = True

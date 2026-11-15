@@ -11,7 +11,7 @@ from backend.datos.noticias_semilla import construir_arboles
 from backend.logica.estado_partida import NOMBRES_INDICADORES, EstadoPartida
 from backend.logica.lote_mision import LoteMision
 from backend.logica.roles import ROLES
-from frontend import estilo
+from frontend import estilo, recta_final_vista
 from frontend.componentes import (
     BarraIndicador,
     BotonAccion,
@@ -301,7 +301,8 @@ class EscenaJuego(Escena):
         self.panel_propagacion.ocultar()
         self.panel_resultado.mostrar(
             self.grafo_social, self.lote.propagaciones_con_niveles(), self.lote.deltas_acumulados,
-            titulo=glosar_texto(self.mision.titulo), indicadores=self.estado.indicadores(),
+            titulo=recta_final_vista.titulo_resultado(glosar_texto(self.mision.titulo), self.estado),
+            indicadores=self.estado.indicadores(),
             al_continuar=lambda: self._continuar_resultado(intento))
 
     # «Continuar»: entrega el resultado una sola vez (y solo si la escena sigue vigente).

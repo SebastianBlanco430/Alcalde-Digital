@@ -78,6 +78,10 @@ def capturar(flujo, mapa, semilla):
     tiempo = getattr(flujo, "tiempo_a_dict", None)
     if callable(tiempo):
         datos.update(tiempo())
+    # Clave OPCIONAL de la recta final (backend/logica/recta_final.py): solo si el flujo la tiene.
+    recta = getattr(flujo, "recta_final_a_dict", None)
+    if callable(recta):
+        datos["recta_final"] = recta()
     return datos
 
 
@@ -180,6 +184,9 @@ def restaurar(datos, estado_partida, fabrica_flujo, escala_mundo=1.0, mapa=None,
         restaurar_tiempo = getattr(flujo, "restaurar_tiempo", None)
         if callable(restaurar_tiempo):
             restaurar_tiempo(datos)
+        restaurar_recta = getattr(flujo, "restaurar_recta_final", None)
+        if callable(restaurar_recta) and datos.get("recta_final") is not None:
+            restaurar_recta(datos["recta_final"])
     except (KeyError, TypeError, AttributeError) as error:
         raise ValueError(f"Guardado incompleto o dañado: {type(error).__name__}: {error}") from error
     if flujo.jugador_activo() is None:

@@ -130,6 +130,9 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
         # lo bien que se verificó en un minijuego da propina y confianza (ALCALDE_CONSECUENCIA_GRADUADA=0 lo apaga)
         from backend.logica import consecuencia_graduada
         flujo = consecuencia_graduada.envolver(flujo)
+        # recta final: decisiones con más peso, eco y desenlace (ALCALDE_SIN_RECTA_FINAL=1 lo apaga)
+        from backend.logica import recta_final
+        flujo = recta_final.envolver(flujo)
         return flujo
 
     transicion = Transicion(duracion_transicion, duracion_transicion)
@@ -265,6 +268,10 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     gestor.cambiar_a(INICIO)
     rendimiento.instalar()                 # silencia en el bucle de Ursina las entidades pasivas (frontend/rendimiento.py)
     telemetria.instalar()                  # F3: FPS y uso de CPU/RAM/GPU (frontend/telemetria.py)
+    from frontend import recta_final_vista
+    recta_final_vista.instalar(gestor)     # aviso, chip de tensión y desenlace (ALCALDE_SIN_RECTA_FINAL_VISTA=1 lo apaga)
+    from frontend import gc_suave
+    gc_suave.instalar()                    # congela lo cargado y espacia el recolector (ALCALDE_SIN_GC_SUAVE=1 lo apaga)
     return aplicacion, gestor
 
 
