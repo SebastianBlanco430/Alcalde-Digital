@@ -242,7 +242,8 @@ def crear_controlador(escena, conexion):
             self.hablando = False
             i = int(datos.get("modelo", orden))
             tono = tuple(datos.get("color", ROPA[i % len(ROPA)]))
-            npc = crear_npc(i, SEMILLA_NPC, aspecto_peaton(i, SEMILLA_NPC), rasgos_peaton(i, SEMILLA_NPC), tono, parent=escena)
+            npc = crear_npc(i, SEMILLA_NPC, aspecto_peaton(i, SEMILLA_NPC), rasgos_peaton(i, SEMILLA_NPC), tono, parent=escena,
+                            nombre=self.nombre)
             npc.aro.enabled = False
             npc.nombre = self.nombre
             y = npc.etiqueta.y

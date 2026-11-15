@@ -145,6 +145,9 @@ def plan_npc(indice, semilla, aspecto, modelo=None):
     if modelo is None and USAR_MODELOS_NUEVOS and 0 <= indice < INDICE_PRIMER_NOMBRADO:
         from frontend import npc_nuevos_calculos as nn       # aquí dentro: ese módulo importa este
         modelo = nn.modelo_variado(indice, semilla)
+    if modelo is None or modelo[0] == "brasilena.glb":       # la influencer queda solo jugable (npc_genero_calculos)
+        from frontend import npc_genero_calculos as ng
+        modelo = ng.sin_influencer(modelo or modelo_npc(indice, semilla), indice, semilla)
     if modelo is not None and modelo[0] in ARCHIVOS_NUEVOS:
         from frontend import npc_nuevos_calculos as nn
         return nn.plan_nuevo(indice, semilla, aspecto, modelo)

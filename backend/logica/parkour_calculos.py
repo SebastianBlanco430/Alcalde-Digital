@@ -18,6 +18,7 @@
 
 import heapq
 import math
+import os
 from dataclasses import dataclass, field
 
 from backend.logica import evidencia
@@ -32,6 +33,25 @@ ALCANCE_INTERRUPTOR = 1.4     # m de altura sobre el interruptor dentro de los q
 TIPOS = ("fija", "movil", "desaparece")
 MEDALLAS = ("bronce", "plata", "oro")
 CATEGORIAS = ("facil", "dificil")
+
+# Resultado v2 del parkour (mensaje final de la ruta Dijkstra). Con la bandera:
+#   - al reaparecer en un checkpoint la ruta se recorta hasta él: el intento fallido no cuenta como tramo de la ruta
+#     (antes un salto fallido desde r1 dejaba la carrera como «Ruta arriesgada» y el salto de reaparición sumaba un
+#     coste estimado de ~5 s; la caída ya se cobra en tiempo y en puntos);
+#   - el panel enseña la ruta de REFERENCIA de la categoría (la segura si la carrera fue segura) con su coste, partida
+#     en varias líneas para que quepa en el panel (la de 26 nodos medía ~160 caracteres y se salía).
+# RESULTADO_PARKOUR_V2 = False (o ALCALDE_RESULTADO_PARKOUR_V2=0) deja el comportamiento anterior.
+RESULTADO_PARKOUR_V2 = True
+MAX_CARACTERES_RUTA = 62      # caracteres por línea de la ruta en el panel final (13 px en un panel de ~540 px)
+
+
+def resultado_v2_activo():
+    valor = os.environ.get("ALCALDE_RESULTADO_PARKOUR_V2", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(RESULTADO_PARKOUR_V2)
 
 
 # -- Datos del nivel --
@@ -421,7 +441,10 @@ class Simulacion:
         self.vertical.reiniciar(py)
         self.doble_usado = False
         self.sobre = cp.id
-        self._registrar_nodo(cp.id)
+        if resultado_v2_activo():
+            self.ruta = ruta_tras_reaparecer(self.ruta, cp.id)
+        else:
+            self._registrar_nodo(cp.id)
         eventos.append("caida")
 
     # Un paso de `dt` s. (mx, mz) = dirección deseada en el mundo (se normaliza si pasa de 1); `salto` = pulsación.
@@ -505,11 +528,61 @@ class Simulacion:
 
 # -- Textos del HUD (puros, para probarlos sin ventana) --
 
-# «mm:ss.d» de un tiempo en segundos.
+# «mm:ss.d» de un tiempo en segundos. Se redondea a décimas ANTES de partir en minutos: si no, 59,96 s salía
+# como «00:60.0» en vez de «01:00.0».
 def formatear_tiempo(segundos):
-    segundos = max(0.0, segundos)
-    minutos, resto = divmod(segundos, 60)
-    return f"{int(minutos):02d}:{resto:04.1f}"
+    decimas = int(round(max(0.0, segundos) * 10))
+    minutos, resto = divmod(decimas, 600)
+    return f"{minutos:02d}:{resto // 10:02d}.{resto % 10}"
+
+
+# Ruta tras reaparecer en `checkpoint`: se recorta hasta la última vez que se pisó (el intento fallido desaparece de
+# la ruta). Si el checkpoint no está en la ruta (no debería pasar), se añade al final como antes.
+def ruta_tras_reaparecer(ruta, checkpoint):
+    ruta = list(ruta)
+    for i in range(len(ruta) - 1, -1, -1):
+        if ruta[i] == checkpoint:
+            return ruta[:i + 1]
+    ruta.append(checkpoint)
+    return ruta
+
+
+# Parte una secuencia de ids en líneas de como mucho `maximo` caracteres, unidas por « > » (la flecha de la línea
+# siguiente empieza con «> »). Un id más largo que `maximo` ocupa su propia línea.
+def partir_ruta(ids, maximo=MAX_CARACTERES_RUTA):
+    lineas, actual = [], ""
+    for id_nodo in ids:
+        trozo = str(id_nodo)
+        candidato = f"{actual} > {trozo}" if actual else trozo
+        if actual and len(candidato) > maximo:
+            lineas.append(actual + " >")
+            actual = trozo
+        else:
+            actual = candidato
+    if actual:
+        lineas.append(actual)
+    return lineas
+
+
+def _coste_texto(coste):
+    return "sin datos" if coste is None else f"{coste:.1f} s"
+
+
+# Textos del bloque «ruta Dijkstra» del panel final: (cabecera, [líneas de la ruta], pie). La ruta es la de
+# REFERENCIA con la que se midió la eficiencia (la segura si la carrera fue segura y existe; si no, la óptima global).
+# Total con datos incompletos: sin ruta dice que no hay ruta de referencia.
+def textos_ruta_dijkstra(resultado, maximo=MAX_CARACTERES_RUTA):
+    resultado = resultado or {}
+    segura = resultado.get("categoria") != "dificil" and resultado.get("ruta_segura")
+    if segura:
+        ruta, coste, cual = resultado.get("ruta_segura") or [], resultado.get("coste_seguro"), "segura"
+    else:
+        ruta, coste, cual = resultado.get("ruta_optima") or [], resultado.get("coste_optimo"), "óptima"
+    if not ruta:
+        return "Ruta de referencia (Dijkstra): no hay ruta", [], ""
+    cabecera = f"Ruta {cual} de referencia (Dijkstra, {_coste_texto(coste)}):"
+    pie = f"Tu ruta: {_coste_texto(resultado.get('coste_real'))} en {max(0, len(resultado.get('ruta_real') or []) - 1)} saltos"
+    return cabecera, partir_ruta(ruta, maximo), pie
 
 
 NOMBRE_MEDALLA = {"bronce": "Bronce", "plata": "Plata", "oro": "Oro", None: "Ninguna"}

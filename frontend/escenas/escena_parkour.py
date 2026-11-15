@@ -18,6 +18,7 @@ from ursina import held_keys, mouse, scene, time, window
 
 from backend.datos import parkour_loader
 from backend.logica import parkour_calculos as pk
+from frontend import camara_calculos as cc
 from frontend import materiales as mat
 from frontend.camara_tercera_persona import CamaraTerceraPersona
 from frontend.componentes import destruir_arbol, rgb
@@ -53,6 +54,7 @@ class EscenaParkour(Escena):
         self._salir_a = None
         self._salto = False
         self._y_camara = 0.0
+        self._y_apoyo = None          # altura del último apoyo en tierra (cámara estable, camara_calculos)
         self._guardado = None
         self._fov_extra = 0.0         # grados de FOV extra suavizados (aspecto nuevo: al caer rápido o saltar)
 
@@ -75,6 +77,7 @@ class EscenaParkour(Escena):
         self.camara.preparar_camara()
         self.camara.yaw, self.camara.pitch = 0.0, 28.0
         self._y_camara = self.sim.y
+        self._y_apoyo = None
         self.camara.colocar_ya()
         self.hud.enabled = True
         self.hud.ocultar_resultado()
@@ -146,6 +149,7 @@ class EscenaParkour(Escena):
         self._partidas[self.nivel.id] = self.sim
         self.hud.ocultar_resultado()
         self._y_camara = self.sim.y
+        self._y_apoyo = None
         self.camara.colocar_ya()
         self.mundo.marcar_checkpoint(self.sim.checkpoint)
         self.mundo.sincronizar(self.sim)
@@ -185,6 +189,10 @@ class EscenaParkour(Escena):
         if self.sim is not None and self.estado == FIN and self.mundo is not None and self.mundo.visual:
             self.mundo.sincronizar(self.sim, min(time.dt, DT_MAX))      # que los efectos de la meta terminen de animarse
             self.hud.avanzar(min(time.dt, DT_MAX))
+            if cc.camara_parkour_estable_activa():          # la cámara termina de asentarse sobre la meta
+                self._seguir_con_camara(min(time.dt, DT_MAX))
+                self._fov_extra = pvc.suavizar_fov(self._fov_extra, 0.0, min(time.dt, DT_MAX))
+                self.camara.fov_extra = self._fov_extra
             return
         if self.sim is None or self.estado != JUGANDO:
             return
@@ -205,6 +213,13 @@ class EscenaParkour(Escena):
 
     def _seguir_con_camara(self, dt):
         _, alto = self.sim.soporte_actual()
+        if cc.camara_parkour_estable_activa():
+            en_aire = self.sim.vertical.en_aire
+            if not en_aire and alto is not None:
+                self._y_apoyo = alto
+            objetivo = cc.objetivo_altura_parkour(self.sim.y, alto, en_aire, self._y_apoyo)
+            self._y_camara = cc.suavizar_altura(self._y_camara, objetivo, dt, RAPIDEZ_CAMARA_Y)
+            return
         if alto is not None:
             self._y_camara += (alto - self._y_camara) * (1 - math.exp(-RAPIDEZ_CAMARA_Y * dt))
 

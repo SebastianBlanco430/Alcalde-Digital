@@ -19,6 +19,14 @@ import os
 PANTALLA_COMPLETA_AJUSTE = True
 TECLA = "f11"
 
+# Esc (pausa) sacaba de la pantalla completa: el `window` de Ursina ES un WindowProperties que se quedaba con los
+# valores del arranque (con borde, tamaño de ventana) y `mouse.locked` / `mouse.visible` lo reenvían entero con
+# `base.win.requestProperties(window)` cada vez que se abre o cierra la pausa, el teléfono o un menú. Con esta
+# bandera, `aplicar()` copia también al `window` de Ursina el borde, el origen y el tamaño que pide, así el reenvío
+# ya no deshace la pantalla completa. PANTALLA_COMPLETA_PERSISTENTE = False (o ALCALDE_PANTALLA_COMPLETA_PERSISTENTE=0)
+# deja el comportamiento anterior.
+PANTALLA_COMPLETA_PERSISTENTE = True
+
 
 def activo():
     valor = os.environ.get("ALCALDE_PANTALLA_COMPLETA_AJUSTE", "").strip().lower()
@@ -27,6 +35,32 @@ def activo():
     if valor in ("0", "false", "no", "off"):
         return False
     return bool(PANTALLA_COMPLETA_AJUSTE)
+
+
+def persistente_activo():
+    valor = os.environ.get("ALCALDE_PANTALLA_COMPLETA_PERSISTENTE", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(PANTALLA_COMPLETA_PERSISTENTE)
+
+
+# Copia al `window` de Ursina (un WindowProperties) lo que se acaba de pedir a la ventana real, SIN volver a pedirlo:
+# se usan los métodos de WindowProperties (no las propiedades `size`/`position` de Ursina, que harían otra petición).
+# `origen`/`tamano`: (x, y) / (ancho, alto) o None para no tocarlos.
+def sincronizar_window_ursina(window, sin_borde, origen=None, tamano=None):
+    if window is None:
+        return False
+    try:
+        window.setUndecorated(bool(sin_borde))
+        if origen is not None:
+            window.setOrigin(int(origen[0]), int(origen[1]))
+        if tamano is not None:
+            window.setSize(int(tamano[0]), int(tamano[1]))
+    except Exception:
+        return False
+    return True
 
 
 class GestorPantallaCompleta:
@@ -98,6 +132,10 @@ class GestorPantallaCompleta:
                 propiedades.setSize(ancho, alto)
         # la ventana normal no se deja redimensionar (main.fijar_tamano_ventana); estos cambios los pide el juego
         base.win.requestProperties(propiedades)
+        if persistente_activo():
+            sincronizar_window_ursina(window, valor,
+                                      (propiedades.getXOrigin(), propiedades.getYOrigin()) if propiedades.hasOrigin() else None,
+                                      (propiedades.getXSize(), propiedades.getYSize()) if propiedades.hasSize() else None)
         window._fullscreen = valor
         self.aplicada = valor
 

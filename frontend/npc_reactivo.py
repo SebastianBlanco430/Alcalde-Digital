@@ -55,13 +55,14 @@ class NpcReactivo:
 
     def _crear_cuerpo(self, fabrica):
         try:
+            from frontend.npc_modelo import con_nombre
             if fabrica is None:
                 from frontend.npc_modelo import crear_npc as fabrica
             from frontend.peatones import ROPA
             from frontend.peatones_calculos import aspecto_peaton, rasgos_peaton
             i = self.clave.modelo
             npc = fabrica(i, SEMILLA_NPC, aspecto_peaton(i, SEMILLA_NPC), rasgos_peaton(i, SEMILLA_NPC),
-                          ROPA[i % len(ROPA)], parent=self._escena)
+                          ROPA[i % len(ROPA)], parent=self._escena, **con_nombre(fabrica, self.clave.nombre))
             npc.aro.enabled = False
             self._poner_nombre(npc)
             npc.suelo = self._escena._mundo.altura

@@ -377,6 +377,10 @@ ARCHIVO_DEPENDIENTA = "brasilena.glb"        # el único modelo femenino
 
 # ¿El nombre del dependiente es de mujer? («Dona X» en el catálogo); decide el modelo para que nombre y aspecto casen.
 def es_dependienta(nombre):
+    from frontend import npc_genero_calculos as ng
+    if ng.nombres_por_genero_activo():                       # tambi\u00e9n \u00abDo\u00f1a X\u00bb y nombres de mujer sin tratamiento
+        from backend.datos.nombres_npc import MUJER, genero_de_nombre
+        return genero_de_nombre(nombre) == MUJER
     return str(nombre or "").strip().lower().startswith(("dona ", "dona\u00a0"))
 
 
@@ -386,6 +390,15 @@ def indice_vestido(minimo, usados=(), mujer=None):
     from frontend import npc_calculos as nc
     from frontend.peatones import SEMILLA
     from frontend.peatones_calculos import aspecto_peaton
+    from frontend import npc_genero_calculos as ng
+    if mujer and ng.influencer_solo_jugable():
+        # Sin la brasileña en los NPC ya no hay mujer entre los modelos de diario de estos índices (el bucle de abajo
+        # no terminaría): se busca solo un índice libre y el modelo de mujer lo pone crear_npc(nombre=...) con
+        # npc_genero_calculos.modelo_para_nombre. Los hombres siguen con el bucle de siempre (periodista).
+        indice = minimo
+        while indice in usados:
+            indice += 1
+        return indice
     indice = minimo
     while True:
         plan = nc.plan_npc(indice, SEMILLA, aspecto_peaton(indice, SEMILLA))
@@ -400,14 +413,14 @@ def indice_vestido(minimo, usados=(), mujer=None):
 
 
 def _crear_dependiente(escena, indice, nombre, x, z, rumbo, crear_npc=None):
-    from frontend.npc_modelo import crear_npc as fabrica
+    from frontend.npc_modelo import con_nombre, crear_npc as fabrica
     from frontend.peatones import ROPA, SEMILLA
     from frontend.peatones_calculos import aspecto_peaton, rasgos_peaton
     from frontend.componentes import destruir_arbol
     from frontend.piezas import etiqueta, silenciar
     fabrica = crear_npc or fabrica
     npc = fabrica(indice, SEMILLA, aspecto_peaton(indice, SEMILLA), rasgos_peaton(indice, SEMILLA),
-                  ROPA[indice % len(ROPA)], parent=escena)
+                  ROPA[indice % len(ROPA)], parent=escena, **con_nombre(fabrica, nombre))
     npc.aro.enabled = False
     npc.nombre = nombre
     try:

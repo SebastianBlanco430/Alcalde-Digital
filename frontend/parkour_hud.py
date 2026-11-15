@@ -211,8 +211,12 @@ class HudParkour(Entity):
         ]
         for i, linea in enumerate(lineas):
             _texto(panel, linea, 20, estilo.COLOR_TEXTO, (0, 0.20 - 0.07 * i))
-        optima = " > ".join(resultado["ruta_optima"])
-        _texto(panel, f"Ruta óptima (Dijkstra): {optima}", 13, estilo.COLOR_TEXTO_TENUE, (0, -0.02))
+        y_mensaje = -0.10
+        if pk.resultado_v2_activo():
+            y_mensaje = self._bloque_ruta_v2(panel, resultado)
+        else:
+            optima = " > ".join(resultado["ruta_optima"])
+            _texto(panel, f"Ruta óptima (Dijkstra): {optima}", 13, estilo.COLOR_TEXTO_TENUE, (0, -0.02))
         if nueva_evidencia:
             mensaje, tono = "Evidencia obtenida: queda en tu archivo de casos.", estilo.ESTADO_EXITO
         elif not hay_recompensa:
@@ -221,13 +225,27 @@ class HudParkour(Entity):
             mensaje, tono = "Sin partida activa: la evidencia no se guarda.", estilo.ESTADO_AVISO
         else:
             mensaje, tono = "Ya tenías la evidencia de este nivel, o aún no alcanzas la medalla pedida.", estilo.ESTADO_AVISO
-        _texto(panel, mensaje, 17, tono, (0, -0.10))
+        _texto(panel, mensaje, 17, tono, (0, y_mensaje))
         BotonPrimario("Volver al mundo", al_clic=lambda: self.al_salir and self.al_salir(), parent=panel,
                       position=(-0.2, -0.27, -0.01), ancho=a_unidades(230))
         BotonSecundario("Reintentar", al_clic=lambda: self.al_reiniciar and self.al_reiniciar(), parent=panel,
                         position=(0.2, -0.27, -0.01), ancho=a_unidades(230))
         diseno_adaptable.ajustar_escala(panel)
         self.resultado = panel
+
+    # Bloque de la ruta Dijkstra del resultado v2 (pk.textos_ruta_dijkstra): cabecera, la ruta partida en líneas que
+    # caben en el panel y el coste de la ruta del jugador. Retorna la altura a la que va el mensaje de la evidencia.
+    def _bloque_ruta_v2(self, panel, resultado):
+        cabecera, lineas, pie = pk.textos_ruta_dijkstra(resultado)
+        y = 0.0
+        _texto(panel, cabecera, 14, estilo.COLOR_TEXTO, (0, y))
+        for linea in lineas[:4]:
+            y -= 0.032
+            _texto(panel, linea, 13, estilo.COLOR_TEXTO_TENUE, (0, y))
+        if pie:
+            y -= 0.036
+            _texto(panel, pie, 13, estilo.COLOR_TEXTO_TENUE, (0, y))
+        return min(-0.10, y - 0.05)
 
     def ocultar_resultado(self):
         if self.resultado is not None:

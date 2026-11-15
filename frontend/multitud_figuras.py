@@ -53,7 +53,9 @@ def crear_actor_variante(variante, **opciones):
     i = indice_variante(variante)
     aspecto, rasgos = aspecto_peaton(i, SEMILLA), rasgos_peaton(i, SEMILLA)
     try:
-        return ActorMultitud(f"Peatón {i}", nc.plan_npc(i, SEMILLA, aspecto), aspecto, rasgos, **opciones)
+        from frontend import npc_genero_calculos as ng
+        plan = nc.plan_npc(i, SEMILLA, aspecto)
+        return ActorMultitud(ng.nombre_para_npc(i, SEMILLA, plan["archivo"]), plan, aspecto, rasgos, **opciones)
     except Exception as error:
         print(f"[multitud] actor {i}: {error}; se usa el de siempre", file=sys.stderr)
         return crear_npc(i, SEMILLA, aspecto, rasgos, ROPA[i % len(ROPA)], **opciones)

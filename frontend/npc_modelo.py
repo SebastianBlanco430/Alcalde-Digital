@@ -182,13 +182,27 @@ class PersonajeNPC(PersonajeModelo):
 
 # Fábrica: PersonajeNPC del peatón `indice`; si algo falla devuelve el muñeco procedural de siempre.
 # `color_ropa` solo lo usa el respaldo procedural.
-def crear_npc(indice, semilla, aspecto, rasgos, color_ropa, **opciones):
+# `nombre` (opcional): nombre visible del NPC; con NOMBRES_POR_GENERO su modelo pasa a ser de su género
+# (frontend/npc_genero_calculos.py). None = como siempre.
+def crear_npc(indice, semilla, aspecto, rasgos, color_ropa, nombre=None, **opciones):
     try:
         plan = nc.plan_npc(indice, semilla, aspecto)
+        if nombre:
+            from frontend import npc_genero_calculos as ng
+            forzado = ng.modelo_para_nombre(indice, semilla, nombre, plan["archivo"])
+            if forzado is not None:
+                plan = nc.plan_npc(indice, semilla, aspecto, modelo=forzado)
         if plan.get("nuevo") and not nnm.disponible(plan):      # modelo nuevo que no carga: uno de los 4 de siempre
             plan = nc.plan_npc(indice, semilla, aspecto, modelo=nc.modelo_npc(indice, semilla))
-        return PersonajeNPC(f"Peatón {indice}", plan, aspecto, rasgos, **opciones)
+        from frontend import npc_genero_calculos as ng
+        return PersonajeNPC(ng.nombre_para_npc(indice, semilla, plan["archivo"]), plan, aspecto, rasgos, **opciones)
     except Exception as error:
         _avisar(f"peatón {indice}: no se pudo crear el modelo ({error}); se usa el muñeco procedural")
         return Personaje("", color_ropa, apariencia=dict(aspecto, rasgos=rasgos, piel_rgb=aspecto["piel"],
                                                           pelo_rgb=aspecto["pelo"]), **opciones)
+
+
+# Argumentos extra para pasar el nombre a una fábrica de NPC: solo la de siempre (crear_npc) lo acepta; una fábrica
+# propia (pruebas) recibe la llamada de antes.
+def con_nombre(fabrica, nombre):
+    return {"nombre": nombre} if fabrica is crear_npc and nombre else {}

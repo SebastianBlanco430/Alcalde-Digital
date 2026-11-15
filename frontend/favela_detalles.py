@@ -668,7 +668,8 @@ def construir_favela_detalles(mundo, casas, bases):
             dibujar_objeto(objetos, o, mundo.altura)
             dibujados.append(o)
         if fc.colision_calle_activa() and hasattr(mundo, "agregar_obstaculos"):
-            mundo.agregar_obstaculos(fc.obstaculos_objetos_calle(dibujados), origen="calle")
+            mundo.agregar_obstaculos(fc.obstaculos_sin_bloqueo(mundo, fc.obstaculos_objetos_calle(dibujados)),
+                                     origen="calle")
         cuerdas = fc.banderines_de_callejones(casas, caras, bases)
         for p in fc.pasadizos_de_callejones(casas, caras, bases):
             pasadizo(objetos, p)

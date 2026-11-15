@@ -128,6 +128,9 @@ class Computador:
         return (x, self.raiz.y + ly, z)
 
     def _empezar(self, jugador, avatar):
+        from frontend import entrada_terminal_calculos as etc
+        if etc.activa():                      # entrada suave (ALCALDE_ENTRADA_TERMINAL_SUAVE=0 vuelve a la de siempre)
+            return self._empezar_suave(jugador, avatar)
         escena = self._escena
         escena._cinematica = True
         escena.camara.tomar_control()
@@ -172,6 +175,93 @@ class Computador:
 
         self._director.reproducir(
             calc.plan_sentarse(), {"caminar": caminar, "sentarse": sentarse, "acercar": acercar, "glitch": glitch},
+            al_terminar=self._entrar, escala=escena.escala_tiempo)
+
+    # Entrada suave (frontend/entrada_terminal_calculos.py): giro previo, paseo a velocidad de marcha con las piernas
+    # sincronizadas, una sola trayectoria de cámara con aceleración y frenado, mirada y FOV que cambian poco a poco,
+    # poses fundidas entre tramos y glitch con curva y meseta.
+    def _empezar_suave(self, jugador, avatar):
+        from frontend import entrada_terminal_calculos as etc
+        escena = self._escena
+        fov0 = float(camera.fov)              # antes de tomar_control, que lo devuelve a 65 de golpe
+        cam0 = tuple(camera.position)
+        escena._cinematica = True
+        escena.camara.tomar_control()
+        camera.fov = fov0
+        avatar.automatico = False
+        avatar.etiqueta.enabled = False
+        escena._sincronizar_raton()
+        inicio = (jugador.x, jugador.z)
+        puerta = calc.local_a_mundo(self.x, self.z, self.rumbo, 0, APROXIMACION)
+        silla = calc.local_a_mundo(self.x, self.z, self.rumbo, 0, ASIENTO)
+        rumbo_sentado = self.rumbo + 180
+        distancia = math.hypot(puerta[0] - inicio[0], puerta[1] - inicio[1])
+        rumbo_ir = (math.degrees(math.atan2(puerta[0] - inicio[0], puerta[1] - inicio[1])) if distancia > 1e-3
+                    else rumbo_sentado)
+        rumbo0 = float(getattr(avatar, "rumbo", rumbo_ir) or 0.0)
+        giro = etc.diferencia_angular(rumbo0, rumbo_ir)
+        plan = etc.plan(distancia, giro)
+        dur = dict(plan)
+        inicio_tramo, acumulado = {}, 0.0
+        for nombre, segundos in plan:
+            inicio_tramo[nombre] = acumulado
+            acumulado += segundos
+        duracion_camara = acumulado - dur["glitch"]
+        objetivo = self._local(*PANTALLA)
+        hombro, via, fin = self._local(*HOMBRO), self._local(*VIA), self._local(*FIN_CAMARA)
+        y_suelo = self.raiz.y
+        # Toma intermedia entre la de partida y el hombro, más alta: la cámara acompaña el paseo sin cruzar al avatar.
+        acompanar = etc.punto_acompanar(cam0, hombro)
+        # Cada toma a su tiempo: la intermedia al acabar el paseo, el hombro al acabar de sentarse, el monitor al final.
+        fin_paseo = inicio_tramo["sentarse"]
+        fin_sentarse = inicio_tramo["acercar"]
+        camino = etc.TrayectoriaCamara(
+            [cam0, acompanar, hombro, via, fin], duracion_camara,
+            tiempos=[0.0, fin_paseo, fin_sentarse, fin_sentarse + 0.55 * dur["acercar"], duracion_camara])
+        fase_fin = etc.fase_piernas(distancia)
+
+        def cabeza():
+            return (avatar.x, y_suelo + 1.45, avatar.z)
+
+        def poner_camara(nombre, t):
+            tiempo = inicio_tramo[nombre] + t * dur[nombre]
+            pos = camino.posicion(tiempo)
+            camera.position = pos
+            camera.rotation = (*cc.rotacion_mirando(pos, camino.mirada(tiempo, cabeza(), objetivo)), 0)
+            camera.fov = etc.fov(tiempo / duracion_camara, fov0, FOV_MONITOR)
+
+        def girar(t):
+            avatar.colocar(*inicio)
+            avatar.fijar_rumbo(rumbo0 + giro * etc.suavizar(t))
+            avatar.aplicar_pose(poses.pose_caminar(0.0, 0.0))
+            poner_camara("girar", t)
+
+        def caminar(t):
+            k = etc.avance_paseo(t)
+            avatar.colocar(lerp(inicio[0], puerta[0], k), lerp(inicio[1], puerta[1], k))
+            avatar.fijar_rumbo(rumbo_ir)
+            avatar.aplicar_pose(poses.pose_caminar(etc.fase_piernas(distancia * k), etc.intensidad_marcha(t)))
+            poner_camara("caminar", t)
+
+        def sentarse(t):
+            k = etc.suavizar(t)
+            avatar.colocar(lerp(puerta[0], silla[0], k), lerp(puerta[1], silla[1], k))
+            avatar.fijar_rumbo(lerp_angulo(rumbo_ir, rumbo_sentado, k))
+            avatar.aplicar_pose(poses.interpolar_pose(poses.pose_caminar(fase_fin, 0.0), poses.POSE_SENTADO, k))
+            poner_camara("sentarse", t)
+
+        def acercar(t):
+            fundido = etc.suavizar(t / etc.FUNDIDO_POSE)
+            avatar.aplicar_pose(poses.interpolar_pose(poses.POSE_SENTADO, poses.pose_teclear(t * 2 * math.pi), fundido))
+            poner_camara("acercar", t)
+
+        def glitch(t):
+            camera.fov = FOV_MONITOR - 4.0 * etc.suavizar(t)          # la cámara «entra» en la pantalla
+            if self._glitch is not None:
+                self._glitch.poner(etc.intensidad_glitch(t))
+
+        self._director.reproducir(
+            plan, {"girar": girar, "caminar": caminar, "sentarse": sentarse, "acercar": acercar, "glitch": glitch},
             al_terminar=self._entrar, escala=escena.escala_tiempo)
 
     def _entrar(self):

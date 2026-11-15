@@ -44,12 +44,12 @@ class VendedorCalle:
         self._t_mensaje = 0.0
 
     def _crear_npc(self, escena, rumbo, crear_npc):
-        from frontend.npc_modelo import crear_npc as fabrica
+        from frontend.npc_modelo import con_nombre, crear_npc as fabrica
         from frontend.peatones import ROPA, SEMILLA
         from frontend.peatones_calculos import aspecto_peaton, rasgos_peaton
         fabrica = crear_npc or fabrica
         npc = fabrica(INDICE_NPC, SEMILLA, aspecto_peaton(INDICE_NPC, SEMILLA), rasgos_peaton(INDICE_NPC, SEMILLA),
-                      ROPA[INDICE_NPC % len(ROPA)], parent=escena)
+                      ROPA[INDICE_NPC % len(ROPA)], parent=escena, **con_nombre(fabrica, self.nombre))
         npc.aro.enabled = False
         self._poner_nombre(npc)
         npc.suelo = escena._mundo.altura

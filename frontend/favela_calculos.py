@@ -333,7 +333,10 @@ class Objeto:
 # Medido (2026-11-15): los 258 objetos del mapa chico tardan ~3,5 ms en entrar a la rejilla (una vez, al cargar; el
 # costo por frame no cambia). Pasa del 1 ms que se fijó como tope, así que van APAGADOS (ALCALDE_COLISION_CALLE=1 los
 # enciende). Mercadito y arcos (16 piezas, ~0,6 ms) van encendidos con su propia bandera, ALCALDE_COLISION_ZONAS.
-COLISION_CALLE = False
+# 2026-11-15 (punto «colisiones»): ENCENDIDOS por defecto a petición del usuario; los 3,5 ms son UNA vez al cargar. Para
+# no bloquear caminos, escaleras ni puertas pasan antes por obstaculos_sin_bloqueo (abajo): fuera los que pisan una
+# escalera o parten en dos el paso que tienen alrededor. ALCALDE_COLISION_CALLE=0 vuelve a apagarlos.
+COLISION_CALLE = True
 COLISION_ZONAS = True
 TIPOS_CON_COLISION = {"bidon": 0.35, "maceta": 0.3, "caja": 0.4}
 MITAD_PUESTO_MERCADO = (1.15, 0.75)     # m: medio ancho y medio fondo de un puesto con toldo (postes y mostrador)
@@ -362,6 +365,59 @@ def obstaculos_objetos_calle(objetos):
     from backend.logica.mundo_ciudad import Obstaculo
     return [Obstaculo("objeto_calle", o.x, o.z, radio=TIPOS_CON_COLISION[o.tipo]) for o in objetos
             if o.tipo in TIPOS_CON_COLISION]
+
+
+# Guardián de caminos para obstáculos nuevos de decorado: descarta los que (a) quedan sobre o junto a una escalera o
+# (b) PARTEN el paso: en una rejilla de `paso` m alrededor del obstáculo (radio `ventana` m) se cuentan las zonas
+# transitables conexas del borde de la ventana con y sin él; si con él hay más, cerraría un callejón y se descarta.
+# `mundo`: MundoCiudad (es_transitable, perfil_escalera_en, radio_jugador). Determinista; ~1 ms por obstáculo.
+VENTANA_SIN_BLOQUEO = 2.4
+PASO_SIN_BLOQUEO = 0.4
+MARGEN_ESCALERA = 0.8
+
+
+def _zonas_del_borde(libre, n):
+    vistos, zonas = set(), 0
+    borde = [(i, j) for i in range(n) for j in range(n) if i in (0, n - 1) or j in (0, n - 1)]
+    for inicio in borde:
+        if inicio in vistos or not libre[inicio]:
+            continue
+        zonas += 1
+        pila = [inicio]
+        vistos.add(inicio)
+        while pila:
+            i, j = pila.pop()
+            for vi, vj in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
+                if 0 <= vi < n and 0 <= vj < n and (vi, vj) not in vistos and libre[(vi, vj)]:
+                    vistos.add((vi, vj))
+                    pila.append((vi, vj))
+    return zonas
+
+
+def bloquea_paso(mundo, obstaculo, ventana=VENTANA_SIN_BLOQUEO, paso=PASO_SIN_BLOQUEO):
+    n = int(round(2 * ventana / paso)) + 1
+    radio = getattr(mundo, "radio_jugador", 0.3)
+    antes, despues = {}, {}
+    for i in range(n):
+        for j in range(n):
+            x, z = obstaculo.cx - ventana + i * paso, obstaculo.cz - ventana + j * paso
+            libre = mundo.es_transitable(x, z)
+            antes[(i, j)] = libre
+            despues[(i, j)] = libre and not obstaculo.choca(x, z, radio)
+    return _zonas_del_borde(despues, n) > _zonas_del_borde(antes, n)
+
+
+def sobre_escalera(mundo, obstaculo, margen=MARGEN_ESCALERA):
+    perfil_en = getattr(mundo, "perfil_escalera_en", None)
+    if perfil_en is None:
+        return False
+    r = (obstaculo.radio or 0.0) + margen
+    return any(perfil_en(obstaculo.cx + dx, obstaculo.cz + dz) is not None
+               for dx, dz in ((0, 0), (r, 0), (-r, 0), (0, r), (0, -r)))
+
+
+def obstaculos_sin_bloqueo(mundo, obstaculos):
+    return [o for o in obstaculos if not sobre_escalera(mundo, o) and not bloquea_paso(mundo, o)]
 
 
 # Puestos con toldo del mercadito (misma colocación que favela_detalles.mercadito) y postes de los arcos de la cancha.

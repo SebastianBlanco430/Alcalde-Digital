@@ -148,6 +148,35 @@ def cadencia_activa():
     return bool(PASOS_CADENCIA)
 
 
+# PASOS SOLO DEL JUGADOR (punto «pasos de los NPC»): con PASOS_NPC = False los pasos solo suenan si el JUGADOR LOCAL
+# se desplaza de verdad (su posición en los datos de la partida, que solo mueve el controlador local). La velocidad
+# del avatar puede venir de otro sitio (la muestra de red de un avatar remoto, una cinemática, un NPC que camina a su
+# lado): si el jugador no se movió, no hay pasos. Los NPC no tienen pasos propios.
+# PASOS_NPC = True (o ALCALDE_PASOS_NPC=1) deja el comportamiento de antes (la velocidad del avatar tal cual).
+PASOS_NPC = False
+
+
+def pasos_npc_activos():
+    valor = os.environ.get("ALCALDE_PASOS_NPC", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(PASOS_NPC)
+
+
+# Velocidad (m/s) con la que cuentan los pasos: la del avatar, pero nunca más que lo que se desplazó el jugador local
+# en este frame (`desplazamiento` m en `dt` s). Sin datos del desplazamiento (None, primer frame) se fía del avatar.
+def velocidad_para_pasos(velocidad_avatar, desplazamiento, dt):
+    try:
+        velocidad_avatar = float(velocidad_avatar or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+    if desplazamiento is None or dt is None or dt <= 0:
+        return velocidad_avatar
+    return min(velocidad_avatar, max(0.0, float(desplazamiento)) / dt)
+
+
 # Volumen de un paso: más fuerte al correr.
 def volumen_paso(velocidad):
     t = max(0.0, min(1.0, velocidad / VEL_CORRER))

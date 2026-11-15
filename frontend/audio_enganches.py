@@ -213,6 +213,8 @@ class EnganchesAudio:
         if avatar is None:
             return
         velocidad = float(getattr(avatar, "velocidad", 0.0) or 0.0)
+        if not ac.pasos_npc_activos():       # solo los pasos del jugador local que se mueve (audio_calculos.PASOS_NPC)
+            velocidad = ac.velocidad_para_pasos(velocidad, self._desplazamiento_jugador(jugador), dt)
         estado = getattr(controlador, "_verticales", {}).get(jugador.nombre)
         en_aire = bool(getattr(estado, "en_aire", False))
         evento = self._salto.actualizar(en_aire, dt)
@@ -231,6 +233,18 @@ class EnganchesAudio:
             superficie = self._superficie(escena, jugador)
             variante = 1 + self._pasos.lado
             self.audio.efecto(f"paso_{superficie}_{variante}", ac.volumen_paso(velocidad), self._variar())
+
+    # Metros que se movió el jugador `jugador` desde el frame anterior (None si es el primero o cambió de jugador).
+    def _desplazamiento_jugador(self, jugador):
+        try:
+            actual = (jugador.nombre, float(jugador.x), float(jugador.z))
+        except (AttributeError, TypeError, ValueError):
+            return None
+        previo = getattr(self, "_posicion_pasos", None)
+        self._posicion_pasos = actual
+        if previo is None or previo[0] != actual[0]:
+            return None
+        return ((actual[1] - previo[1]) ** 2 + (actual[2] - previo[2]) ** 2) ** 0.5
 
     @staticmethod
     def _superficie(escena, jugador):

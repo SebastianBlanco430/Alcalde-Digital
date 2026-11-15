@@ -92,7 +92,7 @@ def color_base_como_color(nodo):
 # dibuja las caras traseras y por eso asoma como línea oscura alrededor de la silueta.
 # ==================================================================================================
 
-from panda3d.core import CullFaceAttrib, GeomVertexReader, GeomVertexWriter, Texture, TextureAttrib
+from panda3d.core import CullFaceAttrib, Geom, GeomVertexReader, GeomVertexWriter, Texture, TextureAttrib
 from PIL import Image, ImageStat
 
 from frontend.texturas_ladrillo import textura_relieve_ladrillo
@@ -479,7 +479,86 @@ def _casco(nombre):
     # solo caras traseras: el casco asoma como línea por detrás de la silueta (con prioridad alta para que
     # no lo pisen los estados propios de los geoms del modelo)
     casco.set_attrib(CullFaceAttrib.make(CullFaceAttrib.MCullCounterClockwise), 1000)
+    if casas_completas_activo():
+        quitar_caras_interiores(casco, nombre)
     return casco
+
+
+# CASAS COMPLETAS (punto «casas sin techo»): el casco de tinta es una copia de TODO el modelo estirada en vertical con
+# OTRA escala que la casa (sy, para que coincidan el fondo y el tope, _colocar_casco) y engordada en planta. Las caras
+# exteriores quedan bien (justo fuera de la casa), pero las INTERIORES (losa de la azotea de casa2, cara interna de los
+# antepechos, paredes de los cuartos y del patio de casa3) caen desplazadas y sus caras traseras, que el casco dibuja en
+# negro, asomaban por encima de la losa: desde la calle la casa se veía hueca, sin techo, con el interior negro. Ahora
+# el casco solo conserva las caras EXTERIORES: las que, mirando desde su centro en la dirección de su normal, no chocan
+# con el propio modelo (lo interior siempre tiene otra cara delante). Se calcula una vez por modelo (~0,2 s) y se
+# reutiliza. CASAS_COMPLETAS = False (o ALCALDE_CASAS_COMPLETAS=0) deja el casco como antes.
+CASAS_COMPLETAS = True
+_MASCARAS_EXTERIORES = {}        # nombre del modelo -> [bool por triángulo, en el orden de recorrido]
+
+
+def casas_completas_activo():
+    valor = os.environ.get("ALCALDE_CASAS_COMPLETAS", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(CASAS_COMPLETAS)
+
+
+def _triangulos_de(raiz):
+    """[(geom_node, índice de geom, [(a, b, c) índices], [posiciones en el marco de `raiz`])] de todos los Geoms."""
+    salida = []
+    for camino in raiz.find_all_matches("**/+GeomNode"):
+        nodo = camino.node()
+        matriz = camino.get_mat(raiz)
+        for i in range(nodo.get_num_geoms()):
+            geom = nodo.get_geom(i)
+            lector = GeomVertexReader(geom.get_vertex_data(), "vertex")
+            posiciones = []
+            while not lector.is_at_end():
+                p = matriz.xform_point(lector.get_data3())
+                posiciones.append((p.x, p.y, p.z))
+            indices = []
+            for k in range(geom.get_num_primitives()):
+                prim = geom.get_primitive(k).decompose()
+                for t in range(prim.get_num_primitives()):
+                    inicio = prim.get_primitive_start(t)
+                    indices.append(tuple(prim.get_vertex(inicio + j) for j in range(3)))
+            salida.append((nodo, i, indices, posiciones))
+    return salida
+
+
+# Máscara de caras exteriores de `triangulos` (lista de (a, b, c) con a, b, c = (x, y, z)): pura, sin panda3d.
+def caras_exteriores(triangulos, eps=1e-3):
+    from frontend.geometria_casco import caras_exteriores as calcular
+    return calcular(triangulos, eps)
+
+
+# Deja en `raiz` (el casco recién cargado) solo los triángulos exteriores. Devuelve cuántos quitó.
+def quitar_caras_interiores(raiz, nombre=None):
+    from panda3d.core import GeomTriangles
+    piezas = _triangulos_de(raiz)
+    planos = [tuple(pos[v] for v in tri) for _n, _i, indices, pos in piezas for tri in indices]
+    mascara = _MASCARAS_EXTERIORES.get(nombre) if nombre is not None else None
+    if mascara is None or len(mascara) != len(planos):
+        mascara = caras_exteriores(planos)
+        if nombre is not None:
+            _MASCARAS_EXTERIORES[nombre] = mascara
+    quitados, k = 0, 0
+    for nodo, i, indices, _pos in piezas:
+        tri = GeomTriangles(Geom.UH_static)
+        tri.set_index_type(Geom.NT_uint32)
+        for a, b, c in indices:
+            if mascara[k]:
+                tri.add_vertices(a, b, c)
+            else:
+                quitados += 1
+            k += 1
+        geom = nodo.modify_geom(i)
+        geom.clear_primitives()
+        if tri.get_num_primitives():
+            geom.add_primitive(tri)
+    return quitados
 
 
 # Color de Panda (0-1) de una tupla RGB 0-255.

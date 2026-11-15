@@ -292,3 +292,47 @@ def distancia_libre_analitica(pivote, destino, obstaculos, margen=0.4, minimo=0.
             continue
         libre = min(libre, max(minimo, real[0] - margen), max(real[0] - 0.05, 0.0))
     return max(min(libre, largo), min(minimo, largo))
+
+
+# -- Altura de la cámara del parkour (escena_parkour) --
+# Antes la altura seguía a la plataforma que hubiera DEBAJO del jugador aunque estuviera en el aire: en la torre final
+# (t3 -> t4 -> ct) el salto pasa por encima de cp5, 3,6 m más abajo, y la cámara caía y volvía a subir a media
+# parábola. Ahora, en el aire, la referencia es la altura del ÚLTIMO apoyo: solo baja si el jugador cae de verdad
+# (más de `margen_caida` m por debajo de ese apoyo) y sube un poco con los saltos altos (doble salto).
+# CAMARA_PARKOUR_ESTABLE = False (o ALCALDE_CAMARA_PARKOUR_ESTABLE=0) deja la altura de antes.
+CAMARA_PARKOUR_ESTABLE = True
+MARGEN_CAIDA_PARKOUR = 2.5      # m por debajo del último apoyo a partir de los que la cámara sigue la caída
+UMBRAL_SUBIDA_PARKOUR = 1.0     # m por encima del último apoyo a partir de los que la cámara acompaña la subida
+FRACCION_SUBIDA_PARKOUR = 0.5   # parte de esa subida extra que acompaña (no rebota con cada salto)
+
+
+def camara_parkour_estable_activa():
+    import os
+    valor = os.environ.get("ALCALDE_CAMARA_PARKOUR_ESTABLE", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(CAMARA_PARKOUR_ESTABLE)
+
+
+# Altura que persigue la cámara del parkour. `alto_soporte`: cara superior de la plataforma bajo los pies (None en
+# el vacío); `y_apoyo`: altura del último apoyo en tierra (None = aún no hay). Total con datos raros: devuelve algo finito.
+def objetivo_altura_parkour(y_jugador, alto_soporte, en_aire, y_apoyo,
+                            margen_caida=MARGEN_CAIDA_PARKOUR, umbral_subida=UMBRAL_SUBIDA_PARKOUR,
+                            fraccion_subida=FRACCION_SUBIDA_PARKOUR):
+    if not en_aire and alto_soporte is not None:
+        return alto_soporte
+    if y_apoyo is None:
+        return alto_soporte if alto_soporte is not None else y_jugador
+    if y_jugador < y_apoyo - margen_caida:             # caída de verdad: la sigue (sin pasar del suelo que haya)
+        return max(y_jugador, alto_soporte) if alto_soporte is not None else y_jugador
+    subida = y_jugador - y_apoyo - umbral_subida
+    if subida > 0:
+        return y_apoyo + subida * fraccion_subida
+    return y_apoyo
+
+
+# Un paso del suavizado exponencial hacia `objetivo` (independiente de los fps).
+def suavizar_altura(actual, objetivo, dt, rapidez):
+    return actual + (objetivo - actual) * (1 - math.exp(-rapidez * max(0.0, dt)))

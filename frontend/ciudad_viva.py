@@ -853,9 +853,21 @@ def crear_controlador(escena, atmosfera=True, capas=True):
             e = sitios_de_etapa(mundo, s)
             largo = float(mundo.ancho_calle) + 1.2
             self._fuego_vivo = cv.fuego_vivo_activo()
-            malla_fuego = mesh_fuego_vivo if self._fuego_vivo else mesh_fuego
-            variantes("fuego", "fuego", lambda v: (lambda: malla_fuego(v)), 2, 5, e["fuego"], 55)
-            if self._fuego_vivo and cv.fuego_brillo_activo():
+            # Fuegos sobre los tejados (frontend/fuego_tejado.py, ALCALDE_FUEGO_TEJADO=0 vuelve a las hogueras de la acera).
+            from frontend import fuego_tejado, fuego_tejado_calculos as ftc
+            self._fuego_tejado = False
+            if ftc.activo():
+                sitios_tejado = fuego_tejado.sitios_fuego_tejado(mundo, SALES_ETAPA["fuego"])
+                self._fuego_tejado = bool(sitios_tejado)
+            if self._fuego_tejado:
+                variantes("fuego", "fuego", lambda v: (lambda: fuego_tejado.mesh_fuego_tejado(v)), 2, 5, sitios_tejado,
+                          ftc.RADIO_FUEGO_TEJADO)
+                for v in range(2):
+                    fuego_tejado.preparar_grupo(self.grupos[f"fuego{v}"][1])
+            else:
+                malla_fuego = mesh_fuego_vivo if self._fuego_vivo else mesh_fuego
+                variantes("fuego", "fuego", lambda v: (lambda: malla_fuego(v)), 2, 5, e["fuego"], 55)
+            if self._fuego_vivo and not self._fuego_tejado and cv.fuego_brillo_activo():
                 self._crear_brillo_fuego()
             self.grupos["rodador"] = ("rodadores", Grupo(raiz, "rodador", lambda: mesh_rodador(0), 5, e["rodadores"], 60,
                                                          _coloca_uniforme, _fija_uniforme))
@@ -898,7 +910,12 @@ def crear_controlador(escena, atmosfera=True, capas=True):
                         continue
                     e = grupo.entidades[k]
                     es = max(0.001, cv.escala_fundida(ranuras.f[k]))
-                    if capa == "fuego" and self._fuego_vivo:
+                    if capa == "fuego" and getattr(self, "_fuego_tejado", False):
+                        from frontend import fuego_tejado
+                        dato = grupo.sitios[sitio]
+                        ancho, alto, giro, color = cv.parpadeo_fuego(t, dato.u, es)
+                        fuego_tejado.animar(e, t, dato.u, ancho, alto, dato.giro + giro, color)
+                    elif capa == "fuego" and self._fuego_vivo:
                         dato = grupo.sitios[sitio]
                         ancho, alto, giro, (r, g, b) = cv.parpadeo_fuego(t, dato.u, es)
                         e.scale = (ancho, alto, ancho)
