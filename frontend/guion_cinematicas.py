@@ -123,3 +123,80 @@ TOMAS_INTERIOR = {
         "target": POSICION_PANTALLA, "fov": FOV_PANTALLA},
     "levantarse": {"position": (2.0, 1.6, 0.2), "target": (1.0, 1.0, 1.4), "fov": FOV_INTERIOR},
 }
+
+# -- Intro: plaza de la fuente (frontend/intro_cinematica.py) ------------------------------------------------------------
+# Todo relativo al CENTRO de la fuente de la Praça da Sé, leído del mundo (centro_fuente), nunca escrito a mano. Los dos
+# actores quedan al sur de la fuente (-z), frente a frente y un poco girados hacia la cámara, que baja desde lo alto
+# mirando a la fuente y termina en un plano medio de los dos con la fuente detrás.
+
+INTRO_LUGAR_FUENTE = "Praça da Sé"
+INTRO_DISTANCIA_ACTORES = 3.7      # m del centro de la fuente al punto medio de los actores (el borde de piedra: 2,05)
+INTRO_SEPARACION = 1.6             # m entre los dos actores
+INTRO_GIRO_A_CAMARA = 25.0         # grados que se abren hacia la cámara (0 = de perfil)
+INTRO_FOV = 50
+INTRO_ALTA = (0.0, 24.0, -16.0)    # cámara alta, relativa al punto medio de los actores (y: sobre su suelo)
+INTRO_CERCA = (0.4, 1.7, -4.3)     # plano medio final
+INTRO_EMPUJE = (0.0, -0.05, 0.5)   # acercamiento lento después de llegar
+INTRO_ALTURA_OBJETIVO = 1.45       # m: a qué altura de los actores mira el plano medio
+INTRO_LLEGADA = 0.45               # fracción de la escena en la que la cámara llega al plano medio
+INTRO_ALTURA_MINIMA_CAMARA = 1.2   # m sobre el suelo que pisa la cámara (la ladera puede subir hacia ella)
+
+
+def centro_fuente(mundo, lugar=INTRO_LUGAR_FUENTE):
+    """(x, z) del centro de la fuente: el círculo «fuente» que la ciudad entregó al mundo o, sin él, el centro de la
+    plaza. None si el mundo no tiene esa plaza."""
+    extra = getattr(mundo, "obstaculos_extra", None)
+    if callable(extra):
+        try:
+            for obstaculo in extra("fuente"):
+                if getattr(obstaculo, "es_circulo", False):
+                    return (float(obstaculo.cx), float(obstaculo.cz))
+        except Exception:
+            pass
+    try:
+        if lugar in mundo.lugares():
+            x, z = mundo.coordenada(lugar)
+            return (float(x), float(z))
+    except Exception:
+        pass
+    return None
+
+
+def tomas_plaza(centro, altura):
+    """Actores y tomas de cámara de la escena 1. `centro`: (x, z) de la fuente; `altura(x, z)`: el suelo.
+    Devuelve {"actores": {hablante: (x, z, rumbo)}, "alta", "cerca", "final": (posicion, objetivo), "fov"}."""
+    cx, cz = centro
+    mx, mz = cx, cz - INTRO_DISTANCIA_ACTORES
+    suelo_m = altura(mx, mz)
+    medio = INTRO_SEPARACION / 2
+    actores = {"Ciudadano": (mx - medio, mz, 90.0 + INTRO_GIRO_A_CAMARA),
+               "Influencer": (mx + medio, mz, -90.0 - INTRO_GIRO_A_CAMARA)}
+
+    def punto(rel):
+        x, z = mx + rel[0], mz + rel[2]
+        y = max(suelo_m + rel[1], altura(x, z) + INTRO_ALTURA_MINIMA_CAMARA)
+        return (x, y, z)
+
+    objetivo_cerca = (mx, suelo_m + INTRO_ALTURA_OBJETIVO, mz)
+    objetivo_alto = (cx, altura(cx, cz) + 1.0, cz)
+    cerca = punto(INTRO_CERCA)
+    final = (tuple(c + e for c, e in zip(cerca, INTRO_EMPUJE)), objetivo_cerca)
+    return {"actores": actores, "alta": (punto(INTRO_ALTA), objetivo_alto), "cerca": (cerca, objetivo_cerca),
+            "final": final, "fov": INTRO_FOV}
+
+
+def camara_plaza(tomas, progreso):
+    """(posicion, pitch, yaw) de la cámara cuando la escena 1 va por `progreso` (0..1): baja de la toma alta al plano
+    medio hasta INTRO_LLEGADA y luego se acerca despacio."""
+    from frontend.cinematica import ease_in_out, lerp_vec3
+    p = max(0.0, min(1.0, progreso))
+    if p <= INTRO_LLEGADA:
+        k = ease_in_out(p / INTRO_LLEGADA)
+        posicion = lerp_vec3(tomas["alta"][0], tomas["cerca"][0], k)
+        objetivo = lerp_vec3(tomas["alta"][1], tomas["cerca"][1], k)
+    else:
+        k = (p - INTRO_LLEGADA) / (1.0 - INTRO_LLEGADA)
+        posicion = lerp_vec3(tomas["cerca"][0], tomas["final"][0], k)
+        objetivo = lerp_vec3(tomas["cerca"][1], tomas["final"][1], k)
+    pitch, yaw = rotacion_mirando(posicion, objetivo)
+    return tuple(posicion), pitch, yaw

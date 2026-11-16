@@ -76,6 +76,21 @@ class DirectorCinematica(Entity):
             self._linea.saltar()
         return True
 
+    # Termina SOLO el tramo actual, sin la regla de la doble pulsación (la intro: cada tramo es un globo y Espacio pasa
+    # al siguiente aunque se pulse rápido). True si había una cinemática en curso.
+    def saltar_tramo(self):
+        if not self.activa:
+            return False
+        self._linea.saltar()
+        return True
+
+    # Termina todo lo que falte (cada tramo pendiente recibe su fn(1.0)) y dispara el callback final.
+    def terminar_ya(self):
+        if not self.activa:
+            return False
+        self._linea.saltar_todo()
+        return True
+
     # Detiene sin disparar el callback final (al salir de la escena).
     def cancelar(self):
         self._linea = None

@@ -10,6 +10,12 @@
 #   - Espacio / Enter / clic avanzan, Escape lo salta. Se vuelve a ver desde la pausa: botón «Cómo se juega».
 #
 # BANDERA. TUTORIAL = False (o ALCALDE_TUTORIAL=0): nada de esto, el juego queda como antes.
+#
+# CINEMÁTICA DE INTRO (frontend/intro_cinematica.py; ALCALDE_INTRO_CINEMATICA, ver frontend/intro_calculos.py): con ella
+# activa, la partida nueva abre la cinemática (plaza, título, periodista) en lugar de las 5 viñetas de cómic, y al
+# terminar el recorrido del HUD con las viñetas «foco» de siempre, una oración por viñeta (los textos del guion). Escape
+# salta todo. Si la cinemática no se puede crear o falla a mitad, se abren las viñetas de antes y se avisa por stderr.
+# Las viñetas de backend/datos/tutorial_vinetas.json siguen en el botón «Cómo se juega» de la pausa.
 
 import json
 import os
@@ -24,6 +30,7 @@ MAX_CARACTERES = 220
 TEXTO_BOTON_PAUSA = "Cómo se juega"
 
 _estado = {"entidad": None, "senalando": False}
+_intro = {"entidad": None}
 
 
 def activo():
@@ -60,6 +67,12 @@ def abierto():
     return _estado["entidad"] is not None
 
 
+def intro_abierta():
+    """¿La cinemática de intro está en curso (escenas 1-5)?"""
+    entidad = _intro["entidad"]
+    return entidad is not None and not getattr(entidad, "terminada", True)
+
+
 def senalando_hud():
     """True durante el recorrido del HUD: lo señalado tiene que verse aunque el tutorial sea un bloqueador."""
     return bool(_estado["senalando"]) and abierto()
@@ -77,6 +90,15 @@ def debe_abrirse(flujo, restaurada, en_linea):
 
 def _aviso(texto):
     print(f"[tutorial] {texto}", file=sys.stderr)
+
+
+def _intro_activa():
+    """¿Toca la cinemática de intro en vez de las viñetas? (ALCALDE_INTRO_CINEMATICA; puro)."""
+    try:
+        from frontend import intro_calculos
+        return intro_calculos.intro_activa()
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------- foco: rectángulo de un elemento real del HUD
@@ -151,9 +173,9 @@ def registrar(gestor, conexion, escena_mundo):
 
 
 def _instalar(conexion, escena, datos):
-    from ursina import Entity, destroy
+    from ursina import Entity
 
-    from frontend.componentes import BotonSecundario, a_unidades
+    from frontend.componentes import BotonSecundario, a_unidades, destruir_arbol
 
     basura = []                                 # secuencias ya terminadas, por destruir
 
@@ -183,15 +205,54 @@ def _instalar(conexion, escena, datos):
         if getattr(escena, "en_pausa", False):
             escena.alternar_pausa(False)
 
-    def abrir():
+    def abrir(vinetas=None):
         if abierto():
             return False
         from frontend.cinematica_final import crear_vinetas
         _estado["senalando"] = False
-        _estado["entidad"] = crear_vinetas(datos["vinetas"], al_terminar, segundos=None, guardia=guardia, rotulos=datos,
-                                           foco_de=foco_de, al_poner=al_poner, parent=escena.hud)
+        _estado["entidad"] = crear_vinetas(vinetas or datos["vinetas"], al_terminar, segundos=None, guardia=guardia,
+                                           rotulos=datos, foco_de=foco_de, al_poner=al_poner, parent=escena.hud)
         _raton()
         return True
+
+    def abrir_intro():
+        """Cinemática de intro y, al acabar, el recorrido del HUD. Si no se puede, las viñetas de siempre."""
+        if abierto() or intro_abierta():
+            return False
+        try:
+            from frontend import intro_calculos, intro_cinematica
+            guion = intro_calculos.cargar_guion(elementos=ELEMENTOS_FOCO)
+            recorrido = intro_calculos.pasos_foco(guion)
+
+            def al_terminar_intro(saltada):
+                _soltar_intro()
+                if not saltada:
+                    abrir(recorrido)
+
+            def al_fallo(error):
+                _soltar_intro()
+                abrir()
+
+            entidad = intro_cinematica.crear_intro(escena, guion, al_terminar_intro, al_fallo)
+            _intro["entidad"] = entidad
+            if entidad.terminada:                   # duración 0 (pruebas): ya terminó dentro de crear_intro
+                _soltar_intro()
+            return True
+        except Exception as error:
+            _aviso(f"intro no disponible ({type(error).__name__}: {error}); se abren las viñetas")
+            _soltar_intro()
+            return abrir()
+
+    def _soltar_intro():
+        entidad = _intro["entidad"]
+        _intro["entidad"] = None
+        if entidad is not None:
+            basura.append(entidad)
+
+    def saltar_intro():
+        entidad = _intro["entidad"]
+        if entidad is not None:
+            entidad.saltar_todo()
 
     def cerrar():
         entidad = _estado["entidad"]
@@ -199,6 +260,7 @@ def _instalar(conexion, escena, datos):
             entidad.saltar()
 
     escena.registrar_bloqueador(abierto, cerrar)        # congela los controles y pausa el reloj (motivo PANEL)
+    escena.registrar_bloqueador(intro_abierta, saltar_intro)
 
     def ver_de_nuevo():
         escena.alternar_pausa(False)
@@ -221,11 +283,12 @@ def _instalar(conexion, escena, datos):
             self._flujo = None
             self._pendiente = False
             self.abrir, self.cerrar, self.boton = abrir, cerrar, boton
+            self.abrir_intro = abrir_intro
             self.veces = 0
 
         def update(self):
-            while basura:
-                destroy(basura.pop())
+            while basura:                       # con sus hijos: destroy() a secas dejaba la viñeta entera viva
+                destruir_arbol(basura.pop())
             flujo = escena.flujo
             if flujo is not self._flujo:
                 self._flujo = flujo
@@ -234,7 +297,7 @@ def _instalar(conexion, escena, datos):
                 self._pendiente = debe_abrirse(flujo, restaurada, getattr(escena, "online", None) is not None)
             if self._pendiente and not getattr(escena, "_cinematica", False) and not escena.en_pausa:
                 self._pendiente = False
-                if abrir():
+                if (abrir_intro() if _intro_activa() else abrir()):
                     self.veces += 1
 
     conexion.tutorial = VigiaTutorial(parent=escena.hud)

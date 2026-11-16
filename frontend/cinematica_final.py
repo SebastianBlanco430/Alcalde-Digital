@@ -44,7 +44,9 @@ def crear_cinematica(tipo, al_terminar, segundos=SEGUNDOS_VINETA, guardia=None, 
 def crear_vinetas(vinetas, al_terminar, segundos=None, guardia=None, rotulos=None, foco_de=None, al_poner=None, **opciones):
     """Crea y arranca una secuencia de viñetas ya cargada (lista de dicts). `segundos=None`: no avanzan solas (decide el
     jugador). `rotulos`: {"saltar", "continuar"} de los botones. `foco_de(elemento)`: rectángulo en camera.ui del elemento
-    del HUD de una viñeta «foco» (o None). `al_poner(vineta, indice)`: aviso cada vez que cambia la viñeta."""
+    del HUD de una viñeta «foco» (o None). `al_poner(vineta, indice)`: aviso cada vez que cambia la viñeta.
+    Una viñeta puede traer sus propios "segundos" (la intro: el tiempo de lectura de su oración); manda sobre `segundos`.
+    Entre dos viñetas «foco» seguidas del MISMO elemento no hay fundido (el recuadro no parpadea entre oraciones)."""
     from ursina import Circle, Entity, Text, color
 
     from frontend import diseno_adaptable, estilo, tipografia
@@ -361,8 +363,20 @@ def crear_vinetas(vinetas, al_terminar, segundos=None, guardia=None, rotulos=Non
                 return
             if self.indice + 1 >= len(vinetas):
                 self._fundido.ejecutar(self._terminar)
+            elif self._mismo_foco(vinetas[self.indice], vinetas[self.indice + 1]):
+                self._poner(self.indice + 1)
             else:
                 self._fundido.ejecutar(lambda: self._poner(self.indice + 1))
+
+        @staticmethod
+        def _mismo_foco(a, b):
+            return a.get("tipo") == "foco" and b.get("tipo") == "foco" and a.get("elemento") == b.get("elemento")
+
+        def _segundos_de(self, vineta):
+            propios = vineta.get("segundos")
+            if isinstance(propios, (int, float)) and not isinstance(propios, bool) and propios > 0:
+                return max(0.05, float(propios))
+            return self._segundos
 
         def saltar(self):
             if not self.terminada:
@@ -412,7 +426,8 @@ def crear_vinetas(vinetas, al_terminar, segundos=None, guardia=None, rotulos=Non
                     self._colocar_foco(rect)
             if not self._fundido.ocupada:
                 self._t += dt
-                if self._segundos is not None and self._t >= self._segundos:
+                limite = self._segundos_de(vinetas[self.indice])
+                if limite is not None and self._t >= limite:
                     self.siguiente()
 
     return CinematicaFinal(**opciones)

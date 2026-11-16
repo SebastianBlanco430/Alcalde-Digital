@@ -272,7 +272,7 @@
         60,
         92
       ],
-      "titulo": "Desinformación · barra de arriba",
+      "titulo": "Desinformación · barra bajo el medidor",
       "texto": "Cuántas noticias falsas circulan. Más baja es mejor. Sube al compartir una mentira (y a veces vuelve al día siguiente). Baja al reportar lo falso.",
       "figuras": [
         {
@@ -492,7 +492,7 @@
     {
       "tipo": "foco",
       "elemento": "medidor",
-      "titulo": "Confianza y desinformación",
+      "titulo": "El medidor y la desinformación",
       "texto": "El medidor dice cómo va Ciudad Nova y hacia qué final camina. Debajo, la barra de desinformación: más baja = mejor."
     },
     {

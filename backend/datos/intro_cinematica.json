@@ -1,0 +1,67 @@
+{
+  "_nota": "Textos de la cinemática de intro (copia literal del guion de la bóveda: 00-Proyecto/guion-cinematica-intro.md). Cada «texto» es una línea del guion; el juego la parte en oraciones y enseña una oración por globo (frontend/intro_calculos.py).",
+  "ayuda": "Espacio: seguir · Esc: saltar",
+  "escenas": [
+    {
+      "id": "plaza",
+      "lineas": [
+        {"hablante": "Ciudadano", "texto": "¿Viste las nuevas noticias?"},
+        {"hablante": "Ciudadano", "texto": "Parece que hay un nuevo candidato a alcalde para derrocar al actual."},
+        {"hablante": "Influencer", "texto": "Sí, he escuchado un montón de cosas sobre él."},
+        {"hablante": "Influencer", "texto": "La información vuela y no sabemos qué es cierto y qué no."}
+      ]
+    },
+    {
+      "id": "titulo",
+      "titulo": "Ciudad Nova vota en 7 días",
+      "lineas": [
+        {"hablante": "", "texto": "Octavio Ruedas, el alcalde de siempre, contra Tomás Arenas, el aspirante nuevo."},
+        {"hablante": "", "texto": "En Civitas corren rumores: ve a mirar, verifica y decide qué compartir y qué reportar."}
+      ]
+    },
+    {
+      "id": "telefono",
+      "lineas": []
+    },
+    {
+      "id": "reel",
+      "lineas": [
+        {"hablante": "Influencer", "toma": "cara", "texto": "¡Alto ahí, detente!"},
+        {"hablante": "Influencer", "toma": "cara", "texto": "¿Ya sabes cómo funciona nuestro sistema de pulseras?"},
+        {"hablante": "Influencer", "toma": "muneca_i", "texto": "La izquierda indica nuestra convivencia: qué tan bien nos llevamos entre vecinos de Civitas."},
+        {"hablante": "Influencer", "toma": "muneca_i", "texto": "Si compartimos noticias verdaderas y reportamos las falsas, mejora y cambia de color."},
+        {"hablante": "Influencer", "toma": "muneca_i", "texto": "Si compartimos mentiras, o pasamos un día entero sin atender misiones, empeora."},
+        {"hablante": "Influencer", "toma": "muneca_d", "texto": "La derecha es la confianza: cuánto le cree la gente a lo que se publica."},
+        {"hablante": "Influencer", "toma": "muneca_d", "texto": "Sube cuando aciertas el veredicto: compartir lo verdadero y reportar lo falso."},
+        {"hablante": "Influencer", "toma": "muneca_d", "texto": "Baja cuando fallas, y un poco si dejas pasar el tiempo sin atender misiones. ¡Ten cuidado!"},
+        {"hablante": "Influencer", "toma": "lejos", "texto": "También debo contarte algo más."},
+        {"hablante": "Influencer", "toma": "lejos", "texto": "Debajo del medidor está la barra de desinformación."},
+        {"hablante": "Influencer", "toma": "lejos", "texto": "Sube cuando compartes una mentira y baja cuando reportas lo falso. Cuanto más baja, mejor."},
+        {"hablante": "Influencer", "toma": "lejos", "texto": "El medidor mezcla todo lo que haces. Desde 60 la ciudad empieza a mejorar por etapas: ¡la idea es llegar lo más alto posible!"},
+        {"hablante": "Influencer", "toma": "lejos", "texto": "Y de 40 hacia abajo se deteriora cada vez más. ¡Que eso no ocurra!"},
+        {"hablante": "Influencer", "toma": "lejos", "texto": "Sin más que decir: ¡disfruta tu estadía!"}
+      ]
+    },
+    {
+      "id": "periodista",
+      "lineas": [
+        {"hablante": "Periodista", "texto": "¡Ey, no tan rápido!"},
+        {"hablante": "Periodista", "texto": "Aún faltan cosas por decir…", "pausa_despues": 3.0},
+        {"hablante": "Periodista", "texto": "¡Bienvenido a Ciudad Nova! Mira tu pantalla para ubicarte rápido."}
+      ]
+    }
+  ],
+  "recorrido": {
+    "hablante": "Periodista",
+    "pasos": [
+      {"elemento": "panel_turno", "titulo": "Turno y misión", "texto": ["Aquí arriba ves de quién es el turno y cuál es su misión actual."]},
+      {"elemento": "minimapa", "titulo": "Minimapa", "texto": ["La ruta cian te guía al destino amarillo.", "Con N abres el mapa grande."]},
+      {"elemento": "telefono_ui", "titulo": "Teléfono", "texto": ["Ábrelo con Tab para ver tus misiones y lo que pasa en la ciudad.", "Con M sigues u ocultas la ruta."]},
+      {"elemento": "brazalete", "titulo": "Pulseras", "texto": ["Estas son tus pulseras de Convivencia y Confianza.", "Presiona B para ver qué significan."]},
+      {"elemento": "medidor", "titulo": "Medidor y barra", "texto": ["Aquí está el medidor de Ciudad Nova: define hacia qué final vamos.", "Debajo, la barra de desinformación: mantenla lo más baja posible."]},
+      {"elemento": "reloj", "titulo": "Reloj", "texto": ["El reloj marca la semana de 7 días.", "Al terminar el séptimo, la ciudad vota."]},
+      {"elemento": "dinero", "titulo": "Dinero", "texto": ["Con tus misiones y trabajos ganas dinero.", "Gástalo en las tiendas."]},
+      {"elemento": "aviso_e", "titulo": "Presiona E", "texto": ["Cuando veas este aviso abajo, presiona E para entrar a lugares, comprar o trabajar.", "¡Listo, empecemos!"]}
+    ]
+  }
+}
