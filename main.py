@@ -128,6 +128,9 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
             # estafas, publicar y tiempo de pantalla (ALCALDE_ESTAFAS / ALCALDE_PUBLICAR_FOTO / ALCALDE_TIEMPO_PANTALLA)
             from backend.logica import habitos_digitales
             flujo = habitos_digitales.envolver(flujo)
+            # rectificar lo que compartiste y resultó falso, impreciso o hiriente (ALCALDE_RECTIFICAR=0 lo apaga)
+            from backend.logica import rectificar
+            flujo = rectificar.envolver(flujo)
         # lo bien que se verificó en un minijuego da propina y confianza (ALCALDE_CONSECUENCIA_GRADUADA=0 lo apaga)
         from backend.logica import consecuencia_graduada
         flujo = consecuencia_graduada.envolver(flujo)

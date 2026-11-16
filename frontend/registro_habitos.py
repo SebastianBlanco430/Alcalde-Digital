@@ -16,6 +16,7 @@
 import sys
 
 from backend.logica import habitos_digitales as logica
+from backend.logica import rectificar
 from frontend import habitos_calculos as hc
 from frontend import teclas
 
@@ -358,7 +359,8 @@ def _crear_vigia(escena_mundo):
 
 
 def registrar(gestor, conexion, escena_mundo):
-    if not logica.activo():
+    # la bandeja también lleva las tarjetas de Rectificar (backend/logica/rectificar.py)
+    if not logica.activo() and not rectificar.activo():
         return None
     try:
         vigia = _crear_vigia(escena_mundo)

@@ -21,7 +21,10 @@ MAX_ELEMENTOS = 7
 INSTRUCCION = {
     "estafa": "Marca lo que te parece sospechoso antes de decidir.",
     "publicar": "Marca lo que vas a TAPAR antes de publicar.",
+    "rectificar": "Marca lo que PRUEBA que tu publicación era falsa o dañina antes de decidir.",
 }
+# verbo de la fase de decidir según el tipo de tarjeta (el resto: estafas)
+VERBO_DECIDIR = {"publicar": "tapas", "rectificar": "marcaste como evidencia"}
 PIE_MARCAR = "1-{n} o clic: marcar  ·  Intro: decidir  ·  Esc: más tarde"
 PIE_DECIDIR = "1-{n} o clic: elegir  ·  Retroceso: volver a marcar  ·  Esc: más tarde"
 PIE_REVISION = "E / Intro: continuar"
@@ -50,7 +53,7 @@ def contenido_marcar(evento, marcas):
 
 def contenido_decidir(evento, marcas):
     marcadas = len(set(marcas or ()) & {e["id"] for e in evento["elementos"]})
-    verbo = "tapas" if evento["tipo"] == "publicar" else "marcaste como sospechosos"
+    verbo = VERBO_DECIDIR.get(evento["tipo"], "marcaste como sospechosos")
     opciones = [{"tecla": str(i), "id": o["id"], "texto": f"{i}   {o['etiqueta']}"}
                 for i, o in enumerate(evento["opciones"], start=1)]
     return {"fase": "decidir", "titulo": evento["titulo"], "remitente": f"De: {evento['remitente']}",
