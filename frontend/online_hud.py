@@ -18,6 +18,19 @@ from frontend.componentes import BotonPrimario, a_unidades, escala_fuente, model
 from frontend.hud import MARGEN, AvisoGenerico, _fondo, _medidor, _seguro
 
 Y_AVISO = 0.5 - MARGEN - 0.115          # centro del aviso superior (bajo la pastilla de ping)
+
+
+# Con los finales por etapas en línea (online_config.ETAPAS_ONLINE) el medidor «Confianza de Ciudad Nova» (y su barra de
+# desinformación) ocupa arriba al centro: la pastilla de ping y el aviso superior bajan lo que mide para no pisarlo.
+def bajada_por_medidor():
+    from backend.logica import etapas_final, online_config
+    if not (online_config.ETAPAS_ONLINE and etapas_final.activo()):
+        return 0.0
+    from frontend import etapas_final_vista as efv
+    alto = 0.5 - efv.Y_MEDIDOR + efv.ALTO_MEDIDOR / 2 - MARGEN
+    if efv.barra_desinfo_activa():
+        alto += efv.SEPARACION_DESINFO + efv.ALTO_DESINFO
+    return alto + 0.012
 COLOR_NIVEL = {
     lobby.NIVEL_BUENO: estilo.ESTADO_EXITO,
     lobby.NIVEL_ACEPTABLE: estilo.ESTADO_AVISO,
@@ -37,7 +50,8 @@ class HudOnline(Entity):
         self._al_menu = al_menu
 
         # Pastilla de ping (arriba al centro): texto «42 ms»; el color acompaña pero no es la única señal.
-        self.pastilla = Entity(parent=self, position=(0, 0.5 - MARGEN - self.ALTO_PASTILLA / 2, 0))
+        bajada = bajada_por_medidor()
+        self.pastilla = Entity(parent=self, position=(0, 0.5 - MARGEN - self.ALTO_PASTILLA / 2 - bajada, 0))
         self.pastilla_fondo = _fondo(self.pastilla, 0.2, self.ALTO_PASTILLA, color.rgba32(12, 14, 24, 235), 12, z=0.001)
         self.pastilla_texto = Text("— ms", parent=self.pastilla, origin=(0, 0), position=(0, 0, -0.001),
                                    scale=escala_fuente(18), color=rgb(estilo.COLOR_TEXTO))
@@ -46,8 +60,8 @@ class HudOnline(Entity):
 
         # Aviso superior (segunda instancia del AvisoGenerico de hud.py).
         self.aviso = AvisoGenerico(parent=self)
-        self.aviso.y_base = Y_AVISO
-        self.aviso.y = Y_AVISO
+        self.aviso.y_base = Y_AVISO - bajada
+        self.aviso.y = Y_AVISO - bajada
         self._texto_aviso = None
 
         # Menú de saludos rápidos (se abre con G): lista fija, sin chat libre.

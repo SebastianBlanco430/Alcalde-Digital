@@ -24,3 +24,13 @@ RADIO_INTERACCION = 2.0
 # los vehículos son locales como en el hot-seat y los remotos montados se dibujan como peatones. Se apaga con
 # ALCALDE_VEHICULOS_ONLINE=0. TODOS los equipos de la sala deben usar el mismo valor.
 VEHICULOS_ONLINE = os.environ.get("ALCALDE_VEHICULOS_ONLINE") != "0"
+
+# Finales por etapas en línea (2026-11-15): la ciudad cambia de etapa (-3..+3: fuego, fiesta, tinte, música y medidor) con
+# el índice que sale de los indicadores y la confianza por grupo que ya manda el anfitrión (FlujoEnLinea.indice_etapas). Es
+# solo visual en cada equipo: no cambia el protocolo ni la huella de sala. Se apaga con ALCALDE_ETAPAS_ONLINE=0.
+ETAPAS_ONLINE = os.environ.get("ALCALDE_ETAPAS_ONLINE") != "0"
+
+# Minijuegos de verificar en línea (2026-11-15): las misiones con carta de misión abren el minijuego como en el hot-seat. Al
+# terminar se deciden las cartas con las MISMAS llamadas que la pantalla de siempre (EstadoRemoto.decidir), así que el
+# anfitrión recibe las decisiones de siempre: no cambia el protocolo. Se apaga con ALCALDE_MINIJUEGOS_ONLINE=0.
+MINIJUEGOS_ONLINE = os.environ.get("ALCALDE_MINIJUEGOS_ONLINE") != "0"

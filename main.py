@@ -211,6 +211,8 @@ def _conectar_online(gestor, mundo, conexion, activa, escena_mundo, transicion, 
                                transicion_lugar=transicion_lugar, con_interior=True)
     en_linea.cinematicas = escena_mundo
     en_linea.saltadores = conexion.saltadores
+    # Minijuegos de verificar también en línea (registro_minijuegos; ALCALDE_MINIJUEGOS_ONLINE=0 los deja en la pantalla de siempre).
+    en_linea.selector_escena = getattr(conexion, "selector_escena", None)
     arranque = ArranqueOnline(gestor, mundo, en_linea, lambda on: activa.__setitem__(0, en_linea if on else conexion),
                               escena_mundo=escena_mundo)
     arranque_online[0] = arranque.al_empezar if al_empezar_online is None else al_empezar_online

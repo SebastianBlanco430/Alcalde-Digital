@@ -167,7 +167,10 @@ class EscenaMinijuego(Escena):
         panel_tinta(self.banner, ANCHO_BANNER, ALTO_BANNER, tono=estilo.COLOR_PANEL, position=(0, Y_BANNER, 0))
         titulo = "Verificaste bien" if bien else "Se te escapó algo"
         # Con la consecuencia graduada, el título adelanta la propina (lo mismo que aplicará el flujo al cerrar).
-        graduacion = consecuencia_graduada.calcular(resultado.a_dict(), self.mision) if consecuencia_graduada.activo() else None
+        # En línea (EstadoRemoto, sin cartas_mision) no hay economía ni consecuencia graduada: no se promete propina.
+        local = getattr(self.estado, "cartas_mision", None) is not None
+        graduacion = (consecuencia_graduada.calcular(resultado.a_dict(), self.mision)
+                      if consecuencia_graduada.activo() and local else None)
         if graduacion is not None and graduacion.propina > 0:
             titulo += f"  ·  propina R$ {graduacion.propina}"
         elif graduacion is not None and graduacion.retardado is not None:

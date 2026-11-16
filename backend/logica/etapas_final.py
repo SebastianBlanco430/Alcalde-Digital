@@ -143,13 +143,17 @@ def indice_forzado():
 
 
 def indice_de_flujo(flujo):
-    """El índice 0-100 que manda: el forzado si lo hay; si no, el de flujo.resumen_final(); None sin resumen (en línea)."""
+    """El índice 0-100 que manda: el forzado si lo hay; si no, el de flujo.resumen_final() o, en línea, el de
+    flujo.indice_etapas(); None si no hay ninguno (en línea con ALCALDE_ETAPAS_ONLINE=0)."""
     forzado = indice_forzado()
     if forzado is not None:
         return forzado
     leer = getattr(flujo, "resumen_final", None) if flujo is not None else None
     if not callable(leer):
-        return None
+        # En línea no hay resumen_final (sin reloj): FlujoEnLinea.indice_etapas da el índice con lo que manda el anfitrión.
+        leer_en_linea = getattr(flujo, "indice_etapas", None) if flujo is not None else None
+        indice = leer_en_linea() if callable(leer_en_linea) else None
+        return None if indice is None else max(0.0, min(100.0, float(indice)))
     resumen = leer()
     indice = resumen.get("indice") if isinstance(resumen, dict) else None
     return None if indice is None else max(0.0, min(100.0, float(indice)))

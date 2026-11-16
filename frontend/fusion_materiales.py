@@ -6,7 +6,9 @@
 # quedaban solo 29 estados distintos (la textura).
 #
 # Aquí, ANTES de copiar y aplanar, el color plano de cada geom de la FUENTE se hornea en la columna de color de sus
-# vértices y se quitan ColorAttrib y MaterialAttrib del estado del geom. Con el shader de Ursina (lit_with_shadows:
+# vértices (la columna se añade si el .glb no la trae), su ColorAttrib pasa a ser «de vértice» y se quita su MaterialAttrib.
+# Hasta el 2026-11-15 la columna no se añadía y se quitaba el ColorAttrib: las casas de la favela salían blancas/grises.
+# Con el shader de Ursina (lit_with_shadows:
 # textura · p3d_ColorScale · p3d_Color, sin p3d_Material) el resultado en pantalla es el mismo: p3d_Color pasa de ser el
 # color plano a ser el color de vértice con el mismo valor, y el tinte del piso (set_color_scale) se sigue multiplicando
 # igual al aplanar. Los geoms sin color plano reciben blanco (lo que Panda daba por defecto sin columna de color) para
@@ -18,7 +20,8 @@
 import os
 import sys
 
-from panda3d.core import ColorAttrib, LColor, MaterialAttrib
+from panda3d.core import (ColorAttrib, Geom, GeomVertexArrayFormat, GeomVertexData, GeomVertexFormat, GeomVertexWriter,
+                          LColor, MaterialAttrib)
 
 FUSION_MATERIALES = True
 _BLANCO = LColor(1, 1, 1, 1)
@@ -64,6 +67,21 @@ def aplanar(raiz):
         variable.set_value(antes)
 
 
+# Copia de `datos` (GeomVertexData) con la columna «color» llena de `color`. GeomVertexData.set_color no añade la
+# columna si falta (pasa con los .glb de las casas, sin COLOR_0): el color se perdía y las casas salían grises.
+def _con_color(datos, color):
+    if not datos.has_column("color"):
+        formato = GeomVertexFormat(datos.get_format())
+        formato.add_array(GeomVertexArrayFormat("color", 4, Geom.NT_uint8, Geom.C_color))
+        datos = datos.convert_to(GeomVertexFormat.register_format(formato))
+    # copia escribible (convert_to y get_vertex_data la devuelven de solo lectura)
+    datos = GeomVertexData(datos)
+    escritor = GeomVertexWriter(datos, "color")
+    for _ in range(datos.get_num_rows()):
+        escritor.set_data4(color)
+    return datos
+
+
 def _hornear_geom(nodo, i):
     estado = nodo.get_geom_state(i)
     atributo = estado.get_attrib(ColorAttrib)
@@ -78,5 +96,7 @@ def _hornear_geom(nodo, i):
             nodo.set_geom_state(i, estado.remove_attrib(MaterialAttrib))     # colores de vértice propios: se respetan
             return
     geom = nodo.modify_geom(i)
-    geom.set_vertex_data(geom.get_vertex_data().set_color(color))
-    nodo.set_geom_state(i, estado.remove_attrib(ColorAttrib).remove_attrib(MaterialAttrib))
+    geom.set_vertex_data(_con_color(geom.get_vertex_data(), color))
+    # ColorAttrib de vértice (no quitarlo): sin él, un color plano heredado de un nodo padre pisaba el color horneado
+    # y las casas de la favela salían grises (2026-11-15). Todos los geoms horneados llevan el mismo, así que se funden igual.
+    nodo.set_geom_state(i, estado.set_attrib(ColorAttrib.make_vertex()).remove_attrib(MaterialAttrib))

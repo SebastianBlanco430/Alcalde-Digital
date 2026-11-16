@@ -100,6 +100,11 @@ class EstadoRemoto:
     def es_carta_de_mision(self):
         return self._cartas is not None and bool(self._mano) and self._cartas.es_de_mision(self._mano[0][0])
 
+    # ¿La partida trae cartas de misión (consecuencias)? Los minijuegos solo se abren con ella (registro_minijuegos). No se
+    # expone `cartas_mision` como en EstadoPartida: LoteMision pondría la carta en mesa, y aquí la reparte el anfitrión.
+    def tiene_cartas_mision(self):
+        return self._cartas is not None
+
     # -- Cambios --
 
     def aplicar_deltas(self, deltas):
@@ -618,6 +623,24 @@ class FlujoEnLinea:
             return confianza_misiones.evaluar_final(*self._datos_final)
         except ValueError:
             return None
+
+    # Índice 0-100 de los finales por etapas (backend/logica/etapas_final.indice_de_flujo) con lo que manda el anfitrión, por
+    # la misma cuenta que el hot-seat (FlujoConTiempo.resumen_final): confianza por grupo ponderada con los indicadores de la
+    # ciudad; sin confianza (sala sin consecuencias o aún sin ninguna misión cerrada), solo los indicadores. Todos los equipos
+    # reciben los mismos datos, así que ven la misma etapa. None con ETAPAS_ONLINE apagado (la ciudad de siempre).
+    def indice_etapas(self):
+        if not online_config.ETAPAS_ONLINE:
+            return None
+        from backend.logica import confianza_misiones
+        from backend.logica.flujo_tiempo import evaluar_final_indicadores, final_ponderado_activo, ponderar_final
+        indicadores = self.estado.indicadores()
+        try:
+            final = confianza_misiones.evaluar_final(self.confianza)
+            if final_ponderado_activo():
+                final = ponderar_final(final, indicadores)
+            return final["indice"]
+        except ValueError:
+            return evaluar_final_indicadores(indicadores)["indice"]
 
     def _ev_saludo(self, ev):
         self.ultimo_saludo = (ev["id"], ev["indice"])
