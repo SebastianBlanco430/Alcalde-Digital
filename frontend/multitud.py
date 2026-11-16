@@ -29,6 +29,7 @@ from ursina import Entity, camera, color, destroy, time
 
 from backend.logica import multitud_calculos as mc
 from backend.logica import multitud_conducta as cd
+from frontend import fuente_calculos
 from frontend import multitud_figuras as mf
 from frontend import poses
 from frontend import sombra_calculos as sc
@@ -62,7 +63,8 @@ class Multitud(Entity):
         self._reloj = reloj or _tiempo.time
         self._hora = hora
         self.densidad = None                         # gancho: callable(agentes, activos | None) -> [bool] (registro_ambiente_npc)
-        self.poblacion = mc.crear_poblacion(mundo, cantidad, semilla)
+        self.poblacion = self._crear_poblacion_sin_fuente(mundo, cantidad, semilla)
+        self._rodeos = fuente_calculos.circulos_fuente(mundo)
         self.agentes = self.poblacion.agentes
         n = len(self.agentes)
         self.asignador = mc.Asignador(self.agentes, ACTORES_POR_VARIANTE, FIGURAS_POR_VARIANTE)
@@ -79,6 +81,20 @@ class Multitud(Entity):
         self._actores = self._crear_actores()
         self._figuras = self._crear_figuras()
         self._en_a, self._en_b = set(), set()
+
+    # Las rutas van de centro de plaza en centro de plaza: con la fuente sólida se descartarían todas las que cruzan la
+    # Praça da Sé (el núcleo). Se validan sin ella (la misma población de antes) y al dibujarse rodean el borde (_estado).
+    @staticmethod
+    def _crear_poblacion_sin_fuente(mundo, cantidad, semilla):
+        extra = getattr(mundo, "obstaculos_extra", None)
+        fuentes = extra(fuente_calculos.ORIGEN_FUENTE) if callable(extra) else []
+        if not fuentes:
+            return mc.crear_poblacion(mundo, cantidad, semilla)
+        mundo.agregar_obstaculos([], origen=fuente_calculos.ORIGEN_FUENTE)
+        try:
+            return mc.crear_poblacion(mundo, cantidad, semilla)
+        finally:
+            mundo.agregar_obstaculos(fuentes, origen=fuente_calculos.ORIGEN_FUENTE)
 
     # -- Piscinas (se crean una vez) --
 
@@ -142,6 +158,10 @@ class Multitud(Entity):
         else:
             a = self.agentes[i]
             e = mc.posicion_en(t, a.ruta, a.semilla)
+        if self._rodeos:
+            x, z = fuente_calculos.apartar_de_circulos(e[0], e[1], self._rodeos)
+            if (x, z) != (e[0], e[1]):
+                e = (x, z) + tuple(e[2:])
         self._pos[i] = e
         return e
 

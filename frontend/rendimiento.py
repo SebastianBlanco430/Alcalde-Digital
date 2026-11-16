@@ -50,6 +50,16 @@
 #    que cree de fondo, sobre todo en portátiles con el plan «Equilibrado». Se le pide que no lo haga con este proceso
 #    (SetProcessInformation, ProcessPowerThrottling). ALCALDE_SIN_ANTI_ESTRANGULAMIENTO=1 lo apaga.
 #    macOS y Linux no ejecutan nada de 8 ni de 9.
+#
+# 10. Solo Windows, HILOS_DE_DIBUJO: Panda dibuja por defecto en el mismo hilo que Python, así que cada frame
+#    suma el bucle de Ursina (~9 ms en la RTX 3050 portátil) y el cull + draw (~11 ms): ~20 ms, 45-50 FPS. Con
+#    «threading-model Cull/Draw» el cull y el draw van en dos hilos propios y se solapan con el Python del frame
+#    siguiente (un frame más de latencia, ~16 ms). Medido 2026-11-15 en el mundo, con tope 60, 3 pares A/B
+#    alternados: 40,6-41,7 → 56,8-57,7 FPS de media y 1 % bajo 18-25 → 32-33. En macOS no se activa (Cocoa
+#    exige dibujar en el hilo principal y allí ya llega a 60). Se fija antes de abrir la ventana
+#    (configurar_panda()). La posición de la cámara para la niebla (CAMARA_EN_LA_RAIZ) es memoria compartida:
+#    el hilo de dibujo puede leer la del frame siguiente, una diferencia de centímetros en la niebla.
+#    ALCALDE_SIN_HILOS_DIBUJO=1 lo apaga.
 
 import __main__
 import os
@@ -69,6 +79,8 @@ PRECARGAR_ESCENAS = True
 BUCLE_RAPIDO = True
 TEMPORIZADOR_FINO = True
 SIN_ESTRANGULAR = True
+HILOS_DE_DIBUJO = True
+MODELO_HILOS = "Cull/Draw"
 
 
 def _variable(nombre):
@@ -84,6 +96,8 @@ def configurar_panda():
         loadPrcFileData("", "garbage-collect-states #f")
     if _variable("ALCALDE_SIN_VSYNC"):
         loadPrcFileData("", "sync-video #f")
+    if hilos_de_dibujo_activos():
+        loadPrcFileData("", f"threading-model {MODELO_HILOS}")
     if camara_en_la_raiz_activa():
         for shader in _shaders_con_niebla():
             shader.continuous_input.pop(ENTRADA_CAMARA, None)
@@ -310,6 +324,11 @@ def _instalar_bucle_rapido():
 
 def temporizador_fino_activo():
     return (sys.platform == "win32" and TEMPORIZADOR_FINO and not _variable("ALCALDE_SIN_TEMPORIZADOR_FINO")
+            and not _todo_apagado())
+
+
+def hilos_de_dibujo_activos():
+    return (sys.platform == "win32" and HILOS_DE_DIBUJO and not _variable("ALCALDE_SIN_HILOS_DIBUJO")
             and not _todo_apagado())
 
 

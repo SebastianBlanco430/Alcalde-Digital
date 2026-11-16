@@ -223,6 +223,17 @@ class Computador:
         def cabeza():
             return (avatar.x, y_suelo + 1.45, avatar.z)
 
+        # .glb de pie (sin pose sentada): el cuerpo detrás de la silla en el marco del escritorio, no dentro de la mesa
+        # (entrada_terminal_calculos.CUERPO_TRAS_SILLA). El muñeco procedural se sienta de verdad y no se toca.
+        from frontend.personaje_modelo import PersonajeModelo
+        mover_cuerpo = isinstance(avatar, PersonajeModelo) and etc.cuerpo_tras_silla_activo()
+
+        def tras_silla(k):
+            if not mover_cuerpo:
+                return
+            dx, dz = etc.desplazamiento_tras_silla(self.rumbo, k)
+            avatar.cuerpo.world_position = (avatar.world_x + dx, avatar.cuerpo.world_y, avatar.world_z + dz)
+
         def poner_camara(nombre, t):
             tiempo = inicio_tramo[nombre] + t * dur[nombre]
             pos = camino.posicion(tiempo)
@@ -248,11 +259,13 @@ class Computador:
             avatar.colocar(lerp(puerta[0], silla[0], k), lerp(puerta[1], silla[1], k))
             avatar.fijar_rumbo(lerp_angulo(rumbo_ir, rumbo_sentado, k))
             avatar.aplicar_pose(poses.interpolar_pose(poses.pose_caminar(fase_fin, 0.0), poses.POSE_SENTADO, k))
+            tras_silla(k)
             poner_camara("sentarse", t)
 
         def acercar(t):
             fundido = etc.suavizar(t / etc.FUNDIDO_POSE)
             avatar.aplicar_pose(poses.interpolar_pose(poses.POSE_SENTADO, poses.pose_teclear(t * 2 * math.pi), fundido))
+            tras_silla(1.0)
             poner_camara("acercar", t)
 
         def glitch(t):

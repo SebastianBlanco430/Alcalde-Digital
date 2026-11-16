@@ -60,6 +60,7 @@ from frontend.props_mundo import (
     cinta_con_tono, colocar_props, construir_props_mundo, construir_props_y_contorno, obstaculos_de_props,
 )
 from frontend import suelo_calculos as sc
+from frontend import fuente_calculos
 from frontend.suelo_favela import (cinta_asfalto_gastado, malla_calles_arena, malla_plaza_pintada,
                                    textura_del_camino, textura_del_grano)
 from frontend.texturas_favela import METROS_GRANO
@@ -654,6 +655,10 @@ class Ciudad3D(Entity):
         props = colocar_props(self._mundo)
         if hasattr(self._mundo, "agregar_obstaculos"):
             self._mundo.agregar_obstaculos(obstaculos_de_props(props), origen="props")
+            # la fuente de la Praça da Sé, con su propio origen (frontend/fuente_calculos.py; ALCALDE_COLISION_FUENTE)
+            if fuente_calculos.colision_fuente_activa():
+                self._mundo.agregar_obstaculos(fuente_calculos.obstaculos_fuente(props),
+                                               origen=fuente_calculos.ORIGEN_FUENTE)
         opaca, luces, contorno = construir_props_y_contorno(self._mundo, props)
         if opaca is not None:
             pieza(parent=self, model=opaca, name="decorado")

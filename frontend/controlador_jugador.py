@@ -44,6 +44,7 @@ from ursina import Entity, held_keys, time
 
 from backend.logica import escaleras_calculos, navegacion, salto_calculos
 from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
+from frontend import fuente_calculos
 from frontend import geometria_mundo
 
 VELOCIDAD = 7.0     # unidades de mundo por segundo
@@ -130,6 +131,8 @@ class ControladorJugador(Entity):
                     factor *= escaleras_calculos.factor_subida(True, True)
                 dx, dz = dx * factor, dz * factor
             x, z = navegacion.mover_con_colisiones(self._mapa, x, z, dx, dz)
+            if (x, z) == (x0, z0):          # clavado: si es contra la fuente de la plaza, la rodea (fuente_calculos)
+                x, z = fuente_calculos.rodear_fuente(self._mapa, x, z, dx, dz) or (x, z)
         # Se notifica siempre (también quieto): mantiene al día EN_RUTA / EN_RADIO.
         flujo.actualizar_posicion(x, z)
 

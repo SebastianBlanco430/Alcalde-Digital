@@ -225,7 +225,9 @@ class HudParkour(Entity):
             mensaje, tono = "Sin partida activa: la evidencia no se guarda.", estilo.ESTADO_AVISO
         else:
             mensaje, tono = "Ya tenías la evidencia de este nivel, o aún no alcanzas la medalla pedida.", estilo.ESTADO_AVISO
-        _texto(panel, mensaje, 17, tono, (0, y_mensaje))
+        # el aviso más largo (74 letras) a 17 px se salía unos píxeles del panel (visto en ventana a 1280x720): con el
+        # resultado v2 los largos van a 15 px
+        _texto(panel, mensaje, 15 if pk.resultado_v2_activo() and len(mensaje) > 60 else 17, tono, (0, y_mensaje))
         BotonPrimario("Volver al mundo", al_clic=lambda: self.al_salir and self.al_salir(), parent=panel,
                       position=(-0.2, -0.27, -0.01), ancho=a_unidades(230))
         BotonSecundario("Reintentar", al_clic=lambda: self.al_reiniciar and self.al_reiniciar(), parent=panel,

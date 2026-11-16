@@ -334,6 +334,8 @@ class GeometriaMinimapa:
     # fuera del minimapa: así el dibujo nunca se sale de su rectángulo. Orden de esquinas: el
     # contorno (sin diagonales), apto para dos triángulos (0,1,2) y (0,2,3).
     def cuadros_casas(self, obstaculos):
+        if self.CUADROS_RAPIDOS:
+            return self._cuadros_casas_rapido(obstaculos)
         cuadros = []
         for o in obstaculos:
             if o.tipo != "casa" or not o.es_caja:
@@ -342,6 +344,42 @@ class GeometriaMinimapa:
             esquinas = [self.punto(o.cx + dx, o.cz + dz)
                         for dx, dz in ((-mx, -mz), (mx, -mz), (mx, mz), (-mx, mz))]
             if all(self.contiene(u, v) for u, v in esquinas):
+                cuadros.append(tuple(esquinas))
+        return cuadros
+
+    # Rendimiento (CUADROS_RAPIDOS): el minimapa rehace las casas cada pocos grados de giro y, con ~400 casas, eran
+    # ~1600 llamadas a navegacion.a_minimapa (cada una recalcula escala, seno y coseno): un tirón de varios ms. Misma
+    # fórmula con la escala, el centro y el giro calculados una vez; mismo resultado. False = lo de siempre.
+    CUADROS_RAPIDOS = True
+
+    def _cuadros_casas_rapido(self, obstaculos):
+        xmin, xmax, zmin, zmax = self.limites
+        razones = [t / d for t, d in ((self._tamano_equivalente[0], xmax - xmin),
+                                      (self._tamano_equivalente[1], zmax - zmin)) if d > 0]
+        escala = min(razones) if razones else 1.0
+        xc, zc = (xmin + xmax) / 2, (zmin + zmax) / 2
+        cu, cv = self._centro
+        if self.yaw:
+            theta = math.radians(self.yaw)
+            cos_t, sin_t = math.cos(theta), math.sin(theta)
+        else:
+            cos_t, sin_t = 1.0, 0.0
+        limite_u, limite_v = self.tamano[0] / 2 + 1e-9, self.tamano[1] / 2 + 1e-9
+        cuadros = []
+        for o in obstaculos:
+            if o.tipo != "casa" or not o.es_caja:
+                continue
+            mx, mz = o.ancho / 2, o.fondo / 2
+            esquinas = []
+            for dx, dz in ((-mx, -mz), (mx, -mz), (mx, mz), (-mx, mz)):
+                px, pz = o.cx + dx - xc, o.cz + dz - zc
+                if self.yaw:
+                    px, pz = px * cos_t - pz * sin_t, px * sin_t + pz * cos_t
+                u, v = cu + escala * px, cv + escala * pz
+                if abs(u) > limite_u or abs(v) > limite_v:
+                    break
+                esquinas.append((u, v))
+            else:
                 cuadros.append(tuple(esquinas))
         return cuadros
 

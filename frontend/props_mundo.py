@@ -6,6 +6,7 @@
 # conoce; desde 2026-11-13 los que tienen cuerpo chocan: obstaculos_de_props() los traduce a círculos que la ciudad 3D
 # entrega a MundoCiudad.agregar_obstaculos (bandera ALCALDE_COLISION_PROPS). Sin colisión a propósito: la fuente
 # central (está en el cruce de las calles de la plaza: peatones y rutas pasan por ahí) y los carteles (un poste fino).
+# Desde 2026-11-15 la fuente SÍ choca, pero aparte: frontend/fuente_calculos.py (ALCALDE_COLISION_FUENTE).
 #
 # Rendimiento: ningún prop es una Entity. Cada pieza (cubo, esfera baja, prisma) es una plantilla de
 # triángulos que se copia con su posición, escala, giro y color directamente en UNA malla con
@@ -342,7 +343,7 @@ def caneca(m, x, y, z, s, variante):
     m.agregar(prisma(8, 0.5, 0.45), (x, y + 0.78 * s, z), (0.5 * s, 0.07 * s, 0.5 * s), 0, HIERRO, (0.9, 1.1))
 
 
-# Fuente de tres niveles: borde de piedra hueco, agua, pedestal, taza y chorro. Atravesable.
+# Fuente de tres niveles: borde de piedra hueco, agua, pedestal, taza y chorro. Su colisión: frontend/fuente_calculos.py.
 def fuente(m, x, y, z, s=1.0):
     m.agregar(prisma(14, 0.5, 0.5), (x, y, z), (4.5 * s, 0.12 * s, 4.5 * s), 0, _tono(PIEDRA_FUENTE, 0.9), (0.8, 1.0))
     m.agregar(anillo(14, 0.5, 0.42), (x, y, z), (4.0 * s, 0.66 * s, 4.0 * s), 12, PIEDRA_FUENTE, (0.85, 1.1), 0.05)

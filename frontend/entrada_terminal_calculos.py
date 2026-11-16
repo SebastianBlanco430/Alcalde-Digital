@@ -242,3 +242,30 @@ def fov(f, inicial, final):
 def intensidad_glitch(t):
     subida = 1.0 - MESETA_GLITCH
     return 1.0 if t >= subida else suavizar(t / subida) ** 1.4
+
+
+# CUERPO TRAS LA SILLA (2026-11-15, verificado en ventana): los .glb no tienen pose sentada; PersonajeModelo los deja de
+# pie desplazados personaje_modelo.OFFSET_SENTADO «detrás de la silla». Ese desplazamiento va en el marco del modelo y,
+# con el rumbo que lleva el avatar ante este escritorio, lo metía 0,7 m HACIA el monitor: el cuerpo quedaba dentro de la
+# mesa (z local -0,04) y la toma final (z 0,23) acababa dentro de su cadera. Aquí el cuerpo va detrás de la silla en el
+# marco del ESCRITORIO, y entra poco a poco mientras se sienta (k de 0 a 1): sin el salto de 0,7 m del cambio de clip.
+# CUERPO_TRAS_SILLA = False (o ALCALDE_TERMINAL_CUERPO_TRAS_SILLA=0) deja lo de antes.
+CUERPO_TRAS_SILLA = True
+DISTANCIA_TRAS_SILLA = 0.7       # m detrás del asiento (lo mismo que OFFSET_SENTADO pedía)
+
+
+def cuerpo_tras_silla_activo():
+    valor = os.environ.get("ALCALDE_TERMINAL_CUERPO_TRAS_SILLA", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(CUERPO_TRAS_SILLA)
+
+
+# (dx, dz) en el mundo del cuerpo respecto de la raíz del avatar: hacia +z local del escritorio de rumbo `rumbo` (el lado
+# de la silla opuesto al monitor), `k` (0-1) de DISTANCIA_TRAS_SILLA. Mismo giro que mundo_digital_calculos.local_a_mundo.
+def desplazamiento_tras_silla(rumbo, k, distancia=DISTANCIA_TRAS_SILLA):
+    r = math.radians(rumbo)
+    d = distancia * _acotar(k)
+    return (math.sin(r) * d, math.cos(r) * d)

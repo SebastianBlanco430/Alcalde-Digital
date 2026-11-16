@@ -12,6 +12,7 @@
 from ursina import Entity, camera, time
 
 from frontend.peatones_calculos import aspecto_peaton, crear_peatones, rasgos_peaton
+from frontend import fuente_calculos
 from frontend import poses
 from frontend.personaje import Personaje
 from frontend.npc_modelo import crear_npc
@@ -35,6 +36,9 @@ class Peatones(Entity):
         self.personajes = []
         self._quietos = set()
         self._frame = 0
+        # fuente sólida de la plaza: la posición dibujada la rodea por el borde (frontend/fuente_calculos.py)
+        self._rodeos = fuente_calculos.circulos_fuente(mundo)
+        self._dibujados = {}
         for i, caminante in enumerate(self.caminantes):
             aspecto = aspecto_peaton(i, SEMILLA)
             if USAR_MODELOS:     # copia de uno de los 4 .glb con otra ropa; si falla, el muñeco de siempre
@@ -55,9 +59,18 @@ class Peatones(Entity):
     def avanzar(self, dt):
         for caminante, personaje in zip(self.caminantes, self.personajes):
             caminante.avanzar(dt)
-            personaje.colocar(caminante.x, caminante.z)
+            rumbo = caminante.rumbo
+            if self._rodeos:
+                x, z = fuente_calculos.apartar_de_circulos(caminante.x, caminante.z, self._rodeos)
+                x0, z0 = self._dibujados.get(id(caminante), (x, z))
+                if (x, z) != (caminante.x, caminante.z):        # por el borde: mira hacia donde avanza de verdad
+                    rumbo = fuente_calculos.rumbo_del_paso(x0, z0, x, z, rumbo)
+                self._dibujados[id(caminante)] = (x, z)
+                personaje.colocar(x, z)
+            else:
+                personaje.colocar(caminante.x, caminante.z)
             if caminante.en_movimiento:
-                personaje.mirar_hacia(caminante.rumbo)
+                personaje.mirar_hacia(rumbo)
                 personaje.girar(dt)
                 personaje.animar_caminar(caminante.velocidad, dt)
                 self._quietos.discard(personaje)
