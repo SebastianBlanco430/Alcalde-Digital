@@ -13,12 +13,14 @@ import random
 from dataclasses import dataclass
 
 ATENDER, SECUENCIA, BARRA, ENTREGAS = "atender", "secuencia", "barra", "entregas"
-MOTORES = (ATENDER, SECUENCIA, BARRA, ENTREGAS)
+# RITMO: flechas que llegan una tras otra por un carril (backend/logica/taller_ritmo.py: TurnoRitmo, no TurnoTrabajo).
+RITMO = "ritmo"
+MOTORES = (ATENDER, SECUENCIA, BARRA, ENTREGAS, RITMO)
 FATIGA_AGOTADO = 100
 MENSAJE_AGOTADO = "Estás agotado: come algo o espera tu turno"
 
 # Segundos por acción que se espera de un buen jugador (define la meta de aciertos del turno).
-RITMO_S = {ATENDER: 2.5, SECUENCIA: 1.2, BARRA: 5.0, ENTREGAS: 5.0}
+RITMO_S = {ATENDER: 2.5, SECUENCIA: 1.2, BARRA: 5.0, ENTREGAS: 5.0, RITMO: 1.2}
 PENALIZA_ERROR = 0.5            # un error resta medio acierto
 BARRA_VUELTAS_POR_S = 0.45      # viajes completos ida y vuelta por segundo
 BARRA_ZONA = 0.22               # ancho de la zona verde (0..1)
@@ -44,7 +46,7 @@ class Trabajo:
             raise ValueError(f"Trabajo {self.id!r}: duración o pagos inválidos.")
         if self.motor == ATENDER and len(self.opciones) != 4:
             raise ValueError(f"Trabajo {self.id!r}: ATENDER necesita 4 opciones.")
-        if self.motor == SECUENCIA and len(self.opciones) < 2:
+        if self.motor in (SECUENCIA, RITMO) and len(self.opciones) < 2:
             raise ValueError(f"Trabajo {self.id!r}: SECUENCIA necesita al menos 2 opciones.")
 
 

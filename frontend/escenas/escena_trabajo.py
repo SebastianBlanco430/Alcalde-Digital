@@ -3,6 +3,8 @@
 #   ATENDER   - un cliente pide «2 pan + 1 café»; teclas 1-4 (o clic) entregan el producto.
 #   SECUENCIA - flechas que hay que repetir en orden (flechas o W A S D, o los botones de abajo).
 #   BARRA     - una marca va y viene; Espacio (o el botón) la detiene dentro de la zona marcada «ZONA».
+#   RITMO     - taller de Beto: las flechas llegan una tras otra hasta un recuadro y cada acierto es un martillazo
+#               sobre una pieza de moto o bici (modelo backend/logica/taller_ritmo.py, vista frontend/taller_vista.py).
 # Arriba: el puesto, la barra de tiempo, los aciertos y los errores. Al acabar el tiempo, un panel con el
 # resultado (aciertos, errores, pago en R$ y cansancio). Todo se entiende con texto, no solo con color.
 #
@@ -16,7 +18,7 @@ import random
 from ursina import Button, Entity, Mesh, Text, color, time
 
 from backend.logica.perfil_economia import FATIGA_MAX, perfil_de
-from backend.logica.trabajos import ATENDER, BARRA, ENTREGAS, MENSAJE_AGOTADO, SECUENCIA, TurnoTrabajo
+from backend.logica.trabajos import ATENDER, BARRA, ENTREGAS, MENSAJE_AGOTADO, RITMO, SECUENCIA, TurnoTrabajo
 from frontend import diseno_adaptable, estilo, tipografia
 from frontend.componentes import (BotonPrimario, BotonSecundario, destruir_arbol, escala_fuente, modelo_redondeado,
                                   panel_tinta, rgb)
@@ -43,9 +45,11 @@ INSTRUCCIONES = {
     BARRA: "Pulsa Espacio cuando la marca esté dentro de la ZONA. Más aciertos, más paga.",
     # Las entregas se juegan en el mundo (frontend/entregas_mundo.py); esto es solo el respaldo con esa bandera apagada.
     ENTREGAS: "Pulsa Espacio cuando la marca esté dentro de la ZONA. Más aciertos, más paga.",
+    RITMO: ("Pulsa cada flecha (o W A S D) cuando llegue al recuadro amarillo. Acierto = martillazo; "
+            "fallo = la pieza se abolla y cobras menos."),
 }
 TEMAS = {   # frase extra por puesto (solo texto de ambientación)
-    "taller": "Sigue los pasos de la reparación.",
+    "taller": "Forja la pieza a martillazos.",
     "lan_house": "Teclea el código de soporte.",
     "lanchonete": "Saca la comida en su punto.",
     "entregas": "Frena justo en la parada.",
@@ -288,6 +292,7 @@ class EscenaTrabajo(Escena):
         self._n_pedido = 0
         self._cliente = None
         self._barra = {}
+        self._vista = None               # JuegoTaller (motor RITMO)
 
     # -- Ciclo de vida --
 
@@ -297,7 +302,12 @@ class EscenaTrabajo(Escena):
             raise ValueError("EscenaTrabajo necesita un trabajo.")
         self._limpiar()
         self.jugador, self.trabajo, self._al_terminar = jugador, trabajo, al_terminar
-        self.turno = TurnoTrabajo(trabajo, random.randrange(1 << 30) if semilla is None else semilla)
+        semilla = random.randrange(1 << 30) if semilla is None else semilla
+        if trabajo.motor == RITMO:
+            from backend.logica.taller_ritmo import TurnoRitmo
+            self.turno = TurnoRitmo(trabajo, semilla)
+        else:
+            self.turno = TurnoTrabajo(trabajo, semilla)
         self._cerrado = False
         self._resultado = None
         self._n_pedido = 0
@@ -313,6 +323,7 @@ class EscenaTrabajo(Escena):
             for hijo in list(padre.children):
                 destruir_arbol(hijo)
         self._tiles, self._flash, self._barra, self._cliente = [], {}, {}, None
+        self._vista = None
         self._firma_juego = None
         self.fase = None
 
@@ -329,6 +340,8 @@ class EscenaTrabajo(Escena):
         if self.fase != JUGANDO:
             return
         self.turno.avanzar(dt)
+        if self._vista is not None:
+            self._vista.animar(dt)
         texto, ok, restante = self._feedback
         if restante > 0:
             self._feedback = (texto, ok, max(0.0, restante - dt))
@@ -364,7 +377,7 @@ class EscenaTrabajo(Escena):
         motor = self.trabajo.motor
         if motor == ATENDER and key in TECLAS_PRODUCTO:
             return self.accion(TECLAS_PRODUCTO[key])
-        if motor == SECUENCIA and key in TECLAS_DIRECCION:
+        if motor in (SECUENCIA, RITMO) and key in TECLAS_DIRECCION:
             return self.accion(TECLAS_DIRECCION[key])
         if motor == BARRA and key == "space":
             return self.accion(None)
@@ -400,6 +413,8 @@ class EscenaTrabajo(Escena):
                 self._decir(f"Bien: {self.trabajo.opciones[indice]}", True)
             else:
                 self._decir("Error: de más o equivocado, el pedido empieza de nuevo", False)
+        elif motor == RITMO:
+            pass                                 # el aviso y la animación salen de los eventos del turno (_juego_ritmo)
         elif motor == SECUENCIA:
             if acierto:
                 self._decir("Bien", True)
@@ -482,8 +497,17 @@ class EscenaTrabajo(Escena):
         _texto(panel, "Tu turno", 15, estilo.COLOR_TEXTO_TENUE, (0, 0.205), z=-0.01)
         _texto(panel, t.nombre, 28, estilo.COLOR_ACENTO, (0, 0.155), negrita=True, z=-0.01)
         texto = INSTRUCCIONES[t.motor] + (" " + TEMAS[t.id] if t.id in TEMAS else "")
-        cuerpo = _texto(panel, texto, 17, estilo.COLOR_TEXTO, (0, 0.04), z=-0.01)
-        diseno_adaptable.ajustar_texto(cuerpo, 0.8, escala_min=0.6, max_lineas=4)
+        if t.motor == RITMO:
+            # Taller: líneas cortas a tamaño fijo (el ajuste automático encogía el párrafo hasta que no se leía).
+            _texto(panel, f"Hoy fabricas: {self.turno.pieza.nombre}", 22, estilo.COLOR_TEXTO, (0, 0.085), negrita=True,
+                   z=-0.01)
+            _texto(panel, "Pulsa cada flecha (o W A S D) cuando llegue al recuadro amarillo.", 17, estilo.COLOR_TEXTO,
+                   (0, 0.035), z=-0.01)
+            _texto(panel, "Acierto = martillazo.  Fallo = la pieza se abolla y cobras menos.", 17, estilo.COLOR_TEXTO,
+                   (0, 0.0), z=-0.01)
+        else:
+            cuerpo = _texto(panel, texto, 17, estilo.COLOR_TEXTO, (0, 0.04), z=-0.01)
+            diseno_adaptable.ajustar_texto(cuerpo, 0.8, escala_min=0.6, max_lineas=4)
         perfil = self._perfil()
         extra = f"Turno de {int(t.duracion_s)} s · paga R$ {t.pago_base} a {t.pago_max} · cansancio +{t.fatiga}"
         if perfil is not None:
@@ -503,13 +527,25 @@ class EscenaTrabajo(Escena):
         for hijo in list(self.juego.children):
             destruir_arbol(hijo)
         self._tiles, self._barra, self._cliente, self._firma_juego = [], {}, None, None
+        self._vista = None
         s = self.superpuesto
         for hijo in list(s.children):
             destruir_arbol(hijo)
         self._velo(s)
         panel = panel_tinta(s, 0.9, 0.66, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX, z=0)
         _texto(panel, "TURNO TERMINADO", 28, estilo.COLOR_ACENTO, (0, 0.265), negrita=True, z=-0.01)
-        _texto(panel, self._valoracion(r["rendimiento"]), 16, estilo.COLOR_TEXTO_TENUE, (0, 0.215), z=-0.01)
+        if self.trabajo.motor == RITMO:
+            from backend.logica.taller_ritmo import etiqueta_calidad
+            from frontend.taller_vista import dibujar_pieza
+            calidad = r["calidad"]
+            _texto(panel, f"{r['pieza']}: calidad {round(calidad * 100)} % ({etiqueta_calidad(calidad)})", 16,
+                   estilo.COLOR_TEXTO_TENUE, (0, 0.215), z=-0.01)
+            dibujar_pieza(panel, self.turno.pieza.id, (-0.36, 0.25), 0.1, 1.0, r["errores"], fondo=estilo.COLOR_TARJETA,
+                          z=-0.01)
+            dibujar_pieza(panel, self.turno.pieza.id, (0.36, 0.25), 0.1, 1.0, r["errores"], fondo=estilo.COLOR_TARJETA,
+                          z=-0.01)
+        else:
+            _texto(panel, self._valoracion(r["rendimiento"]), 16, estilo.COLOR_TEXTO_TENUE, (0, 0.215), z=-0.01)
         _texto(panel, f"Aciertos: {r['aciertos']}", 20, estilo.COLOR_TEXTO, (-0.2, 0.15), negrita=True, z=-0.01)
         _texto(panel, f"Errores: {r['errores']}", 20, estilo.COLOR_TEXTO, (0.2, 0.15), negrita=True, z=-0.01)
         _linea(panel, 0.78, (0, 0.105), z=-0.01)
@@ -556,7 +592,10 @@ class EscenaTrabajo(Escena):
         r = t.resultado()
         self._poner(self._t_aciertos, f"Aciertos: {r['aciertos']}")
         self._poner(self._t_errores, f"Errores: {r['errores']}")
-        self._poner(self._t_rend, f"Rendimiento: {round(r['rendimiento'] * 100)} %")
+        if self.trabajo.motor == RITMO:
+            self._poner(self._t_rend, f"Ganado hasta ahora: R$ {r['pago']}")
+        else:
+            self._poner(self._t_rend, f"Rendimiento: {round(r['rendimiento'] * 100)} %")
         texto, ok, resta = self._feedback
         tema = TEMAS.get(self.trabajo.id, "")
         self._poner(self._t_feedback, texto if resta > 0 else tema)
@@ -567,6 +606,8 @@ class EscenaTrabajo(Escena):
                 self._juego_atender()
             elif motor == SECUENCIA:
                 self._juego_secuencia()
+            elif motor == RITMO:
+                self._juego_ritmo()
             else:
                 self._juego_barra()
 
@@ -579,6 +620,19 @@ class EscenaTrabajo(Escena):
         for hijo in list(self.juego.children):
             destruir_arbol(hijo)
         self._tiles, self._barra, self._cliente = [], {}, None
+        self._vista = None
+
+    # -- RITMO --
+
+    def _juego_ritmo(self):
+        if self._vista is None:
+            from frontend.taller_vista import JuegoTaller
+            self._vaciar_juego()
+            self._vista = JuegoTaller(self.juego, self.turno, self.jugador)
+        aviso = self._vista.eventos(self.turno.sacar_eventos())
+        if aviso is not None:
+            self._decir(*aviso)
+        self._vista.refrescar()
 
     # -- ATENDER --
 
