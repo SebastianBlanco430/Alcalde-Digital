@@ -10,10 +10,12 @@
 # COLOR_HORIZONTE es también el color de la niebla (frontend/niebla.py): lo lejano se funde con el cielo.
 
 import math
+import sys
 
 from ursina import Entity, Mesh, camera, time
 from ursina.shaders import unlit_shader
 
+from frontend import ciclo_dia_calculos as ciclo
 from frontend.azar_fijo import azar_de
 
 # Atardecer cálido tipo Río (ver MODELOS_3D.md, sección «Cielo»): horizonte dorado-anaranjado que sube a rosa,
@@ -54,13 +56,22 @@ def _mezclar(a, b, t):
     return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
 
 
+# Paleta del atardecer de siempre, con las constantes de arriba (las del ciclo de día están en frontend/ciclo_dia_calculos.py,
+# con las mismas claves). Las funciones de geometría la usan cuando no se les pasa otra: sin ciclo el cielo es el de antes.
+def _paleta_tarde():
+    return {"horizonte": COLOR_HORIZONTE, "paradas": PARADAS_CIELO, "resplandor": COLOR_RESPLANDOR,
+            "fuerza_resplandor": FUERZA_RESPLANDOR, "sol": COLOR_SOL, "mar": COLOR_MAR, "reflejo_mar": COLOR_REFLEJO_MAR,
+            "cerros": None, "nube_arriba": COLOR_NUBE_ARRIBA, "nube_abajo": COLOR_NUBE_ABAJO}
+
+
 # Color del degradado a esa elevación (seno del ángulo, 0 = horizonte; por debajo se queda en él).
-def color_degradado(elevacion):
+def color_degradado(elevacion, paradas=None):
+    paradas = PARADAS_CIELO if paradas is None else paradas
     e = min(1.0, max(0.0, elevacion))
-    for (e0, c0), (e1, c1) in zip(PARADAS_CIELO, PARADAS_CIELO[1:]):
+    for (e0, c0), (e1, c1) in zip(paradas, paradas[1:]):
         if e <= e1:
             return _mezclar(c0, c1, (e - e0) / (e1 - e0))
-    return PARADAS_CIELO[-1][1]
+    return paradas[-1][1]
 
 
 # Dirección unitaria HACIA el sol (opuesta a la de la luz).
@@ -71,10 +82,11 @@ def direccion_hacia_el_sol(direccion_luz=DIRECCION_SOL):
 
 
 # Color del cielo en la dirección unitaria `d`: degradado más un resplandor cálido hacia el sol.
-def color_en_direccion(d, sol):
-    base = color_degradado(d[1])
+def color_en_direccion(d, sol, paleta=None):
+    paleta = paleta or _paleta_tarde()
+    base = color_degradado(d[1], paleta["paradas"])
     cos = max(0.0, d[0] * sol[0] + d[1] * sol[1] + d[2] * sol[2])
-    return _mezclar(base, COLOR_RESPLANDOR, FUERZA_RESPLANDOR * cos ** POTENCIA_RESPLANDOR)
+    return _mezclar(base, paleta["resplandor"], paleta["fuerza_resplandor"] * cos ** POTENCIA_RESPLANDOR)
 
 
 # Siluetas de cerros lejanos: dos filas de picos bajos (la lejana más clara y velada) pegadas al
@@ -89,11 +101,15 @@ COLUMNAS_CERROS = 72
 PICOS = ((38.0, 6.0, 0.115), (-52.0, 9.0, 0.085), (150.0, 12.0, 0.07))
 
 
-def geometria_cerros():
+def geometria_cerros(paleta=None):
+    paleta = paleta or _paleta_tarde()
+    horizonte = paleta["horizonte"]
     vertices, triangulos, colores = [], [], []
     sol = direccion_hacia_el_sol()
     azimut_sol = math.atan2(sol[2], sol[0])
     for capa, (radio, base, amplitud, tono, fase) in enumerate(CAPAS_CERROS):
+        if paleta["cerros"] is not None:
+            tono = paleta["cerros"][capa]
         inicio = len(vertices)
         for k in range(COLUMNAS_CERROS):
             azimut = 2 * math.pi * k / COLUMNAS_CERROS
@@ -104,7 +120,7 @@ def geometria_cerros():
                 for grados, ancho, alto in PICOS:
                     d = (azimut - azimut_sol - math.radians(grados) + math.pi) % (2 * math.pi) - math.pi
                     altura += alto * math.exp(-(d / math.radians(ancho)) ** 2)
-            for seno, tono_vertice in ((-0.06, COLOR_HORIZONTE), (max(0.004, altura), tono)):
+            for seno, tono_vertice in ((-0.06, horizonte), (max(0.004, altura), tono)):
                 coseno = math.sqrt(1 - seno * seno)
                 vertices.append((radio * coseno * math.cos(azimut), radio * seno, radio * coseno * math.sin(azimut)))
                 colores.append((tono_vertice[0] / 255, tono_vertice[1] / 255, tono_vertice[2] / 255, 1.0))
@@ -120,7 +136,8 @@ def geometria_cerros():
 COLUMNAS_MAR = 48
 
 
-def geometria_mar():
+def geometria_mar(paleta=None):
+    paleta = paleta or _paleta_tarde()
     sol = direccion_hacia_el_sol()
     azimut_sol = math.atan2(sol[2], sol[0])
     vertices, triangulos, colores = [], [], []
@@ -132,8 +149,8 @@ def geometria_mar():
         for seno, arriba in ((-0.06, 0.0), (ALTURA_MAR * borde, 1.0)):
             coseno = math.sqrt(1 - seno * seno)
             vertices.append((0.99 * coseno * math.cos(azimut), 0.99 * seno, 0.99 * coseno * math.sin(azimut)))
-            tono = _mezclar(COLOR_MAR, COLOR_REFLEJO_MAR, reflejo * (0.55 + 0.45 * arriba))
-            tono = _mezclar(tono, COLOR_HORIZONTE, (1 - borde) * 0.8)
+            tono = _mezclar(paleta["mar"], paleta["reflejo_mar"], reflejo * (0.55 + 0.45 * arriba))
+            tono = _mezclar(tono, paleta["horizonte"], (1 - borde) * 0.8)
             colores.append((tono[0] / 255, tono[1] / 255, tono[2] / 255, 1.0))
     for k in range(COLUMNAS_MAR):
         a, b = 2 * k, 2 * (k + 1)
@@ -142,18 +159,20 @@ def geometria_mar():
 
 
 # Disco del sol: una esfera pequeña (icosfera) en la dirección del sol, dentro del domo y delante del mar.
-def geometria_sol():
+def geometria_sol(paleta=None):
+    tono = (paleta or _paleta_tarde())["sol"]
     sol = direccion_hacia_el_sol()
     base_v, base_t = icosfera()
     centro = tuple(0.96 * c for c in sol)
     vertices = [tuple(centro[i] + RADIO_SOL * v[i] for i in range(3)) for v in base_v]
-    colores = [(COLOR_SOL[0] / 255, COLOR_SOL[1] / 255, COLOR_SOL[2] / 255, 1.0)] * len(vertices)
+    colores = [(tono[0] / 255, tono[1] / 255, tono[2] / 255, 1.0)] * len(vertices)
     return vertices, list(base_t), colores
 
 
 # Domo de radio 1: (vértices, triángulos, colores 0-1 RGBA). Los anillos van de bajo el horizonte
 # al cenit; su elevación se concentra cerca del horizonte, donde cambia más el color.
-def geometria_domo(direccion_luz=DIRECCION_SOL):
+def geometria_domo(direccion_luz=DIRECCION_SOL, paleta=None):
+    paleta = paleta or _paleta_tarde()
     sol = direccion_hacia_el_sol(direccion_luz)
     vertices, colores = [], []
     for seno in ELEVACIONES_ANILLOS:
@@ -162,7 +181,7 @@ def geometria_domo(direccion_luz=DIRECCION_SOL):
             azimut = 2 * math.pi * k / SEGMENTOS
             d = (coseno * math.cos(azimut), seno, coseno * math.sin(azimut))
             vertices.append(d)
-            r, g, b = color_en_direccion(d, sol)
+            r, g, b = color_en_direccion(d, sol, paleta)
             colores.append((r / 255, g / 255, b / 255, 1.0))
     triangulos = []
     for fila in range(len(ELEVACIONES_ANILLOS) - 1):
@@ -206,7 +225,8 @@ def icosfera():
 
 # Nubes: (vértices, triángulos, colores). Cada nube son varias esferas aplastadas en fila sobre el
 # domo; los colores van de blanco (arriba) a azul grisáceo (abajo) y se tiñen de horizonte las bajas.
-def geometria_nubes(cantidad=CANTIDAD_NUBES):
+def geometria_nubes(cantidad=CANTIDAD_NUBES, paleta=None):
+    paleta = paleta or _paleta_tarde()
     base_v, base_t = icosfera()
     vertices, triangulos, colores = [], [], []
     for n in range(cantidad):
@@ -234,21 +254,45 @@ def geometria_nubes(cantidad=CANTIDAD_NUBES):
                           + radial[i] * z * radio * 0.35 for i in range(3))
                 vertices.append(v)
                 t = (y + 1) / 2
-                arriba = _mezclar(COLOR_NUBE_ABAJO, COLOR_NUBE_ARRIBA, min(1.0, t * 1.25))
-                r, g, b = _mezclar(arriba, COLOR_HORIZONTE, tinte)
+                arriba = _mezclar(paleta["nube_abajo"], paleta["nube_arriba"], min(1.0, t * 1.25))
+                r, g, b = _mezclar(arriba, paleta["horizonte"], tinte)
                 colores.append((r / 255, g / 255, b / 255, 1.0))
             triangulos += [(inicio + a, inicio + b, inicio + c) for a, b, c in base_t]
     return vertices, triangulos, colores
 
 
+# Domo, mar, cerros y sol en UNA malla: (vértices, triángulos, colores) con los colores de `paleta` (None = la tarde).
+def geometria_cielo(paleta=None):
+    vertices, triangulos, colores = geometria_domo(paleta=paleta)
+    for extra in (geometria_mar(paleta), geometria_cerros(paleta), geometria_sol(paleta)):
+        cv, ct, cc = extra
+        ct = [(a + len(vertices), b + len(vertices), c + len(vertices)) for a, b, c in ct]
+        vertices, triangulos, colores = vertices + cv, triangulos + ct, colores + cc
+    return vertices, triangulos, colores
+
+
+# Reescribe la columna de color de la malla de `entidad` con `plano` (lista plana RGBA 0..1, un color por vértice y en el
+# mismo orden). Solo esa columna (la de Ursina es un arreglo float32 aparte): sin Mesh.generate(), que rehace la malla entera.
+def escribir_colores(entidad, plano):
+    from array import array
+    for camino in entidad.model.find_all_matches("**/+GeomNode"):
+        nodo = camino.node()
+        for i in range(nodo.get_num_geoms()):
+            datos = nodo.modify_geom(i).modify_vertex_data()
+            if datos.get_num_rows() * 4 != len(plano):
+                raise ValueError("la malla del cielo no tiene un color por vértice")
+            formato = datos.get_format()
+            for k in range(formato.get_num_arrays()):
+                if formato.get_array(k).has_column("color"):
+                    datos.modify_array(k).modify_handle().set_data(array("f", plano).tobytes())
+                    return
+    raise ValueError("la malla del cielo no tiene columna de color")
+
+
 class CieloDegradado(Entity):
 
     def __init__(self, **opciones):
-        vertices, triangulos, colores = geometria_domo()
-        for extra in (geometria_mar(), geometria_cerros(), geometria_sol()):
-            cv, ct, cc = extra
-            ct = [(a + len(vertices), b + len(vertices), c + len(vertices)) for a, b, c in ct]
-            vertices, triangulos, colores = vertices + cv, triangulos + ct, colores + cc
+        vertices, triangulos, colores = geometria_cielo()
         opciones.setdefault("scale", 400)
         super().__init__(model=Mesh(vertices=vertices, triangles=triangulos, colors=colores),
                          shader=unlit_shader, unlit=True, double_sided=True, name="cielo", **opciones)
@@ -257,8 +301,59 @@ class CieloDegradado(Entity):
         self.nubes = Entity(parent=self, model=Mesh(vertices=vn, triangles=tn, colors=cn),
                             shader=unlit_shader, unlit=True, double_sided=True, name="nubes")
         self.nubes.setBin("background", 1)
+        # Ciclo de mañana, tarde y noche (frontend/ciclo_dia_calculos.py): los colores de cada paleta se calculan UNA vez y
+        # luego solo se mezclan. `horizonte` (RGB 0-255) es el color del horizonte vigente: la niebla lo usa (ciudad_viva).
+        self.horizonte = COLOR_HORIZONTE
+        self._paletas = None
+        self._diferencias = {}           # (a, b) -> (dif. del cielo, dif. de las nubes), listas planas; una vez por par
+        self._clave_ciclo = ("tarde", "tarde", 0.0)
+        self._t_ciclo = 0.0
+        if ciclo.activo():
+            try:
+                self._paletas = {"tarde": (_paleta_tarde(), ciclo.plano(colores), ciclo.plano(cn))}
+                for nombre, paleta in ciclo.PALETAS.items():
+                    self._paletas[nombre] = (paleta, ciclo.plano(geometria_cielo(paleta)[2]),
+                                             ciclo.plano(geometria_nubes(paleta=paleta)[2]))
+            except Exception as error:      # noqa: BLE001 — sin ciclo el cielo queda como siempre
+                self._paletas = None
+                print(f"[cielo] ciclo de día desactivado ({type(error).__name__}: {error})", file=sys.stderr)
 
     # Como Sky: del tamaño del plano lejano y sin giro propio; solo las nubes derivan despacio.
     def update(self):
         self.scale = camera.clip_plane_far * 0.8
         self.nubes.rotation_y += VELOCIDAD_NUBES * time.dt
+        if self._paletas is not None:
+            self._t_ciclo -= time.dt
+            if self._t_ciclo <= 0:
+                self._t_ciclo = ciclo.PERIODO_CICLO
+                self.aplicar_hora(self._hora())
+
+    @staticmethod
+    def _hora():
+        forzada = ciclo.hora_forzada()
+        if forzada is not None:
+            return forzada
+        from frontend import ambiente_vivo
+        return ambiente_vivo.hora()
+
+    # Pone el cielo de esa hora (None = el atardecer de siempre). Solo escribe colores si cambió el escalón de mezcla.
+    def aplicar_hora(self, hora):
+        if self._paletas is None:
+            return
+        clave = ciclo.mezcla_de_hora(hora)
+        if clave == self._clave_ciclo:
+            return
+        a, b, t = clave
+        (paleta_a, cielo_a, nubes_a), (paleta_b, cielo_b, nubes_b) = self._paletas[a], self._paletas[b]
+        try:
+            if t > 0.0 and (a, b) not in self._diferencias:
+                self._diferencias[(a, b)] = (ciclo.diferencia(cielo_a, cielo_b), ciclo.diferencia(nubes_a, nubes_b))
+            dif_cielo, dif_nubes = self._diferencias.get((a, b), (None, None))
+            escribir_colores(self, ciclo.mezclar_plano(cielo_a, dif_cielo, t))
+            escribir_colores(self.nubes, ciclo.mezclar_plano(nubes_a, dif_nubes, t))
+        except Exception as error:          # noqa: BLE001 — si la malla no se deja, el cielo se queda como estaba
+            self._paletas = None
+            print(f"[cielo] ciclo de día desactivado ({type(error).__name__}: {error})", file=sys.stderr)
+            return
+        self._clave_ciclo = clave
+        self.horizonte = ciclo.mezclar_rgb(paleta_a["horizonte"], paleta_b["horizonte"], t)

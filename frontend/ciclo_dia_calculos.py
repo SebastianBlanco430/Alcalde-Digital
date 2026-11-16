@@ -1,0 +1,117 @@
+# Ciclo de mañana, tarde y noche del CIELO (Python puro: NO importa ursina). Solo cambia el color del cielo (domo, sol,
+# nubes, mar y cerros del fondo) y, para que no quede costura, el de la niebla, que siempre es el del horizonte. La luz del
+# sol, las sombras y la ciudad no se tocan.
+#
+# La hora es la del reloj de 7 días (ambiente_vivo.hora(): 0..24). Sin reloj (en línea, ALCALDE_RELOJ=0, menús) el cielo es
+# el atardecer de siempre. Entre dos tramos fijos los colores se mezclan en PASOS_MEZCLA escalones (no cada frame): cada
+# escalón reescribe los colores de la malla del cielo y la niebla una sola vez.
+#
+#   00:00-04:30 noche · 06:00 amanecer (solo de paso) · 07:30-14:30 mañana · 17:00-18:30 tarde (el cielo de siempre) · 20:00 noche
+#
+# La paleta «tarde» es la de frontend/cielo.py (sus constantes de siempre); aquí están las otras tres.
+# Banderas: CICLO_DIA = False o ALCALDE_CICLO_DIA=0 dejan el atardecer fijo de antes. ALCALDE_HORA_CIELO=<0-24> fija la hora
+# del cielo (capturas y feria) aunque no haya reloj.
+
+import os
+
+CICLO_DIA = True
+PASOS_MEZCLA = 32                # escalones de color entre dos tramos (≈ 0,6 s reales cada uno con la semana de 30 min)
+PERIODO_CICLO = 0.5              # s reales entre dos lecturas de la hora
+
+# (hora, paleta): entre dos puntos seguidos se mezclan sus paletas; mismo nombre = tramo fijo.
+TRAMOS = (
+    (0.0, "noche"), (4.5, "noche"), (6.0, "amanecer"), (7.5, "manana"), (14.5, "manana"),
+    (17.0, "tarde"), (18.5, "tarde"), (20.0, "noche"), (24.0, "noche"),
+)
+# Elevaciones (seno del ángulo sobre el horizonte) de las paradas del degradado: las mismas de cielo.PARADAS_CIELO.
+ELEVACIONES = (0.00, 0.08, 0.22, 0.45, 0.75, 1.00)
+
+
+def _paleta(horizonte, degradado, resplandor, fuerza, sol, mar, reflejo, cerros, nube_arriba, nube_abajo):
+    return {"horizonte": horizonte, "paradas": tuple(zip(ELEVACIONES, (horizonte,) + tuple(degradado))),
+            "resplandor": resplandor, "fuerza_resplandor": fuerza, "sol": sol, "mar": mar, "reflejo_mar": reflejo,
+            "cerros": cerros, "nube_arriba": nube_arriba, "nube_abajo": nube_abajo}
+
+
+PALETAS = {
+    # Mañana despejada: el cielo azul de antes del atardecer (ver el comentario de cielo.PARADAS_CIELO), cerros verdosos.
+    "manana": _paleta((238, 224, 204), ((214, 222, 230), (180, 206, 234), (146, 190, 232), (100, 156, 224), (74, 128, 210)),
+                      (255, 248, 226), 0.45, (255, 250, 228), (72, 128, 196), (222, 236, 250),
+                      ((150, 176, 188), (100, 134, 138)), (255, 255, 255), (196, 210, 228)),
+    # Amanecer: franja melocotón pálida en el horizonte que sube enseguida a lila y azul (la tarde es cálida hasta arriba);
+    # solo se ve de paso entre la noche y la mañana.
+    "amanecer": _paleta((255, 214, 170), ((236, 196, 186), (196, 178, 204), (150, 168, 214), (112, 142, 206), (86, 118, 196)),
+                        (255, 226, 190), 0.60, (255, 226, 176), (78, 108, 166), (255, 206, 160),
+                        ((160, 140, 170), (104, 100, 140)), (255, 232, 214), (196, 170, 196)),
+    # Noche: azul marino casi negro arriba; el disco del sol queda como una luna pálida con un halo frío.
+    "noche": _paleta((40, 48, 82), ((32, 40, 74), (24, 32, 64), (18, 24, 54), (12, 18, 44), (8, 12, 34)),
+                     (150, 170, 220), 0.25, (226, 232, 246), (14, 22, 44), (70, 86, 130),
+                     ((30, 34, 58), (18, 20, 40)), (70, 78, 110), (34, 38, 62)),
+}
+NOMBRES_PERIODO = {"manana": "mañana", "amanecer": "mañana", "tarde": "tarde", "noche": "noche"}
+
+
+def activo():
+    valor = os.environ.get("ALCALDE_CICLO_DIA", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(CICLO_DIA)
+
+
+# Hora fijada con ALCALDE_HORA_CIELO (0..24) o None.
+def hora_forzada():
+    bruto = os.environ.get("ALCALDE_HORA_CIELO", "").strip()
+    if not bruto:
+        return None
+    try:
+        return float(bruto.replace(",", ".")) % 24.0
+    except ValueError:
+        return None
+
+
+# (paleta_a, paleta_b, t) de la hora: t (0..1, en escalones de 1/PASOS_MEZCLA) va de a hacia b. Sin hora: el atardecer.
+def mezcla_de_hora(hora):
+    if hora is None:
+        return "tarde", "tarde", 0.0
+    h = float(hora) % 24.0
+    for (h0, a), (h1, b) in zip(TRAMOS, TRAMOS[1:]):
+        if h <= h1:
+            if a == b or h1 <= h0:
+                return a, a, 0.0
+            t = round((h - h0) / (h1 - h0) * PASOS_MEZCLA) / PASOS_MEZCLA
+            if t <= 0.0:
+                return a, a, 0.0
+            if t >= 1.0:
+                return b, b, 0.0
+            return a, b, t
+    return TRAMOS[-1][1], TRAMOS[-1][1], 0.0
+
+
+# «mañana», «tarde» o «noche» de la hora (el amanecer cuenta como mañana). Sin hora: «tarde».
+def periodo_de_hora(hora):
+    a, b, t = mezcla_de_hora(hora)
+    return NOMBRES_PERIODO[b if t >= 0.5 else a]
+
+
+# Lista plana [r, g, b, a, r, g, b, a...] de una lista de colores RGBA (0..1): así se mezcla y se escribe más rápido.
+def plano(colores):
+    return [c for color in colores for c in color]
+
+
+# b - a, componente a componente (dos listas planas del mismo largo): se calcula una vez por par de paletas.
+def diferencia(a, b):
+    return [y - x for x, y in zip(a, b)]
+
+
+# a + (b - a)·t con la diferencia ya hecha (listas planas). Medido: ~1,3 ms para el cielo y las nubes (~3.600 vértices).
+def mezclar_plano(a, dif, t):
+    if t <= 0.0:
+        return a
+    return [x + d * t for x, d in zip(a, dif)]
+
+
+# Mezcla de dos colores RGB 0-255 (enteros).
+def mezclar_rgb(a, b, t):
+    return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))

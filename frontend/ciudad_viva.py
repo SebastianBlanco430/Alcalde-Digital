@@ -770,9 +770,11 @@ def crear_controlador(escena, atmosfera=True, capas=True):
             return leer(escena.ciudad.luz, COLOR_LUZ_SOL), leer(escena.ciudad.ambiente, COLOR_LUZ_AMBIENTE)
 
         def _atmosfera(self, amb):
-            p = cv.atmosfera(amb, sol=self.sol_base, ambiente=self.ambiente_base, horizonte=COLOR_HORIZONTE,
-                             fin=self.fin_base, fuerza=INTENSIDAD_NIEBLA)
             ciudad = escena.ciudad
+            # Horizonte del ciclo de mañana, tarde y noche (frontend/cielo.py): la niebla sigue al cielo, sin costura.
+            horizonte = getattr(getattr(ciudad, "cielo", None), "horizonte", COLOR_HORIZONTE)
+            p = cv.atmosfera(amb, sol=self.sol_base, ambiente=self.ambiente_base, horizonte=horizonte,
+                             fin=self.fin_base, fuerza=INTENSIDAD_NIEBLA)
             if cv.cambio_apreciable(self._params, p):
                 self._params = p
                 ciudad.luz.color = rgb_luz(p["sol"])
