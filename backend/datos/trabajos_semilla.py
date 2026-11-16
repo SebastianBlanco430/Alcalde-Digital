@@ -1,7 +1,7 @@
 # Catálogo semilla de trabajos (datos puros): un puesto por comercio con `trabajo_id`. Turnos de 60-90 s,
 # pago de R$ 12 a 25 según el rendimiento. `opciones` = productos (teclas 1-4) o direcciones de la secuencia.
 
-from backend.logica.trabajos import Trabajo, ATENDER, SECUENCIA, BARRA
+from backend.logica.trabajos import Trabajo, ATENDER, SECUENCIA, BARRA, ENTREGAS
 
 _FLECHAS = ("arriba", "abajo", "izquierda", "derecha")
 
@@ -17,5 +17,6 @@ CATALOGO_TRABAJOS = {t.id: t for t in (
     Trabajo("taller", "Ayudante de taller", SECUENCIA, 90, 15, 25, 30, _FLECHAS),
     Trabajo("lan_house", "Soporte en la lan house", SECUENCIA, 60, 12, 19, 15, _FLECHAS),
     Trabajo("lanchonete", "Cocinar en la lanchonete", BARRA, 60, 12, 20, 25),
-    Trabajo("entregas", "Mototaxi y entregas", BARRA, 90, 16, 25, 30),
+    # Se juega en el mundo, en moto (backend/logica/entregas.py): 150 s es solo el tope; el límite sale de la ruta.
+    Trabajo("entregas", "Mototaxi y entregas", ENTREGAS, 150, 16, 25, 30),
 )}

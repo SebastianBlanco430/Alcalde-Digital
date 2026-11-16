@@ -127,6 +127,9 @@ class EscenaMundo(Escena):
         # hook: callable(mision) -> (x, z) del punto EXACTO al que apunta la baliza, o None = la puerta del destino. Lo
         # pone frontend/registro_mundo_digital.py: las misiones digitales se abren en la Terminal de la Fiscalía.
         self.punto_de_mision = None
+        # hook: callable() -> lugar al que apuntan baliza y ruta mientras dura un trabajo en el mundo (las entregas en
+        # moto de frontend/entregas_mundo.py), o None = el destino de la misión de siempre.
+        self.destino_trabajo = None
         self.texto_turno_fn = None       # hook: callable(jugador) -> texto del panel de turno (None = «Turno de ...»)
         self.sanear_nombre = None        # hook: callable(nombre) -> nombre visible (None = tal cual)
         # hook: callable(flujo) -> bool que pinta la pantalla final de la semana (frontend/registro_reloj.py); True = ya
@@ -350,10 +353,22 @@ class EscenaMundo(Escena):
     # Destino de la misión del jugador activo SOLO si la sigue (casilla «Seguir misión» del teléfono, tecla M);
     # si no, None: sin baliza, ruta del piso, bandera destacada ni giro inicial hacia él. La misión sigue igual.
     def _destino_seguido(self):
+        trabajo = self._destino_de_trabajo()
+        if trabajo is not None:
+            return trabajo
         mision = self.flujo.mision_actual()
         if mision is None:
             return None
         return hud_calculos.destino_visible(mision.destino, hud_calculos.sigue_mision(self.flujo.jugador_activo().telefono))
+
+    # Lugar que da el hook `destino_trabajo` (entregas en curso), o None (sin hook, sin turno o si el hook falla).
+    def _destino_de_trabajo(self):
+        if self.destino_trabajo is None:
+            return None
+        try:
+            return self.destino_trabajo()
+        except Exception:
+            return None
 
     # Rumbo (yaw) que mira desde el jugador activo hacia la puerta de su misión (o 0).
     def _yaw_hacia_el_destino(self):
@@ -428,7 +443,7 @@ class EscenaMundo(Escena):
 
     # (x, z) que da el hook `punto_de_mision` para la misión actual, o None (sin hook, sin misión, o si el hook falla).
     def _punto_exacto_de_mision(self):
-        if self.punto_de_mision is None:
+        if self.punto_de_mision is None or self._destino_de_trabajo() is not None:
             return None
         try:
             punto = self.punto_de_mision(self.flujo.mision_actual())

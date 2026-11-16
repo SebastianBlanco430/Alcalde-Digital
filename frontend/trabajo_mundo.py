@@ -42,6 +42,7 @@ GROSOR_TINTA_CARTEL = 0.04         # casco de tinta (contorno de cómic)
 SEGUNDOS_AVISO = 3.0
 MENSAJE_EN_LINEA = "Trabajar aún no está disponible en línea"
 ANCHO_MENU, ALTO_MENU = 0.78, 0.36
+ANCHO_MENU_LARGO, ALTO_MENU_LARGO = 1.14, 0.66       # con la explicación previa de las entregas en moto
 
 
 # Lo que recibe `economia.al_trabajar` y `ConexionFlujo.iniciar_trabajo`: el puesto elegido.
@@ -113,6 +114,8 @@ def pedir_turno(economia, menu, puesto, jugador):
         menu.decir(MENSAJE_EN_LINEA)
     elif cfg.CANSANCIO and perfil is not None and not puede_trabajar(perfil):
         menu.decir(MENSAJE_AGOTADO)
+    elif getattr(getattr(economia, "entregas", None), "en_curso", False):
+        menu.decir("Ya estás repartiendo: termina tus entregas primero")
     elif getattr(economia, "al_trabajar", None) is None:
         menu.decir("Trabajar no está disponible ahora")
     else:
@@ -195,16 +198,37 @@ class MenuTrabajo(Entity):
         self.jugador = None
         self._edad = 0
         self.panel = panel_tinta(self, ANCHO_MENU, ALTO_MENU, z=-0.01)
-        self.titulo = Text("", parent=self.panel, origin=(0, 0), position=(0, 0.115, -0.02), scale=escala_fuente(26),
+        # Panel alto para los trabajos con explicación previa (entregas en moto): se crea la primera vez que hace falta.
+        self.panel_largo = None
+        self.titulo = Text("", parent=self, origin=(0, 0), scale=escala_fuente(26),
                            color=rgb(estilo.COLOR_ACENTO), font=tipografia.FUENTE_TITULO)
-        self.detalle = Text("", parent=self.panel, origin=(0, 0), position=(0, 0.05, -0.02), scale=escala_fuente(17),
-                            color=rgb(estilo.COLOR_TEXTO))
-        self.cansancio = Text("", parent=self.panel, origin=(0, 0), position=(0, 0.01, -0.02), scale=escala_fuente(15),
+        self.detalle = Text("", parent=self, origin=(0, 0), scale=escala_fuente(17), color=rgb(estilo.COLOR_TEXTO))
+        self.cansancio = Text("", parent=self, origin=(0, 0), scale=escala_fuente(15),
                               color=rgb(estilo.COLOR_TEXTO_TENUE))
+        self.explicacion = Text("", parent=self, origin=(-0.5, 0.5), scale=escala_fuente(15),
+                                color=rgb(estilo.COLOR_TEXTO), enabled=False)
         self.boton_trabajar = BotonPrimario("Trabajar (Enter)", al_clic=self.aceptar, ancho=0.33, alto=0.07,
-                                            tamano_fuente_px=20, parent=self.panel, position=(-0.18, -0.09, -0.02))
+                                            tamano_fuente_px=20, parent=self)
         self.boton_cancelar = BotonSecundario("Cancelar (Esc)", al_clic=self.cerrar, ancho=0.3, alto=0.07,
-                                              tamano_fuente_px=20, parent=self.panel, position=(0.19, -0.09, -0.02))
+                                              tamano_fuente_px=20, parent=self)
+        self._colocar(False)
+
+    # Coloca los textos y botones en el panel corto (de siempre) o en el alto con la explicación.
+    def _colocar(self, largo):
+        if largo and self.panel_largo is None:
+            self.panel_largo = panel_tinta(self, ANCHO_MENU_LARGO, ALTO_MENU_LARGO, z=-0.01)
+        self.panel.enabled = not largo
+        if self.panel_largo is not None:
+            self.panel_largo.enabled = largo
+        arriba = ALTO_MENU_LARGO / 2 if largo else ALTO_MENU / 2
+        self.titulo.position = (0, arriba - 0.065, -0.02)
+        self.detalle.position = (0, arriba - 0.13, -0.02)
+        self.cansancio.position = (0, arriba - 0.17, -0.02)
+        self.explicacion.position = (-ANCHO_MENU_LARGO / 2 + 0.04, arriba - 0.205, -0.02)
+        self.explicacion.enabled = largo
+        y_botones = -arriba + 0.09
+        self.boton_trabajar.position = (-0.18, y_botones, -0.02)
+        self.boton_cancelar.position = (0.19, y_botones, -0.02)
 
     def decir(self, texto):
         aviso_temporal(self.economia, texto)
@@ -213,6 +237,17 @@ class MenuTrabajo(Entity):
         self.puesto, self.jugador, self._edad = puesto, jugador, 0
         self.titulo.text = f"Trabajar en {puesto.nombre}".replace("<", "(")
         self.detalle.text = texto_turno(puesto.trabajo)
+        # Entregas en moto: se eligen ya los pedidos para explicarlos antes de aceptar.
+        plan = None
+        entregas = getattr(self.economia, "entregas", None)
+        if entregas is not None:
+            from frontend import entregas_mundo
+            if entregas_mundo.es_entregas(puesto):
+                plan = entregas.preparar(jugador)
+                if plan is not None:
+                    self.detalle.text = entregas_mundo.texto_detalle(puesto.trabajo, plan)
+                    self.explicacion.text = entregas_mundo.explicacion(plan).replace("<", "(")
+        self._colocar(plan is not None)
         perfil = self.economia.perfil(jugador)
         self.cansancio.text = (f"Cansancio: {perfil.fatiga}/{FATIGA_MAX} · este turno +{puesto.trabajo.fatiga}"
                                if perfil is not None else "")
@@ -342,6 +377,12 @@ def instalar(economia, comercios=None, trabajos=None):
         economia.registrar(puesto)
         puestos.append(puesto)
     economia.puestos_trabajo = puestos
+    # Entregas en moto (frontend/entregas_mundo.py): el puesto «entregas» se juega en el mundo, no en la escena 2D.
+    try:
+        from frontend import entregas_mundo
+        entregas_mundo.instalar(economia)
+    except Exception as error:
+        print(f"[trabajo] entregas en el mundo no instaladas ({error})", file=sys.stderr)
     return puestos
 
 
@@ -351,6 +392,11 @@ def instalar(economia, comercios=None, trabajos=None):
 def conectar(economia, iniciar):
     def al_trabajar(*args):
         if len(args) == 1:
+            entregas = getattr(economia, "entregas", None)
+            if entregas is not None:
+                from frontend import entregas_mundo
+                if entregas_mundo.es_entregas(args[0]):
+                    return entregas.iniciar(args[0])
             return iniciar(args[0])
         jugador, trabajo_id = args[0], args[1]
         puesto = next((p.puesto for p in getattr(economia, "puestos_trabajo", ())

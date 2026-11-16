@@ -1323,6 +1323,9 @@ class HudMundo(Entity):
         self.panel_fin = PanelFinPartida(
             lambda: al_menu() if al_menu is not None else None, parent=self)
         self.guia = hud_calculos.GuiaRuta(mapa)
+        # hook: callable() -> lugar al que lleva la ruta del minimapa durante un trabajo en el mundo (entregas en moto,
+        # frontend/entregas_mundo.py), o None = el destino de la misión.
+        self.destino_trabajo = None
         # Aviso genérico (API pública: mostrar_aviso / ocultar_aviso), apilado sobre el de «E».
         self.aviso_generico = AvisoGenerico(parent=self, referencia=self.aviso)
         for componente in (
@@ -1378,6 +1381,15 @@ class HudMundo(Entity):
         flujo = self._obtener_flujo()
         return None if flujo is None else flujo.mision_actual()
 
+    # Lugar del hook `destino_trabajo` (None sin hook, sin trabajo en curso o si falla).
+    def _destino_de_trabajo(self):
+        if self.destino_trabajo is None:
+            return None
+        try:
+            return self.destino_trabajo()
+        except Exception:
+            return None
+
     # Un paso del HUD (dt segundos): ruta, minimapa, teléfono y aviso con el estado del
     # modelo. Devuelve True si la ruta cambió (EscenaMundo redibuja la del mundo).
     # yaw_grados (mundo 3D): yaw de la cámara; el minimapa gira con él (arriba = adelante).
@@ -1393,6 +1405,9 @@ class HudMundo(Entity):
         destino = mision.destino if mision is not None else None
         # «Seguir misión» desmarcada: ni ruta ni destino en el minimapa (el aviso de la E sí usa el destino real).
         seguido = hud_calculos.destino_visible(destino, hud_calculos.sigue_mision(activo.telefono))
+        trabajo = self._destino_de_trabajo()
+        if trabajo is not None:
+            seguido = trabajo
         cambio = self.guia.actualizar(activo.x, activo.z, seguido)
 
         self.minimapa.actualizar(

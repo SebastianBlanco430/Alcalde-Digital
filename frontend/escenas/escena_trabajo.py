@@ -16,7 +16,7 @@ import random
 from ursina import Button, Entity, Mesh, Text, color, time
 
 from backend.logica.perfil_economia import FATIGA_MAX, perfil_de
-from backend.logica.trabajos import ATENDER, BARRA, MENSAJE_AGOTADO, SECUENCIA, TurnoTrabajo
+from backend.logica.trabajos import ATENDER, BARRA, ENTREGAS, MENSAJE_AGOTADO, SECUENCIA, TurnoTrabajo
 from frontend import diseno_adaptable, estilo, tipografia
 from frontend.componentes import (BotonPrimario, BotonSecundario, destruir_arbol, escala_fuente, modelo_redondeado,
                                   panel_tinta, rgb)
@@ -41,6 +41,8 @@ INSTRUCCIONES = {
     ATENDER: "Pulsa 1, 2, 3 o 4 para dar cada producto del pedido. Si das de más, el pedido se reinicia.",
     SECUENCIA: "Repite las flechas en orden (flechas del teclado o W A S D). Un error reinicia la secuencia.",
     BARRA: "Pulsa Espacio cuando la marca esté dentro de la ZONA. Más aciertos, más paga.",
+    # Las entregas se juegan en el mundo (frontend/entregas_mundo.py); esto es solo el respaldo con esa bandera apagada.
+    ENTREGAS: "Pulsa Espacio cuando la marca esté dentro de la ZONA. Más aciertos, más paga.",
 }
 TEMAS = {   # frase extra por puesto (solo texto de ambientación)
     "taller": "Sigue los pasos de la reparación.",

@@ -94,6 +94,9 @@ class EnganchesAudio:
         if nombre == MUNDO and _perfil_mundo_etapa is not None:
             musica, vol_musica = _perfil_mundo_etapa["musica"], _perfil_mundo_etapa["volumen_musica"]
             bucles = _perfil_mundo_etapa["bucles"]
+        # Sin el ruido de ambiente que sonaba a locomotora (audio_calculos.AMBIENTE_RUIDO).
+        if not ac.ambiente_ruido_activo():
+            bucles = {}
         self.audio.musica(musica, volumen=vol_musica, fundido=FUNDIDO_MUSICA)
         for bucle in BUCLES_AMBIENTE:
             if bucle in bucles:
@@ -227,6 +230,10 @@ class EnganchesAudio:
         # Partida terminada: el controlador deja de mover y no pone la velocidad a 0; sin esto los pasos seguirían.
         activo = getattr(controlador, "activo", None)
         if callable(activo) and not activo():
+            self._pasos.reiniciar()
+            return
+        # Sin pasos (audio_calculos.PASOS): eran ráfagas de ruido que, seguidas, sonaban a locomotora.
+        if not ac.pasos_activos():
             self._pasos.reiniciar()
             return
         if self._pasos.avanzar(velocidad, dt, en_aire):

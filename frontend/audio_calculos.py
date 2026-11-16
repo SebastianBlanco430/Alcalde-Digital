@@ -165,6 +165,32 @@ def pasos_npc_activos():
     return bool(PASOS_NPC)
 
 
+# SIN PASOS NI RUIDO DE AMBIENTE (2026-11-15): el sonido «de pasos o locomotora» que molestaba en la partida eran
+# ráfagas de ruido filtrado: los pasos del jugador y el bucle de ambiente (viento + murmullo modulado a 3-7 Hz, que
+# suena a «chu-chu»; ambiente_plaza late a 7 Hz). PASOS = False quita los pasos; AMBIENTE_RUIDO = False quita los
+# bucles ambiente_favela / ambiente_plaza / ambiente_caos (la música sigue). ALCALDE_PASOS=1 o ALCALDE_AMBIENTE_RUIDO=1
+# los devuelven.
+PASOS = False
+AMBIENTE_RUIDO = False
+
+
+def _bandera(variable, defecto):
+    valor = os.environ.get(variable, "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(defecto)
+
+
+def pasos_activos():
+    return _bandera("ALCALDE_PASOS", PASOS)
+
+
+def ambiente_ruido_activo():
+    return _bandera("ALCALDE_AMBIENTE_RUIDO", AMBIENTE_RUIDO)
+
+
 # Velocidad (m/s) con la que cuentan los pasos: la del avatar, pero nunca más que lo que se desplazó el jugador local
 # en este frame (`desplazamiento` m en `dt` s). Sin datos del desplazamiento (None, primer frame) se fía del avatar.
 def velocidad_para_pasos(velocidad_avatar, desplazamiento, dt):

@@ -2,6 +2,8 @@
 #   ATENDER   - pedido «2 pan + 1 café»; teclas 1-4 = las 4 opciones del puesto.
 #   SECUENCIA - repetir una secuencia de direcciones (flechas / teclas).
 #   BARRA     - detener una barra que va y viene dentro de la zona verde.
+#   ENTREGAS  - llevar pedidos en moto por la favela (backend/logica/entregas.py). Se juega en el mundo, no aquí; si
+#               un turno de este motor llegara a TurnoTrabajo, se comporta como BARRA para no romper nada.
 # TurnoTrabajo(trabajo, semilla) es determinista: avanzar(dt) mueve el reloj, accion(entrada) -> bool
 # (True = acierto), terminado(), resultado() -> {aciertos, errores, rendimiento, pago, fatiga}.
 # pago = round(pago_base + (pago_max - pago_base) * rendimiento). Sin ursina: la vista 2D vive en frontend/.
@@ -10,13 +12,13 @@ import math
 import random
 from dataclasses import dataclass
 
-ATENDER, SECUENCIA, BARRA = "atender", "secuencia", "barra"
-MOTORES = (ATENDER, SECUENCIA, BARRA)
+ATENDER, SECUENCIA, BARRA, ENTREGAS = "atender", "secuencia", "barra", "entregas"
+MOTORES = (ATENDER, SECUENCIA, BARRA, ENTREGAS)
 FATIGA_AGOTADO = 100
 MENSAJE_AGOTADO = "Estás agotado: come algo o espera tu turno"
 
 # Segundos por acción que se espera de un buen jugador (define la meta de aciertos del turno).
-RITMO_S = {ATENDER: 2.5, SECUENCIA: 1.2, BARRA: 5.0}
+RITMO_S = {ATENDER: 2.5, SECUENCIA: 1.2, BARRA: 5.0, ENTREGAS: 5.0}
 PENALIZA_ERROR = 0.5            # un error resta medio acierto
 BARRA_VUELTAS_POR_S = 0.45      # viajes completos ida y vuelta por segundo
 BARRA_ZONA = 0.22               # ancho de la zona verde (0..1)
