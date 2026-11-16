@@ -136,4 +136,5 @@ class MinijuegoChat(Minijuego):
         for o in self.opciones:
             o.habilitada = False
         self.rotulo.text = resultado.detalle
-        self.barra.fijar(0.0)
+        # La presión ya no corre: una barra vacía sin rótulo solo confunde.
+        self.barra.enabled = False

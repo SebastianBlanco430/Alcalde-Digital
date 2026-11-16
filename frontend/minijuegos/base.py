@@ -61,6 +61,8 @@ class Minijuego(Entity):
         self.terminado = True
         self.resultado = resultado
         self._pintar_foco()                    # sin anillo de foco en la revisión
+        # Las teclas ya no sirven y el banner de resultado ocupa esa franja: el pie se esconde para que no se pisen.
+        self.pie.enabled = False
         self.al_terminar_propio(resultado)
         callback = (self.contexto or {}).get("al_terminar")
         if callback is not None:
@@ -76,7 +78,7 @@ class Minijuego(Entity):
         rumor = getattr(self.mision, "rumor", "") or self.caso.get("intro", "")
         self.rumor = ui.texto(self, "Rumor a verificar: «" + rumor + "»", 17, ANCHO_UTIL, estilo.COLOR_ACENTO,
                               (-ANCHO_UTIL / 2, Y_ENCABEZADO - a_unidades(36)))
-        self.pie = ui.texto(self, self.AYUDA, 14, ANCHO_UTIL, estilo.COLOR_TEXTO_TENUE,
+        self.pie = ui.texto(self, ui.ayuda_legible(self.AYUDA), 14, ANCHO_UTIL, estilo.COLOR_TEXTO_TENUE,
                             (-ANCHO_UTIL / 2, -0.462))
 
     # -- Foco de teclado --

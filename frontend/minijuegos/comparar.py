@@ -42,11 +42,13 @@ class MinijuegoComparar(Minijuego):
                            margen_px=margen, reserva=reserva)
             self.tarjetas.append(t)
             y -= altos[i] + 0.011
+        # Los dos botones reparten el ancho de la columna de la copia (antes el segundo se salía por la derecha).
         y_botones = -0.245
-        self.boton_confirmar = ui.Boton("Confirmar marcas", self.confirmar, 0.44, 0.055, 17, primario=True, parent=self,
-                                        position=(x_der - 0.24, y_botones))
-        self.boton_igual = ui.Boton("No veo diferencias", self.sin_diferencias, 0.44, 0.055, 17, parent=self,
-                                    position=(x_der + 0.22, y_botones))
+        ancho_b = (ancho_col - 0.04) / 2
+        self.boton_confirmar = ui.Boton("Confirmar marcas", self.confirmar, ancho_b, 0.055, 17, primario=True, parent=self,
+                                        position=(x_der - ancho_b / 2 - 0.02, y_botones))
+        self.boton_igual = ui.Boton("No veo diferencias", self.sin_diferencias, ancho_b, 0.055, 17, parent=self,
+                                    position=(x_der + ancho_b / 2 + 0.02, y_botones))
         self.focables = self.tarjetas + [self.boton_confirmar, self.boton_igual]
     def alternar(self, i):
         if self.terminado:

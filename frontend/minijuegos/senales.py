@@ -8,7 +8,8 @@ from frontend.minijuegos import ui
 from frontend.minijuegos.base import ANCHO_UTIL, Minijuego, Y_CONTENIDO_ARRIBA
 from frontend.minijuegos.senales_calculos import PartidaSenales
 
-ANCHO_TEL = 1.0
+ANCHO_TEL = 0.95
+MARCO_TEL = 0.07                # lo que el marco del teléfono suma al ancho de las zonas (mitad por lado)
 ANCHO_LUPA = 0.56
 
 
@@ -20,16 +21,17 @@ class MinijuegoSenales(Minijuego):
     def construir(self):
         self.partida = PartidaSenales(self.caso)
         p = self.partida
-        self.x_tel = -ANCHO_UTIL / 2 + ANCHO_TEL / 2
+        # El marco del teléfono (no las zonas) se apoya en el margen izquierdo: antes sobresalía del contenido.
+        self.x_tel = -ANCHO_UTIL / 2 + MARCO_TEL / 2 + ANCHO_TEL / 2
         self.x_lupa = ANCHO_UTIL / 2 - ANCHO_LUPA / 2
         y = Y_CONTENIDO_ARRIBA
         ui.texto(self, "CAPTURA QUE CIRCULA: " + self.caso["titulo"], 15, ANCHO_TEL, estilo.COLOR_ACENTO,
-                 (self.x_tel - ANCHO_TEL / 2, y), negrita=True)
+                 (-ANCHO_UTIL / 2, y), negrita=True)
         y -= a_unidades(32)
         n = len(p.zonas)
         altos = [ui.Tarjeta.alto_necesario(z["texto"], ANCHO_TEL, 17, margen_px=7, reserva=0.2) for z in p.zonas]
         total = sum(altos) + 0.01 * (n - 1)
-        marco = ui.rect(self, ANCHO_TEL + 0.07, total + 0.05, estilo.COLOR_PANEL, (self.x_tel, y - total / 2), z=0.1, radio_px=14)
+        marco = ui.rect(self, ANCHO_TEL + MARCO_TEL, total + 0.05, estilo.COLOR_PANEL, (self.x_tel, y - total / 2), z=0.1, radio_px=14)
         self.tarjetas = []
         for i, z in enumerate(p.zonas):
             self.tarjetas.append(ui.Tarjeta(ANCHO_TEL, altos[i], z["texto"], "", 17, 13, parent=self,

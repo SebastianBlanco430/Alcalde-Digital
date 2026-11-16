@@ -18,6 +18,7 @@ from ursina import Entity, Text, color, time
 
 from backend.datos import minijuegos_asignacion as asignacion
 from backend.datos import minijuegos_casos
+from backend.datos import minijuegos_instrucciones as instrucciones
 from backend.datos.nombres_visibles import glosar_texto
 from backend.logica import consecuencia_graduada
 from backend.logica import minijuegos as mj
@@ -35,7 +36,8 @@ ASPECTO = 16 / 9
 DEMORA_CONTINUAR = 0.5          # s antes de aceptar Enter/Espacio en el banner (evita pulsaciones sueltas)
 Y_BANNER = -0.365
 ALTO_BANNER = 0.17
-ANCHO_BANNER = 1.66
+# Mismo ancho que el contenido de los minijuegos (base.ANCHO_UTIL): el banner queda alineado con las tarjetas de arriba.
+ANCHO_BANNER = 1.62
 
 
 class EscenaMinijuego(Escena):
@@ -47,6 +49,7 @@ class EscenaMinijuego(Escena):
         self.fondo = Entity(parent=self, model="quad", color=rgb(estilo.COLOR_FONDO), scale=(ASPECTO, 1), z=0.2)
         self.contenido = None
         self.minijuego = None
+        self.previa = None               # pantalla «Antes de empezar» (frontend/minijuegos/pantalla_previa.py)
         self.banner = None
         self.panel_resultado = PanelResultadoGrafo(parent=self, z=-0.3)
         self.usados = {}                 # ids de casos ya jugados por minijuego (para no repetir en la partida)
@@ -69,8 +72,18 @@ class EscenaMinijuego(Escena):
         self.lote = None
         self.t_banner = None
         self.t_panel = None
+        self.t_previa = None
+        self._clase = None
+        self._caso = None
+        self._azar = None
 
     def _limpiar_vista(self):
+        if self.previa is not None:
+            try:
+                destruir_arbol(self.previa)
+            except Exception:                    # noqa: BLE001  limpieza de mejor esfuerzo
+                pass
+            self.previa = None
         if self.minijuego is not None:
             try:
                 destruir_arbol(self.minijuego)
@@ -130,7 +143,12 @@ class EscenaMinijuego(Escena):
         self._al_terminar, self._al_respaldo = al_terminar, al_respaldo
         self._poner_marco(marco, lugar)
         try:
-            self._abrir_minijuego()
+            self._preparar_minijuego()
+            textos = instrucciones.instrucciones_de(self.minijuego_id)
+            if mj.pantalla_previa_activa() and textos is not None:
+                self._mostrar_previa(textos)
+            else:
+                self._arrancar_minijuego()
         except Exception as error:               # noqa: BLE001  cualquier fallo: se vuelve al minijuego de siempre
             self._respaldo(error)
 
@@ -139,20 +157,46 @@ class EscenaMinijuego(Escena):
         self._limpiar_vista()
         self._poner_marco(False, "")
 
-    def _abrir_minijuego(self):
+    # Elige minijuego, caso y clase de la vista ANTES de la pantalla previa: si algo de eso falla, se va al respaldo sin haber
+    # enseñado instrucciones de un minijuego que no se podrá jugar.
+    def _preparar_minijuego(self):
         self.minijuego_id = asignacion.asignar(self.mision, habilitados=minijuegos_casos.CASOS)
         if self.minijuego_id == mj.ACTUAL or self.estado is None or self.mision is None:
             raise RuntimeError("misión sin minijuego asignado")
         casos = minijuegos_casos.CASOS[self.minijuego_id]
         usados = self.usados.setdefault(self.minijuego_id, set())
         semilla = random.randrange(1 << 30)
-        azar = random.Random(semilla)
-        caso = mj.elegir_caso(casos, self.mision, asignacion.tema_de(self.mision), usados, azar)
-        caso = mj.preparar_caso(caso, self.mision)
+        self._azar = random.Random(semilla)
+        caso = mj.elegir_caso(casos, self.mision, asignacion.tema_de(self.mision), usados, self._azar)
+        self._caso = mj.preparar_caso(caso, self.mision)
+        self._clase = clase_de(self.minijuego_id)
+
+    def _arrancar_minijuego(self):
         self.contenido = Entity(parent=self)
-        self.minijuego = clase_de(self.minijuego_id)(parent=self.contenido)
-        self.minijuego.empezar({"caso": caso, "mision": self.mision, "azar": azar,
+        self.minijuego = self._clase(parent=self.contenido)
+        self.minijuego.empezar({"caso": self._caso, "mision": self.mision, "azar": self._azar,
                                 "al_terminar": self._minijuego_terminado})
+
+    # -- Pantalla previa («Antes de empezar») --
+
+    def _mostrar_previa(self, textos):
+        from frontend.minijuegos.pantalla_previa import PantallaPrevia
+        rumor = getattr(self.mision, "rumor", "") or self._caso.get("intro", "")
+        self.previa = PantallaPrevia(self._clase.TITULO, rumor, textos, ui.ayuda_legible(self._clase.AYUDA),
+                                     self._empezar_desde_previa, parent=self)
+        self.t_previa = 0.0
+
+    def _empezar_desde_previa(self):
+        if self.previa is None:
+            return
+        # Misma demora que el banner: la tecla con la que se entró a la misión no salta las instrucciones.
+        if self.t_previa is not None and self.t_previa < DEMORA_CONTINUAR:
+            self.previa.al_empezar = self._empezar_desde_previa      # el botón se «gastó»: se vuelve a armar
+            return
+        destruir_arbol(self.previa)
+        self.previa = None
+        self.t_previa = None
+        self._arrancar_minijuego()
 
     # -- Fin del minijuego: banner y «Continuar» --
 
@@ -277,6 +321,10 @@ class EscenaMinijuego(Escena):
         if self.en_respaldo or self.cerrado and self.t_panel is not None:
             return
         try:
+            if self.previa is not None:
+                if key in ("enter", "space", "return"):
+                    self._empezar_desde_previa()
+                return
             if self.resultado is not None and not self.cerrado:
                 if key in ("enter", "space", "return"):
                     self.continuar()
@@ -291,6 +339,8 @@ class EscenaMinijuego(Escena):
             return
         dt = time.dt
         try:
+            if self.t_previa is not None:
+                self.t_previa += dt
             if self.t_banner is not None:
                 self.t_banner += dt
             if self.t_panel is not None:

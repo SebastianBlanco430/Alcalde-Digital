@@ -51,6 +51,21 @@ def activo():
     return bool(MINIJUEGOS)
 
 
+# Pantalla previa («Antes de empezar»: qué se hace y qué hábito de redes se practica). ALCALDE_MINIJUEGOS_INTRO=0 la apaga y
+# el minijuego empieza directo, como antes. Textos en backend/datos/minijuegos_instrucciones.py.
+PANTALLA_PREVIA = True
+
+
+def pantalla_previa_activa():
+    """¿Se enseña la pantalla previa? ALCALDE_MINIJUEGOS_INTRO=1/0 manda sobre la constante (se lee en cada llamada)."""
+    valor = os.environ.get("ALCALDE_MINIJUEGOS_INTRO", "").strip().lower()
+    if valor in ("0", "false", "no", "off"):
+        return False
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    return bool(PANTALLA_PREVIA)
+
+
 @dataclass(frozen=True)
 class ResultadoMinijuego:
     """Resultado común de TODOS los minijuegos (lo que devuelve `empezar`/`resultado()` de cada partida pura)."""

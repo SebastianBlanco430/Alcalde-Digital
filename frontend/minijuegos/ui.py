@@ -7,6 +7,8 @@
 #
 # Sin números de indicadores a la vista: aquí solo se pintan palabras, barras sin cifra y marcas.
 
+import re
+
 from panda3d.core import TextNode
 from ursina import Entity, Text, color
 
@@ -46,6 +48,12 @@ def lineas_de(texto, px, ancho, negrita=False):
     for parrafo in str(texto).split("\n"):
         salida += envolver_texto(parrafo, lambda c: medir(c, px, negrita), ancho) or [""]
     return salida
+
+
+# Las AYUDA de las vistas separan las teclas con varios espacios, pero el envoltorio de texto los junta en uno y todo se lee
+# de corrido («...elegirlo Teclas 1, 2, 3 Clic...»). Se cambian por un punto medio, que sobrevive al envoltorio.
+def ayuda_legible(cadena):
+    return re.sub(r" {2,}", " · ", str(cadena).strip())
 
 
 def alto_de(n_lineas, px):

@@ -8,6 +8,7 @@ from frontend.minijuegos.base import ANCHO_UTIL, Minijuego, Y_CONTENIDO_ARRIBA
 from frontend.minijuegos.cronologia_calculos import PartidaOrden
 
 ANCHO_LISTA = 1.12
+ANCHO_BOTONES = 0.4
 
 
 class MinijuegoCronologia(Minijuego):
@@ -35,12 +36,16 @@ class MinijuegoCronologia(Minijuego):
         self.numeros = [ui.texto(self, str(pos + 1), 22, None, estilo.COLOR_ACENTO,
                                  (-ANCHO_UTIL / 2 + 0.0, y - pos * self.paso - self.alto_fila / 2 + a_unidades(11)), negrita=True)
                         for pos in range(n)]
-        x_der = ANCHO_UTIL / 2 - 0.25
-        self.boton_subir = ui.Boton("Subir", lambda: self._mover(-1), 0.4, 0.07, 17, parent=self, position=(x_der, y - 0.06))
-        self.boton_bajar = ui.Boton("Bajar", lambda: self._mover(+1), 0.4, 0.07, 17, parent=self, position=(x_der, y - 0.15))
-        self.boton_comprobar = ui.Boton("Comprobar el orden", self.comprobar, 0.4, 0.08, 17, primario=True, parent=self,
-                                        position=(x_der, y - 0.26))
-        self.nota = ui.texto(self, "", 15, 0.4, estilo.COLOR_TEXTO_TENUE, (x_der - 0.17, y - 0.34))
+        # Columna de botones pegada al margen derecho (como el resto de minijuegos) y con hueco respecto a la lista; el
+        # primer botón arranca a la altura de la primera fila.
+        x_der = ANCHO_UTIL / 2 - ANCHO_BOTONES / 2
+        self.boton_subir = ui.Boton("Subir", lambda: self._mover(-1), ANCHO_BOTONES, 0.07, 17, parent=self,
+                                    position=(x_der, y - 0.035))
+        self.boton_bajar = ui.Boton("Bajar", lambda: self._mover(+1), ANCHO_BOTONES, 0.07, 17, parent=self,
+                                    position=(x_der, y - 0.125))
+        self.boton_comprobar = ui.Boton("Comprobar el orden", self.comprobar, ANCHO_BOTONES, 0.08, 17, primario=True,
+                                        parent=self, position=(x_der, y - 0.235))
+        self.nota = ui.texto(self, "", 15, ANCHO_BOTONES, estilo.COLOR_TEXTO_TENUE, (x_der - ANCHO_BOTONES / 2, y - 0.3))
         self.focables = self.filas + [self.boton_comprobar]
         self._pintar_filas()
 
@@ -102,7 +107,7 @@ class MinijuegoCronologia(Minijuego):
                 tarjeta.fijar_estado("correcta", "EN SU PUESTO")
             else:
                 tarjeta.fijar_estado("incorrecta", f"ERA EL {real}.º")
-        self.nota.text = "\n".join(ui.lineas_de(self.caso.get("cierre", ""), 15, 0.4))
+        self.nota.text = "\n".join(ui.lineas_de(self.caso.get("cierre", ""), 15, ANCHO_BOTONES))
         for b in (self.boton_subir, self.boton_bajar, self.boton_comprobar):
             b.fijar_habilitado(False)
         self.focables = []
