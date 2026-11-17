@@ -90,7 +90,7 @@ class EscenaParkour(Escena):
         parkour_minimapa.actualizar_altura(self.sim.y)
         self.hud.plano.fijar(alturas)
         self.hud.plano.actualizar(self.sim.x, self.sim.z, self.sim.y)
-        # Misiones visuales (frontend/parkour_extra.py, ALCALDE_PARKOUR_VISUAL=0 lo apaga): glitch, orbe, fantasma,
+        # Misiones visuales (frontend/parkour_extra.py, ALCALDE_PARKOUR_EXTRA=0 lo apaga): glitch, orbe, fantasma,
         # cámara lenta y medallas. None = la escena de siempre.
         try:
             from frontend import parkour_extra

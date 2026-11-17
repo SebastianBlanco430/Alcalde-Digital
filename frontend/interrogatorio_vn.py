@@ -76,6 +76,7 @@ class InterfazVN(InterfazCaso):
         super().__init__(acciones, textura, **opciones)
         self.temporizador.position = POS_TEMPORIZADOR
         self.escenario = EscenarioVN()
+        self.escenario.dueno = self         # el escenario se esconde solo si esta interfaz deja de verse
         self._caso = None
         self._acusados = {}
         self._ultima_fila = None
@@ -358,6 +359,14 @@ class InterfazVN(InterfazCaso):
                 pass
             return None
 
+    # Los modelos 3D cuelgan de la CÁMARA (no de esta interfaz), así que esconder la interfaz no los esconde: sin esto
+    # se quedaban delante de la cámara en todo el juego al salir de la fiscalía (tapando el mundo y los minijuegos).
+    def on_disable(self):
+        try:
+            self.escenario.esconder()
+        except Exception:                # noqa: BLE001  (durante __init__ aún no hay escenario)
+            pass
+
     def on_destroy(self):
         try:
             self.escenario.apagar()
@@ -410,6 +419,18 @@ class EscenarioVN:
         self._desde = {}
         self._k = {}
         self.apagado = False
+        self.dueno = None             # la InterfazVN: si deja de verse, el escenario se esconde (red de seguridad)
+        self.raiz.update = self._seguir_al_dueno
+        self.raiz.enabled = False
+
+    def _seguir_al_dueno(self):
+        """Cada frame mientras se ve: si la interfaz que lo usa ya no se ve (desactivada ella o un padre, o destruida),
+        se esconde. Así los personajes nunca se quedan pegados a la cámara fuera del interrogatorio."""
+        if self.dueno is not None and not _se_ve(self.dueno):
+            self.esconder()
+
+    def esconder(self):
+        """Esconde los modelos (sin apagar el escenario: la próxima vez que hable alguien vuelven a salir)."""
         self.raiz.enabled = False
 
     def fijar_caso(self, caso_id, personajes):
@@ -575,6 +596,19 @@ class EscenarioVN:
     def apagar(self):
         self.apagado = True
         self.raiz.enabled = False
+
+
+def _se_ve(entidad):
+    """True si la entidad y todos sus padres están activos (y no se ha destruido)."""
+    try:
+        e, pasos = entidad, 0
+        while e is not None and pasos < 64:
+            if not getattr(e, "enabled", True):
+                return False
+            e, pasos = getattr(e, "parent", None), pasos + 1
+        return True
+    except Exception:                    # noqa: BLE001  destruida a medias: no se ve
+        return False
 
 
 def _coronilla(npc):

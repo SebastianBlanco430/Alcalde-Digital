@@ -35,7 +35,10 @@ class PlanoAlturas(Entity):
         super().__init__(parent=padre)
         x = diseno_adaptable.aspecto() / 2 - MARGEN - LADO_PLANO / 2
         self.caja = panel_tinta(self, LADO_PLANO, LADO_PLANO, sombra=False, position=(x, 0.5 - MARGEN - LADO_PLANO / 2))
-        self.titulo = _texto(self.caja, "Alturas", 13, estilo.COLOR_TEXTO_TENUE, (0, -LADO_PLANO / 2 - 0.018))
+        # «Alturas» con su pastilla oscura: sin ella no se leía encima de las plataformas claras.
+        Entity(parent=self.caja, model="quad", position=(0, -LADO_PLANO / 2 - 0.018, 0.005), scale=(0.1, 0.03),
+               color=color.rgba(6 / 255, 8 / 255, 20 / 255, 0.7))
+        self.titulo = _texto(self.caja, "Alturas", 13, estilo.COLOR_TEXTO, (0, -LADO_PLANO / 2 - 0.018))
         self.lienzo = Entity(parent=self.caja, scale=LADO_PLANO, z=-0.01)
         self.punto = Entity(parent=self.lienzo, model="circle", scale=0.05, z=-0.03, color=rgb(estilo.COLOR_ACENTO))
         self._quads, self._rotulos = {}, []
@@ -45,7 +48,8 @@ class PlanoAlturas(Entity):
 
     def fijar(self, alturas):
         from frontend.componentes import destruir_arbol
-        for e in list(self._quads.values()) + self._rotulos:
+        fondos = [r.fondo for r in self._rotulos if getattr(r, "fondo", None) is not None]
+        for e in list(self._quads.values()) + self._rotulos + fondos:
             destruir_arbol(e)
         self._quads, self._rotulos, self._firma = {}, [], None
         self._alturas = alturas
@@ -53,6 +57,10 @@ class PlanoAlturas(Entity):
             self._quads[p["id"]] = Entity(parent=self.lienzo, model="quad", z=-0.01, enabled=False)
         self._rotulos = [Text("", parent=self.lienzo, origin=(0, 0), z=-0.04, scale=escala_fuente(12) / LADO_PLANO,
                               color=rgb(estilo.COLOR_TEXTO)) for _ in range(ROTULOS_PLANO)]
+        # Pastilla oscura tras cada rótulo: así no se confunde con los cuadros de las plataformas que tiene debajo.
+        for rotulo in self._rotulos:
+            rotulo.fondo = Entity(parent=self.lienzo, model="quad", z=-0.035, scale=(0.26, 0.09), enabled=False,
+                                  color=color.rgba(6 / 255, 8 / 255, 20 / 255, 0.85))
 
     def actualizar(self, x, z, y):
         if self._alturas is None:
@@ -67,9 +75,15 @@ class PlanoAlturas(Entity):
                 quad.scale_x, quad.scale_y = p["ancho"], p["alto"]
         # Rótulo solo en las plataformas a otra altura (y en la meta): son las que hay que decidir si se alcanzan.
         con_rotulo = [p for p in visibles if p["nivel"] != "igual" or p["meta"]]
-        cercanas = sorted(con_rotulo, key=lambda p: p["x"] ** 2 + p["y"] ** 2)[:ROTULOS_PLANO]
-        for rotulo, p in zip(self._rotulos, cercanas):
-            rotulo.x, rotulo.y = p["x"], p["y"]
+        # Rótulos sin pisarse ni salirse del recuadro (parkour_minimapa.colocar_rotulos): encima de su plataforma.
+        puestos = parkour_minimapa.colocar_rotulos(sorted(con_rotulo, key=lambda p: p["x"] ** 2 + p["y"] ** 2),
+                                                   maximo=ROTULOS_PLANO)
+        cercanas = [p for _, _, p in puestos]
+        for rotulo, (rx, ry, _) in zip(self._rotulos, puestos):
+            rotulo.x, rotulo.y = rx, ry
+            rotulo.fondo.x, rotulo.fondo.y = rx, ry
+        for i, rotulo in enumerate(self._rotulos):
+            rotulo.fondo.enabled = i < len(puestos)
         firma = (tuple(p["nivel"] for p in plano["plataformas"]), tuple((p["id"], p["texto"]) for p in cercanas))
         if firma == self._firma:
             return
@@ -128,6 +142,11 @@ class HudParkour(Entity):
         self.barra_relleno = quad(self, -0.18, 0.372, 0.0001, 0.011, estilo.COLOR_ACENTO, 1.0, 0.012)
         self.barra_relleno.origin = (-0.5, 0)
         self.pastilla_aviso = quad(self, 0, 0.325, 0.74, 0.062, (6, 8, 20), 0.72, 0.02)
+        # Fondos oscuros tras el texto de arriba a la izquierda y la línea de teclas: encima de las plataformas claras
+        # (cian, verde, amarillo) no se leían.
+        xi = -diseno_adaptable.aspecto() / 2 + MARGEN
+        quad(self.izquierda, xi + 0.28, 0.426, 0.6, 0.11, (6, 8, 20), 0.6, 0.02)
+        self.fondo_ayuda = quad(self, 0, -0.46, 1.12, 0.04, (6, 8, 20), 0.6, 0.02)
         self.pastilla_aviso.enabled = False
         self._aviso_escala = tuple(self.aviso.scale)
         self._progreso = -1.0

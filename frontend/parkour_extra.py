@@ -11,7 +11,7 @@
 #     que ya no se alcanza cae y se apaga; al llegar a la meta, la ganada aparece grande.
 # La matemática está en frontend/parkour_extra_calculos.py (puro, con tests).
 #
-# APAGADO: ALCALDE_PARKOUR_VISUAL=0 (o PARKOUR_VISUAL = False): preparar() devuelve None y la escena queda como siempre.
+# APAGADO: ALCALDE_PARKOUR_EXTRA=0 (o PARKOUR_VISUAL = False; OJO: ALCALDE_PARKOUR_VISUAL es la bandera del aspecto neón, no esta): preparar() devuelve None y la escena queda como siempre.
 # REDUCIR MOVIMIENTO: sin cámara lenta, sin fragmentos ni temblores; las medallas aparecen sin rebote.
 # GUARDIÁN: cada método público atrapa sus errores, avisa una vez por stderr y apaga lo nuevo (la carrera sigue igual).
 
@@ -27,7 +27,7 @@ from frontend import parkour_extra_calculos as calc
 from frontend.componentes import escala_fuente
 
 PARKOUR_VISUAL = True
-VARIABLE = "ALCALDE_PARKOUR_VISUAL"
+VARIABLE = "ALCALDE_PARKOUR_EXTRA"
 
 TONOS_MEDALLA = {"bronce": (205, 127, 50), "plata": (200, 204, 214), "oro": (255, 205, 64)}
 LETRA = {"bronce": "B", "plata": "P", "oro": "O"}
@@ -100,6 +100,10 @@ class ControladorParkour:
 
     def _construir_medallas(self):
         self.medallas_ui = Entity(parent=camera.ui, z=-0.05)
+        # Pastilla oscura detrás de las medallas (como la del cronómetro): sin ella flotaban sobre el mundo.
+        n = len(calc.ORDEN)
+        Entity(parent=self.medallas_ui, model="quad", position=(X_DISCOS + 0.031 * (n - 1), Y_DISCOS, 0.01),
+               scale=(0.062 * n + 0.02, 0.07), color=_rgba((6, 8, 20), 0.62))
         self.discos = {}
         for i, nombre in enumerate(calc.ORDEN):
             disco = Entity(parent=self.medallas_ui, position=(X_DISCOS + i * 0.062, Y_DISCOS, 0))

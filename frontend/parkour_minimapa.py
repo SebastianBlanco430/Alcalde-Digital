@@ -73,3 +73,24 @@ def limpiar(registro=None):
     registro = registro if registro is not None else mm.registro()
     registro.limpiar_fuente(FUENTE)
     registro.fijar_altura_jugador(None)
+
+
+# Dónde va cada rótulo «±N m» del plano (coordenadas del lienzo, -0,5..0,5) para que NO se pisen entre sí, no tapen su
+# plataforma y no se salgan del recuadro: encima de la plataforma (debajo si no cabe), dentro del borde, y se descarta
+# el que caería encima de otro ya puesto. `cercanas`: plataformas del plano (dicts con x, y, alto), ya ordenadas por
+# cercanía. Devuelve [(x, y, plataforma)] con a lo sumo `maximo` rótulos.
+def colocar_rotulos(cercanas, maximo=3, sep_x=0.3, sep_y=0.11, borde_x=0.36, borde_y=0.43, hueco=0.06):
+    puestos = []
+    for p in cercanas:
+        if len(puestos) >= maximo:
+            break
+        medio = p.get("alto", 0.0) / 2
+        y = p["y"] + medio + hueco
+        if y > borde_y:
+            y = p["y"] - medio - hueco
+        x = max(-borde_x, min(borde_x, p["x"]))
+        y = max(-borde_y, min(borde_y, y))
+        if any(abs(x - ox) < sep_x and abs(y - oy) < sep_y for ox, oy, _ in puestos):
+            continue
+        puestos.append((x, y, p))
+    return puestos
