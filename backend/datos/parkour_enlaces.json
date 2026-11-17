@@ -1,0 +1,14 @@
+{
+  "_comentario": "Puertas EXTRA al parkour desde la terminal de un caso (además de la que declara el propio caso en su JSON, campo 'parkour'). Las lee backend/logica/enlace_parkour_extra.py y las pinta frontend/parkour_segundo_boton.py. 'requiere_evidencia': el botón sale bloqueado hasta tener esa evidencia (null = siempre abierto).",
+  "casos": {
+    "cuentas_fantasma": [
+      {
+        "nivel": "sector_2",
+        "texto": "Entrar a la granja de bots",
+        "texto_completado": "Granja de bots (completada)",
+        "requiere_evidencia": "servidor_fantasma",
+        "bloqueado": "Primero cruza el Sector corrupto 1"
+      }
+    ]
+  }
+}

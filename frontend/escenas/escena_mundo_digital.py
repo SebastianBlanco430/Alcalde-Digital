@@ -33,7 +33,13 @@ class EscenaMundoDigital(Escena):
         super().__init__(**opciones)
         self.glitch = glitch
         self.catalogo = catalogo or {}
-        self.interfaz = InterfazCaso({"fila": self._accion_fila}, dialogo_retratos.textura_retrato_caso)
+        # Misiones visuales: interrogatorio como novela visual (frontend/interrogatorio_vn.py, ALCALDE_INTERROGATORIO_VN=0
+        # lo apaga). Si no está o falla, la InterfazCaso de siempre.
+        try:
+            from frontend.interrogatorio_vn import elegir_interfaz_caso
+        except Exception:                        # noqa: BLE001
+            elegir_interfaz_caso = InterfazCaso
+        self.interfaz = elegir_interfaz_caso({"fila": self._accion_fila}, dialogo_retratos.textura_retrato_caso)
         self._decorados = {}
         self._sesiones = {}
         self._gs_de_sesiones = None        # GameState al que pertenecen las sesiones guardadas
@@ -112,6 +118,12 @@ class EscenaMundoDigital(Escena):
     def _preparar_enlace_parkour(self, caso):
         self._enlace = enlace_parkour.de_caso(caso.datos, parkour_loader.listar_niveles()) if self.al_pedir_parkour else None
         self._refrescar_enlace_parkour()
+        # Segunda puerta al parkour (frontend/parkour_segundo_boton.py, tecla U; ALCALDE_PARKOUR_SEGUNDO=0 la quita).
+        try:
+            from frontend import parkour_segundo_boton
+            self._segundo_parkour = parkour_segundo_boton.preparar(self, caso, getattr(self, "_segundo_parkour", None))
+        except Exception:                        # noqa: BLE001
+            self._segundo_parkour = None
 
     # El botón se ofrece también con el caso YA RESUELTO (sin sesión): la misión de parkour puede tocar después de la de
     # investigación y el parkour solo se lanza desde aquí.
@@ -230,6 +242,9 @@ class EscenaMundoDigital(Escena):
     def _accion_fila(self, fila):
         if self._bloqueo or self._sesion is None and fila.tipo != "salir":
             return
+        # Misiones visuales: la interfaz de novela visual reacciona a pruebas y acusaciones (la de siempre no lo tiene).
+        if hasattr(self.interfaz, "al_elegir_fila"):
+            self.interfaz.al_elegir_fila(fila)
         antes = set(self._sesion.evidencias_en_mano()) if self._sesion else set()
         try:
             self._ejecutar(fila)
@@ -300,6 +315,8 @@ class EscenaMundoDigital(Escena):
             return
         if key == TECLA_PARKOUR:
             self.abrir_parkour()
+            return
+        if getattr(self, "_segundo_parkour", None) is not None and self._segundo_parkour.tecla(key):
             return
         if key == "p":
             fila = next((f for f in self._filas if f.tipo == "modo_pruebas"), None)

@@ -90,6 +90,13 @@ class EscenaParkour(Escena):
         parkour_minimapa.actualizar_altura(self.sim.y)
         self.hud.plano.fijar(alturas)
         self.hud.plano.actualizar(self.sim.x, self.sim.z, self.sim.y)
+        # Misiones visuales (frontend/parkour_extra.py, ALCALDE_PARKOUR_VISUAL=0 lo apaga): glitch, orbe, fantasma,
+        # cámara lenta y medallas. None = la escena de siempre.
+        try:
+            from frontend import parkour_extra
+            self._extra = parkour_extra.preparar(self, getattr(self, "_extra", None))
+        except Exception:                        # noqa: BLE001
+            self._extra = None
 
     def _jugador_activo(self):
         try:
@@ -112,6 +119,8 @@ class EscenaParkour(Escena):
         self.hud.mostrar_pausa(False)
         self.hud.enabled = False
         self._restaurar_entorno()
+        if getattr(self, "_extra", None) is not None:                    # misiones visuales
+            self._extra.al_salir()
 
     def _guardar_entorno(self):
         if self._guardado is None:
@@ -154,6 +163,8 @@ class EscenaParkour(Escena):
         self.mundo.marcar_checkpoint(self.sim.checkpoint)
         self.mundo.sincronizar(self.sim)
         self._poner_estado(JUGANDO)
+        if getattr(self, "_extra", None) is not None:                    # misiones visuales
+            self._extra.reiniciar()
 
     def _salir(self):
         if self._salir_a is not None:
@@ -188,6 +199,8 @@ class EscenaParkour(Escena):
     def update(self):
         if self.sim is not None and self.estado == FIN and self.mundo is not None and self.mundo.visual:
             self.mundo.sincronizar(self.sim, min(time.dt, DT_MAX))      # que los efectos de la meta terminen de animarse
+            if getattr(self, "_extra", None) is not None:                # misiones visuales: orbe y medalla de la meta
+                self._extra.tras_paso([], min(time.dt, DT_MAX))
             self.hud.avanzar(min(time.dt, DT_MAX))
             if cc.camara_parkour_estable_activa():          # la cámara termina de asentarse sobre la meta
                 self._seguir_con_camara(min(time.dt, DT_MAX))
@@ -198,10 +211,12 @@ class EscenaParkour(Escena):
             return
         dt = min(time.dt, DT_MAX)
         mx, mz = self._direccion()
-        pasos = max(1, math.ceil(dt / PASO_MAX))
+        # Misiones visuales: cámara lenta = menos tiempo de simulación este frame (el cronómetro es ese mismo tiempo).
+        dt_sim = self._extra.escala_tiempo(dt) if getattr(self, "_extra", None) is not None else dt
+        pasos = max(1, math.ceil(dt_sim / PASO_MAX))
         eventos = []
         for i in range(pasos):
-            eventos += self.sim.paso(dt / pasos, mx, mz, salto=self._salto and i == 0)
+            eventos += self.sim.paso(dt_sim / pasos, mx, mz, salto=self._salto and i == 0)
         self._salto = False
         self._seguir_con_camara(dt)
         self._ajustar_fov(dt)
@@ -210,6 +225,8 @@ class EscenaParkour(Escena):
         self.mundo.sincronizar(self.sim, dt)
         self.hud.actualizar(self.sim, self.nivel, dt)
         self._procesar(eventos)
+        if getattr(self, "_extra", None) is not None:                    # misiones visuales (nunca lanza)
+            self._extra.tras_paso(eventos, dt)
 
     def _seguir_con_camara(self, dt):
         _, alto = self.sim.soporte_actual()
@@ -259,6 +276,8 @@ class EscenaParkour(Escena):
         estado = self._game_state()
         nueva = pk.otorgar_recompensa(self.nivel, resultado, estado)
         self._poner_estado(FIN)
+        if getattr(self, "_extra", None) is not None:                    # misiones visuales: fantasma y medalla
+            self._extra.al_terminar(resultado)
         self.hud.mostrar_resultado(resultado, nueva_evidencia=nueva, con_estado=estado is not None,
                                    hay_recompensa=bool(self.nivel.recompensa.get("evidencia")))
         if self._al_terminar is not None:

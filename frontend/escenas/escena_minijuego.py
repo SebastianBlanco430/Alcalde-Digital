@@ -170,6 +170,12 @@ class EscenaMinijuego(Escena):
         caso = mj.elegir_caso(casos, self.mision, asignacion.tema_de(self.mision), usados, self._azar)
         self._caso = mj.preparar_caso(caso, self.mision)
         self._clase = clase_de(self.minijuego_id)
+        # Misiones visuales (frontend/minijuegos_visual, ALCALDE_EFECTOS_UI=0 lo apaga): misma lógica, mismo resultado.
+        try:
+            from frontend.minijuegos_visual import clase_visual
+            self._clase = clase_visual(self.minijuego_id, self._clase)
+        except Exception:                        # noqa: BLE001  sin capa visual: la vista de siempre
+            pass
 
     def _arrancar_minijuego(self):
         self.contenido = Entity(parent=self)
@@ -347,5 +353,8 @@ class EscenaMinijuego(Escena):
                 self.panel_resultado.avanzar(dt)
             if self.minijuego is not None and self.resultado is None:
                 self.minijuego.avanzar(dt)
+            # Misiones visuales: el sello y las estrellas siguen animándose tras terminar (avanzar_visual nunca lanza).
+            if self.minijuego is not None and hasattr(self.minijuego, "avanzar_visual"):
+                self.minijuego.avanzar_visual(dt)
         except Exception as error:               # noqa: BLE001
             self._respaldo(error)

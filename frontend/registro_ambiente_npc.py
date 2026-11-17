@@ -247,6 +247,7 @@ def _crear_controlador(escena):
             for i in m._en_a:
                 actor = actores[recurso[i]]
                 estado = estados[i] if estados is not None else ce.NEUTRO
+                estado = getattr(actor, "_postura_forzada", None) or estado     # misiones visuales (rectificar_visual.py)
                 if revisar and estados is not None and npc_postura.estado_de(actor) != estado:
                     npc_postura.aplicar(actor, estado)
                 if self.globos is not None:
@@ -266,6 +267,7 @@ def _crear_controlador(escena):
             revisar = self._frame % PERIODO_POSTURA == 0
             for k, (caminante, personaje) in enumerate(zip(p.caminantes, p.personajes)):
                 estado = estados[k] if self.conducta else ce.NEUTRO
+                estado = getattr(personaje, "_postura_forzada", None) or estado     # misiones visuales (rectificar_visual.py)
                 x, z = caminante.x, caminante.z
                 d = math.hypot(x - cx, z - cz)
                 a_la_vista = en_cono(x, z, cx, cz, fx, fz, COS_VISTA)
@@ -299,6 +301,7 @@ def _crear_controlador(escena):
                 if cuerpo is None or clave is None or not hasattr(interaccion, "mirando"):
                     continue
                 estado = postura_de_reactivo(ac.estado_npc(str(clave.id), amb), interaccion.mirando)
+                estado = getattr(cuerpo, "_postura_forzada", None) or estado     # misiones visuales (rectificar_visual.py)
                 if npc_postura.estado_de(cuerpo) != estado:
                     npc_postura.aplicar(cuerpo, estado)
 

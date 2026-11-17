@@ -23,6 +23,7 @@ MODULOS = (
     "frontend.registro_ciudad_viva",       # plan final 5: la ciudad cambia de aspecto con los indicadores (luz, cielo, niebla, basura, flores...)
     "frontend.registro_etapas_final",      # finales por etapas: medidor, fuego/fiesta, NPC, tinte y música según el índice (-3..+3)
     "frontend.registro_tutorial",          # claridad: tutorial en viñetas al empezar una partida nueva y «Cómo se juega» en la pausa
+    "frontend.registro_misiones_visuales",  # misiones visuales: efectos, vistas nuevas y «Reducir movimiento» (ALCALDE_MISIONES_VISUALES=0)
 )
 
 

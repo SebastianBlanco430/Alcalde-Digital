@@ -496,6 +496,12 @@ MISIONES_DIGITALES_CHICO = (
         pago=30, dificultad="media", tipo="parkour", objetivo="sector_1", grupo="policia",
     ),
     Mision(
+        "parkour_sector_2", None, "La granja de bots",
+        "Las cuentas falsas salen de una granja de bots. En la Terminal de la Fiscalía, cruza su servidor hasta la meta.",
+        "Mercado Municipal",
+        pago=40, dificultad="dificil", tipo="parkour", objetivo="sector_2", grupo="policia",
+    ),
+    Mision(
         "investigacion_cuentas", None, "Cuentas fantasma",
         "Hay cuentas falsas en Civitas. Revisa el caso en la Terminal de la Fiscalía.",
         "Mercado Municipal",
@@ -509,6 +515,12 @@ MISIONES_DIGITALES_GRANDE = (
         "Un servidor fantasma guarda un rastro. En la Terminal de la Fiscalía, cruza hasta la meta.",
         "Feira da Ladeira",
         pago=85, dificultad="media", tipo="parkour", objetivo="sector_1", grupo="policia",
+    ),
+    Mision(
+        "parkour_sector_2_grande", None, "La granja de bots",
+        "Las cuentas falsas salen de una granja de bots. En la Terminal de la Fiscalía, cruza su servidor hasta la meta.",
+        "Feira da Ladeira",
+        pago=110, dificultad="dificil", tipo="parkour", objetivo="sector_2", grupo="policia",
     ),
     Mision(
         "investigacion_cuentas_grande", None, "Cuentas fantasma",
