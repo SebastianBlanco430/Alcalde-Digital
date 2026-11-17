@@ -593,36 +593,47 @@ class Minimapa(Entity):
 
     # -- Satélite (mundo chico) --
 
-    # Pone la foto aérea de la ciudad (frontend/mapa_satelite.py) como fondo del minimapa, bajo todo lo demás. Cubre justo los
-    # límites del mundo, que caben en el recuadro con cualquier giro (rotacion_libre), y gira con él: una sola entidad con
-    # su rotación, sin rehacer nada. Con foto no se dibujan las calles ni las casas vectoriales (ya salen en la foto).
-    # Cualquier fallo deja el minimapa de siempre.
+    # Con la foto aérea de la ciudad (frontend/mapa_satelite.py) el minimapa pasa a ser el de FOTO (frontend/minimapa_foto.py):
+    # una ventana de ~90 m centrada en el jugador, ampliada y recortada al recuadro. Las capas vectoriales (calles, casas, ruta,
+    # plazas, jugadores) se apagan y Minimapa.actualizar / fijar_yaw se lo delegan. Cualquier fallo deja el minimapa de siempre.
     def poner_satelite(self, satelite):
         if satelite is None or self._local or self._satelite is not None:
             return
+        foto = None
         try:
-            xmin, xmax, zmin, zmax = (float(v) for v in self._mapa.limites())
-            g = self.geometria
-            esquinas = [(xmin, zmin), (xmax, zmin), (xmax, zmax), (xmin, zmax)]
-            malla = Mesh(vertices=[(-0.5, -0.5, 0), (0.5, -0.5, 0), (0.5, 0.5, 0), (-0.5, 0.5, 0)],
-                         uvs=[satelite.uv_de(*c) for c in esquinas], triangles=[(0, 1, 2), (0, 2, 3)])
-            fondo = Entity(parent=self, model=malla, color=color.rgba(0.92, 0.92, 0.95, 1.0), z=-0.0004,
-                           scale=((xmax - xmin) * g.escala, (zmax - zmin) * g.escala))
-            fondo.set_texture(satelite.textura, 1)
-            fondo.position = (*g.punto((xmin + xmax) / 2, (zmin + zmax) / 2), -0.0004)
-            self.fondo_satelite, self._satelite = fondo, satelite
-            self._girar_satelite()
+            from frontend.minimapa_foto import MinimapaFoto
+            foto = MinimapaFoto(self, self._mapa, satelite, yaw=mm.yaw_efectivo(self.modo_rotacion, self._yaw_camara))
+            self.fondo_satelite, self._satelite = foto, satelite
+            foto.fijar_yaw(self.geometria.yaw, self._yaw_camara)
+            for capa in (self.capa_ruta, self.capa_lugares, self.flecha, self.marcador_destino, self.flecha_mirada):
+                capa.enabled = False
             self._aplicar_detalle()
         except Exception as error:                     # noqa: BLE001
             from frontend import mapa_satelite
             mapa_satelite._avisar_una_vez("minimapa", error)
-            if self.fondo_satelite is not None:
-                destruir_arbol(self.fondo_satelite)
-            self.fondo_satelite, self._satelite = None, None
+            if foto is not None and self._satelite is None:
+                destruir_arbol(foto)                   # se construyó a medias y no llegó a instalarse
+            if self._satelite is not None:
+                self._quitar_satelite()                # se instaló y algo falló después: vuelve el vectorial entero
+
+    def _quitar_satelite(self):
+        """Vuelve al minimapa vectorial (la foto falló): reactiva sus capas y borra la de foto."""
+        if self.fondo_satelite is not None:
+            destruir_arbol(self.fondo_satelite)
+        self.fondo_satelite, self._satelite = None, None
+        for capa in (self.capa_ruta, self.capa_lugares, self.capa_casas):
+            capa.enabled = True
+        self.marcador_destino.enabled = False
+        self.flecha_mirada.enabled = False
+        self._firma_ruta = None
+        self._aplicar_detalle()
+        self._colocar_mapa()                 # las capas vectoriales no siguieron el giro mientras estuvo la foto: se recolocan
+        self._reconstruir_casas()
+        self._capas_sucias = True
 
     def _girar_satelite(self):
         if self.fondo_satelite is not None:
-            self.fondo_satelite.rotation_z = -self.geometria.yaw      # igual que el resto: rotation_z es horario, el yaw no
+            self.fondo_satelite.fijar_yaw(self.geometria.yaw, self._yaw_camara)
 
     # -- Modo local (mundo grande) --
 
@@ -792,13 +803,13 @@ class Minimapa(Entity):
             self._aplicar_zoom(ajustes.minimapa_zoom)
         if "minimapa_rotacion" in cambiadas:
             self.modo_rotacion = ajustes.minimapa_rotacion
-            self.flecha_mirada.enabled = self.modo_rotacion == "norte"
+            self.flecha_mirada.enabled = self.modo_rotacion == "norte" and self._satelite is None
             self.fijar_yaw(self._yaw_camara)
 
     # Capas base según el detalle y la visibilidad del registro (calles, edificios, jugadores).
     def _aplicar_detalle(self):
         self.capa_calles.enabled = self.registro.capa_visible("calles") and self._satelite is None
-        self.capa_jugadores.enabled = self.registro.capa_visible("jugador")
+        self.capa_jugadores.enabled = self.registro.capa_visible("jugador") and self._satelite is None
         activas = self._casas_activas()
         self.capa_casas.enabled = activas
         if activas and self._local and self._casas_obsoletas:
@@ -924,6 +935,15 @@ class Minimapa(Entity):
     # jugador del turno; destino: lugar o None; ruta: lugares que faltan (GuiaRuta).
     def actualizar(self, posiciones, activo, destino, ruta):
         g = self.geometria
+        if self._satelite is not None:
+            self._poner_etiqueta_destino(destino)
+            try:
+                self.fondo_satelite.actualizar(posiciones, activo, destino, ruta)
+                return
+            except Exception as error:                 # noqa: BLE001  la foto falla en marcha: vuelve el minimapa vectorial
+                from frontend import mapa_satelite
+                mapa_satelite._avisar_una_vez("minimapa_frame", error)
+                self._quitar_satelite()
         if self._local:
             self._seguir_al_activo(posiciones, activo)
         presentes = {nombre for nombre, _, _, _ in posiciones}
