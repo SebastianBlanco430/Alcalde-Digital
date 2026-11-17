@@ -105,11 +105,11 @@ def lateral_feed(contenido):
 
 
 def lateral_dilema(contenido, resultado=None):
-    """Panel lateral de un dilema: situación y opciones (tocables) al decidir; el resultado después."""
+    """Panel lateral de un dilema: situación y pistas al decidir (las opciones tocables van SOLO en el teléfono, en su
+    hoja «¿Qué haces?»: si salieran también aquí habría botones repetidos); el resultado después."""
     if resultado is None:
         opciones = contenido.get("opciones", [])
         return {"titulo": contenido.get("titulo", ""), "texto": contenido.get("situacion", ""),
-                "botones": [(f"{o['tecla']}  {o['etiqueta']}", False) for o in opciones],
                 "lineas": [(f"{o['tecla']}: {o['pista']}", TONO_TENUE) for o in opciones if o.get("pista")],
                 "aviso": contenido.get("aviso", ""), "pie": contenido.get("pie", "")}
     return {"titulo": resultado.get("titulo", ""), "texto": resultado.get("texto", ""), "pie": resultado.get("pie", "")}

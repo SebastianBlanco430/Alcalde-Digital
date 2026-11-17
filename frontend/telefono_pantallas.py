@@ -232,7 +232,8 @@ class PanelLateral(Entity):
         _poner(self.titulo, _recortar(contenido.get("titulo") or "", medir_titulo, self.ancho_texto))
         y -= alto_linea(22) + 0.004
         y = self._bloque(self.subtitulo, contenido.get("subtitulo"), 14, y, 1)
-        y = self._bloque(self.texto, contenido.get("texto"), 16, y, 6)
+        # sin botones (dilemas: las opciones van solo en el teléfono) hay sitio para la situación entera
+        y = self._bloque(self.texto, contenido.get("texto"), 16, y, 6 if contenido.get("botones") else 10)
         y = self._bloque(self.instruccion, contenido.get("instruccion"), 15, y, 2)
         botones = contenido.get("botones") or []
         for i, boton in enumerate(self.filas):
@@ -250,8 +251,12 @@ class PanelLateral(Entity):
         self._lineas_datos = list(contenido.get("lineas") or [])
         self._y_lineas = y
         hay_aviso = bool(contenido.get("aviso"))
+        # el aviso se parte en líneas (antes era una sola y se salía del panel por la derecha)
+        lineas_aviso = envolver_texto(" ".join((contenido.get("aviso") or "").split()), medidor().funcion(13),
+                                      self.ancho_texto)[:2] if hay_aviso else []
         # la revisión no tiene aviso: la ventana llega hasta encima del pie (deja sitio al indicador de scroll)
-        self._suelo = (self.aviso.y + 0.035) if hay_aviso else (self.pie.y + 0.075)
+        extra_aviso = max(0, len(lineas_aviso) - 1) * alto_linea(13)
+        self._suelo = (self.aviso.y + 0.035 + extra_aviso) if hay_aviso else (self.pie.y + 0.075)
         self._ventana = max(0.05, y - self._suelo - 0.03)
         self._alturas = []
         medir = medidor().funcion(self.PX_LINEA)
@@ -262,7 +267,7 @@ class PanelLateral(Entity):
             self._alturas.append(len(partida) * alto_linea(self.PX_LINEA))
         self.desplazamiento = 0.0
         self._colocar_lineas()
-        _poner(self.aviso, contenido.get("aviso") or "")
+        _poner(self.aviso, "\n".join(lineas_aviso))
         pie = contenido.get("pie") or ""
         lineas_pie = envolver_texto(pie, medidor().funcion(13), self.ancho_texto) if pie else []
         _poner(self.pie, "\n".join(lineas_pie[:2]))
