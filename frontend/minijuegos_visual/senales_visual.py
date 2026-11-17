@@ -13,7 +13,7 @@
 import math
 import re
 
-from ursina import Entity, Mesh, Text, color
+from ursina import Entity, Mesh, Text, color, destroy
 
 from frontend import banderas_visuales as bv
 from frontend import efectos_ui_calculos as fx_calc
@@ -131,7 +131,7 @@ class BloqueCaptura(ui.Tarjeta):
 
     def _poner_sello(self, texto, tono):
         if self._sello is not None:
-            self._sello.enabled = False
+            destroy(self._sello)
         dy = 0.012 if self.estado in self.ETIQUETAS_FIN else 0.0
         self._sello = _sello(self, texto, (self._x_sello(), dy), tono)
         self._sello.z = -0.02
@@ -165,7 +165,7 @@ class BloqueCaptura(ui.Tarjeta):
                                       scale=(0.19, 0.008), rotation_z=-14, color=_rgba(GRIS))
             self.etiqueta.text = self.ETIQUETAS_FIN[estado]
         elif self._sello is not None:
-            self._sello.enabled = False
+            destroy(self._sello)
             self._sello = None
         self._sello_de = estado
         if estado in self.ETIQUETAS_FIN:
@@ -175,8 +175,26 @@ class BloqueCaptura(ui.Tarjeta):
 class SenalesVisual(CapaVisual, MinijuegoSenales):
 
     _lupa_rota = False
+    _vista_base = False               # True si la captura falló al montarse y quedó la vista de siempre
 
     def construir(self):
+        """Captura de móvil; si su montaje falla, se borra lo creado y queda la vista de siempre (guardián)."""
+        antes = set(id(h) for h in self.children)
+        try:
+            self._construir_captura()
+        except Exception as error:      # noqa: BLE001
+            bv.avisar_una_vez("senales_visual", error)
+            for hijo in list(self.children):
+                if id(hijo) not in antes:
+                    destroy(hijo)
+            self._lupa_rota = True
+            self._listo = False
+            self.lente = None
+            self._vista_base = True
+            self.casillas = []
+            MinijuegoSenales.construir(self)
+
+    def _construir_captura(self):
         """Misma partida y mismos objetos que MinijuegoSenales.construir, con la captura de móvil y la ficha de pista."""
         from frontend.minijuegos.senales_calculos import PartidaSenales
         self._listo = False
@@ -269,6 +287,8 @@ class SenalesVisual(CapaVisual, MinijuegoSenales):
         self.marcas_txt = _texto(self, "", 16, TINTA, (izq + 0.03 + self.partida.max_marcas * 0.065, yc), origen=(-0.5, 0))
 
     def _pintar_lupa(self):
+        if self._vista_base:
+            return MinijuegoSenales._pintar_lupa(self)
         if self.terminado or not hasattr(self, "ficha_etiqueta"):
             return
         if self.foco < len(self.tarjetas):
@@ -336,7 +356,8 @@ class SenalesVisual(CapaVisual, MinijuegoSenales):
 
     def al_terminar_propio(self, resultado):
         super().al_terminar_propio(resultado)
-        self._vigilar(self._cierre)
+        if not self._vista_base:
+            self._vigilar(self._cierre)
 
     def _cierre(self):
         if getattr(self, "lente", None) is not None:
@@ -355,9 +376,13 @@ class SenalesVisual(CapaVisual, MinijuegoSenales):
                giro=-8, escala=(0.26, 0.07)).z = -0.05
 
     def posicion_sello(self):
+        if self._vista_base:
+            return super().posicion_sello()
         return (FICHA_X + 0.12, 0.41)
 
     def posicion_estrellas(self):
+        if self._vista_base:
+            return super().posicion_estrellas()
         return (FICHA_X + 0.2, 0.35)
 
     # -- Bucle visual --

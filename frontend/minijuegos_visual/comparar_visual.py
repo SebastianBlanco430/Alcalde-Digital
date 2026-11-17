@@ -327,6 +327,9 @@ class CompararVisual(CapaVisual, MinijuegoComparar):
             elif t.estado == "perdida":
                 _aro(t, (0, -0.004, -0.025), ANCHO_FILA / 2 - 0.005, ALTO_FILA / 2 + 0.004)
 
+    def posicion_estrellas(self):
+        return (0.70, 0.415)              # encima de la copia, no sobre su primer renglón
+
     # -- Bucle visual --
 
     def avanzar_visual_propio(self, dt):
