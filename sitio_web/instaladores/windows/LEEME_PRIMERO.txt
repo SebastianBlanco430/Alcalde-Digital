@@ -1,0 +1,23 @@
+ALCALDE DIGITAL (beta) para Windows
+===================================
+
+1. Descomprime TODO el .zip (clic derecho, "Extraer todo"). No ejecutes nada desde dentro del .zip.
+2. Haz doble clic en  Instalar.bat
+   - Si Windows dice "Windows protegió su PC", pulsa "Más información" y luego "Ejecutar de todas formas".
+   - El instalador necesita internet: descarga Python (privado del juego, no toca el tuyo) y las bibliotecas. Tarda unos minutos y
+     ocupa unos 600 MB en %LOCALAPPDATA%\AlcaldeDigital.
+3. Al terminar, abre "Alcalde Digital" desde el escritorio o el menú Inicio.
+
+DESINSTALAR: ejecuta  %LOCALAPPDATA%\AlcaldeDigital\Desinstalar.bat
+Tu partida guardada queda en la carpeta .alcalde_digital de tu usuario (se borra desde Ajustes del juego).
+
+CONTROLES
+- Mover: W A S D o flechas · Correr: Shift · Saltar: Espacio · Interactuar y entrar: E
+- Teléfono (Civitas): Tab · Seguir misión: M · Mapa de la ciudad: N · Pausa: Esc
+- Con mando: palo izquierdo camina, palo derecho gira la cámara, A salta, B interactúa, Y teléfono, Inicio pausa.
+
+ESTADO
+- Versión beta de un proyecto de aprendizaje. El instalador de Windows es nuevo y todavía no se ha probado en Windows:
+  si algo falla, el registro del juego está en  %USERPROFILE%\.alcalde_digital\registro.txt
+- El modo en línea es opcional y su tráfico no va cifrado: no lo uses con desconocidos.
+- Personas, lugares y noticias del juego son ficticios.

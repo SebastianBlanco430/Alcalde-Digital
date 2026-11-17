@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Alcalde Digital · Juego 3D sobre desinformación</title>
+<meta name="theme-color" content="#121420">
+<meta property="og:type" content="website">
+<meta name="description" content="Un juego 3D gratis para PC. Ciudad Nova vota en 7 días y en la red del barrio corren rumores. Ve al lugar, verifica y decide qué compartir.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="Alcalde Digital">
+<meta property="og:description" content="Ciudad Nova vota en 7 días. Verifica los rumores, decide qué compartir y mira cómo cambia la ciudad.">
+<meta property="og:image" content="img/hero.jpg">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+
+<header class="cabecera" id="inicio">
+  <div class="cabecera-fila">
+    <a class="marca" href="#inicio" aria-label="Alcalde Digital, inicio">
+      <span class="marca-alcalde">ALCALDE</span><span class="marca-digital">DIGITAL</span>
+    </a>
+    <nav class="menu" aria-label="Secciones">
+      <a href="#juego">Cómo se juega</a>
+      <a href="#minijuegos">Minijuegos</a>
+      <a href="#ciudad">La ciudad</a>
+      <a href="#mas">Y además</a>
+      <a href="#controles">Controles</a>
+    </nav>
+    <a class="boton boton-primario boton-chico" href="#descargar">Descargar</a>
+  </div>
+</header>
+
+<main id="contenido">
+
+<!-- HERO -->
+<section class="hero" aria-labelledby="titulo-hero">
+  <div class="hero-fondo" aria-hidden="true"></div>
+  <div class="envoltorio hero-rejilla">
+    <div class="hero-texto">
+      <p class="etiqueta">Juego 3D gratis · beta para PC y Mac</p>
+      <h1 id="titulo-hero">Ciudad Nova vota en 7 días.<br><span class="resalta">Tú decides qué se comparte.</span></h1>
+      <p class="hero-sub">En Civitas, la red social del barrio, aparece un rumor nuevo cada rato. Ve al lugar, mira de dónde salió y decide qué compartir y qué reportar. Lo que haces cambia el aspecto de la ciudad. Es un proyecto de aprendizaje sobre desinformación.</p>
+      <div class="acciones">
+        <a class="boton boton-primario" href="#descargar">Descargar e instalar <span class="boton-nota">32 MB</span></a>
+        <a class="boton boton-secundario" href="#juego">Ver cómo se juega</a>
+      </div>
+      <p class="confianza"><span class="punto" aria-hidden="true"></span>Gratis · beta para Windows, macOS y Linux · se instala solo, sin instalar nada antes</p>
+      <ul class="datos" aria-label="El juego en cifras">
+        <li><strong>4</strong><span>roles</span></li>
+        <li><strong>6</strong><span>minijuegos</span></li>
+        <li><strong>7</strong><span>días de juego<br>(unos 30 min)</span></li>
+        <li><strong>11</strong><span>dilemas con consecuencias</span></li>
+      </ul>
+    </div>
+    <figure class="hero-captura">
+      <img src="img/interfaz.jpg" width="1600" height="900" alt="Pantalla del juego: el periodista junto a la fuente, el minimapa con foto aérea, los indicadores de confianza y desinformación y el teléfono con la misión" data-zoom>
+      <figcaption>Así se ve una partida: tu misión en el teléfono, el minimapa con foto aérea y los indicadores de la ciudad.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- CÓMO SE JUEGA -->
+<section class="banda" id="juego" aria-labelledby="t-juego">
+  <div class="envoltorio">
+    <header class="encabezado">
+      <p class="etiqueta">Una misión, cuatro pasos</p>
+      <h2 id="t-juego">Un rumor. Tu decisión.</h2>
+      <p class="intro">Cada misión sigue el mismo camino, y cada vez te lleva a un rincón distinto del barrio.</p>
+    </header>
+    <ol class="pasos">
+      <li class="paso">
+        <img src="img/mundo-rodoviaria.jpg" width="1600" height="900" loading="lazy" alt="La Rodoviária, con el puesto de mototaxi y entregas y los vecinos en la plaza" data-zoom>
+        <div class="paso-texto">
+          <span class="paso-n">1</span>
+          <h3>Ve</h3>
+          <p>Sigue la línea cian del GPS por plazas, escaleras y callejones hasta el lugar del rumor. Puedes ir a pie, en bici o en moto.</p>
+        </div>
+      </li>
+      <li class="paso">
+        <img src="img/mapa.jpg" width="1600" height="900" loading="lazy" alt="El mapa de Ciudad Nova con foto aérea, los lugares, el destino de la misión y la ruta" data-zoom>
+        <div class="paso-texto">
+          <span class="paso-n">2</span>
+          <h3>Mira</h3>
+          <p>Pulsa <kbd>E</kbd> en la puerta y entra. Con <kbd>N</kbd> abres el mapa de la ciudad, con la foto aérea del propio barrio y tu destino marcado.</p>
+        </div>
+      </li>
+      <li class="paso">
+        <img src="img/mj-cronologia.jpg" width="1400" height="788" loading="lazy" alt="El minijuego Ordenar la cadena de difusión: viñetas de cómic con mensajes que hay que poner en orden" data-zoom>
+        <div class="paso-texto">
+          <span class="paso-n">3</span>
+          <h3>Verifica</h3>
+          <p>Rastrea la fuente, compara versiones, ordena la cadena. Seis minijuegos distintos, con tutorial corto la primera vez.</p>
+        </div>
+      </li>
+      <li class="paso">
+        <img src="img/viva-florece-fuente.jpg" width="1600" height="900" loading="lazy" alt="La plaza de la fuente con banderines, flores y vecinos conversando" data-zoom>
+        <div class="paso-texto">
+          <span class="paso-n">4</span>
+          <h3>Decide</h3>
+          <p>Compartir, ignorar o reportar. Cambian la confianza y la desinformación de Ciudad Nova, y la ciudad se nota.</p>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- MINIJUEGOS -->
+<section class="banda banda-tinta" id="minijuegos" aria-labelledby="t-mini">
+  <div class="envoltorio">
+    <header class="encabezado">
+      <p class="etiqueta">Seis minijuegos</p>
+      <h2 id="t-mini">Seis formas de no caer en el engaño</h2>
+      <p class="intro">Cada uno entrena un hábito real de las redes sociales. Antes de empezar, el juego te dice cuál.</p>
+    </header>
+
+    <div class="mini">
+      <div class="mini-lista" role="tablist" aria-label="Minijuegos" aria-orientation="vertical">
+        <button class="mini-tab" role="tab" id="tab-rastrear" aria-controls="panel-rastrear" aria-selected="true" tabindex="0">Rastrear la fuente</button>
+        <button class="mini-tab" role="tab" id="tab-comparar" aria-controls="panel-comparar" aria-selected="false" tabindex="-1">Comparar dos versiones</button>
+        <button class="mini-tab" role="tab" id="tab-cronologia" aria-controls="panel-cronologia" aria-selected="false" tabindex="-1">Ordenar la cadena</button>
+        <button class="mini-tab" role="tab" id="tab-chat" aria-controls="panel-chat" aria-selected="false" tabindex="-1">Chat del barrio</button>
+        <button class="mini-tab" role="tab" id="tab-senales" aria-controls="panel-senales" aria-selected="false" tabindex="-1">Señales de edición</button>
+        <button class="mini-tab" role="tab" id="tab-contrarreloj" aria-controls="panel-contrarreloj" aria-selected="false" tabindex="-1">Contrarreloj</button>
+      </div>
+
+      <div class="mini-paneles">
+        <article class="mini-panel" role="tabpanel" id="panel-rastrear" aria-labelledby="tab-rastrear">
+          <img src="img/mj-rastrear.jpg" width="1400" height="788" alt="Rastrear la fuente: tres mensajes entre los que hay que elegir el más antiguo que no sea un reenvío" data-zoom>
+          <div class="mini-texto">
+            <h3>Rastrear la fuente</h3>
+            <p>En cada salto aparecen tres mensajes: quién lo mandó, a qué hora y qué dice. Elige el más antiguo que no diga «reenviado» hasta llegar a quien lo publicó primero.</p>
+            <p class="redes"><strong>Lo que practicas en redes</strong>«Reenviado muchas veces» o «me lo pasó una amiga» no es una fuente. Antes de compartir, busca la cuenta o el documento original.</p>
+          </div>
+        </article>
+        <article class="mini-panel" role="tabpanel" id="panel-comparar" aria-labelledby="tab-comparar" hidden>
+          <img src="img/mj-comparar.jpg" width="1400" height="788" alt="Comparar dos versiones: el original a la izquierda y la copia a la derecha, con líneas como programa, tema, fecha, efecto y quién habla; hay que marcar las que cambiaron" data-zoom loading="lazy">
+          <div class="mini-texto">
+            <h3>Comparar dos versiones</h3>
+            <p>Tienes lo que de verdad se dijo y la copia que circula en el chat. Marca las líneas alteradas, o di que no ves diferencias si crees que la copia es fiel.</p>
+            <p class="redes"><strong>Lo que practicas en redes</strong>Una captura o una transcripción se edita en segundos. Ve al original antes de creerle a la copia.</p>
+          </div>
+        </article>
+        <article class="mini-panel" role="tabpanel" id="panel-cronologia" aria-labelledby="tab-cronologia" hidden>
+          <img src="img/mj-cronologia.jpg" width="1400" height="788" alt="Ordenar la cadena de difusión: seis viñetas de cómic con mensajes desordenados" data-zoom loading="lazy">
+          <div class="mini-texto">
+            <h3>Ordenar la cadena</h3>
+            <p>Varios mensajes hablan del mismo rumor pero llegaron desordenados. Agarra una viñeta, súbela o bájala, y comprueba el orden por día y hora.</p>
+            <p class="redes"><strong>Lo que practicas en redes</strong>Cada reenvío agrega detalles y pierde la fuente. Mirar la cadena completa evita quedarte con la última versión, que suele ser la más exagerada.</p>
+          </div>
+        </article>
+        <article class="mini-panel" role="tabpanel" id="panel-chat" aria-labelledby="tab-chat" hidden>
+          <img src="img/mj-chat.jpg" width="1400" height="788" alt="Chat del barrio: una conversación en el teléfono y tres respuestas posibles, con una barra de presión del grupo" data-zoom loading="lazy">
+          <div class="mini-texto">
+            <h3>Chat del barrio</h3>
+            <p>En el grupo te piden datos tuyos y de otras personas. Elige una de tres respuestas antes de que la presión del grupo te deje en visto.</p>
+            <p class="redes"><strong>Lo que practicas en redes</strong>Tu número, tu cuenta o tu dirección no se comparten en un grupo porque alguien insista. Si el pedido es legítimo, llega por un canal oficial.</p>
+          </div>
+        </article>
+        <article class="mini-panel" role="tabpanel" id="panel-senales" aria-labelledby="tab-senales" hidden>
+          <img src="img/mj-senales.jpg" width="1400" height="788" alt="Señales de edición: una captura de una cadena de premios con una lupa sobre el nombre de la cuenta" data-zoom loading="lazy">
+          <div class="mini-texto">
+            <h3>Señales de edición</h3>
+            <p>Te llegó una captura con un premio. Con la lupa, marca hasta tres pistas: una cuenta rara, una hora imposible, un premio a cambio de reenviar.</p>
+            <p class="redes"><strong>Lo que practicas en redes</strong>Las cadenas que prometen premios por reenviar son el engaño más viejo de las redes. Revisa la cuenta, la fecha y si la promesa tiene sentido.</p>
+          </div>
+        </article>
+        <article class="mini-panel" role="tabpanel" id="panel-contrarreloj" aria-labelledby="tab-contrarreloj" hidden>
+          <img src="img/mj-contrarreloj.jpg" width="1400" height="788" alt="Contrarreloj: noticias que se difunden solas con una barra que se llena, y los botones Frenar y Dejar pasar" data-zoom loading="lazy">
+          <div class="mini-texto">
+            <h3>Contrarreloj</h3>
+            <p>Las noticias llegan al chat una tras otra y se difunden solas. Frena la que creas falsa y deja pasar la cierta antes de que se llene la barra.</p>
+            <p class="redes"><strong>Lo que practicas en redes</strong>Lo urgente se comparte sin pensar. Antes de reenviar una alerta, tómate unos segundos: ¿quién la firma?, ¿lo dice una fuente oficial?</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LA CIUDAD RESPONDE -->
+<section class="banda" id="ciudad" aria-labelledby="t-ciudad">
+  <div class="envoltorio">
+    <header class="encabezado">
+      <p class="etiqueta">Ciudad viva</p>
+      <h2 id="t-ciudad">La misma plaza, según lo que decides</h2>
+      <p class="intro">No hay una cifra que leer. La ciudad cambia de aspecto, poco a poco y sin saltos, con la confianza, la convivencia y la desinformación.</p>
+    </header>
+
+    <div class="comparador" id="comparador">
+      <div class="comparador-marco" id="marco-comparador">
+        <img class="comp-img comp-base" id="comp-florece" src="img/viva-florece-fuente.jpg" width="1600" height="900" alt="Ciudad que florece: banderines, flores, vecinos conversando y cielo claro" draggable="false">
+        <img class="comp-img comp-tapa" id="comp-crisis" src="img/viva-crisis-fuente.jpg" width="1600" height="900" alt="Ciudad en crisis: cielo apagado, basura en el suelo y la plaza vacía" draggable="false">
+        <div class="comp-linea" id="comp-linea" aria-hidden="true"><span class="comp-asa"></span></div>
+        <span class="comp-rotulo comp-rotulo-izq">Ciudad en crisis</span>
+        <span class="comp-rotulo comp-rotulo-der">Ciudad que florece</span>
+      </div>
+      <label class="comp-control" for="comp-rango">Arrastra para comparar
+        <input type="range" id="comp-rango" min="0" max="100" value="50">
+      </label>
+      <div class="comp-pares" role="group" aria-label="Elegir plaza">
+        <button class="chip" data-par="fuente" aria-pressed="true">La fuente</button>
+        <button class="chip" data-par="plaza" aria-pressed="false">La plaza del parque</button>
+      </div>
+    </div>
+
+    <div class="doble">
+      <div>
+        <h3>Cuando la confianza cae</h3>
+        <p>Aparecen basura y grafitis, carteles de «sin conexión» y farolas apagadas. El cielo y la niebla se apagan, y en las plazas queda poca gente.</p>
+      </div>
+      <div>
+        <h3>Cuando sube</h3>
+        <p>Salen flores y guirnaldas con banderines, los bancos se llenan y se forman corros de vecinos. Cambian la luz, el cielo y las frases que dicen los vecinos.</p>
+      </div>
+      <div>
+        <h3>Y se puede leer en la muñeca</h3>
+        <p>Los indicadores también se ven como manillas de Bonfim en tu brazo y en el de los vecinos. Cuatro rasgos distintos (color, tejido, nudos y desgaste) para que nunca dependa solo del color.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA A MITAD -->
+<section class="cta-medio" aria-labelledby="t-cta">
+  <div class="envoltorio cta-medio-fila">
+    <div>
+      <h2 id="t-cta">¿Ya viste la diferencia? Pruébalo tú.</h2>
+      <p>Una partida dura unos 30 minutos y se queda en tu equipo.</p>
+    </div>
+    <a class="boton boton-primario boton-grande" href="#descargar">Descargar e instalar <span class="boton-nota">32 MB</span></a>
+  </div>
+</section>
+
+<!-- Y ADEMÁS -->
+<section class="banda banda-tinta" id="mas" aria-labelledby="t-mas">
+  <div class="envoltorio">
+    <header class="encabezado">
+      <p class="etiqueta">Más que verificar</p>
+      <h2 id="t-mas">Una ciudad con muchas cosas que hacer</h2>
+    </header>
+
+    <div class="filas">
+      <article class="fila">
+        <img src="img/parkour.jpg" width="1400" height="788" loading="lazy" alt="Parkour digital: plataformas de neón sobre una cuadrícula magenta, con cronómetro y medallas" data-zoom>
+        <div class="fila-texto">
+          <h3>Parkour en el mundo digital</h3>
+          <p>Dos sectores corruptos de neón, de 30 y 26 plataformas. Fijas, móviles, que se desvanecen y otras que aparecen con un interruptor. Doble salto, puntos de control y medallas de bronce, plata y oro.</p>
+        </div>
+      </article>
+      <article class="fila fila-inversa">
+        <img src="img/interrogatorio.jpg" width="1400" height="788" loading="lazy" alt="Interrogatorio de novela visual: la moderadora de Civitas habla y aparece una evidencia nueva" data-zoom>
+        <div class="fila-texto">
+          <h3>Interrogatorio de novela visual</h3>
+          <p>Entra a la terminal de la Fiscalía e investiga el caso de las cuentas fantasma. Pregunta, presenta pruebas y reúne evidencias en tu archivo de casos.</p>
+        </div>
+      </article>
+      <article class="fila">
+        <img src="img/trabajo-taller.jpg" width="1400" height="788" loading="lazy" alt="Trabajo en el taller: una pantalla de ritmo con flechas que hay que pulsar a tiempo" data-zoom>
+        <div class="fila-texto">
+          <h3>Trabajos con su propio minijuego</h3>
+          <p>Atiende en la panadería o el súper, cocina en la lanchonete, repara en el taller o reparte en moto. Ganas reales del juego (dinero ficticio), pero el cansancio se acumula y no puedes trabajar sin parar.</p>
+        </div>
+      </article>
+      <article class="fila fila-inversa">
+        <img src="img/civitas-estafa.jpg" width="1400" height="788" loading="lazy" alt="Un mensaje de estafa en el teléfono de Civitas: «Ganaste el sorteo del barrio». Hay que marcar lo sospechoso: un número que no tienes guardado, un enlace raro, pagar una tasa de R$ 15 por Pix, un plazo de 20:00 y el texto en portugués" data-zoom>
+        <div class="fila-lista">
+          <h3>Y en el teléfono, Civitas no descansa</h3>
+          <ul>
+            <li><strong>Estafas.</strong> Marca lo sospechoso del mensaje y decide: seguir, ignorar o reportar. Caer cuesta reales.</li>
+            <li><strong>Tu foto, tu decisión.</strong> Antes de publicar una foto, marca lo que conviene ocultar.</li>
+            <li><strong>Tiempo de pantalla.</strong> El feed te lo cuenta, y tú decides cuánto dura.</li>
+          </ul>
+        </div>
+      </article>
+      <article class="fila">
+        <img src="img/dilema.jpg" width="1400" height="788" loading="lazy" alt="Un dilema en viñeta de cómic: «La foto del cumple». Una fiesta sorpresa en la vereda quedó en una foto que enseña el número de la casa y el letrero de la calle, y hay que decidir si publicarla" data-zoom>
+        <div class="fila-lista">
+          <h3>Dilemas sin respuesta correcta</h3>
+          <ul>
+            <li><strong>Once situaciones.</strong> La foto del cumple, mañana no hay agua, un domingo sin pantalla. Ninguna opción es gratis.</li>
+            <li><strong>Con consecuencia.</strong> Lo que eliges tiene un efecto inmediato y otro que llega entre 24 y 48 horas después, contado con palabras y no con cifras.</li>
+            <li><strong>Rectificar.</strong> Lo que compartiste y resultó falso vuelve a tu bandeja. Puedes rectificar, borrar en silencio o defenderlo. Borrar no deshace el daño.</li>
+          </ul>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ROLES -->
+<section class="banda" id="roles" aria-labelledby="t-roles">
+  <div class="envoltorio roles">
+    <div class="roles-imagen">
+      <img src="img/roles.jpg" width="1600" height="900" loading="lazy" alt="Pantalla de elección de rol con cuatro jugadores: ciudadano, periodista, influencer y candidato a alcalde" data-zoom>
+    </div>
+    <div class="roles-texto">
+      <p class="etiqueta">Elige quién eres</p>
+      <h2 id="t-roles">Cuatro roles, cuatro maneras de mirar el rumor</h2>
+      <dl class="lista-roles">
+        <div><dt>Ciudadano</dt><dd>Vecino común: lo que comparte influye en su barrio.</dd></div>
+        <div><dt>Periodista</dt><dd>Verifica los hechos y decide qué se publica.</dd></div>
+        <div><dt>Influencer</dt><dd>Su alcance es enorme: cada publicación se viraliza.</dd></div>
+        <div><dt>Candidato a alcalde</dt><dd>Busca ganar la confianza de Ciudad Nova.</dd></div>
+      </dl>
+      <p class="nota">Juega solo, o hasta cuatro personas por turnos en el mismo equipo. También hay un modo cooperativo en línea opcional.</p>
+    </div>
+  </div>
+</section>
+
+<!-- RECORRIDO -->
+<section class="banda banda-sol" id="recorrido" aria-labelledby="t-recorrido">
+  <div class="envoltorio">
+    <header class="encabezado">
+      <p class="etiqueta">Ciudad Nova</p>
+      <h2 id="t-recorrido">Una favela en la ladera, con once lugares por recorrer</h2>
+      <p class="intro">Más de trescientas casas, escaleras, callejones, plazas, una cancha y un mercado. Nombres en portugués con su glosa en español.</p>
+    </header>
+  </div>
+  <div class="galeria-marco">
+    <div class="galeria" id="galeria" role="region" aria-roledescription="carrusel" aria-label="Galería de Ciudad Nova" tabindex="0">
+      <figure><img src="img/mundo-fuente.jpg" width="1600" height="900" loading="lazy" alt="La fuente de la plaza con puestos de trabajo detrás" data-zoom><figcaption>La plaza de la fuente</figcaption></figure>
+      <figure><img src="img/mundo-padaria.jpg" width="1600" height="900" loading="lazy" alt="La panadería con una bici de reparto" data-zoom><figcaption>La panadería y su bici</figcaption></figure>
+      <figure><img src="img/mundo-hospital.jpg" width="1600" height="900" loading="lazy" alt="Frente al Hospital Santa Casa" data-zoom><figcaption>Hospital Santa Casa</figcaption></figure>
+      <figure><img src="img/mundo-morro.jpg" width="1600" height="900" loading="lazy" alt="El Morro da Esperança con sus casas en la ladera" data-zoom><figcaption>Morro da Esperança</figcaption></figure>
+      <figure><img src="img/mundo-parque.jpg" width="1600" height="900" loading="lazy" alt="El parque con árboles y una plaza de colores" data-zoom><figcaption>El parque</figcaption></figure>
+      <figure><img src="img/mundo-rodoviaria.jpg" width="1600" height="900" loading="lazy" alt="La Rodoviária con el puesto de mototaxi y entregas" data-zoom><figcaption>La Rodoviária</figcaption></figure>
+      <figure><img src="img/menu.jpg" width="1600" height="900" loading="lazy" alt="Pantalla de inicio del juego con el título Alcalde Digital sobre un atardecer" data-zoom><figcaption>La pantalla de inicio</figcaption></figure>
+    </div>
+    <p class="solo-lectores" id="gal-estado" role="status" aria-live="polite"></p>
+    <div class="galeria-botones">
+      <button class="boton-redondo" id="gal-prev" aria-label="Anterior">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="boton-redondo" id="gal-sig" aria-label="Siguiente">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- CONTROLES -->
+<section class="banda" id="controles" aria-labelledby="t-controles">
+  <div class="envoltorio">
+    <header class="encabezado">
+      <p class="etiqueta">Teclado o mando</p>
+      <h2 id="t-controles">Se juega con lo que tengas a mano</h2>
+      <p class="intro">El juego reconoce el mando al enchufarlo. Con el palo izquierdo mueves el cursor en los menús y A hace clic.</p>
+    </header>
+    <div class="controles">
+      <section aria-labelledby="t-teclado">
+        <h3 id="t-teclado">Teclado y ratón</h3>
+        <ul class="teclas">
+          <li><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span> Mover</li>
+          <li><kbd>Shift</kbd> Correr</li>
+          <li><kbd>Espacio</kbd> Saltar</li>
+          <li><kbd>E</kbd> Interactuar y entrar</li>
+          <li><kbd>Tab</kbd> Teléfono de Civitas</li>
+          <li><kbd>M</kbd> Seguir la misión</li>
+          <li><kbd>N</kbd> Mapa de la ciudad</li>
+          <li><kbd>I</kbd> Inventario</li>
+          <li><kbd>B</kbd> Leyenda de las manillas</li>
+          <li><kbd>Esc</kbd> Pausa</li>
+        </ul>
+      </section>
+      <section aria-labelledby="t-mando">
+        <h3 id="t-mando">Mando</h3>
+        <ul class="teclas">
+          <li><span class="mando">Palo izq.</span> Caminar</li>
+          <li><span class="mando">Palo der.</span> Girar la cámara</li>
+          <li><span class="mando">A</span> Saltar</li>
+          <li><span class="mando">B</span> Interactuar</li>
+          <li><span class="mando">Y</span> Teléfono</li>
+          <li><span class="mando">RB</span> Correr</li>
+          <li><span class="mando">Inicio</span> Pausa</li>
+        </ul>
+        <p class="nota">En los menús, el palo izquierdo mueve el cursor y A hace clic. Para escribir un alias en el modo en línea sigue haciendo falta teclado.</p>
+      </section>
+    </div>
+    <p class="nota nota-centro">Pensado para ser legible: tipografía Atkinson Hyperlegible, filtros de daltonismo en Ajustes, y ningún estado que dependa solo del color.</p>
+  </div>
+</section>
+
+<!-- DESCARGAR -->
+<section class="descarga" id="descargar" aria-labelledby="t-descarga">
+  <div class="envoltorio descarga-rejilla">
+    <div class="descarga-cabeza">
+      <p class="etiqueta etiqueta-oscura">Beta gratuita</p>
+      <h2 id="t-descarga">Descarga Alcalde Digital</h2>
+      <p>Una partida dura unos 30 minutos. El instalador prepara todo lo que el juego necesita, así que no tienes que instalar nada más.</p>
+      <div class="descargas">
+        <a class="boton boton-primario boton-grande" id="dl-win" href="descargas/AlcaldeDigital-Windows.zip" download>
+          Descargar para Windows <span class="boton-nota">.zip · 32 MB</span>
+        </a>
+        <a class="boton boton-papel boton-grande" id="dl-mac" href="descargas/AlcaldeDigital-macOS-Linux.zip" download>
+          Descargar para macOS y Linux <span class="boton-nota">.zip · 32 MB</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="instala">
+      <h3>Instálalo en tres pasos</h3>
+      <p class="tiempo">Unos 5 minutos la primera vez, casi todo esperando las descargas.</p>
+      <div class="so" role="tablist" aria-label="Sistema operativo">
+        <button role="tab" id="so-win" aria-controls="p-win" aria-selected="true" class="chip" tabindex="0">Windows <small>(sin probar)</small></button>
+        <button role="tab" id="so-mac" aria-controls="p-mac" aria-selected="false" class="chip" tabindex="-1">macOS</button>
+        <button role="tab" id="so-lin" aria-controls="p-lin" aria-selected="false" class="chip" tabindex="-1">Linux <small>(sin probar)</small></button>
+      </div>
+      <div id="p-win" role="tabpanel" aria-labelledby="so-win" class="so-panel">
+        <ol>
+          <li>Descarga el .zip y descomprímelo entero (clic derecho, «Extraer todo»).</li>
+          <li>Haz doble clic en <code>Instalar.bat</code>. Descarga e instala solo lo necesario, Python incluido, en una carpeta privada del juego. Si Windows avisa «Windows protegió su PC», pulsa «Más información» y luego «Ejecutar de todas formas».</li>
+          <li>Abre <strong>Alcalde Digital</strong> desde el escritorio o el menú Inicio.</li>
+        </ol>
+      </div>
+      <div id="p-mac" role="tabpanel" aria-labelledby="so-mac" class="so-panel" hidden>
+        <ol>
+          <li>Descarga el .zip y descomprímelo.</li>
+          <li>Haz doble clic en <code>Instalar.command</code>. Si macOS dice que es de un desarrollador no identificado, clic derecho, «Abrir» y «Abrir» otra vez.</li>
+          <li>Para jugar, doble clic en <code>Jugar.command</code>.</li>
+        </ol>
+      </div>
+      <div id="p-lin" role="tabpanel" aria-labelledby="so-lin" class="so-panel" hidden>
+        <ol>
+          <li>Descarga el .zip y descomprímelo.</li>
+          <li>Abre una terminal en esa carpeta y ejecuta:
+            <div class="cmd"><code>./instalar.sh</code><button class="copiar" data-copiar="./instalar.sh" aria-label="Copiar ./instalar.sh">Copiar</button></div></li>
+          <li>Para jugar:
+            <div class="cmd"><code>./jugar.sh</code><button class="copiar" data-copiar="./jugar.sh" aria-label="Copiar ./jugar.sh">Copiar</button></div></li>
+        </ol>
+      </div>
+      <ul class="requisitos">
+        <li>Solo necesitas internet para instalar. Se descarga el motor del juego (unos 600 MB en total); después juegas sin conexión.</li>
+        <li><strong>Estado de la beta:</strong> el instalador de macOS está probado. Los de Windows y Linux son nuevos y todavía no se han probado en esos sistemas.</li>
+      </ul>
+      <details class="verificar">
+        <summary>Verificar los archivos descargados (SHA-256)</summary>
+        <p>La huella de cada .zip debe coincidir con esta:</p>
+        <p class="huella-nombre">Windows</p><code id="sha-win">3e0c22077b0676009f01ced8a09eec486fef430a32b76c282e8efbf12dd68029</code>
+        <p class="huella-nombre">macOS y Linux</p><code id="sha-mac">94517a62316ccd29e5cfeffda1fe616ab8e6276569587a6df02e0dae4946eb9d</code>
+      </details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="pie">
+  <div class="envoltorio pie-fila">
+    <div>
+      <a class="marca marca-pie" href="#inicio" aria-label="Alcalde Digital, inicio"><span class="marca-alcalde">ALCALDE</span><span class="marca-digital">DIGITAL</span></a>
+      <p>Proyecto de aprendizaje sobre desinformación. Personas, lugares, noticias y candidatos son ficticios.</p>
+    </div>
+    <div>
+      <p><a href="legal.html">Aviso de uso, privacidad, créditos y clasificación</a></p>
+      <p>Esta página no usa cookies ni rastreadores.</p>
+    </div>
+  </div>
+</footer>
+
+<dialog id="visor" aria-label="Imagen ampliada">
+  <form method="dialog"><button class="visor-cerrar" aria-label="Cerrar">Cerrar</button></form>
+  <img id="visor-img" alt="">
+  <p id="visor-pie"></p>
+</dialog>
+
+<p class="solo-lectores" id="aviso-copiado" role="status" aria-live="polite"></p>
+<script src="app.js"></script>
+</body>
+</html>
