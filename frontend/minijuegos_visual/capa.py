@@ -102,6 +102,8 @@ class CapaVisual:
         self._fx.sello(texto, posicion=self.posicion_sello(), retardo=retardo + 0.15)
         cantidad = calc.estrellas(resultado.fraccion, resultado.bien, resultado.completado)
         self._fx.estrellas(cantidad, posicion=self.posicion_estrellas(), retardo=retardo + 0.55)
+        if getattr(self, "es_tutorial", False):      # tutorial de la primera vez: se ve el sello y las estrellas, pero NO se anota nada
+            return
         from backend.logica import logros_minijuegos
         perfecto = cantidad == 3
         anotado = logros_minijuegos.registrar(getattr(self.mision, "id", ""), resultado.minijuego, cantidad, perfecto)

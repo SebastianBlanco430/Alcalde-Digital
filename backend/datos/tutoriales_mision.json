@@ -1,0 +1,1418 @@
+{
+  "contrarreloj": {
+    "titulo": "Contrarreloj: frena lo falso a tiempo",
+    "frase": "Lo urgente se comparte sin pensar: tómate unos segundos antes de reenviar.",
+    "n_focos": 3,
+    "caso_demo": {
+      "intro": "Práctica: tres noticias llegan al chat del barrio.",
+      "cartas": [
+        {
+          "texto": "URGENTE: reparten mercados gratis en la plaza, ¡reenvía y corre!",
+          "veraz": false,
+          "ritmo": 8,
+          "aparece": 0.0
+        },
+        {
+          "texto": "La junta de vecinos se reúne el sábado en la cancha.",
+          "veraz": true,
+          "ritmo": 4,
+          "aparece": 0.5
+        }
+      ],
+      "mision": {
+        "texto": "El comedor del barrio abre el lunes a las 12.",
+        "veraz": true,
+        "ritmo": 1000000,
+        "aparece": 5.2
+      }
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Llegan noticias al chat y cada una se va difundiendo sola.",
+        "foco": 0
+      },
+      {
+        "accion": "esperar",
+        "s": 1.5,
+        "avanza": 1.5
+      },
+      {
+        "accion": "mover",
+        "foco": 0,
+        "s": 0.6
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Esta es falsa: se frena con FRENAR (tecla F) antes de que la barra se llene.",
+        "foco": 0
+      },
+      {
+        "accion": "tecla",
+        "k": "f"
+      },
+      {
+        "accion": "error_demo",
+        "foco": 1,
+        "texto": "Si se llena, no cuenta: decide antes de que llegue al final.",
+        "s": 3.0,
+        "avanza": 3.4
+      },
+      {
+        "accion": "esperar",
+        "s": 0.8,
+        "avanza": 0.6
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 2,
+        "k": [
+          "d",
+          "right arrow"
+        ],
+        "texto": "Ahora tú: esta noticia es cierta. Déjala pasar con DEJAR PASAR (tecla D).",
+        "si_falla": "Esa noticia es cierta: frenarla la pierde. Prueba con DEJAR PASAR (tecla D)."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "rastrear": {
+    "titulo": "Rastrear la fuente: busca quién lo dijo primero",
+    "frase": "Antes de compartir, busca quién lo publicó primero.",
+    "n_focos": 3,
+    "caso_demo": {
+      "intro": "Práctica: un aviso sobre la feria llegó reenviado.",
+      "hops": [
+        {
+          "pregunta": "Tu primo te lo pasó. ¿De quién lo recibió él?",
+          "opciones": [
+            {
+              "de": "Tía Marta",
+              "hora": "ayer 20:10",
+              "texto": "Me lo contó una vecina: dicen que cierran la feria."
+            },
+            {
+              "de": "Grupo «Primos»",
+              "hora": "hoy 08:00",
+              "texto": "Reenviado muchas veces: ¡cierran la feria!"
+            },
+            {
+              "de": "Lucho",
+              "hora": "hoy 09:30",
+              "texto": "Reenviado: ya lo vio medio barrio."
+            }
+          ]
+        },
+        {
+          "pregunta": "La tía Marta lo sacó de un grupo. ¿Cuál lo publicó antes?",
+          "opciones": [
+            {
+              "de": "Grupo «Feria Viva»",
+              "hora": "ayer 18:30",
+              "texto": "Aviso: la feria cambia de horario el sábado."
+            },
+            {
+              "de": "Grupo «Ofertas»",
+              "hora": "ayer 22:00",
+              "texto": "Reenviado de otro grupo."
+            },
+            {
+              "de": "Vecina Rosa",
+              "hora": "hoy 07:15",
+              "texto": "Reenviado: pásenlo a todos."
+            }
+          ]
+        },
+        {
+          "pregunta": "El grupo lo copió de una cuenta. ¿Cuál es la original?",
+          "opciones": [
+            {
+              "de": "@feria_oficial",
+              "hora": "ayer 09:00",
+              "texto": "Comunicado: la feria cambia de horario el sábado."
+            },
+            {
+              "de": "@chismes_ya",
+              "hora": "ayer 17:45",
+              "texto": "Copiado de @feria_oficial (sin enlace)."
+            },
+            {
+              "de": "Grupo «Alerta»",
+              "hora": "hoy 06:00",
+              "texto": "Reenviado: ¡compartan antes de que lo borren!"
+            }
+          ]
+        }
+      ],
+      "origen": {
+        "titulo": "Origen: @feria_oficial",
+        "detalle": "Cuenta de la junta de la feria. Solo cambió el horario del sábado."
+      }
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Un mensaje llegó reenviado. Sigue la cadena hacia atrás hasta quien lo publicó primero.",
+        "foco": 0
+      },
+      {
+        "accion": "mover",
+        "foco": 1,
+        "s": 0.6
+      },
+      {
+        "accion": "error_demo",
+        "foco": 1,
+        "texto": "«Reenviado» no es una fuente: el hilo se enreda y suma un rodeo.",
+        "s": 2.6
+      },
+      {
+        "accion": "mover",
+        "foco": 0,
+        "s": 0.6
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Esta es la buena: la más antigua y sin «reenviado».",
+        "foco": 0
+      },
+      {
+        "accion": "tecla",
+        "k": "enter"
+      },
+      {
+        "accion": "mover",
+        "foco": 0,
+        "s": 0.6
+      },
+      {
+        "accion": "tecla",
+        "k": "enter"
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 0,
+        "k": [
+          "enter",
+          "space",
+          "1"
+        ],
+        "texto": "Ahora tú: elige el mensaje más antiguo que no diga «reenviado» (Enter o clic).",
+        "si_falla": "Ese es posterior o es un reenvío. Busca el más antiguo, el que no dice «reenviado»."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "comparar": {
+    "titulo": "Comparar versiones: ve al original",
+    "frase": "Una captura se edita en segundos: ve al original antes de creerle a la copia.",
+    "n_focos": 3,
+    "caso_demo": {
+      "intro": "Práctica: un cartel y su copia.",
+      "titulo": "Un cartel de la feria",
+      "original": "El cartel de la feria",
+      "copia": "La copia que circula",
+      "es_verdadera": false,
+      "lineas": [
+        {
+          "e": "Evento",
+          "o": "Feria del barrio"
+        },
+        {
+          "e": "Entrada",
+          "o": "R$ 5",
+          "c": "R$ 50"
+        },
+        {
+          "e": "Día",
+          "o": "Sábado a las 10"
+        }
+      ]
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "A la izquierda, lo que de verdad se dijo. A la derecha, la copia que circula.",
+        "foco": 0
+      },
+      {
+        "accion": "mover",
+        "foco": 0,
+        "s": 0.6
+      },
+      {
+        "accion": "error_demo",
+        "foco": 0,
+        "texto": "Si es igual al original, déjala: no marques lo que no cambió.",
+        "s": 2.6
+      },
+      {
+        "accion": "tecla",
+        "k": "enter"
+      },
+      {
+        "accion": "mover",
+        "foco": 1,
+        "s": 0.6
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Aquí sí: «R$ 5» pasó a «R$ 50». Una captura se edita en segundos.",
+        "foco": 1
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 1,
+        "k": [
+          "c"
+        ],
+        "texto": "Ahora tú: marca la línea alterada (Enter) y pulsa «Confirmar marcas» (tecla C).",
+        "si_falla": "Marca solo la línea que cambió y confirma. Si es igual al original, déjala sin marcar."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "cronologia": {
+    "titulo": "Cronología: ordena cómo se fue contando",
+    "frase": "La última versión suele ser la más exagerada: busca la primera.",
+    "n_focos": 3,
+    "caso_demo": {
+      "intro": "Práctica: tres mensajes sobre la feria.",
+      "titulo": "La feria",
+      "orden_inicial": [
+        2,
+        1,
+        0
+      ],
+      "cierre": "Lo primero que se dijo era un aviso sencillo.",
+      "items": [
+        {
+          "quien": "Cultura municipal",
+          "texto": "Aviso: la feria abre el sábado a las 10.",
+          "hora": "lunes 09:10"
+        },
+        {
+          "quien": "Radio del barrio",
+          "texto": "Confirmaron la feria junto a la cancha.",
+          "hora": "lunes 12:30"
+        },
+        {
+          "quien": "Grupo «Vecinos»",
+          "texto": "Reenviado: ¡todos a la feria, ya llegan miles!",
+          "hora": "martes 08:00"
+        }
+      ]
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Estos mensajes llegaron desordenados. Hay que ponerlos en el orden en que se dijeron.",
+        "foco": 0
+      },
+      {
+        "accion": "mover",
+        "foco": 2,
+        "s": 0.6
+      },
+      {
+        "accion": "tecla",
+        "k": "enter"
+      },
+      {
+        "accion": "tecla",
+        "k": "up arrow"
+      },
+      {
+        "accion": "tecla",
+        "k": "enter"
+      },
+      {
+        "accion": "error_demo",
+        "foco": 1,
+        "texto": "Aquí no: la hora de este mensaje es anterior a la de los de arriba.",
+        "s": 2.6
+      },
+      {
+        "accion": "tecla",
+        "k": "enter"
+      },
+      {
+        "accion": "tecla",
+        "k": "up arrow"
+      },
+      {
+        "accion": "tecla",
+        "k": "enter"
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Así: lo primero que se dijo va arriba.",
+        "foco": 0
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 2,
+        "k": [
+          "c"
+        ],
+        "texto": "Ahora tú: sube el último mensaje (Enter, flecha arriba, Enter) y pulsa «Comprobar» (tecla C).",
+        "si_falla": "Aún no está en orden: lo más antiguo va arriba y lo más nuevo abajo. Mira las horas."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "chat": {
+    "titulo": "Chat del barrio: no regales datos de nadie",
+    "frase": "Los datos tuyos y de tus amigos no se comparten porque alguien insista.",
+    "n_focos": 3,
+    "caso_demo": {
+      "intro": "Práctica: el grupo te escribe y tú decides.",
+      "titulo": "Chat «Mutirão de la calle»",
+      "amigo": "Dani",
+      "turnos": [
+        {
+          "de": "Marcela (organizadora)",
+          "texto": "Necesito el número de cuenta de Dani, que no me contesta. ¿Me lo pasas?",
+          "segundos": 20,
+          "opciones": [
+            {
+              "texto": "Eso se lo tienes que pedir a Dani, no a mí.",
+              "valor": 2,
+              "reaccion": "Marcela: «Está bien, qué difícil»."
+            },
+            {
+              "texto": "Es 4455-0021, pero no lo repitas.",
+              "valor": 0,
+              "reaccion": "Marcela: «Ya lo tengo, gracias»."
+            },
+            {
+              "texto": "No sé, creo que lo tiene su hijo.",
+              "valor": 1,
+              "reaccion": "Marcela: «¿Y su hijo cuál es?»."
+            }
+          ]
+        },
+        {
+          "de": "Vecina Gloria",
+          "texto": "Si no dan los datos, los tachan de la lista. ¿Todos de acuerdo?",
+          "segundos": 20,
+          "opciones": [
+            {
+              "texto": "En las planillas solo piden nombre y calle: no hace falta cuenta.",
+              "valor": 2,
+              "reaccion": "Gloria: «Cierto, no lo había pensado»."
+            },
+            {
+              "texto": "Sí, que todos los den para evitar problemas.",
+              "valor": 0,
+              "reaccion": "Gloria: «Perfecto, lo anoto»."
+            },
+            {
+              "texto": "Que cada uno decida qué datos da.",
+              "valor": 1,
+              "reaccion": "Gloria: «Hmm, bueno»."
+            }
+          ]
+        }
+      ]
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "El grupo te pide el número de cuenta de tu amigo Dani y no para de escribir.",
+        "foco": 0
+      },
+      {
+        "accion": "esperar",
+        "s": 1.5,
+        "avanza": 4
+      },
+      {
+        "accion": "mover",
+        "foco": 1,
+        "s": 0.6
+      },
+      {
+        "accion": "error_demo",
+        "foco": 1,
+        "texto": "Mira qué entregas antes de enviar: esta respuesta suelta un dato de Dani.",
+        "s": 2.6
+      },
+      {
+        "accion": "mover",
+        "foco": 0,
+        "s": 0.6
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Esta protege a tu amigo: que se lo pida él mismo.",
+        "foco": 0
+      },
+      {
+        "accion": "tecla",
+        "k": "enter"
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 0,
+        "k": [
+          "1",
+          "enter"
+        ],
+        "texto": "Ahora tú: elige la respuesta que no entrega datos de nadie. No hay prisa.",
+        "si_falla": "Esa respuesta entrega o promete un dato. Elige la que no suelta nada de nadie."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "senales": {
+    "titulo": "Señales de edición: busca lo que no puede ser",
+    "frase": "Si te prometen premios por reenviar, desconfía.",
+    "n_focos": 4,
+    "caso_demo": {
+      "intro": "Práctica: una captura sospechosa.",
+      "titulo": "Una captura de «premios»",
+      "max_marcas": 3,
+      "es_verdadera": false,
+      "zonas": [
+        {
+          "id": "z1",
+          "texto": "Hoy 25:61",
+          "lupa": "La hora del mensaje",
+          "falla": true,
+          "explica": "La hora no existe: no hay 25:61."
+        },
+        {
+          "id": "z2",
+          "texto": "Retira tu premio en la plaza este sábado",
+          "lupa": "El lugar y el día del premio",
+          "falla": false,
+          "explica": "Un dato concreto no prueba nada por sí solo."
+        },
+        {
+          "id": "z3",
+          "texto": "Reenvía este mensaje a 10 contactos para ganar",
+          "lupa": "Lo que pide a cambio",
+          "falla": true,
+          "explica": "Un premio a cambio de reenviar es el mecanismo de una cadena."
+        }
+      ]
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Busca lo que no puede ser. La lupa te dice qué mira cada zona, sin delatar si está bien.",
+        "foco": 1
+      },
+      {
+        "accion": "mover",
+        "foco": 1,
+        "s": 0.6
+      },
+      {
+        "accion": "error_demo",
+        "foco": 1,
+        "texto": "Esta zona es normal: marcarla sería una falsa alarma.",
+        "s": 2.6
+      },
+      {
+        "accion": "tecla",
+        "k": "enter"
+      },
+      {
+        "accion": "mover",
+        "foco": 0,
+        "s": 0.6
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Una hora «25:61» no existe: alguien editó la captura.",
+        "foco": 0
+      },
+      {
+        "accion": "tecla",
+        "k": "enter"
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 2,
+        "k": [
+          "c"
+        ],
+        "texto": "Ahora tú: marca la segunda pista (Enter) y pulsa «Confirmar marcas» (tecla C).",
+        "si_falla": "Aún no: marca solo las dos pistas, la hora imposible y el premio por reenviar, y confirma."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "investigacion": {
+    "titulo": "Investigación: una pregunta y una prueba",
+    "frase": "Una buena pregunta y una prueba vencen a cualquier rumor.",
+    "n_focos": 4,
+    "caso_demo": {
+      "archivo": "casos_demo/tutorial_interrogatorio.json"
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Interrogas a un sospechoso: elige una pregunta y escucha qué responde.",
+        "foco": 0
+      },
+      {
+        "accion": "mover",
+        "foco": 0,
+        "s": 0.6
+      },
+      {
+        "accion": "tecla",
+        "k": "1"
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Mira su gesto: cada respuesta cambia cómo se ve. Sigue la conversación.",
+        "foco": 0
+      },
+      {
+        "accion": "tecla",
+        "k": "enter"
+      },
+      {
+        "accion": "mover",
+        "foco": 2,
+        "s": 0.6
+      },
+      {
+        "accion": "tecla",
+        "k": "3"
+      },
+      {
+        "accion": "mover",
+        "foco": 0,
+        "s": 0.6
+      },
+      {
+        "accion": "error_demo",
+        "foco": 0,
+        "texto": "Elige la prueba que choca con lo que dijo: esta no encaja y se burla.",
+        "s": 2.6
+      },
+      {
+        "accion": "mover",
+        "foco": 2,
+        "s": 0.6
+      },
+      {
+        "accion": "tecla",
+        "k": "3"
+      },
+      {
+        "accion": "mover",
+        "foco": 1,
+        "s": 0.6
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Esta sí choca con lo que dijo: la captura muestra la hora real.",
+        "foco": 1
+      },
+      {
+        "accion": "tecla",
+        "k": "2"
+      },
+      {
+        "accion": "tecla",
+        "k": "enter"
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 0,
+        "k": [
+          "1"
+        ],
+        "texto": "Ahora tú: señala a quien escribió el mensaje. Hay una sola respuesta resaltada.",
+        "si_falla": "Esa persona no escribió el mensaje: la prueba señalaba a otra. Prueba con la resaltada."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "parkour": {
+    "titulo": "Parkour: sube hasta el orbe de evidencia",
+    "frase": "Un dato falso se rompe en cuanto lo pisas: compruébalo antes de apoyarte en él.",
+    "n_focos": 1,
+    "oscuro": false,
+    "caso_demo": {
+      "nota": "se usa el nivel real con una simulación de práctica propia"
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Este es el mundo digital. Tu meta: llegar al orbe de evidencia al final de la ruta.",
+        "s": 3.6
+      },
+      {
+        "accion": "camara",
+        "a": "meta",
+        "s": 3.5
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Las plataformas con glitch son datos falsos: se rompen al pisarlas.",
+        "s": 3.3
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Toca el orbe para conseguir la evidencia.",
+        "s": 2.4
+      },
+      {
+        "accion": "camara",
+        "a": "inicio",
+        "s": 1.5
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Tu mejor tiempo vuelve como corredor fantasma y te da medallas.",
+        "s": 3.3
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 0,
+        "k": [
+          "space"
+        ],
+        "texto": "Ahora tú: pulsa ESPACIO para saltar. El reloj está parado.",
+        "texto2": "Muy bien. Ahora corre con W y pulsa ESPACIO a la vez: corre y salta.",
+        "si_falla": "Para correr y saltar, mantén W (o una flecha) y pulsa ESPACIO."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "parkour_boton2": {
+    "titulo": "Novedad: el segundo botón del parkour",
+    "rotulo": "Novedad: segundo botón",
+    "frase": "Algunas pruebas se consiguen jugando: el parkour te lleva a ellas.",
+    "n_focos": 1,
+    "caso_demo": {},
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Novedad: con este botón (tecla U) entras al segundo sector del parkour, sin cerrar el caso.",
+        "foco": 0,
+        "s": 4.5
+      }
+    ]
+  },
+  "civitas_estafas": {
+    "titulo": "Estafas: marca lo sospechoso antes de decidir",
+    "frase": "Si te apuran a pagar o a compartir, es mejor frenar y preguntar.",
+    "n_focos": 4,
+    "caso_demo": {
+      "archivo": "casos_demo/tutorial_civitas.json"
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Te llega un mensaje por Civitas. Antes de decidir, marca lo que te parezca sospechoso.",
+        "foco": 0
+      },
+      {
+        "accion": "mover",
+        "foco": 0,
+        "s": 0.6
+      },
+      {
+        "accion": "tecla",
+        "k": "1"
+      },
+      {
+        "accion": "mover",
+        "foco": 1,
+        "s": 0.6
+      },
+      {
+        "accion": "tecla",
+        "k": "2"
+      },
+      {
+        "accion": "mover",
+        "foco": 2,
+        "s": 0.6
+      },
+      {
+        "accion": "error_demo",
+        "foco": 2,
+        "texto": "Reportarlo todo también es un error: hay mensajes legítimos.",
+        "s": 2.6
+      },
+      {
+        "accion": "tecla",
+        "k": "3"
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 3,
+        "k": [
+          "4"
+        ],
+        "texto": "Ahora tú: marca la prisa de este mensaje («solo hoy»).",
+        "si_falla": "Esa parte no es la prisa. Busca lo que te apura a decidir ya."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Ahora decide. Si pagas, pierdes plata de verdad: mira cómo salen las monedas (aquí no se descuenta nada).",
+        "foco": 0,
+        "etapa": 2,
+        "s": 4.0
+      },
+      {
+        "accion": "tecla",
+        "k": "enter",
+        "etapa": 2
+      },
+      {
+        "accion": "tecla",
+        "k": "1",
+        "etapa": 2
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Así se ve el costo de caer. Por eso se marca antes de decidir.",
+        "etapa": 2,
+        "s": 3.0
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "civitas_foto": {
+    "titulo": "Publicar una foto: tapa lo que te delata",
+    "frase": "Lo que dejas a la vista lo usa la próxima estafa: tapa lo personal antes de publicar.",
+    "n_focos": 3,
+    "caso_demo": {
+      "archivo": "casos_demo/tutorial_civitas.json"
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Vas a publicar una foto. Marca lo que quieres TAPAR con una pegatina antes de subirla.",
+        "foco": 0
+      },
+      {
+        "accion": "mover",
+        "foco": 1,
+        "s": 0.6
+      },
+      {
+        "accion": "tecla",
+        "k": "2"
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "El número de tu casa queda tapado. Lo que dejas a la vista lo usa la próxima estafa.",
+        "foco": 1
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 0,
+        "k": [
+          "1"
+        ],
+        "texto": "Ahora tú: tapa el uniforme con el nombre de tu escuela.",
+        "si_falla": "Esa parte no delata nada. Busca lo que dice dónde estás o dónde vives: el uniforme."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Ahora publica con lo marcado tapado y mira qué pasa (aquí no se publica nada de verdad).",
+        "foco": 0,
+        "etapa": 2,
+        "s": 3.5
+      },
+      {
+        "accion": "tecla",
+        "k": "enter",
+        "etapa": 2
+      },
+      {
+        "accion": "tecla",
+        "k": "1",
+        "etapa": 2
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Tapar lo personal no cuesta nada y evita estafas mañana.",
+        "etapa": 2,
+        "s": 3.0
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "civitas_pantalla": {
+    "titulo": "Tiempo de pantalla: el feed se come tus minutos",
+    "frase": "Cada publicación que deslizas gasta minutos de tu semana: decide cuándo parar.",
+    "n_focos": 1,
+    "caso_demo": {
+      "archivo": "casos_demo/tutorial_civitas.json"
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Este es el feed de Civitas: puedes deslizar publicación tras publicación.",
+        "foco": 0
+      },
+      {
+        "accion": "mover",
+        "foco": 0,
+        "s": 0.6
+      },
+      {
+        "accion": "tecla",
+        "k": "space",
+        "s": 1.2
+      },
+      {
+        "accion": "tecla",
+        "k": "space",
+        "s": 1.2
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Mira la batería y la luz del teléfono: bajan con cada publicación.",
+        "foco": 0
+      },
+      {
+        "accion": "tecla",
+        "k": "space",
+        "s": 1.2
+      },
+      {
+        "accion": "tecla",
+        "k": "space",
+        "s": 1.2
+      },
+      {
+        "accion": "tecla",
+        "k": "space",
+        "s": 1.2
+      },
+      {
+        "accion": "tecla",
+        "k": "space",
+        "s": 1.2
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Cada publicación gasta minutos de tu semana. Tú decides cuándo cerrar.",
+        "foco": 0,
+        "s": 4.5
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 4.5
+      }
+    ]
+  },
+  "rectificar": {
+    "titulo": "Rectificar: corrige en público",
+    "frase": "Si compartiste algo falso, corrígelo en público.",
+    "n_focos": 3,
+    "caso_demo": {
+      "archivo": "casos_demo/tutorial_civitas.json"
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Compartiste algo que no era cierto. Primero marca la evidencia de por qué fue un error.",
+        "foco": 0
+      },
+      {
+        "accion": "mover",
+        "foco": 0,
+        "s": 0.6
+      },
+      {
+        "accion": "tecla",
+        "k": "1"
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 1,
+        "k": [
+          "2"
+        ],
+        "texto": "Ahora tú: marca la segunda evidencia (lo reenviaste sin leer).",
+        "si_falla": "Esa no es la evidencia. Busca lo que hiciste mal: reenviar sin leer."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Ahora decide qué hacer: mira qué pasa si borras la publicación (aquí no cambia nada de verdad).",
+        "foco": 1,
+        "etapa": 2,
+        "s": 4.0
+      },
+      {
+        "accion": "tecla",
+        "k": "enter",
+        "etapa": 2
+      },
+      {
+        "accion": "tecla",
+        "k": "2",
+        "etapa": 2
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Borrar no deshace el daño: la publicación reaparece como captura. Rectificar sí baja el daño.",
+        "etapa": 2,
+        "s": 4.0
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "dilemas": {
+    "titulo": "Dilemas: no hay una única respuesta",
+    "frase": "Lo que decides hoy vuelve en uno o dos días: piensa antes de compartir.",
+    "n_focos": 3,
+    "caso_demo": {
+      "archivo": "casos_demo/tutorial_civitas.json"
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "No hay una única respuesta correcta: cada opción tiene su consecuencia.",
+        "foco": 0,
+        "s": 4.4
+      },
+      {
+        "accion": "mover",
+        "foco": 1,
+        "s": 0.6
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Lo que elijas hoy vuelve en uno o dos días.",
+        "foco": 1,
+        "s": 3.6
+      },
+      {
+        "accion": "tecla",
+        "k": "2"
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Mañana vuelve la consecuencia de lo que elegiste. Mira el panel de «Mañana…».",
+        "s": 4.6
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Si lo dejas pasar, también tiene consecuencia.",
+        "s": 4.0
+      },
+      {
+        "accion": "esperar",
+        "s": 1.5
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 3.0
+      }
+    ]
+  },
+  "trabajo_atender": {
+    "titulo": "Atender: sirve el pedido sin pasarte",
+    "frase": "Fijarte bien en lo que piden evita errores y clientes enojados.",
+    "n_focos": 4,
+    "caso_demo": {
+      "nota": "se usa el puesto real con una copia de práctica: sin paga ni fatiga"
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Llega un cliente con un pedido. Pulsa la tecla de cada producto que pide.",
+        "foco": 0,
+        "s": 3.4
+      },
+      {
+        "accion": "mover",
+        "foco": 2,
+        "s": 0.6
+      },
+      {
+        "accion": "error_demo",
+        "foco": 2,
+        "texto": "Si das un producto de más o equivocado, el cliente pierde paciencia y el pedido empieza otra vez.",
+        "s": 3.2
+      },
+      {
+        "accion": "mover",
+        "foco": 0,
+        "s": 0.6
+      },
+      {
+        "accion": "tecla",
+        "k": "auto"
+      },
+      {
+        "accion": "tecla",
+        "k": "auto"
+      },
+      {
+        "accion": "mover",
+        "foco": 1,
+        "s": 0.6
+      },
+      {
+        "accion": "tecla",
+        "k": "auto"
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Pedido completo: ¡bien! Cada acierto suma a tu paga.",
+        "foco": 1,
+        "s": 3.0
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 3,
+        "k": [
+          "4"
+        ],
+        "texto": "Ahora tú: sirve un pedido de 1 producto. Pulsa la tecla resaltada.",
+        "si_falla": "Ese no es el producto que pide el cliente. Mira el pedido y pulsa la tecla del producto resaltado."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora tu turno de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "trabajo_secuencia": {
+    "titulo": "Secuencia: repite las flechas en orden",
+    "frase": "Hacer las cosas en orden y con calma evita repetirlas.",
+    "n_focos": 1,
+    "caso_demo": {
+      "nota": "se usa el puesto real con una copia de práctica: sin paga ni fatiga"
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Para reparar el PC, repite las flechas en el orden en que aparecen.",
+        "foco": 0,
+        "s": 3.4
+      },
+      {
+        "accion": "error_demo",
+        "foco": 0,
+        "texto": "Un error reinicia la secuencia: hay que empezar otra vez desde la primera flecha.",
+        "s": 3.2
+      },
+      {
+        "accion": "tecla",
+        "k": "auto"
+      },
+      {
+        "accion": "tecla",
+        "k": "auto"
+      },
+      {
+        "accion": "tecla",
+        "k": "auto"
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Secuencia completa: el PC se repara por bloques.",
+        "foco": 0,
+        "s": 3.0
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 0,
+        "k": [
+          "up arrow",
+          "down arrow",
+          "left arrow",
+          "right arrow"
+        ],
+        "texto": "Ahora tú: repite una secuencia de 2 flechas (flechas del teclado o W A S D).",
+        "si_falla": "Esa no es la flecha que toca. Sigue el orden que ves."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora tu turno de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "trabajo_barra": {
+    "titulo": "Barra: pulsa en la zona verde",
+    "frase": "Esperar el momento justo da mejores resultados que apurarse.",
+    "n_focos": 1,
+    "caso_demo": {
+      "nota": "se usa el puesto real con una copia de práctica: sin paga ni fatiga"
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Una marca va y viene. Pulsa ESPACIO cuando esté dentro de la zona verde.",
+        "foco": 0,
+        "s": 3.6
+      },
+      {
+        "accion": "esperar",
+        "s": 1.8,
+        "hasta": "fuera"
+      },
+      {
+        "accion": "error_demo",
+        "foco": 0,
+        "texto": "Fuera de la zona verde, la comida se quema.",
+        "s": 2.6
+      },
+      {
+        "accion": "esperar",
+        "s": 1.8,
+        "hasta": "dentro"
+      },
+      {
+        "accion": "tecla",
+        "k": "space"
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Dentro de la zona: punto perfecto. Más aciertos, más paga.",
+        "foco": 0,
+        "s": 3.2
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 0,
+        "k": [
+          "space"
+        ],
+        "texto": "Ahora tú: pulsa ESPACIO cuando la marca esté dentro de la zona verde.",
+        "si_falla": "Aún no: espera a que la marca entre en la zona verde."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora tu turno de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "trabajo_ritmo": {
+    "titulo": "Ritmo: toca cada flecha a tiempo",
+    "frase": "Cada cosa a su tiempo: el ritmo importa más que la prisa.",
+    "n_focos": 1,
+    "caso_demo": {
+      "nota": "se usa el puesto real con una copia de práctica: sin paga ni fatiga"
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Las flechas viajan por el carril. Pulsa la misma flecha cuando llegue al recuadro.",
+        "foco": 0,
+        "s": 3.6
+      },
+      {
+        "accion": "esperar",
+        "s": 2.4,
+        "hasta": "nota"
+      },
+      {
+        "accion": "tecla",
+        "k": "auto"
+      },
+      {
+        "accion": "esperar",
+        "s": 2.0,
+        "hasta": "nota"
+      },
+      {
+        "accion": "error_demo",
+        "foco": 0,
+        "texto": "Una flecha equivocada deja un defecto en la pieza y baja la calidad.",
+        "s": 2.8
+      },
+      {
+        "accion": "esperar",
+        "s": 2.0,
+        "hasta": "nota"
+      },
+      {
+        "accion": "tecla",
+        "k": "auto"
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Cada acierto es un martillazo: la pieza se va armando.",
+        "foco": 0,
+        "s": 3.0
+      },
+      {
+        "accion": "turno_jugador",
+        "foco": 0,
+        "k": [
+          "up arrow",
+          "down arrow",
+          "left arrow",
+          "right arrow"
+        ],
+        "texto": "Ahora tú: 2 flechas lentas. Pulsa la flecha cuando la nota llegue al recuadro.",
+        "si_falla": "Esa no es la flecha de la nota. Mira hacia dónde apunta."
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora tu turno de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "llegada": {
+    "titulo": "Llegada: cómo te llega una misión",
+    "rotulo": "Tutorial: cómo llega una misión",
+    "frase": "Antes de actuar sobre un rumor, ve a ver qué pasa de verdad.",
+    "n_focos": 3,
+    "oscuro": true,
+    "caso_demo": {
+      "nota": "usa el HUD y la ruta reales"
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Te llegó un rumor: el teléfono vibra cada vez que hay una misión nueva.",
+        "foco": 0,
+        "s": 3.6
+      },
+      {
+        "accion": "camara",
+        "a": "meta",
+        "s": 3.0
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Ve a la puerta marcada: la columna de luz y la línea del mapa te guían hasta allí.",
+        "s": 3.8
+      },
+      {
+        "accion": "camara",
+        "a": "inicio",
+        "s": 1.5
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "El mapa te muestra la ruta paso a paso.",
+        "foco": 1,
+        "s": 3.0
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Los vecinos ya comentan el rumor: escúchalos al acercarte.",
+        "s": 3.2
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Al llegar, aparece el aviso «Pulsa E» en esta zona: así entras a verificar.",
+        "foco": 2,
+        "s": 3.6
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 2.0
+      }
+    ]
+  },
+  "trabajo_entregas": {
+    "titulo": "Entregas en moto: sigue la ruta",
+    "rotulo": "Tutorial: entregas en moto",
+    "frase": "Un buen recorrido ahorra tiempo: sigue la ruta y no te desvíes.",
+    "n_focos": 3,
+    "oscuro": true,
+    "caso_demo": {
+      "nota": "usa la ruta real del primer pedido"
+    },
+    "pasos": [
+      {
+        "accion": "bocadillo",
+        "texto": "Vas a repartir en moto. Te enseñamos el primer destino antes de salir.",
+        "s": 3.4
+      },
+      {
+        "accion": "camara",
+        "a": "meta",
+        "s": 3.2
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Esta baliza marca la entrega: sigue la línea azul del mapa hasta ella.",
+        "s": 3.6
+      },
+      {
+        "accion": "camara",
+        "a": "inicio",
+        "s": 1.5
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "Pasa por encima del punto: no hay que pulsar nada.",
+        "foco": 1,
+        "s": 3.4
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "El tiempo empieza cuando arrancas la moto. ¡Buen viaje!",
+        "s": 3.2
+      },
+      {
+        "accion": "bocadillo",
+        "texto": "¡Listo! Ahora la misión de verdad.",
+        "s": 2.0
+      }
+    ]
+  }
+}

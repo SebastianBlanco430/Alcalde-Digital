@@ -112,6 +112,7 @@ class ControladorJugador(Entity):
             h = v = 0                      # con el teléfono abierto no se camina
         dt = min(dt, DT_MAXIMO)
         velocidad = self.velocidad_correr if (correr and self.velocidad_correr) else self.velocidad
+        velocidad *= min(1.0, math.hypot(h, v))     # MANDO: media inclinación del palo = medio paso (con teclado h, v >= 1: sin cambio)
         dx, dz = navegacion.mover_isometrico(h, v, self._obtener_yaw(), velocidad, dt)
         x0, z0 = jugador.x, jugador.z
         x, z = x0, z0

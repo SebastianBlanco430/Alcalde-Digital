@@ -1,0 +1,156 @@
+{
+  "id": "tutorial_interrogatorio",
+  "titulo": "Práctica de interrogatorio",
+  "resumen": "Un caso mínimo para aprender a interrogar.",
+  "inicio": "n_menu",
+  "rejugable": true,
+  "personajes": {
+    "beto": {
+      "nombre": "Beto Ramos",
+      "rol": "Vecino que reenvió el rumor",
+      "retrato": {
+        "piel": [
+          176,
+          124,
+          92
+        ],
+        "pelo": [
+          30,
+          26,
+          34
+        ],
+        "pelo_estilo": "corto",
+        "ropa": [
+          120,
+          44,
+          64
+        ],
+        "accesorio": "ninguno",
+        "expresiones": [
+          "neutral",
+          "nervioso",
+          "enojado"
+        ]
+      }
+    },
+    "lucia": {
+      "nombre": "Lucía Paz",
+      "rol": "Vecina del grupo",
+      "retrato": {
+        "piel": [
+          236,
+          190,
+          152
+        ],
+        "pelo": [
+          74,
+          42,
+          32
+        ],
+        "pelo_estilo": "largo",
+        "ropa": [
+          66,
+          168,
+          158
+        ],
+        "accesorio": "ninguno",
+        "expresiones": [
+          "neutral",
+          "nervioso",
+          "enojado"
+        ]
+      }
+    }
+  },
+  "evidencias": {
+    "a_foto_vieja": {
+      "nombre": "Foto antigua",
+      "descripcion": "Una foto de la feria del año pasado."
+    },
+    "b_captura_hora": {
+      "nombre": "Captura con la hora",
+      "descripcion": "Muestra que el mensaje salió de la cuenta de Beto a las 03:10."
+    }
+  },
+  "nodos": {
+    "n_menu": {
+      "tipo": "menu",
+      "personaje": "beto",
+      "expresion": "neutral",
+      "texto": "«Yo solo reenvié ese mensaje. No sé quién lo escribió.»",
+      "preguntas": [
+        {
+          "id": "q1",
+          "texto": "¿De quién lo recibiste?",
+          "destino": "n_resp"
+        },
+        {
+          "id": "dejar_pasar",
+          "texto": "Dejar pasar la afirmación",
+          "destino": "n_acusacion",
+          "una_vez": false
+        }
+      ],
+      "contradicciones": [
+        {
+          "evidencia": "b_captura_hora",
+          "destino": "n_contradice",
+          "texto": "La captura lo delata."
+        }
+      ],
+      "error": {
+        "texto": "«Eso no tiene nada que ver con lo que dije.»"
+      }
+    },
+    "n_resp": {
+      "tipo": "dialogo",
+      "personaje": "beto",
+      "expresion": "nervioso",
+      "texto": "«Me lo mandó... eh... alguien del grupo. No me acuerdo quién.»",
+      "siguiente": "@volver"
+    },
+    "n_contradice": {
+      "tipo": "dialogo",
+      "personaje": "beto",
+      "expresion": "enojado",
+      "texto": "«Está bien, lo escribí yo. Pensé que nadie iba a revisar la hora.»",
+      "siguiente": "n_acusacion"
+    },
+    "n_acusacion": {
+      "tipo": "acusacion",
+      "personaje": "beto",
+      "expresion": "neutral",
+      "texto": "Es hora de decidir. ¿A quién señalas como autor del mensaje?",
+      "acusados": [
+        {
+          "id": "acusar_beto",
+          "texto": "Acusar a Beto Ramos",
+          "personaje": "beto",
+          "destino": "f_bien"
+        },
+        {
+          "id": "acusar_lucia",
+          "texto": "Acusar a Lucía Paz",
+          "personaje": "lucia",
+          "destino": "f_mal"
+        }
+      ]
+    },
+    "f_bien": {
+      "tipo": "final",
+      "personaje": "beto",
+      "expresion": "neutral",
+      "resultado": "exito",
+      "titulo": "Caso resuelto",
+      "texto": "Con la prueba correcta, el rumor tiene dueño."
+    },
+    "f_mal": {
+      "tipo": "final",
+      "personaje": "lucia",
+      "expresion": "neutral",
+      "resultado": "fracaso",
+      "titulo": "Acusación equivocada",
+      "texto": "Sin la prueba, se acusó a quien no era."
+    }
+  }
+}

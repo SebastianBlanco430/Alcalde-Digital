@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "_nota": "Eventos de DEMO del tutorial de la bandeja de Civitas. Nunca los carga habitos_digitales para la partida: solo frontend/tutorial_mision_bandeja.py.",
+  "estafas": [
+    {
+      "id": "tutorial_estafa",
+      "titulo": "Premio del sorteo",
+      "remitente": "+55 21 90000-0000 (no está en tus contactos)",
+      "mensaje": "CIVITAS PREMIOS: ganaste R$ 200. Paga la tasa de R$ 15 por Pix solo hoy en civitas-premios.top/liberar",
+      "legitimo": false,
+      "monto": 15,
+      "etiquetas": {
+        "seguir": "Pagar la tasa por Pix",
+        "ignorar": "Ignorarlo",
+        "reportar": "Reportarlo en Civitas"
+      },
+      "elementos": [
+        {
+          "id": "remitente",
+          "texto": "Número que no tienes guardado",
+          "sospechoso": true,
+          "explicacion": "Un premio de verdad no llega de un número suelto."
+        },
+        {
+          "id": "enlace",
+          "texto": "Enlace civitas-premios.top",
+          "sospechoso": true,
+          "explicacion": "No es la dirección de Civitas: copian el nombre y cambian el final."
+        },
+        {
+          "id": "barrio",
+          "texto": "Menciona el nombre de tu barrio",
+          "sospechoso": false,
+          "explicacion": "Que sepan tu barrio no prueba nada: es público."
+        },
+        {
+          "id": "prisa",
+          "texto": "«Solo hoy»",
+          "sospechoso": true,
+          "explicacion": "La prisa es para que no lo pienses ni preguntes a nadie."
+        }
+      ]
+    }
+  ],
+  "publicaciones": [
+    {
+      "id": "tutorial_foto",
+      "titulo": "Foto de tu casa nueva",
+      "descripcion": "Tu foto frente a la puerta, con el uniforme de la escuela puesto. Etiqueta de ubicación activada.",
+      "elementos": [
+        {
+          "id": "uniforme",
+          "texto": "El uniforme con el nombre de la escuela",
+          "sensible": true,
+          "dato": "tu escuela",
+          "explicacion": "Dice dónde pasas la mañana: cualquiera sabe dónde encontrarte.",
+          "retardado": "{cuando} publicaste tu foto con el uniforme: un perfil falso escribió a tu familia «desde la escuela»."
+        },
+        {
+          "id": "numero",
+          "texto": "El número de tu casa en la puerta",
+          "sensible": true,
+          "dato": "tu casa",
+          "explicacion": "Lo que dejas a la vista lo usa la próxima estafa.",
+          "retardado": "{cuando} publicaste el número de tu casa: alguien llamó a tu puerta preguntando por ti."
+        },
+        {
+          "id": "sonrisa",
+          "texto": "Tu sonrisa",
+          "sensible": false,
+          "explicacion": "Tu cara contenta no revela dónde vives ni cuándo sales."
+        }
+      ]
+    }
+  ]
+}

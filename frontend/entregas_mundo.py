@@ -161,6 +161,13 @@ class EntregasMundo(Entity):
         if plan is None:
             self.economia.aviso_temporal("Hoy no hay pedidos que repartir.")
             return False
+        # Tutorial de la primera vez (frontend/tutorial_mision_ruta.py, ALCALDE_TUTORIAL_MISION=0 lo apaga): el turno empieza al cerrarlo.
+        try:
+            from frontend import tutorial_mision_ruta
+            if tutorial_mision_ruta.entregas_antes_de_iniciar(self, puesto, plan):
+                return True
+        except Exception:                # noqa: BLE001
+            pass
         self.turno = le.TurnoEntregas(puesto.trabajo, plan["pedidos"], plan["limite"])
         self.jugador, self.puesto = jugador, puesto
         try:

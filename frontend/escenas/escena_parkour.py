@@ -97,6 +97,26 @@ class EscenaParkour(Escena):
             self._extra = parkour_extra.preparar(self, getattr(self, "_extra", None))
         except Exception:                        # noqa: BLE001
             self._extra = None
+        self._abrir_tutorial()
+
+    # Tutorial de la primera vez en el mundo digital (frontend/registro_tutorial_mision.py, ALCALDE_TUTORIAL_MISION=0 lo apaga):
+    # la carrera real queda en pausa y la práctica usa una simulación propia. Nunca rompe la entrada al parkour.
+    def _abrir_tutorial(self):
+        self._tutorial = None
+        try:
+            from ursina import camera
+            from frontend import registro_tutorial_mision as tutorial_mision
+            self._tutorial = tutorial_mision.abrir_si_toca(camera.ui, "parkour", self._tras_tutorial, contexto={"escena": self})
+        except Exception:                        # noqa: BLE001
+            self._tutorial = None
+
+    def _tras_tutorial(self, saltado, fallo):
+        tutorial, self._tutorial = getattr(self, "_tutorial", None), None
+        if tutorial is not None:
+            try:
+                destruir_arbol(tutorial)
+            except Exception:                    # noqa: BLE001
+                pass
 
     def _jugador_activo(self):
         try:
@@ -111,6 +131,9 @@ class EscenaParkour(Escena):
         return self.mundo.clave_pedida != psc.datos_de_skin(jugador)
 
     def al_salir(self):
+        tutorial = getattr(self, "_tutorial", None)
+        if tutorial is not None and not tutorial.cerrado:
+            tutorial.saltar_todo()                # devuelve la carrera real antes de salir
         parkour_minimapa.limpiar()
         mouse.locked = False
         self.camara.bloquear(False)
@@ -190,6 +213,12 @@ class EscenaParkour(Escena):
     def _direccion(self):
         avance = (held_keys["w"] or held_keys["up arrow"]) - (held_keys["s"] or held_keys["down arrow"])
         lateral = (held_keys["d"] or held_keys["right arrow"]) - (held_keys["a"] or held_keys["left arrow"])
+        if not avance and not lateral:          # MANDO: sin teclas, manda el palo izquierdo
+            try:
+                from frontend import mando_calculos as mc
+                lateral, avance = mc.palo(held_keys)
+            except Exception:                   # noqa: BLE001
+                pass
         yaw = math.radians(self.camara.yaw)
         return (math.sin(yaw) * avance + math.cos(yaw) * lateral,
                 math.cos(yaw) * avance - math.sin(yaw) * lateral)

@@ -313,9 +313,39 @@ class EscenaTrabajo(Escena):
         self._n_pedido = 0
         self._feedback = ("", True, 0.0)
         self._construir_estatico()
-        self._mostrar_intro()
+        if not self._abrir_tutorial():
+            self._mostrar_intro()
+
+    # Tutorial de la primera vez de este motor de trabajo (frontend/registro_tutorial_mision.py, ALCALDE_TUTORIAL_MISION=0 lo
+    # apaga). Se juega aquí, ANTES de «Tu turno», con un trabajo de práctica sin paga ni fatiga; al terminar sigue la intro real.
+    def _abrir_tutorial(self):
+        self._tutorial = None
+        try:
+            from backend.logica import tutorial_mision as logica
+            from frontend import registro_tutorial_mision as tutorial_mision
+            id_ = logica.id_tutorial({"motor": self.trabajo.motor})
+            if id_ is not None:
+                self._tutorial = tutorial_mision.abrir_si_toca(self, id_, self._tras_tutorial,
+                                                               contexto={"escena": self, "trabajo": self.trabajo})
+        except Exception:                        # noqa: BLE001
+            self._tutorial = None
+        return self._tutorial is not None
+
+    def _tras_tutorial(self, saltado, fallo):
+        tutorial, self._tutorial = getattr(self, "_tutorial", None), None
+        if tutorial is not None:
+            try:
+                destruir_arbol(tutorial)
+            except Exception:                    # noqa: BLE001
+                pass
+        if not self._cerrado and self.turno is not None:
+            self._mostrar_intro()
 
     def al_salir(self):
+        tutorial = getattr(self, "_tutorial", None)
+        if tutorial is not None and not tutorial.cerrado:
+            self._cerrado = True                  # sale de la escena: no se enseña «Tu turno»
+            tutorial.saltar_todo()
         self._limpiar()
 
     def _limpiar(self):

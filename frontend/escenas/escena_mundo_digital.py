@@ -81,8 +81,36 @@ class EscenaMundoDigital(Escena):
         self._avisar_evidencia_del_parkour()
         if self.glitch is not None:
             self.glitch.desvanecer()
+        self._abrir_tutorial()
+
+    # Tutorial de la primera vez de una investigación (frontend/registro_tutorial_mision.py, ALCALDE_TUTORIAL_MISION=0 lo apaga).
+    # Se juega en esta misma escena con un caso de demo y un GameState desechable; nunca rompe la apertura del caso real.
+    def _abrir_tutorial(self):
+        self._tutorial = None
+        try:
+            from ursina import camera
+            from frontend import registro_tutorial_mision as tutorial_mision
+            self._tutorial = tutorial_mision.abrir_si_toca(camera.ui, "investigacion", self._tras_tutorial,
+                                                           contexto={"escena": self})
+            if self._tutorial is None and getattr(self, "_segundo_parkour", None) is not None:     # novedad: el botón U
+                self._tutorial = tutorial_mision.abrir_si_toca(camera.ui, "parkour_boton2", self._tras_tutorial,
+                                                               contexto={"escena": self})
+        except Exception:                        # noqa: BLE001
+            self._tutorial = None
+
+    def _tras_tutorial(self, saltado, fallo):
+        tutorial, self._tutorial = getattr(self, "_tutorial", None), None
+        if tutorial is not None:
+            try:
+                from frontend.componentes import destruir_arbol
+                destruir_arbol(tutorial)
+            except Exception:                    # noqa: BLE001
+                pass
 
     def al_salir(self):
+        tutorial = getattr(self, "_tutorial", None)
+        if tutorial is not None and not tutorial.cerrado:
+            tutorial.saltar_todo()                # devuelve la escena a su caso real antes de salir
         self.interfaz.enabled = False
         self._bloqueo = False
         self._restaurar_estado()

@@ -50,6 +50,7 @@ class EscenaMinijuego(Escena):
         self.contenido = None
         self.minijuego = None
         self.previa = None               # pantalla «Antes de empezar» (frontend/minijuegos/pantalla_previa.py)
+        self.tutorial = None             # tutorial de la primera vez (frontend/registro_tutorial_mision.py)
         self.banner = None
         self.panel_resultado = PanelResultadoGrafo(parent=self, z=-0.3)
         self.usados = {}                 # ids de casos ya jugados por minijuego (para no repetir en la partida)
@@ -78,6 +79,12 @@ class EscenaMinijuego(Escena):
         self._azar = None
 
     def _limpiar_vista(self):
+        if getattr(self, "tutorial", None) is not None:
+            try:
+                destruir_arbol(self.tutorial)
+            except Exception:                    # noqa: BLE001  limpieza de mejor esfuerzo
+                pass
+            self.tutorial = None
         if self.previa is not None:
             try:
                 destruir_arbol(self.previa)
@@ -145,6 +152,8 @@ class EscenaMinijuego(Escena):
         try:
             self._preparar_minijuego()
             textos = instrucciones.instrucciones_de(self.minijuego_id)
+            if self._abrir_tutorial(textos):         # primera vez de este tipo de misión: tutorial animado (nunca rompe)
+                return
             if mj.pantalla_previa_activa() and textos is not None:
                 self._mostrar_previa(textos)
             else:
@@ -188,9 +197,58 @@ class EscenaMinijuego(Escena):
     def _mostrar_previa(self, textos):
         from frontend.minijuegos.pantalla_previa import PantallaPrevia
         rumor = getattr(self.mision, "rumor", "") or self._caso.get("intro", "")
+        # Con tutorial para este minijuego (bandera encendida): versión corta y botón «Ver tutorial». Sin él, la de siempre.
+        corta, ver = False, None
+        try:
+            from frontend import registro_tutorial_mision as tutorial_mision
+            if tutorial_mision.hay_tutorial(self.minijuego_id):
+                corta, ver = True, self._ver_tutorial
+        except Exception:                        # noqa: BLE001
+            pass
         self.previa = PantallaPrevia(self._clase.TITULO, rumor, textos, ui.ayuda_legible(self._clase.AYUDA),
-                                     self._empezar_desde_previa, parent=self)
+                                     self._empezar_desde_previa, corta=corta, al_ver_tutorial=ver, parent=self)
         self.t_previa = 0.0
+
+    # -- Tutorial de la primera vez (frontend/registro_tutorial_mision.py): no cambia reglas, resultados ni pagos --
+
+    def _abrir_tutorial(self, textos, forzar_ver=False):
+        """Abre el tutorial si toca. Si no toca, o falla al construirse, devuelve False y todo sigue como hoy."""
+        try:
+            from frontend import registro_tutorial_mision as tutorial_mision
+            intento = self._intento
+            self.tutorial = tutorial_mision.abrir_si_toca(
+                self, self.minijuego_id, lambda saltado, fallo: self._tras_tutorial(textos, intento), forzar_ver)
+        except Exception:                        # noqa: BLE001
+            self.tutorial = None
+        return self.tutorial is not None
+
+    def _tras_tutorial(self, textos, intento):
+        if intento != self._intento:
+            return
+        if self.tutorial is not None:
+            try:
+                destruir_arbol(self.tutorial)
+            except Exception:                    # noqa: BLE001
+                pass
+            self.tutorial = None
+        try:
+            if mj.pantalla_previa_activa() and textos is not None:
+                self._mostrar_previa(textos)
+            else:
+                self._arrancar_minijuego()
+        except Exception as error:               # noqa: BLE001
+            self._respaldo(error)
+
+    def _ver_tutorial(self):
+        """«Ver tutorial» de la pantalla previa: lo enseña otra vez y vuelve a la previa."""
+        if self.previa is None:
+            return
+        textos = instrucciones.instrucciones_de(self.minijuego_id)
+        destruir_arbol(self.previa)
+        self.previa = None
+        self.t_previa = None
+        if not self._abrir_tutorial(textos, forzar_ver=True):
+            self._mostrar_previa(textos)
 
     def _empezar_desde_previa(self):
         if self.previa is None:

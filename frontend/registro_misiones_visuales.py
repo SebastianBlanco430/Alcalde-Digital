@@ -11,6 +11,7 @@
 #   - Llegada a la misión: vibración, vistazo al destino, columna de luz y vecinos que comentan (frontend/llegada_visual.py).
 #   - Dilemas: escena de cómic, burbujas de pensamiento, «mañana…» y la viñeta del día anterior (frontend/dilemas_visual.py).
 #   - Bandeja de Civitas: notificación, pegatinas, monedas, lupa del desconocido y feed que oscurece (frontend/civitas_visual.py).
+#   - Tutorial breve de la primera vez de cada tipo de misión (frontend/registro_tutorial_mision.py, ALCALDE_TUTORIAL_MISION).
 #   - Trabajos: fila y paciencia, PC que se repara, comida que se cocina, saludo, claxon, estela y «+R$» (frontend/trabajos_visual.py).
 #
 # APAGADO TOTAL: ALCALDE_MISIONES_VISUALES=0 no registra nada de lo de aquí.
@@ -55,6 +56,11 @@ def _trabajos(gestor, conexion, escena_mundo):
     trabajos_visual.registrar(gestor, conexion, escena_mundo)
 
 
+def _tutorial_mision(gestor, conexion, escena_mundo):
+    from frontend import registro_tutorial_mision
+    registro_tutorial_mision.registrar(gestor, conexion, escena_mundo)
+
+
 # (nombre, función(gestor, conexion, escena_mundo)). Los pasos siguientes añaden sus piezas a esta lista.
 PIEZAS = [
     ("movimiento", lambda gestor, conexion, escena_mundo: _movimiento()),
@@ -63,6 +69,7 @@ PIEZAS = [
     ("llegada", _llegada),                  # ALCALDE_LLEGADA_VISUAL
     ("dilemas", _dilemas),                  # ALCALDE_DILEMAS_VISUAL
     ("trabajos", _trabajos),                # ALCALDE_TRABAJOS_VISUAL
+    ("tutorial_mision", _tutorial_mision),  # ALCALDE_TUTORIAL_MISION (sección «Tutoriales» de Ajustes)
 ]
 
 

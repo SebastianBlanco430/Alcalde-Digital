@@ -282,6 +282,11 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     recta_final_vista.instalar(gestor)     # aviso, chip de tensión y desenlace (ALCALDE_SIN_RECTA_FINAL_VISTA=1 lo apaga)
     from frontend import gc_suave
     gc_suave.instalar()                    # congela lo cargado y espacia el recolector (ALCALDE_SIN_GC_SUAVE=1 lo apaga)
+    try:
+        from frontend import mando
+        mando.instalar(gestor)             # mando: botones -> teclas, cursor con el palo (frontend/mando.py, ALCALDE_MANDO=0 lo apaga)
+    except Exception as error:             # noqa: BLE001  un fallo del mando nunca impide arrancar
+        print(f"[Mando] no se pudo instalar: {error}")
     return aplicacion, gestor
 
 

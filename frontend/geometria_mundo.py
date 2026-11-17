@@ -33,6 +33,12 @@ def _pulsada(teclas, nombres):
 def ejes_de_teclas(teclas):
     h = int(_pulsada(teclas, TECLAS_DERECHA)) - int(_pulsada(teclas, TECLAS_IZQUIERDA))
     v = int(_pulsada(teclas, TECLAS_ARRIBA)) - int(_pulsada(teclas, TECLAS_ABAJO))
+    if h == 0 and v == 0:               # MANDO: sin teclas pulsadas manda el palo izquierdo (dirección analógica, módulo <= 1)
+        try:
+            from frontend import mando_calculos
+            return mando_calculos.combinar_ejes((h, v), mando_calculos.palo(teclas))
+        except Exception:               # noqa: BLE001  sin mando, el teclado de siempre
+            return (h, v)
     return (h, v)
 
 

@@ -100,6 +100,8 @@ class VigiaLlegada(Entity):
             self._t_vibra = 0.0 if not reducir else None
             if not reducir:
                 self._vistazo(mision)
+            else:
+                self._tutorial(mision)
         self._vibrar(dt, reducir)
         self._pintar_columna(mision, estado, reducir)
         self._pintar_vecinos(mision, estado, dt)
@@ -122,6 +124,14 @@ class VigiaLlegada(Entity):
         if self._t_vibra >= calc.DUR_VIBRACION:
             telefono.x = self._x_telefono
             self._t_vibra = None
+
+    # Tutorial de la primera vez (frontend/tutorial_mision_ruta.py, ALCALDE_TUTORIAL_MISION=0 lo apaga). Nunca rompe el vigía.
+    def _tutorial(self, mision):
+        try:
+            from frontend import tutorial_mision_ruta
+            tutorial_mision_ruta.llegada_despues_del_vistazo(self.escena, mision)
+        except Exception:                # noqa: BLE001
+            pass
 
     # -- Vistazo de cámara al destino --
 
@@ -168,6 +178,7 @@ class VigiaLlegada(Entity):
                 escena._sincronizar_raton()
             except Exception:            # noqa: BLE001
                 pass
+            self._tutorial(mision)       # la primera vez: tutorial de cómo llega una misión (tras el vistazo)
 
         escena.director.reproducir(calc.plan_vistazo(), {"ir": ir, "mirar": mirar, "volver": volver}, al_terminar=terminar)
 

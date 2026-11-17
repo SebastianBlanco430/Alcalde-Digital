@@ -127,6 +127,16 @@ class CamaraTerceraPersona(Entity):
                 self._reposo = (mouse.prev_x, mouse.prev_y)
         else:
             self._reposo = (0.0, 0.0)
+        if mouse.locked and not self.bloqueada:               # MANDO: el palo derecho también gira la cámara
+            try:
+                from ursina import held_keys
+
+                from frontend import mando_calculos as mc
+                palo = mc.palo(held_keys, mc.PALO_DERECHO)
+                if palo != (0.0, 0.0):
+                    self.yaw, self.pitch = mc.giro_camara(self.yaw, self.pitch, palo, time.dt, PITCH_MIN, PITCH_MAX)
+            except Exception:                                 # noqa: BLE001  sin mando, solo el ratón
+                pass
         self.actualizar(time.dt)
 
     def input(self, key):
