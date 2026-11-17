@@ -384,6 +384,8 @@ class Minimapa(Entity):
         yaw = 0 if yaw_grados is None else yaw_grados
         self.registro = registro if registro is not None else mm.registro()
         self.modo_rotacion = "camara"          # «camara» (gira con la cámara) | «norte» (norte arriba)
+        self._satelite = None                  # foto aérea de la ciudad de fondo (mapa_satelite); None = el minimapa vectorial de siempre
+        self.fondo_satelite = None
         self.densidad = 2                      # nivel de detalle 1..3 (minimapa_calculos.detalle)
         self._yaw_camara = yaw                 # yaw real de la cámara (la geometría usa el efectivo según el modo)
         self._casas_obsoletas = False          # (mundo grande) las casas no se dibujaron por el detalle y toca rehacerlas
@@ -506,6 +508,7 @@ class Minimapa(Entity):
         if abs(yaw_grados - self.geometria.yaw) < 0.05:
             return
         self.geometria.girar(yaw_grados)
+        self._girar_satelite()
         if not self._local and hud_calculos.diferencia_yaw(yaw_grados, self._yaw_capas) > self._umbral_capas():
             self._capas_sucias = True                   # marcadores y zonas se proyectan con el yaw
         self._girar_capa_extra()
@@ -587,6 +590,39 @@ class Minimapa(Entity):
                                        (self.malla_escaleras, rectangulos)):
             entidad.enabled = bool(cuadrilateros)
             entidad.model = self._malla_de_cuadrilateros(cuadrilateros) if cuadrilateros else None
+
+    # -- Satélite (mundo chico) --
+
+    # Pone la foto aérea de la ciudad (frontend/mapa_satelite.py) como fondo del minimapa, bajo todo lo demás. Cubre justo los
+    # límites del mundo, que caben en el recuadro con cualquier giro (rotacion_libre), y gira con él: una sola entidad con
+    # su rotación, sin rehacer nada. Con foto no se dibujan las calles ni las casas vectoriales (ya salen en la foto).
+    # Cualquier fallo deja el minimapa de siempre.
+    def poner_satelite(self, satelite):
+        if satelite is None or self._local or self._satelite is not None:
+            return
+        try:
+            xmin, xmax, zmin, zmax = (float(v) for v in self._mapa.limites())
+            g = self.geometria
+            esquinas = [(xmin, zmin), (xmax, zmin), (xmax, zmax), (xmin, zmax)]
+            malla = Mesh(vertices=[(-0.5, -0.5, 0), (0.5, -0.5, 0), (0.5, 0.5, 0), (-0.5, 0.5, 0)],
+                         uvs=[satelite.uv_de(*c) for c in esquinas], triangles=[(0, 1, 2), (0, 2, 3)])
+            fondo = Entity(parent=self, model=malla, color=color.rgba(0.92, 0.92, 0.95, 1.0), z=-0.0004,
+                           scale=((xmax - xmin) * g.escala, (zmax - zmin) * g.escala))
+            fondo.set_texture(satelite.textura, 1)
+            fondo.position = (*g.punto((xmin + xmax) / 2, (zmin + zmax) / 2), -0.0004)
+            self.fondo_satelite, self._satelite = fondo, satelite
+            self._girar_satelite()
+            self._aplicar_detalle()
+        except Exception as error:                     # noqa: BLE001
+            from frontend import mapa_satelite
+            mapa_satelite._avisar_una_vez("minimapa", error)
+            if self.fondo_satelite is not None:
+                destruir_arbol(self.fondo_satelite)
+            self.fondo_satelite, self._satelite = None, None
+
+    def _girar_satelite(self):
+        if self.fondo_satelite is not None:
+            self.fondo_satelite.rotation_z = -self.geometria.yaw      # igual que el resto: rotation_z es horario, el yaw no
 
     # -- Modo local (mundo grande) --
 
@@ -744,7 +780,7 @@ class Minimapa(Entity):
         Entity(parent=self.flecha_mirada, model=forma, double_sided=True, color=color.white)
 
     def _casas_activas(self):
-        return mm.detalle(self.densidad)["casas"] and self.registro.capa_visible("edificios")
+        return mm.detalle(self.densidad)["casas"] and self.registro.capa_visible("edificios") and self._satelite is None
 
     # Ajustes en vivo: giro («camara» / «norte»), detalle (1..3) y zoom (solo mundo grande: el chico ya cabe entero).
     def _al_cambiar_ajustes(self, ajustes, cambiadas):
@@ -761,7 +797,7 @@ class Minimapa(Entity):
 
     # Capas base según el detalle y la visibilidad del registro (calles, edificios, jugadores).
     def _aplicar_detalle(self):
-        self.capa_calles.enabled = self.registro.capa_visible("calles")
+        self.capa_calles.enabled = self.registro.capa_visible("calles") and self._satelite is None
         self.capa_jugadores.enabled = self.registro.capa_visible("jugador")
         activas = self._casas_activas()
         self.capa_casas.enabled = activas
@@ -1341,11 +1377,29 @@ class HudMundo(Entity):
         # Mapa grande a pantalla casi completa (tecla N): solo con el mundo grande; el mundo chico no cambia.
         self.puede_abrir_mapa = None       # callable() -> bool que pone la escena (pausa, cinemática, otros paneles)
         self.mapa_grande = None
-        if mundo_config.es_mundo_grande(mapa):
+        # Con SATÉLITE (frontend/mapa_satelite.py) el mundo chico 3D también tiene mapa grande: la foto aérea de la ciudad con
+        # las plazas, el destino de la misión y la ruta (la foto la pone EscenaMundo con poner_satelite()).
+        from frontend import mapa_satelite
+        if mundo_config.es_mundo_grande(mapa) or (rotacion_libre and mapa_satelite.activo()):
             from frontend.mapa_grande_vista import MapaGrandeVista
             self.mapa_grande = MapaGrandeVista(
                 mapa, self._puede_abrir_mapa_grande, parent=self,
                 ocultar=(self.minimapa, self.panel_turno, self.telefono_ui, self.aviso, self.aviso_generico))
+
+    # Foto aérea de la ciudad (mapa_satelite.Satelite) para el minimapa y el mapa grande. None = los vectoriales de siempre.
+    def poner_satelite(self, satelite):
+        if satelite is None:
+            return
+        self.minimapa.poner_satelite(satelite)
+        if self.mapa_grande is not None:
+            self.mapa_grande.poner_satelite(satelite)
+
+    # La foto no salió: el mundo chico se queda como antes (sin mapa grande); el grande conserva el suyo.
+    def sin_satelite(self):
+        if self.mapa_grande is not None and not mundo_config.es_mundo_grande(self._mapa):
+            self.mapa_grande.enabled = False          # ya no recibe la N aunque Ursina tarde un frame en retirarlo
+            destruir_arbol(self.mapa_grande)
+            self.mapa_grande = None
 
     # ¿Se puede abrir el mapa grande ahora? Partida en curso, ni minijuego ni teléfono abierto, y lo que diga la escena.
     def _puede_abrir_mapa_grande(self):

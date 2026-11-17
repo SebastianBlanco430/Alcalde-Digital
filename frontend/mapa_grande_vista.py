@@ -54,6 +54,7 @@ class MapaGrandeVista(Entity):
         self._rejilla = None                # (xs, zs, colores, triangulos): se calcula la primera vez que se abre
         self._aspecto = None
         self._encaje = None
+        self.satelite = None                # foto aérea (mapa_satelite.Satelite): sustituye al terreno y a las calles vectoriales
         self.panel = Entity(parent=self, z=self.Z_PANEL, enabled=False)
         self.contenido = Entity(parent=self.panel)
         self.recomposiciones = 0            # cuántas veces se compuso el mapa (lo usan las pruebas)
@@ -68,6 +69,15 @@ class MapaGrandeVista(Entity):
         self._t_sondeo = 0.0
         self.reconstrucciones_capas = 0
         self._reiniciar_dinamicos()
+
+    def poner_satelite(self, satelite):
+        """Fondo = la foto aérea de la ciudad. Si el mapa ya estaba compuesto se rehace al abrirlo."""
+        self.satelite = satelite
+        try:                                   # la foto cubre la ciudad: el mapa se encaja a sus límites, no a los del terreno
+            self._extension = tuple(float(v) for v in self._mapa.limites())
+        except Exception:                      # noqa: BLE001
+            pass
+        self._aspecto = None
 
     def _reiniciar_dinamicos(self):
         self.puntos = {}                    # nombre -> (aro, punto)
@@ -113,6 +123,8 @@ class MapaGrandeVista(Entity):
         self.zoom = 1.0
         if modelo_ajustes.AJUSTES:
             self.modo_rotacion = modelo_ajustes.obtener().actual.minimapa_rotacion
+        if self.satelite is not None:
+            self.modo_rotacion = "norte"        # como un mapa de ciudad: el norte arriba (R lo gira con la cámara)
         if self._rejilla is None or self._aspecto != diseno_adaptable.aspecto():
             self._componer()
         self._previos = [(e, e.visible) for e in self._ocultar]
@@ -162,20 +174,26 @@ class MapaGrandeVista(Entity):
         mapa = self._mapa
 
         _fondo(raiz, aspecto - 0.04, 0.96, color.rgba32(12, 14, 24, 255), 14, z=0.01)
-        xs, zs, colores, triangulos = self._tabla_terreno()
-        vertices = [(*calc.a_pantalla(encaje, x, z), 0) for z in zs for x in xs]
-        Entity(parent=mapa_raiz, model=Mesh(vertices=vertices, triangles=triangulos, colors=colores), z=0.0)
+        con_foto = self._poner_foto(mapa_raiz, encaje)
+        if not con_foto:
+            xs, zs, colores, triangulos = self._tabla_terreno()
+            vertices = [(*calc.a_pantalla(encaje, x, z), 0) for z in zs for x in xs]
+            Entity(parent=mapa_raiz, model=Mesh(vertices=vertices, triangles=triangulos, colors=colores), z=0.0)
 
-        # calles: borde oscuro + relleno claro (legibles sobre cualquier tono del terreno)
+        # calles: borde oscuro + relleno claro (legibles sobre cualquier tono del terreno). Sobre la foto aérea no se dibujan:
+        # las calles ya salen en la foto y las líneas del grafo la taparían.
         ancho = max(mapa.ancho_calle * escala, 0.007)
         puntos = [(calc.a_pantalla(encaje, *mapa.coordenada(a)), calc.a_pantalla(encaje, *mapa.coordenada(b)))
                   for a, b in mapa.segmentos()]
         for grosor, tono, z in ((ancho + 0.004, COLOR_CALLE_BORDE, -0.001), (ancho, COLOR_CALLE, -0.0015)):
+            if con_foto:
+                break
             Entity(parent=mapa_raiz, model=Minimapa._malla_de_cuadrilateros(
                 [hud_calculos.segmento_a_rectangulo(p0, p1, grosor) for p0, p1 in puntos]), color=rgb(tono), z=z)
 
         # plazas con su color y contorno de tinta
-        radio = max(mapa.radio_plaza * escala * 1.3, 0.0095)
+        # Sobre la foto aérea las marcas son iconos pequeños (las plazas reales ya salen en la foto y a escala taparían el mapa).
+        radio = self.RADIO_ICONO_FOTO if con_foto else max(mapa.radio_plaza * escala * 1.3, 0.0095)
         lugares = mapa.lugares()
         centros = [calc.a_pantalla(encaje, *mapa.coordenada(l)) for l in lugares]
         Entity(parent=mapa_raiz, z=-0.003, model=Minimapa._malla_de_poligonos(
@@ -205,7 +223,14 @@ class MapaGrandeVista(Entity):
                 guias.append(hud_calculos.segmento_a_rectangulo((mu, mv), fin, 0.0025))
         if guias:
             self._guias_ent = Entity(parent=mapa_raiz, z=-0.0045, color=rgb(estilo.COLOR_TEXTO_TENUE), model=Minimapa._malla_de_cuadrilateros(guias))
-        self._chips_ent = Entity(parent=mapa_raiz, z=-0.005, color=COLOR_CHIP, model=Minimapa._malla_de_cuadrilateros(chips))
+        if con_foto:
+            # Sobre la foto cada nombre lleva SU fondo (hijo del texto): acompaña al zoom y al giro, que ocultan los chips del mapa.
+            fuente = escala_fuente(PX_ETIQUETA)
+            for lugar, (w, h) in zip(lugares, tamanos):
+                Entity(parent=textos[lugar], model="quad", color=COLOR_CHIP, scale=(w / fuente, h / fuente), z=0.0005 / fuente)
+            self._chips_ent = None
+        else:
+            self._chips_ent = Entity(parent=mapa_raiz, z=-0.005, color=COLOR_CHIP, model=Minimapa._malla_de_cuadrilateros(chips))
         self.etiquetas = textos
 
         # encabezado y leyenda
@@ -215,6 +240,26 @@ class MapaGrandeVista(Entity):
                                   position=(aspecto / 2 - 0.05, 0.5 - 0.05, -0.006))
         self._poner_leyenda(raiz, aspecto)
         self._aplicar_transformacion()
+
+    def _poner_foto(self, mapa_raiz, encaje):
+        """Dibuja la foto aérea como fondo. True si la puso; cualquier fallo deja el terreno vectorial de siempre."""
+        sat = self.satelite
+        if sat is None:
+            return False
+        try:
+            xmin, xmax, zmin, zmax = self._extension        # solo el mundo (la foto trae unos metros de margen)
+            esquinas = [(xmin, zmin), (xmax, zmin), (xmax, zmax), (xmin, zmax)]
+            vertices = [(*calc.a_pantalla(encaje, x, z), 0) for x, z in esquinas]
+            fondo = Entity(parent=mapa_raiz, z=0.0, color=color.rgba(0.88, 0.88, 0.92, 1.0),
+                           model=Mesh(vertices=vertices, uvs=[sat.uv_de(x, z) for x, z in esquinas],
+                                      triangles=[(0, 1, 2), (0, 2, 3)]))
+            fondo.set_texture(sat.textura, 1)
+            return True
+        except Exception as error:                     # noqa: BLE001
+            from frontend import mapa_satelite
+            mapa_satelite._avisar_una_vez("mapa_grande", error)
+            self.satelite = None
+            return False
 
     def _poner_leyenda(self, raiz, aspecto):
         y = -0.5 + 0.06
@@ -275,6 +320,7 @@ class MapaGrandeVista(Entity):
 
     # -- Capas del registro (zonas, misiones, objetivos, NPC) --
 
+    RADIO_ICONO_FOTO = 0.0165           # radio en pantalla de la marca de un lugar sobre la foto aérea
     ICONO = 0.012                       # radio en pantalla de un marcador (se compensa con el zoom)
     BORDE_ZONA = 0.003
 

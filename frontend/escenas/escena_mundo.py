@@ -159,6 +159,7 @@ class EscenaMundo(Escena):
         self.hud.enabled = True
         self.ciudad.encender_luces(True)
         activar_niebla(**self._niebla)          # tras construir la ciudad: solo afecta a lo que ya existe
+        self._capturar_satelite()
         self.camara.preparar_camara()
         if self._grande:
             camera.clip_plane_far = mundo_config.PLANO_LEJANO_GRANDE
@@ -186,6 +187,25 @@ class EscenaMundo(Escena):
         self._sincronizar_raton()
         if salida is not None:
             self._reproducir_salida(salida["jugador"], salida["lugar"])
+
+    _satelite_hecho = False
+
+    # Foto aérea de la ciudad (frontend/mapa_satelite.py) para el minimapa y el mapa grande: una sola vez y solo en el mundo
+    # chico (el grande es por chunks y no está entero en memoria). Cualquier fallo deja los mapas vectoriales de siempre.
+    def _capturar_satelite(self):
+        if self._satelite_hecho or self._grande:
+            return
+        self._satelite_hecho = True
+        try:
+            from frontend import mapa_satelite
+            foto = mapa_satelite.capturar(self.ciudad, self._mundo.limites(), ocultar=[getattr(self.ciudad, "cielo", None)])
+            if foto is not None:
+                self.hud.poner_satelite(foto)
+            else:
+                self.hud.sin_satelite()
+        except Exception as error:               # noqa: BLE001
+            from frontend import mapa_satelite
+            mapa_satelite._avisar_una_vez("escena", error)
 
     def al_salir(self):
         if self.online is not None:
