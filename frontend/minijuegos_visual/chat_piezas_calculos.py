@@ -100,7 +100,7 @@ X_RESPUESTAS = 0.45
 ANCHO_RESPUESTAS = 0.78
 Y_RESPUESTAS_ARRIBA = 0.24
 SEPARACION_RESPUESTAS = 0.04
-X_AVATARES = 0.57               # primer avatar «esperando»; a la izquierda del reloj, en su misma franja
+X_AVATARES = 0.60               # primer avatar «esperando»; a la izquierda del reloj, en su misma franja
 PASO_AVATARES = 0.045
 
 

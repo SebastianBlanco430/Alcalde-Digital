@@ -53,7 +53,7 @@ class RelojPresion(Entity):
         self.radio = diametro / 2
         Entity(parent=self, model="circle", scale=diametro + 0.008, color=rgba(estilo.TINTA), z=0.003)
         Entity(parent=self, model="circle", scale=diametro, color=rgba(estilo.PAPEL), z=0.002)
-        self._sector = Entity(parent=self, z=0.001)
+        self._sector = Entity(parent=self, z=-0.001)
         self._ultimo = None
 
     def fijar(self, restante):
