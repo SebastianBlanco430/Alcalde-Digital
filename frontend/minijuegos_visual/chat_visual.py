@@ -46,7 +46,7 @@ DUR_FINAL = 2.4
 _textura_vineta = None
 
 
-def _rgba(tono, alfa):
+def _rgba(tono, alfa=1.0):
     return color.rgba32(int(tono[0]), int(tono[1]), int(tono[2]), int(max(0.0, min(1.0, alfa)) * 255))
 
 
