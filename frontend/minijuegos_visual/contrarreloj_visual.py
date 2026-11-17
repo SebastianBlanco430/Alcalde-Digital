@@ -374,9 +374,7 @@ class ContrarrelojVisual(CapaVisual, MinijuegoContrarreloj):
             else:
                 punto.color = _rgba(TONO_LIBERADA, 1)
                 pz.icono_palomita(self.mapa, 0.03, pz.VERDE, (cx + 0.085, cy + 0.035), z=-0.004)
-        self.leyenda.text = "\n".join(ui.lineas_de(calc.texto_contagio(len(contagiadas)), PX_LEYENDA + 1, MAPA_ANCHO))
-        self.leyenda.scale = escala_fuente(PX_LEYENDA + 1)
-        self.leyenda.color = _rgba(TONO_VIRAL if contagiadas else TONO_LIBERADA, 1)
+        self._leyenda_final(len(contagiadas))
         # Los botones ya no sirven (la vista de siempre los deshabilita): se esconden, igual que el cronómetro y el enlace.
         self.boton_frenar.enabled = self.boton_pasar.enabled = False
         self.cronometro.enabled = False
@@ -385,6 +383,21 @@ class ContrarrelojVisual(CapaVisual, MinijuegoContrarreloj):
             h.enabled = False
         if self._fx is not None:
             self._vigilar(self._sello_final, bool(contagiadas))
+
+    def _leyenda_final(self, n_contagiadas):
+        """El banner de resultado de la vista base tapa el borde inferior del mapa, donde está la leyenda: el resumen pasa a
+        una pastilla oscura sobre la calle central del mapa (siempre visible y con contraste, claro u oscuro el papel)."""
+        texto = calc.texto_contagio(n_contagiadas)
+        ancho = 0.70
+        lineas = ui.lineas_de(texto, PX_LEYENDA + 1, ancho - 0.04)
+        alto = ui.alto_de(len(lineas), PX_LEYENDA + 1) + 0.024
+        y = MAPA_Y - 0.07
+        self.leyenda_fondo = ui.rect(self.mapa, ancho, alto, (22, 24, 38), (X_MAPA, y), z=-0.006, radio_px=8)
+        self.leyenda.origin = (0, 0.5)
+        self.leyenda.position = (X_MAPA, y + alto / 2 - 0.012, -0.02)
+        self.leyenda.text = "\n".join(lineas)
+        self.leyenda.scale = escala_fuente(PX_LEYENDA + 1)
+        self.leyenda.color = _rgba((255, 150, 150) if n_contagiadas else (150, 230, 170), 1)
 
     def _sello_final(self, contagiado):
         """Sello grande sobre el mapa: BARRIO A SALVO o BARRIO CONTAGIADO (sustituye al sello común de la capa)."""
