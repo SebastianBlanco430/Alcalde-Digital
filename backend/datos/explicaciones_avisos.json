@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "_nota": "Tarjetas de primera vez del teléfono grande (backend/logica/avisos_telefono.py): salen ANTES del teléfono la primera vez que llega cada tipo en la partida. Texto de 1 o 2 oraciones; dibujos: nombres de frontend/dibujos_avisos.py (de 1 a 3). Sin emojis ni flechas: la fuente del juego no los tiene.",
+  "tarjetas": {
+    "sospechoso": {
+      "titulo": "Mensajes de Civitas",
+      "texto": "Te escriben por Civitas. Unos mensajes son reales y otros son estafas. Marca lo que te parezca raro y decide.",
+      "dibujos": ["burbuja_lupa", "sobre_candado", "sobre_anzuelo"]
+    },
+    "publicar": {
+      "titulo": "Publicar con cuidado",
+      "texto": "Vas a publicar algo. Antes, tapa lo que muestre de más: tu casa, tu uniforme, dónde estás.",
+      "dibujos": ["foto_pegatina"]
+    },
+    "rectificar": {
+      "titulo": "Rectificar",
+      "texto": "Compartiste algo que resultó falso. Puedes corregirlo en público. Borrarlo no basta: ya lo pudieron guardar.",
+      "dibujos": ["post_tachado", "post_corregido", "camara_captura"]
+    },
+    "acoso": {
+      "titulo": "Burlas en grupo",
+      "texto": "Un grupo se burla de alguien. Tú decides: reenviar, callar, apoyar o reportar.",
+      "dibujos": ["grupo_aparte"]
+    },
+    "red": {
+      "titulo": "Lo que circula en tu red",
+      "texto": "Te llega algo por tus grupos o tu muro. Antes de reenviar o publicar, piensa a quién le llega y qué pasa después.",
+      "dibujos": ["cadena_reenvios", "burbuja_lupa"]
+    },
+    "feed": {
+      "titulo": "Tu feed",
+      "texto": "Deslizar es fácil, pero el tiempo se va. Cada publicación cuesta minutos y cansancio.",
+      "dibujos": ["reloj", "dedo_deslizando"]
+    }
+  }
+}

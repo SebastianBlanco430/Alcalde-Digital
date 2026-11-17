@@ -365,6 +365,9 @@ def registrar(gestor, conexion, escena_mundo):
     try:
         vigia = _crear_vigia(escena_mundo)
         control = vigia.control
+        # teléfono en grande (ALCALDE_TELEFONO_GRANDE): solo cambia la vista; si falla queda el panel de siempre
+        from frontend import registro_telefono_grande
+        registro_telefono_grande.envolver_habitos(vigia, escena_mundo)
         escena_mundo.registrar_bloqueador(control.abierto, control.cerrar)
         # El inventario (I) no mira controles_bloqueados: no se le deja abrirse encima del panel.
         economia = getattr(escena_mundo, "economia", None)

@@ -1,0 +1,340 @@
+{
+  "version": 1,
+  "_nota": "En qué pantalla del teléfono grande se ve cada aviso (backend/logica/avisos_telefono.py). canal: dm, muro, rectificar, grupo, cadena, notificaciones o feed. zonas: elemento -> parte de la pantalla donde se dibuja y se toca para marcarlo (cabecera, burbuja o texto con su fragmento LITERAL, foto con x,y de 0 a 1 sobre la foto, ubicacion, etiquetas, contador, fuente o detalle). Un fragmento que no aparezca en el texto, o una zona que el canal no dibuja, cae en «Otros detalles». tarjeta: tipo de la tarjeta de primera vez (si falta, sale del canal). foto: nombre de frontend/fotos_avisos.py. mensajes: la conversación (autor, texto, foto, reenviado). resultados: por opción, lo que se ve en el teléfono después de elegir (mio = tu mensaje, sistema = aviso gris, respuestas = lo que contestan, publica = la publicación queda subida). Un caso que no está aquí se ve en el panel de texto de siempre. No cambia eventos_digitales.json, rectificaciones.json ni dilemas_extra.json.",
+  "comunes": {
+    "personal": {"zona": "burbuja", "fragmento": "Te escriben por tu nombre"}
+  },
+  "casos": {
+    "premio_pix": {
+      "canal": "dm",
+      "zonas": {
+        "remitente": "cabecera",
+        "dominio": {"zona": "burbuja", "fragmento": "civitas-premios.top/liberar"},
+        "tasa": {"zona": "burbuja", "fragmento": "paga la tasa de R$"},
+        "reloj": {"zona": "burbuja", "fragmento": "antes de las 20:00"},
+        "idioma": "detalle"
+      }
+    },
+    "codigo_prima": {
+      "canal": "dm",
+      "zonas": {
+        "codigo": {"zona": "burbuja", "fragmento": "código de 6 números por SMS"},
+        "numero": "cabecera",
+        "urgencia": {"zona": "burbuja", "fragmento": "Es urgente"},
+        "emojis": "detalle"
+      }
+    },
+    "reunion_escuela": {
+      "canal": "dm",
+      "zonas": {
+        "guardado": "cabecera",
+        "sin_dinero": {"zona": "burbuja", "fragmento": "No pedimos dinero ni datos"},
+        "fecha": {"zona": "burbuja", "fragmento": "el jueves a las 18:00 en el patio"}
+      }
+    },
+    "trabajo_likes": {
+      "canal": "dm",
+      "zonas": {
+        "sueldo": {"zona": "burbuja", "fragmento": "Gana R$ 300 por día"},
+        "inscripcion": {"zona": "burbuja", "fragmento": "Solo paga R$"},
+        "perfil": "cabecera",
+        "cupos": {"zona": "burbuja", "fragmento": "Cupos limitados"},
+        "videos": {"zona": "burbuja", "fragmento": "dando likes a videos"}
+      }
+    },
+    "banco_bloqueo": {
+      "canal": "dm",
+      "zonas": {
+        "dominio": {"zona": "burbuja", "fragmento": "bancco-nova-seguro.com"},
+        "clave": {"zona": "burbuja", "fragmento": "Confirme su clave y el código de su tarjeta"},
+        "amenaza": {"zona": "burbuja", "fragmento": "será BLOQUEADA hoy"},
+        "nombre_banco": "cabecera"
+      }
+    },
+    "rifa_dona_marta": {
+      "canal": "dm",
+      "zonas": {
+        "vecina": "cabecera",
+        "en_mano": {"zona": "burbuja", "fragmento": "te lo doy en mano con el talonario"},
+        "dinero": {"zona": "burbuja", "fragmento": "a R$ 5"}
+      }
+    },
+
+    "selfie_uniforme": {
+      "canal": "muro",
+      "foto": "selfie",
+      "leyenda": "Todos los días a las 6:40 por la ladera. ¡Buenos días, morro!",
+      "ubicacion": "Rua da Ladeira, 214",
+      "etiquetas": "Con @bia_prima",
+      "zonas": {
+        "uniforme": {"zona": "foto", "x": 0.42, "y": 0.84},
+        "ubicacion": "ubicacion",
+        "horario": {"zona": "texto", "fragmento": "Todos los días a las 6:40"},
+        "sonrisa": {"zona": "foto", "x": 0.42, "y": 0.40},
+        "cielo": {"zona": "foto", "x": 0.82, "y": 0.22}
+      },
+      "comentarios": {
+        "uniforme": "Ah, vas a la Escuela Barrio Esperanza. Te veo a la salida.",
+        "ubicacion": "La Rua da Ladeira, ¿la casa del portón verde?",
+        "horario": "Mañana a las 6:40 entonces. ;)"
+      }
+    },
+    "casa_pintada": {
+      "canal": "muro",
+      "foto": "fachada",
+      "leyenda": "¡Por fin pintamos la fachada! Quedó hermosa.",
+      "ubicacion": "",
+      "etiquetas": "Con @tio_ronaldo",
+      "zonas": {
+        "numero": {"zona": "foto", "x": 0.45, "y": 0.36},
+        "llaves": {"zona": "foto", "x": 0.55, "y": 0.66},
+        "placa": {"zona": "foto", "x": 0.82, "y": 0.88},
+        "pintura": {"zona": "foto", "x": 0.16, "y": 0.28},
+        "maceta": {"zona": "foto", "x": 0.17, "y": 0.66}
+      },
+      "comentarios": {
+        "numero": "Linda. ¿Es la 214? Paso a verla.",
+        "llaves": "Con las llaves puestas y todo, jaja. Qué confianza.",
+        "placa": "Esa moto, la de la placa que se ve, ¿se vende?"
+      }
+    },
+    "viaje_familia": {
+      "canal": "muro",
+      "foto": "pasajes",
+      "leyenda": "¡Nos vamos de viaje! Casa sola hasta el domingo.",
+      "ubicacion": "",
+      "etiquetas": "",
+      "zonas": {
+        "casa_sola": {"zona": "texto", "fragmento": "Casa sola hasta el domingo"},
+        "reserva": {"zona": "foto", "x": 0.42, "y": 0.52},
+        "mochila": {"zona": "foto", "x": 0.83, "y": 0.48},
+        "mate": {"zona": "foto", "x": 0.12, "y": 0.50}
+      },
+      "comentarios": {
+        "casa_sola": "Hasta el domingo, anotado.",
+        "reserva": "Con ese código ya puedo ver tu vuelo de vuelta. Buen viaje."
+      }
+    },
+
+    "salud_kaua": {
+      "canal": "rectificar",
+      "reenvios": 132,
+      "zonas": {
+        "comunicado": "fuente",
+        "fuente": "fuente",
+        "likes": "contador"
+      }
+    },
+    "rumor_vecino_lucas": {
+      "canal": "rectificar",
+      "reenvios": 58,
+      "zonas": {
+        "escuela": "fuente",
+        "anonimo": "fuente",
+        "risas": "fuente"
+      }
+    },
+    "video_fuera_de_contexto": {
+      "canal": "rectificar",
+      "reenvios": 410,
+      "zonas": {
+        "original": "fuente",
+        "titulo": "fuente",
+        "vistas": "contador"
+      }
+    },
+    "cifra_alcaldia": {
+      "canal": "rectificar",
+      "reenvios": 87,
+      "zonas": {
+        "acueducto": "fuente",
+        "alcaldia": "fuente",
+        "baldes": "fuente"
+      }
+    },
+    "acusacion_escuela": {
+      "canal": "rectificar",
+      "reenvios": 214,
+      "zonas": {
+        "empresa": "fuente",
+        "foto": "fuente",
+        "miedo": "fuente"
+      }
+    },
+    "rumor_de_mision": {
+      "canal": "rectificar",
+      "reenvios": 66,
+      "zonas": {
+        "verificado": "fuente",
+        "sin_fuente": "fuente",
+        "conocidos": "contador"
+      }
+    },
+
+    "foto_cumple_dani": {
+      "canal": "muro",
+      "tarjeta": "red",
+      "foto": "cumple",
+      "leyenda": "¡Feliz cumple, Dani! La mejor fiesta de la vereda.",
+      "resultados": {
+        "publicar_ya": {"publica": true, "sistema": "Publicada. 46 reacciones en diez minutos.",
+                        "respuestas": [{"autor": "Doña Marta", "texto": "¡Gracias! Ya tengo seis encargos de torta."},
+                                       {"autor": "kaique_22", "texto": "¿Esa es la calle de Dani? Se ve el número."}]},
+        "esperar_permiso": {"sistema": "La guardaste en borradores para preguntarle a Dani.",
+                            "respuestas": [{"autor": "Dani", "texto": "Gracias por preguntar. Recórtale el fondo, porfa."}]}
+      }
+    },
+    "aviso_corte_agua": {
+      "canal": "cadena",
+      "tarjeta": "red",
+      "nombre_grupo": "Vecinos do Morro",
+      "mensajes": [
+        {"autor": "Tia Neide", "texto": "Mañana cortan el agua en todo el morro desde las 6. ¡Llenen baldes!", "reenviado": true},
+        {"autor": "Seu Jorge", "texto": "¿Quién lo dijo? La oficina del acueducto ya cerró."},
+        {"autor": "Paty", "texto": "Mi mamá ya está llenando ollas por si acaso."}
+      ],
+      "resultados": {
+        "compartir_sin_confirmar": {"mio": "Lo paso, pero SIN CONFIRMAR: «Mañana cortan el agua desde las 6».",
+                                    "respuestas": [{"autor": "Paty", "texto": "¿Y de dónde lo sacaste?"}]},
+        "esperar_oficina": {"sistema": "No reenviaste nada. Mañana preguntas en la oficina."}
+      }
+    },
+    "domingo_sin_pantalla": {
+      "canal": "notificaciones",
+      "tarjeta": "red",
+      "nombre_grupo": "112 mensajes sin leer",
+      "mensajes": [
+        {"autor": "Grupo de la cuadra", "texto": "Mutirão de la escalera: ¿a las 9 o a las 10? Votemos."},
+        {"autor": "Curso 9B", "texto": "34 mensajes nuevos"},
+        {"autor": "Civitas", "texto": "Tienes 12 publicaciones nuevas en tu feed."},
+        {"autor": "Vó Lurdes", "texto": "La comida está lista. Sin aparatos, ¿sí?"}
+      ],
+      "resultados": {
+        "apagar_todo": {"sistema": "Celular apagado hasta la noche."},
+        "seguir_conectado": {"sistema": "Sigues conectado: 3 notificaciones más mientras comes."},
+        "solo_grupo_cuadra": {"sistema": "Todo silenciado menos el grupo de la cuadra."}
+      }
+    },
+    "video_balanza_feira": {
+      "canal": "muro",
+      "tarjeta": "red",
+      "foto": "feira",
+      "leyenda": "La balanza de la feira marca de más. Ojo, vecinos.",
+      "resultados": {
+        "publicar_video": {"publica": true, "sistema": "Video publicado. Lo vio medio barrio en una hora.",
+                           "respuestas": [{"autor": "feirante_oficial", "texto": "La administración revisará todas las balanzas."},
+                                          {"autor": "anon_771", "texto": "Jajaja la señora gritando, qué loca."}]},
+        "llevar_a_administracion": {"sistema": "No lo publicaste. Lo llevas a la administración de la feria."}
+      }
+    },
+    "colecta_kaua": {
+      "canal": "cadena",
+      "tarjeta": "red",
+      "nombre_grupo": "Reenviados",
+      "mensajes": [
+        {"autor": "Reenviado", "texto": "AYUDA para la operación de Kauã, hijo del mototaxista. La colecta cierra HOY.", "reenviado": true, "foto": "colecta"},
+        {"autor": "Reenviado", "texto": "Depositar a nombre de Wesley (primo). Pix en el enlace.", "reenviado": true},
+        {"autor": "Clara", "texto": "¿Alguien habló con la familia? No contestan."}
+      ],
+      "resultados": {
+        "compartir_con_tu_nombre": {"mio": "¡Ayudemos a Kauã! Yo ya aporté. Compartan.",
+                                    "respuestas": [{"autor": "Clara", "texto": "Si lo compartes tú, es en serio. Aporto."}]},
+        "confirmar_en_el_hospital": {"sistema": "No compartiste nada. Mañana vas al hospital a preguntar."}
+      }
+    },
+    "pelo_en_el_pan": {
+      "canal": "muro",
+      "tarjeta": "red",
+      "foto": "pan",
+      "leyenda": "Reseña: Padaria Pão Quente. Un pelo LARGO en el pan. El panadero es calvo.",
+      "resultados": {
+        "publicar_resena": {"publica": true, "sistema": "Reseña publicada: 104 reacciones.",
+                            "respuestas": [{"autor": "lu_dos_santos", "texto": "Nunca más compro ahí."},
+                                           {"autor": "Seu Tonho", "texto": "Ese señor me fía hace años, qué pena."}]},
+        "decirlo_en_privado": {"sistema": "No la publicaste. Se lo dijiste al panadero en persona."}
+      }
+    },
+    "captura_de_la_rifa": {
+      "canal": "grupo",
+      "tarjeta": "red",
+      "nombre_grupo": "Asociación de vecinos",
+      "mensajes": [
+        {"autor": "Tesorero Edson", "texto": "Presté la plata de la rifa para arreglar la moto. La repongo el viernes."},
+        {"autor": "Rosa", "texto": "¿Cómo que la prestaste? Esa plata es de todos."},
+        {"autor": "Tesorero Edson", "texto": "Tranquilos, el viernes está. Aquí la lista de quienes pagaron.", "foto": "lista"}
+      ],
+      "resultados": {
+        "publicar_captura": {"sistema": "Captura publicada en Civitas, con los teléfonos de doce vecinos.",
+                             "respuestas": [{"autor": "Rosa", "texto": "¿Por qué sale mi número en Civitas?"}]},
+        "esperar_asamblea": {"mio": "Edson, el sábado en la asamblea quiero preguntar por la rifa.",
+                             "respuestas": [{"autor": "Tesorero Edson", "texto": "Está bien. Llevo las cuentas."}]}
+      }
+    },
+    "extrano_en_la_escuela": {
+      "canal": "cadena",
+      "tarjeta": "red",
+      "nombre_grupo": "Reenviados",
+      "mensajes": [
+        {"autor": "Reenviado", "texto": "OJO: tipo raro rondando la Escuela Barrio Esperanza. Mira las casas y anota cosas.", "reenviado": true, "foto": "borrosa"},
+        {"autor": "Mãe do Davi", "texto": "¡Qué miedo! ¿Alguien sabe quién es?"},
+        {"autor": "Reenviado", "texto": "Pásenlo a todos los padres YA.", "reenviado": true}
+      ],
+      "resultados": {
+        "reenviar_alerta": {"mio": "¡Cuidado, padres! Tipo raro en la escuela, pasen la foto.",
+                            "respuestas": [{"autor": "Vigilancia Barrio Esperanza", "texto": "Grupo nuevo: 60 participantes."}]},
+        "avisar_escuela_y_guardia": {"sistema": "Mandaste la foto solo a la escuela y a la guardia municipal."}
+      }
+    },
+    "ensayo_en_vivo": {
+      "canal": "muro",
+      "tarjeta": "red",
+      "foto": "samba",
+      "leyenda": "EN VIVO: ensayo de la Escola de Samba. ¡Escuchen esa batería!",
+      "resultados": {
+        "transmitir_en_vivo": {"publica": true, "sistema": "Transmitiendo: 300 personas mirando.",
+                               "respuestas": [{"autor": "bailarina_jaque", "texto": "Te pedimos no salir en redes..."},
+                                              {"autor": "fan_do_samba", "texto": "¿Esa es la coreografía del desfile?"}]},
+        "solo_fecha_y_tambores": {"publica": true, "sistema": "Publicaste una foto de los tambores con la fecha y la hora.",
+                                  "respuestas": [{"autor": "Tía Neide", "texto": "¡Ahí estaremos!"}]}
+      }
+    },
+    "meme_de_lucas": {
+      "canal": "cadena",
+      "tarjeta": "acoso",
+      "nombre_grupo": "Curso 9B",
+      "mensajes": [
+        {"autor": "Reenviado", "texto": "JAJAJA miren al nuevo", "reenviado": true, "foto": "meme"},
+        {"autor": "Kaio", "texto": "40 risas y contando"},
+        {"autor": "Bruna", "texto": "¿Alguien tiene el video de cuando se cayó?"}
+      ],
+      "resultados": {
+        "reenviar_meme": {"mio": "JAJAJA lo paso al otro grupo",
+                          "respuestas": [{"autor": "Kaio", "texto": "Eres un genio, jaja."}]},
+        "callar_meme": {"sistema": "No escribiste nada. El meme sigue arriba del todo."},
+        "apoyar_y_reportar": {"mio": "Lucas, eso no está bien. ¿Estás ok? Reporté el meme.",
+                              "respuestas": [{"autor": "Kaio", "texto": "Aguafiestas."}]}
+      }
+    },
+    "grupo_contra_ana": {
+      "canal": "grupo",
+      "tarjeta": "acoso",
+      "nombre_grupo": "Fans de la Ana jaja",
+      "mensajes": [
+        {"autor": "Rafa", "texto": "Escuchen este audio, habla igualito a Ana jajaja"},
+        {"autor": "Juli", "texto": "Y miren la foto que le saqué en la panadería", "foto": "ana"},
+        {"autor": "Rafa", "texto": "Ahora tú, manda uno tuyo"}
+      ],
+      "resultados": {
+        "mandar_audio": {"mio": "Audio imitando a Ana (0:12)",
+                         "respuestas": [{"autor": "Rafa", "texto": "JAJAJA el mejor"}]},
+        "salir_callado": {"sistema": "Saliste del grupo «Fans de la Ana jaja»."},
+        "pruebas_y_adulto": {"mio": "Guardé capturas y se lo conté a la orientadora. Ana, no estás sola.",
+                             "respuestas": [{"autor": "Juli", "texto": "Qué exagerado."}]}
+      }
+    },
+
+    "feed": {
+      "canal": "feed"
+    }
+  }
+}

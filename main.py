@@ -131,6 +131,9 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
             # rectificar lo que compartiste y resultó falso, impreciso o hiriente (ALCALDE_RECTIFICAR=0 lo apaga)
             from backend.logica import rectificar
             flujo = rectificar.envolver(flujo)
+            # qué avisos de Civitas ya se explicaron en esta partida (ALCALDE_TARJETAS_AVISOS / ALCALDE_TELEFONO_GRANDE)
+            from backend.logica import avisos_telefono
+            flujo = avisos_telefono.envolver(flujo)
         # lo bien que se verificó en un minijuego da propina y confianza (ALCALDE_CONSECUENCIA_GRADUADA=0 lo apaga)
         from backend.logica import consecuencia_graduada
         flujo = consecuencia_graduada.envolver(flujo)
