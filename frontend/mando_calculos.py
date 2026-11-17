@@ -24,7 +24,7 @@ GIRO_CAMARA = 140.0         # grados por segundo con el palo derecho a fondo
 UMBRAL_GATILLO = 0.45       # el gatillo cuenta como «pulsado» al pasar de esto
 UMBRAL_RUEDA = 0.55         # el palo derecho cuenta como una vuelta de rueda al pasar de esto
 PERIODO_RUEDA = 0.16        # s entre dos vueltas de rueda con el palo sostenido
-MARGEN_CURSOR = 0.01        # el cursor no sale de la ventana
+MARGEN_CURSOR = 0.02        # el cursor no sale de la ventana
 
 PREFIJO = "gamepad"
 PALO_IZQUIERDO = f"{PREFIJO} left stick"

@@ -448,7 +448,7 @@ class VigiaEntregas(Entity):
         if jugador is None or bv.reducir_movimiento() or dt <= 0:
             self._ultima = None
             return
-        pos = (float(jugador.x), float(jugador.y), float(jugador.z))
+        pos = (float(jugador.x), float(getattr(jugador, "y", 0.0)), float(jugador.z))      # el Jugador del backend no tiene y
         if self._ultima is not None:
             v = math.hypot(pos[0] - self._ultima[0], pos[2] - self._ultima[2]) / dt
             self._t_estela += dt
