@@ -16,7 +16,7 @@ from frontend.minijuegos import previa_calculos as calc
 from frontend.minijuegos import ui
 from frontend.minijuegos.base import ANCHO_UTIL, Y_ENCABEZADO
 
-Y_BOTON = -0.385
+Y_BOTON = -0.397
 Y_ARRIBA = 0.35                 # arriba del contenido (bajo el título)
 Y_ABAJO = -0.28                 # abajo del contenido (sobre el botón)
 ALTO_ILUSTRACION_MIN = 0.50
