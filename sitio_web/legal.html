@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Aviso de uso y privacidad</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="estilos.css">
+<style>.pend { background: var(--amarillo); color: var(--tinta); padding: 0 6px; border-radius: 4px; font-weight: 700; }</style>
+</head>
+<body>
+<header class="cabecera">
+  <div class="cabecera-fila">
+    <a class="marca" href="index.html" aria-label="Alcalde Digital, inicio"><span class="marca-alcalde">ALCALDE</span><span class="marca-digital">DIGITAL</span></a>
+    <nav class="menu" aria-label="Secciones"><a href="index.html">Volver al sitio</a></nav>
+    <a class="boton boton-primario boton-chico" href="index.html#descargar">Descargar</a>
+  </div>
+</header>
+<main class="legal">
+<h1>Aviso de uso, privacidad, créditos y clasificación</h1>
+<div class="aviso"><p><strong>Borrador para revisión legal antes de publicar.</strong> No soy abogado y esto no es asesoría legal. Estos textos cubren los requisitos que conozco y se basan solo en lo que dicen <code>docs/AVISOS_LEGALES_Y_ACTIVOS.md</code>, <code>docs/PRIVACIDAD_ONLINE.md</code>, <code>docs/CONTENIDO_Y_CLASIFICACION.md</code> y <code>docs/ONLINE.md</code>. Lo que aparece como <strong><mark class="pend">[PENDIENTE]</mark></strong> falta por completar o confirmar antes de publicar. Versión 1.0 · 2026-11-17</p></div>
+
+<h2>Aviso de descarga y uso</h2>
+<p><strong>Qué descargas.</strong> Un archivo .zip con «Alcalde Digital», un juego educativo en 3D para computador (PC), hecho en Python con el motor Ursina. Trata sobre la desinformación y se ambienta en una favela brasileña ficticia. Todas las personas, lugares, misiones y el dinero (R$) del juego son inventados y no tienen valor real.</p>
+<p><strong>Es software de aprendizaje.</strong> Es un proyecto educativo y de aprendizaje. No es un producto comercial ni un servicio profesional.</p>
+<p><strong>Sin garantías.</strong> El juego se ofrece «tal cual», sin garantía de ningún tipo: puede tener errores, cambiar o dejar de estar disponible sin aviso. En la medida que permita la ley, el autor no responde por daños derivados de descargarlo o usarlo.</p>
+<p><strong>Ejecútalo bajo tu propia responsabilidad.</strong> Descarga el archivo solo desde esta página. Antes de abrirlo, revisa con tu antivirus que no haya sido alterado. El programa se ejecuta con los permisos de tu usuario y escribe archivos en tu carpeta personal (ver «Privacidad»). Si usas el modo online, lee los riesgos de esa sección.</p>
+<p><strong>Sin telemetría.</strong> El juego no envía estadísticas, informes de errores ni datos de uso al autor. No tiene cuentas, publicidad, compras reales, ni pide ubicación, cámara, micrófono ni contactos. La única conexión de red posible es el modo online opcional, que solo se activa cuando tú creas una sala o te unes a una.</p>
+<p><strong>Uso con menores.</strong> El juego no está dirigido a menores y no pide la edad. Si lo usan menores, que sea con permiso y acompañamiento de un adulto responsable. <mark class="pend">[PENDIENTE: edad mínima.]</mark></p>
+<h2>Privacidad</h2>
+<p><strong>Esta web.</strong> Es un sitio estático. No usa cookies, no usa rastreadores ni analítica, y no pide datos personales. <mark class="pend">[PENDIENTE: confirmar antes de publicar. Si el alojamiento o una red de distribución (CDN) guarda registros de visitas, o si se añade un formulario o contador, este párrafo debe cambiar.]</mark></p>
+<p><strong>Qué guarda el juego y dónde.</strong> Todo se guarda solo en tu equipo, en la carpeta <code>~/.alcalde_digital</code>, sin cifrar. Nada de esto se envía al autor:</p>
+<ul><li><code>partida.json</code>: tu partida (alias de los jugadores, rol, posición, teléfono y dinero <strong>del juego</strong>, misiones, decisiones y reloj).</li><li><code>ajustes.json</code>: filtros de daltonismo, volúmenes, dispositivo de audio, tu último alias y la última dirección de anfitrión (IP:puerto) del modo online.</li><li><code>cache/</code>: archivos de caché del mundo, generados por el propio juego.</li></ul>
+<p><strong>Consejo:</strong> no uses tu nombre real como alias. Para borrar tus datos: en el juego, Ajustes, botón «Borrar partida guardada» (partida) y Ajustes, sección Online, botón «Olvidar» (alias y último anfitrión). También puedes cerrar el juego y borrar la carpeta <code>~/.alcalde_digital</code>.</p>
+<p><strong>Modo online (opcional).</strong> Está activo por defecto, pero no se conecta a nada hasta que crees una sala o te unas a una (se apaga por completo arrancando con <code>ALCALDE_ONLINE=0</code>). No hay servidor del autor ni cuentas: una persona (el anfitrión) aloja la sala y los demás se conectan a su equipo. Esto implica:</p>
+<ul><li>El anfitrión ve tu <strong>dirección IP</strong>. Los demás jugadores ven tu <strong>alias, rol, posición y movimiento</strong>, tus decisiones públicas y tus saludos rápidos. No hay chat libre.</li><li><strong>El tráfico no va cifrado</strong> y tu juego <strong>no comprueba quién es el anfitrión</strong>. Quien esté en la ruta de red podría leer alias, posiciones e IP, o un impostor podría hacerse pasar por tu anfitrión. Juega en red local o con una VPN, y solo con personas de confianza.</li><li>El anfitrión no guarda nada de la partida en disco: todo queda en memoria y desaparece al cerrar la sala. Tras una desconexión conserva tu rol 90 segundos para que puedas volver.</li><li>El inventario, el dinero y el cansancio son locales y no se envían en el modo online.</li><li>No se recolecta ubicación real, contactos, cámara ni micrófono.</li><li>Si alojas una sala, ves la IP y el alias de los demás: úsalos solo para la partida.</li></ul>
+<p><strong>Responsable.</strong> El autor del juego no recibe datos. En el modo online, quien aloja la sala trata los datos de los participantes mientras dura la partida. <mark class="pend">[PENDIENTE: nombre y correo de contacto público del autor para dudas de privacidad.]</mark></p>
+<h2>Créditos y licencias</h2>
+<p><strong>Juego:</strong> «Alcalde Digital». Autor/a: <mark class="pend">[PENDIENTE: nombre o seudónimo a publicar]</mark>. Licencia del código y de los contenidos propios: <mark class="pend">[PENDIENTE: no consta en los documentos; elegir licencia, por ejemplo todos los derechos reservados o una licencia abierta]</mark>.</p>
+<p><strong>Activos que constan en la documentación:</strong></p>
+<table><thead><tr><th>Activo</th><th>Autor/a y licencia</th><th>Estado</th></tr></thead><tbody><tr><td>5 modelos 3D de personajes nuevos (.glb)</td><td>El archivo declara solo el generador «Khronos glTF Blender I/O». No consta autor, origen ni licencia</td><td><strong><mark class="pend">[PENDIENTE]</mark></strong> no publicar estos modelos hasta confirmar autoría y licencia. Si no se confirma, el juego usa los 4 modelos de respaldo</td></tr><tr><td>4 modelos 3D de respaldo (los de siempre)</td><td>No consta en los documentos leídos</td><td><strong><mark class="pend">[PENDIENTE]</mark></strong></td></tr><tr><td>Textos, personajes, lugares, misiones y dilemas</td><td>No consta licencia</td><td><strong><mark class="pend">[PENDIENTE]</mark></strong></td></tr><tr><td>Música, sonidos, tipografías, imágenes y texturas</td><td>No constan en los documentos leídos</td><td><strong><mark class="pend">[PENDIENTE]</mark></strong> inventario y licencia de cada uno</td></tr><tr><td>Motor Ursina, Python y bibliotecas del .zip</td><td>No constan en los documentos leídos</td><td><strong><mark class="pend">[PENDIENTE]</mark></strong> listar y atribuir con la licencia de cada una (varias exigen incluir su aviso)</td></tr></tbody></table>
+<p>El archivo <code>CREDITOS.md</code> de la raíz, que debía llevar el registro (archivo, autor, licencia, enlace y modificaciones), todavía no consta como creado. Cuando exista, este apartado debe reflejarlo y enlazarlo.</p>
+<p><strong>Inspiración cultural.</strong> Las manillas del juego están inspiradas en una tradición popular de Salvador (Brasil). Aquí son solo un recurso de juego y no representan ninguna práctica religiosa. La iglesia, el puesto de salud, la escuela y los demás lugares son ficticios.</p>
+<p><strong>Marcas y personas.</strong> Todos los personajes y lugares son ficticios; cualquier parecido con personas, escuelas, asociaciones o marcas reales es casual. Las marcas citadas pertenecen a sus dueños y el juego no está afiliado a ellas.</p>
+<h2>Clasificación de contenido</h2>
+<p>Clasificación oficial: <strong>ninguna asignada</strong>. Este juego no se publica en tiendas y no ha pasado por IARC, Apple, Classificação Indicativa ni otra autoridad. <strong><mark class="pend">[PENDIENTE]</mark></strong> Si se distribuye, la clasificación la decide la autoridad correspondiente.</p>
+<p>Descripción del contenido (según nuestra revisión interna, con las opciones sensibles apagadas):</p>
+<ul><li><strong>Tema:</strong> sátira educativa sobre desinformación, ambientada en una favela brasileña. Hay noticias falsas, dilemas morales y referencias a menores y a posibles estafas, tratados con tono educativo.</li><li><strong>Violencia, sangre, desnudez, lenguaje soez grave, apuestas:</strong> no hay.</li><li><strong>Sustancias:</strong> hay una referencia a una bolsita de bicarbonato de sodio vendida en un puesto de calle (el juego aclara que «no cura nada») y un bar en el mapa. No se muestra ningún consumo.</li><li><strong>Armas:</strong> el catálogo contiene objetos de utilería ocultos por defecto, sin uso, sin precio y sin forma de obtenerlos. Hay también decoración humorística (pistolas de agua) que está bajo una opción de huevos de pascua. <strong><mark class="pend">[PENDIENTE]</mark></strong> confirmar qué incluye exactamente el .zip publicado y apagar estas opciones.</li><li><strong>Dinero:</strong> solo moneda ficticia (R$ del juego). Sin compras reales, cajas de botín, publicidad ni apuestas.</li><li><strong>Online:</strong> posible interacción con otras personas si abres una sala a internet; sin chat libre (solo saludos fijos).</li><li><strong>Recomendación:</strong> no dirigido a menores. Edad mínima sugerida: <mark class="pend">[PENDIENTE, a definir con asesoría legal]</mark>.</li></ul>
+</main>
+<footer class="pie"><div class="envoltorio pie-fila"><p>Alcalde Digital · proyecto de aprendizaje. Personas, lugares y noticias ficticios.</p><p><a href="index.html">Volver al inicio</a></p></div></footer>
+</body>
+</html>

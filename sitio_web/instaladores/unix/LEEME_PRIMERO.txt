@@ -1,0 +1,24 @@
+ALCALDE DIGITAL (beta) para macOS y Linux
+=========================================
+
+1. Descomprime el .zip.
+2. Instala (necesita internet; descarga Python privado del juego y las bibliotecas, unos 600 MB dentro de esta carpeta):
+   - macOS: doble clic en  Instalar.command
+       Si macOS dice que no puede abrirlo por ser de un desarrollador no identificado: clic derecho sobre el archivo, "Abrir",
+       y "Abrir" otra vez. (Alternativa en la terminal:  xattr -dr com.apple.quarantine .  y luego  ./instalar.sh )
+   - Linux: abre una terminal en esta carpeta y ejecuta  ./instalar.sh
+3. Para jugar: macOS, doble clic en  Jugar.command  ·  Linux,  ./jugar.sh
+
+No hace falta tener Python instalado.
+
+CONTROLES
+- Mover: W A S D o flechas · Correr: Shift · Saltar: Espacio · Interactuar y entrar: E
+- Teléfono (Civitas): Tab · Seguir misión: M · Mapa de la ciudad: N · Pausa: Esc
+- Con mando: palo izquierdo camina, palo derecho gira la cámara, A salta, B interactúa, Y teléfono, Inicio pausa.
+
+ESTADO
+- Versión beta de un proyecto de aprendizaje. Probada en macOS. En Linux el instalador es nuevo y todavía no se ha probado
+  (puede hacer falta instalar los controladores OpenGL de tu distribución).
+- El modo en línea es opcional y su tráfico no va cifrado: no lo uses con desconocidos.
+- Personas, lugares y noticias del juego son ficticios.
+- La partida se guarda en la carpeta .alcalde_digital de tu usuario (se borra desde Ajustes del juego).

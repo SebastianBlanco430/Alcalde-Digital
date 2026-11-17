@@ -206,7 +206,8 @@ class EscenaMinijuego(Escena):
         except Exception:                        # noqa: BLE001
             pass
         self.previa = PantallaPrevia(self._clase.TITULO, rumor, textos, ui.ayuda_legible(self._clase.AYUDA),
-                                     self._empezar_desde_previa, corta=corta, al_ver_tutorial=ver, parent=self)
+                                     self._empezar_desde_previa, corta=corta, al_ver_tutorial=ver, minijuego_id=self.minijuego_id,
+                                     parent=self)
         self.t_previa = 0.0
 
     # -- Tutorial de la primera vez (frontend/registro_tutorial_mision.py): no cambia reglas, resultados ni pagos --
