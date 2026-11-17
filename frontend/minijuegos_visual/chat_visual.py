@@ -285,7 +285,7 @@ class ChatVisual(CapaVisual, MinijuegoChat):
                 self._texto_globo(lineas, px, cx - ancho / 2 + 0.014, y + alto / 2 - 0.012, estilo.TINTA)
                 tipo_marca = pc.marca_de_valor(self._valores_log.get(idx))
                 if tipo_marca:       # palomita verde (protegió) o aspa roja (cedió un dato), en una chapa sobre el globo
-                    px_m, py_m = cx - ancho / 2 - 0.002, y + alto / 2 - 0.002
+                    px_m, py_m = cx - ancho / 2 - 0.032, y
                     Entity(parent=self.burbujas, model="circle", color=_rgba(estilo.TINTA), position=(px_m, py_m, -0.012), scale=0.05)
                     Entity(parent=self.burbujas, model="circle", color=_rgba(estilo.PAPEL), position=(px_m, py_m, -0.013), scale=0.044)
                     pz.marca(self.burbujas, tipo_marca, (px_m, py_m), 0.026, z=-0.016)
@@ -407,7 +407,7 @@ class ChatVisual(CapaVisual, MinijuegoChat):
             e.enabled = False
         self._protegido = self.partida.datos_cedidos() == 0
         # Tapa todo el chat entre el título y la franja de avatares.
-        arriba = self.y_panel - 0.05
+        arriba = self.y_panel - 0.095          # por debajo de la cabecera amarilla del móvil
         abajo = self.y_panel - self.alto_chat + RESERVA_ABAJO + 0.006
         cx, cy = self.x_tel, (arriba + abajo) / 2
         ancho, alto = ANCHO_TEL - 0.012, arriba - abajo
@@ -438,16 +438,16 @@ class ChatVisual(CapaVisual, MinijuegoChat):
             Entity(parent=self.final, model="circle", color=_rgba(ROJO, 1), position=(fx_, fy, 0), scale=0.06)
             Text("?", parent=self.final, origin=(0, 0), position=(fx_, fy, -0.002), scale=escala_fuente(24),
                  font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA, 1))
-            Text("Perfil desconocido", parent=self.final, origin=(0, 0), position=(fx_ - 0.03, fy - 0.05, -0.002),
+            Text("Perfil desconocido", parent=self.final, origin=(0, 0), position=(fx_ - 0.06, fy - 0.05, -0.002),
                  scale=escala_fuente(12), color=_rgba(ROJO, 1))
             Text("El dato salió del grupo y ya no sabes quién lo tiene.", parent=self.final, origin=(0, 0),
-                 position=(cx, cy + alto / 2 - 0.025, -0.002), scale=escala_fuente(14), color=_rgba(estilo.TINTA, 1))
+                 position=(cx, cy + alto / 2 - 0.07, -0.002), scale=escala_fuente(14), color=_rgba(estilo.TINTA, 1))
             sx, sy = self._ruta[0]
             Entity(parent=self.final, model="circle", color=_rgba(TONOS_AVATAR[0], 1), position=(sx, sy, 0), scale=0.05)
             Text("Tú", parent=self.final, origin=(0, 0), position=(sx, sy, -0.002), scale=escala_fuente(13),
                  font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA, 1))
             # La ficha termina justo encima del perfil desconocido (no lo tapa).
-            self._ruta_chip = self._ruta[:-1] + [(fx_, fy + 0.055)]
+            self._ruta_chip = self._ruta[:-1] + [(fx_ - 0.04, fy + 0.055)]
             self._chip = Entity(parent=self.final, position=(sx, sy + 0.045, -0.01))
             ui.rect(self._chip, 0.11, 0.032, ROJO, (0, 0), z=0.001, radio_px=6)
             Text("el dato", parent=self._chip, origin=(0, 0), z=-0.002, scale=escala_fuente(13),
@@ -455,7 +455,7 @@ class ChatVisual(CapaVisual, MinijuegoChat):
         resumen = pc.resumen_final(self.partida.respuestas)
         if resumen:
             Text("\n".join(ui.lineas_de(resumen, 13, ancho - 0.04)), parent=self.final, origin=(0, 0),
-                 position=(cx, cy - alto / 2 + 0.135, -0.002), scale=escala_fuente(13), color=_rgba(estilo.TINTA, 1))
+                 position=(cx, cy + alto / 2 - 0.03, -0.002), scale=escala_fuente(13), color=_rgba(estilo.TINTA, 1))
         self.final.enabled = True
         if self._fx is not None:
             self._vigilar(self._fx.sello, "A SALVO" if self._protegido else "DATOS REGALADOS", (cx, cy - alto / 2 + 0.05),

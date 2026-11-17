@@ -79,7 +79,7 @@ class TarjetaTitular(ui.Tarjeta):
         self.cuerpo.x += reserva
         self.cuerpo.color = rgb(TINTA)
         self.etiqueta.color = rgb(TINTA)
-        self.etiqueta.y = -alto / 2 + 0.017
+        self.etiqueta.y = -alto / 2 + 0.024
         self.etiqueta.scale = escala_fuente(13)
         cx, cy = -ancho / 2 + 0.036, alto / 2 - 0.034
         self.disco = Entity(parent=self, model="circle", color=rgba(TINTA), scale=0.054, position=(cx, cy, -0.01))

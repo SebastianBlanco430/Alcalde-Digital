@@ -66,6 +66,7 @@ class RelojPresion(Entity):
             self._sector.model = None
             return
         self._sector.model = Mesh(vertices=[(x, y, 0) for x, y in verts], triangles=tris, mode="triangle")
+        self._sector.double_sided = True
         self._sector.color = rgba(pc.color_reloj(r))
 
 
