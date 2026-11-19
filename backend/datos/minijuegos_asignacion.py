@@ -2,7 +2,7 @@
 # misión -> minijuego vive AQUÍ, aparte, para no tocar ese archivo.
 #
 # Orden de decisión de asignar(mision):
-#   1. ASIGNACION_POR_ID: la lista explícita (las 47 misiones del mapa grande; las 14 del chico comparten ids).
+#   1. ASIGNACION_POR_ID: la lista explícita (las 14 misiones del catálogo).
 #   2. Por TEMA del rumor (palabras clave de su texto): foto/video/audio -> comparar, premios/cupones/encuestas -> señales, datos
 #      personales -> chat, salud/seguridad urgente -> contrarreloj, fechas y horarios -> cronología.
 #   3. Por GRUPO de confianza y DIFICULTAD: instituciones -> rastrear, policía -> contrarreloj, ciudadanos -> cronología.
@@ -16,55 +16,22 @@ ASIGNACION_POR_ID = {
     "periodista_prefeitura": mj.RASTREAR,
     "candidato_morro": mj.RASTREAR,
     "candidato_mercado": mj.RASTREAR,
-    "periodista_oficina": mj.RASTREAR,
-    "candidato_oficina": mj.RASTREAR,
-    "candidato_varzea": mj.RASTREAR,
     "generica_universidade": mj.RASTREAR,
-    "periodista_estacao": mj.RASTREAR,
     # -- Comparar versiones: fotos, videos, audios, carteles y volantes que circulan --
     "periodista_radio": mj.COMPARAR,
     "ciudadano_teleferico": mj.COMPARAR,
-    "generica_oficina": mj.COMPARAR,
-    "generica_feira_ladeira": mj.COMPARAR,
-    "periodista_igreja": mj.COMPARAR,
-    "periodista_escola": mj.COMPARAR,
-    "influencer_posto": mj.COMPARAR,
-    "candidato_igreja": mj.COMPARAR,
     # -- Ordenar la cadena: eventos, horarios y fechas --
     "ciudadano_praca": mj.CRONOLOGIA,
     "generica_rodoviaria": mj.CRONOLOGIA,
     "influencer_samba": mj.CRONOLOGIA,
     "generica_feira": mj.CRONOLOGIA,
-    "generica_escola": mj.CRONOLOGIA,
-    "ciudadano_padaria": mj.CRONOLOGIA,
-    "ciudadano_feira": mj.CRONOLOGIA,
-    "influencer_padaria": mj.CRONOLOGIA,
-    "generica_feira_turno": mj.CRONOLOGIA,
     # -- Chat del barrio: piden datos, cuentas, cuotas (dilema entre ayudar y proteger a un amigo) --
     "generica_mutirao": mj.CHAT,
-    "generica_bar": mj.CHAT,
-    "generica_igreja": mj.CHAT,
-    "ciudadano_supermercado": mj.CHAT,
-    "influencer_bar": mj.CHAT,
-    "generica_lanhouse": mj.CHAT,
-    "generica_taller_turno": mj.CHAT,
-    "generica_entregas": mj.CHAT,
     # -- Señales de edición: cadenas, cupones, capturas con premios y encuestas --
     "generica_corrente": mj.SENALES,
-    "generica_mototaxi": mj.SENALES,
-    "generica_supermercado": mj.SENALES,
-    "generica_salao": mj.SENALES,
-    "generica_mirante": mj.SENALES,
-    "candidato_salao": mj.SENALES,
     # -- Contrarreloj: salud, seguridad y servicios que se propagan rápido --
     "influencer_parque": mj.CONTRARRELOJ,
     "generica_santa_casa": mj.CONTRARRELOJ,
-    "generica_posto": mj.CONTRARRELOJ,
-    "generica_padaria": mj.CONTRARRELOJ,
-    "generica_varzea": mj.CONTRARRELOJ,
-    "generica_estacao_alto": mj.CONTRARRELOJ,
-    "ciudadano_posto": mj.CONTRARRELOJ,
-    "influencer_mirante": mj.CONTRARRELOJ,
 }
 
 # Tema del rumor -> palabras clave (en minúsculas) que lo delatan en `mision.rumor`. El orden importa: gana el primero que case.

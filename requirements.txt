@@ -1,3 +1,9 @@
 ursina==8.3.0
-pytest
-psutil>=6,<8
+psutil==7.2.2
+# Dependencias de ejecucion que ursina trae, fijadas segun el venv probado (macOS, Python 3.14)
+Panda3D==1.10.16
+panda3d-gltf==1.3.0
+panda3d-simplepbr==0.13.1
+pillow==13.0.0
+pyperclip==1.11.0
+screeninfo==0.8.1

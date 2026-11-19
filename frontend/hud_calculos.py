@@ -421,21 +421,18 @@ def segmento_a_cuadro(p0, p1):
     return ((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, largo, angulo - 90)
 
 
-# -- Minimapa LOCAL (mundo grande) -------------------------------------------------------------------------------
+# -- Geometría LOCAL del minimapa (ventana alrededor del jugador) --------------------------------------------------
 #
-# En el mundo grande (900 x 650 m, ~4.600 casas) ajustar toda la ciudad a 280 x 200 px da un rombo ilegible. El minimapa
-# local enseña solo lo que rodea al jugador: una ventana de ±RADIO_VENTANA_MINIMAPA m (a lo ancho del recuadro; a lo alto
-# caben menos metros), centrada en él y girada con la cámara como siempre (arriba = adelante). El jugador queda SIEMPRE
-# en el centro (u, v) = (0, 0).
+# La usa el minimapa de FOTO AÉREA (frontend/minimapa_foto.py): enseña solo lo que rodea al jugador, una ventana de
+# ±radio_ventana m (a lo ancho del recuadro; a lo alto caben menos metros), centrada en él y girada con la cámara como
+# siempre (arriba = adelante). El jugador queda SIEMPRE en el centro (u, v) = (0, 0).
 #
-# Idea de rendimiento: lo que no se mueve (calles, plazas, casas) vive en una capa en coordenadas absolutas ESCALADAS
-# (u = escala * x, v = escala * z, sin girar) y se coloca con UNA sola transformación por frame
-# (transformacion_capa: posición + rotation_z). Girar la cámara o caminar no rehace ninguna malla; solo se rehacen las
-# mallas de casas al cambiar el chunk del jugador (ver CacheCasasMinimapa). El mundo chico no pasa por aquí.
+# Idea de rendimiento: lo que no se mueve vive en una capa en coordenadas absolutas ESCALADAS (u = escala * x,
+# v = escala * z, sin girar) y se coloca con UNA sola transformación por frame (transformacion_capa: posición +
+# rotation_z). Girar la cámara o caminar no rehace ninguna malla.
 
 RADIO_VENTANA_MINIMAPA = 150.0    # m del centro al borde izquierdo/derecho del recuadro
 MARGEN_FLECHA_BORDE = 0.016       # unidades de camera.ui que la flecha del destino deja libres hasta el borde
-LADO_CHUNK_VENTANA = 64.0         # el de MundoGrande (backend/logica/mundo_grande.py)
 
 
 class GeometriaMinimapaLocal(GeometriaMinimapa):
@@ -485,11 +482,6 @@ class GeometriaMinimapaLocal(GeometriaMinimapa):
         return [n for n in self._mapa.lugares()
                 if math.hypot(self._mapa.coordenada(n)[0] - cx, self._mapa.coordenada(n)[1] - cz) <= limite]
 
-    # Chunks que hay que tener dibujados mientras el jugador esté en SU chunk actual: los que quedan a menos de
-    # radio_cobertura() del rectángulo de ese chunk (así no se rehace nada hasta cambiar de chunk). [(ci, cj)].
-    def chunks_de_ventana(self, mundo):
-        return chunks_alrededor(mundo, mundo.chunk_de(*self.centro_mundo), self.radio_cobertura())
-
     # Flecha de borde hacia un punto del mundo fuera del recuadro: (u, v, angulo, metros) con (u, v) en el borde (con
     # `margen` libre) sobre el rayo centro -> punto, y angulo horario desde arriba (como GeometriaMinimapa.flecha).
     # None si el punto cae dentro del recuadro (entonces se dibuja su marca normal).
@@ -503,82 +495,3 @@ class GeometriaMinimapaLocal(GeometriaMinimapa):
         return (u * t, v * t, navegacion.angulo_hacia(0.0, 0.0, u, v), metros)
 
 
-# Chunks (ci, cj) de `mundo` a menos de `radio` m del rectángulo del chunk `centro`, ordenados.
-def chunks_alrededor(mundo, centro, radio):
-    ci0, cj0 = centro
-    x0, x1, z0, z1 = mundo.limites_de_chunk(ci0, cj0)
-    n = int(math.ceil(radio / LADO_CHUNK_VENTANA)) + 1
-    resultado = []
-    for ci in range(max(0, ci0 - n), min(mundo.chunks_x, ci0 + n + 1)):
-        for cj in range(max(0, cj0 - n), min(mundo.chunks_z, cj0 + n + 1)):
-            a0, a1, b0, b1 = mundo.limites_de_chunk(ci, cj)
-            dx, dz = max(0.0, a0 - x1, x0 - a1), max(0.0, b0 - z1, z0 - b1)
-            if math.hypot(dx, dz) <= radio:
-                resultado.append((ci, cj))
-    return resultado
-
-
-# Casas (obstáculos tipo "casa", de caja) y escaleras que PERTENECEN a un chunk: cada una se asigna al chunk de su
-# centro (el contenido de un chunk incluye lo que lo toca, y una casa en el borde saldría dos veces).
-def casas_y_escaleras_de_chunk(mundo, ci, cj):
-    contenido = mundo.contenido_de_chunk(ci, cj, 0.0)
-    casas = [o for o in contenido["obstaculos"]
-             if o.tipo == "casa" and o.es_caja and mundo.chunk_de(o.cx, o.cz) == (ci, cj)]
-    escaleras = [e for e in contenido["escaleras"]
-                 if mundo.chunk_de((e.ax + e.bx) / 2, (e.az + e.bz) / 2) == (ci, cj)]
-    return casas, escaleras
-
-
-_TRIANGULOS_CUADROS = []
-
-
-# Triángulos (a, b, c) de `n` cuadriláteros de 4 vértices seguidos (mismo patrón que Minimapa._malla_de_cuadrilateros).
-def triangulos_de_cuadros(n):
-    while len(_TRIANGULOS_CUADROS) < 2 * n:
-        base = 2 * len(_TRIANGULOS_CUADROS)
-        _TRIANGULOS_CUADROS.extend(((base, base + 1, base + 2), (base, base + 2, base + 3)))
-    return _TRIANGULOS_CUADROS[:2 * n]
-
-
-# Casas y escaleras ya convertidas a vértices absolutos escalados, por chunk, con un tope (LRU simple): el
-# minimapa pide los de su ventana y solo calcula los que faltan. Python puro: se prueba con un mundo falso.
-class CacheCasasMinimapa:
-
-    def __init__(self, mundo, escala, ancho_min_escalera=0.003, maximo=160):
-        self._mundo = mundo
-        self._escala = escala
-        self._ancho_min = ancho_min_escalera
-        self._maximo = maximo
-        self._chunks = {}                  # (ci, cj) -> (vertices de casas, vertices de escaleras)
-        self.calculados = 0                # chunks calculados desde cero (lo usan las pruebas)
-
-    def _calcular(self, ci, cj):
-        k = self._escala
-        casas, escaleras = casas_y_escaleras_de_chunk(self._mundo, ci, cj)
-        vc = []
-        for o in casas:
-            mx, mz = o.ancho / 2, o.fondo / 2
-            vc += [(k * (o.cx + dx), k * (o.cz + dz), 0.0) for dx, dz in ((-mx, -mz), (mx, -mz), (mx, mz), (-mx, mz))]
-        ve = []
-        for e in escaleras:
-            rect = segmento_a_rectangulo((k * e.ax, k * e.az), (k * e.bx, k * e.bz), max(e.ancho * k, self._ancho_min))
-            ve += [(u, v, 0.0) for u, v in rect]
-        self.calculados += 1
-        return vc, ve
-
-    # (vertices_casas, vertices_escaleras) de los chunks pedidos, concatenados.
-    def vertices(self, chunks):
-        casas, escaleras = [], []
-        for clave in chunks:
-            if clave not in self._chunks:
-                self._chunks[clave] = self._calcular(*clave)
-            else:                                          # reciente: pasa al final del orden de inserción
-                self._chunks[clave] = self._chunks.pop(clave)
-            vc, ve = self._chunks[clave]
-            casas += vc
-            escaleras += ve
-        sobran = len(self._chunks) - self._maximo
-        if sobran > 0:
-            for clave in [k for k in self._chunks if k not in set(chunks)][:sobran]:
-                del self._chunks[clave]
-        return casas, escaleras

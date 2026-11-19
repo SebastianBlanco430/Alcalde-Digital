@@ -16,8 +16,7 @@ RADIO_COMERCIO = 2.0
 
 
 # stock = ids de objetos a la venta (al precio del catálogo de objetos). trabajo_id = puesto de trabajo del
-# lugar (backend/datos/trabajos_semilla.py). npc = nombre del vendedor. lugar_ancla = nombre SIMBÓLICO del
-# sitio donde debe ir (el mapa extenso lo ubica); `ancla` es dónde está hoy.
+# lugar (backend/datos/trabajos_semilla.py). npc = nombre del vendedor. `ancla` es dónde está.
 @dataclass(frozen=True)
 class Comercio:
     id: str
@@ -27,7 +26,6 @@ class Comercio:
     stock: tuple = ()
     trabajo_id: str | None = None
     npc: str | None = None
-    lugar_ancla: str = ""
 
     def __post_init__(self):
         if self.tipo not in TIPOS:
@@ -69,12 +67,8 @@ def resolver_ancla(mundo, ancla):
     return (px + nx * fuera + tx * lateral, pz + nz * fuera + tz * lateral, float(_numero({"r": rumbo}, "r")))
 
 
-# Ancla del comercio EN ESTE mundo: si el mundo expone `anclas_comercios` ({id: ancla}; el mapa grande) y trae el id,
-# esa; si no, la `ancla` del catálogo (el mundo chico de siempre, sin cambios).
+# Ancla del comercio EN ESTE mundo: la `ancla` del catálogo.
 def ancla_de(mundo, comercio):
-    anclas = getattr(mundo, "anclas_comercios", None)
-    if isinstance(anclas, dict) and comercio.id in anclas:
-        return anclas[comercio.id]
     return comercio.ancla
 
 

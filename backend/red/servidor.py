@@ -26,15 +26,7 @@ from backend.logica.misiones import RADIO_INTERACCION     # m: distancia a la pu
 
 
 def _construir_mundo(semilla):
-    """El mismo mundo que el juego local (backend/logica/mundo_config: ALCALDE_MAPA_GRANDE; por defecto el mapa pequeño)."""
-    try:
-        from backend.logica import mundo_config
-        grande = mundo_config.mapa_grande_activo()
-    except Exception:
-        grande = False
-    if grande:
-        from backend.datos.ciudad_grande import construir_mundo_grande
-        return construir_mundo_grande(semilla=semilla)
+    """El mismo mundo que el juego local (Ciudad3D, ver backend/logica/mundo_config)."""
     return construir_mundo_3d(semilla=semilla)
 
 
@@ -45,7 +37,7 @@ def construir_anfitrion(puerto=0, ambito="lan", semilla=SEMILLA_CASAS, abierto=F
     codigo = opciones.pop("codigo", None) or huellas.generar_codigo_sala(
         huellas.LARGO_CODIGO_ABIERTO if ambito == "abierto" else huellas.LARGO_CODIGO)
     mundo = mundo if mundo is not None else _construir_mundo(semilla)
-    catalogo = catalogo_de_mundo(mundo)       # el grande con el mapa grande; el de siempre con el chico
+    catalogo = catalogo_de_mundo(mundo)
     arbol_noticias, arbol_stats = construir_arboles()
     estado = EstadoPartida(arbol_noticias, arbol_stats, mazo=MazoSembrado(arbol_noticias, semilla))
     partida = PartidaCooperativa(

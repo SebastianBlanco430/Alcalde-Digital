@@ -141,7 +141,7 @@ CELDA_INDICE = 3.0              # m: lado de las celdas de indice_por_celdas
 
 # {(i, j): (perfil, ...)}: los perfiles (en el MISMO orden de `perfiles`) cuya escalera toca cada celda de `celda` m, con
 # 1 m de margen. Mirar solo los de la celda de un punto da el mismo resultado que altura_sobre_escaleras con todos (el
-# margen cubre de sobra el medio ancho de la escalera), pero sin recorrer las ~360 escaleras del mapa grande en cada
+# margen cubre de sobra el medio ancho de la escalera), pero sin recorrer todas las escaleras del mapa (~360 en el antiguo mapa grande, hoy borrado) en cada
 # consulta (era ~0,9 ms por frame solo para el suelo del jugador).
 def indice_por_celdas(perfiles, celda=CELDA_INDICE):
     indice = {}

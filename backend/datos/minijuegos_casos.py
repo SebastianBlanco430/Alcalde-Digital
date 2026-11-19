@@ -47,7 +47,7 @@ RASTREAR = [
             "f": {"titulo": "Origen: una foto sin contexto", "detalle": "Una foto de maquinaria que alguien explicó mal. El cartel de la obra habla de otra cosa."}},
     },
     {
-        "id": "r_estacion", "temas": ["dinero"], "misiones": ["periodista_estacao"],
+        "id": "r_estacion", "temas": ["dinero"], "misiones": [],
         "intro": "Todos comentan: «{rumor}». Antes de publicarlo, rastrea de dónde viene.",
         "hops": [
             {"pregunta": "Un colega te pasó la captura. ¿De dónde la sacó?", "opciones": [
@@ -64,7 +64,7 @@ RASTREAR = [
             "f": {"titulo": "Origen: una foto recortada", "detalle": "Alguien recortó el aviso y quitó la parte que lo desmiente."}},
     },
     {
-        "id": "r_licitacion", "temas": ["politica", "dinero"], "misiones": ["candidato_varzea", "candidato_oficina"],
+        "id": "r_licitacion", "temas": ["politica", "dinero"], "misiones": [],
         "intro": "En la calle se comenta: «{rumor}». ¿De quién salió?",
         "hops": [
             {"pregunta": "Un vecino te mostró su teléfono. ¿Quién se lo mandó?", "opciones": [
@@ -130,7 +130,7 @@ COMPARAR = [
         ],
     },
     {
-        "id": "c_taller", "temas": ["seguridad", "imagen"], "misiones": ["generica_oficina"],
+        "id": "c_taller", "temas": ["seguridad", "imagen"], "misiones": [],
         "titulo": "Una foto del taller",
         "original": "La foto del taller tomada ayer", "copia": "La foto que circula con el rumor",
         "lineas": [
@@ -142,7 +142,7 @@ COMPARAR = [
         ],
     },
     {
-        "id": "c_organico", "temas": ["dinero"], "misiones": ["generica_feira_ladeira"],
+        "id": "c_organico", "temas": ["dinero"], "misiones": [],
         "titulo": "Etiquetas de un puesto de la feria",
         "original": "La etiqueta del puesto (foto de hoy)", "copia": "La etiqueta que se ve en la publicación",
         "lineas": [
@@ -154,7 +154,7 @@ COMPARAR = [
         ],
     },
     {
-        "id": "c_milagro", "temas": ["imagen", "salud"], "misiones": ["periodista_igreja"],
+        "id": "c_milagro", "temas": ["imagen", "salud"], "misiones": [],
         "titulo": "Un video dentro de la iglesia",
         "original": "Lo que se ve al pasar por la nave", "copia": "El video que circula",
         "lineas": [
@@ -166,7 +166,7 @@ COMPARAR = [
         ],
     },
     {
-        "id": "c_lista", "temas": ["imagen", "politica"], "misiones": ["periodista_escola"],
+        "id": "c_lista", "temas": ["imagen", "politica"], "misiones": [],
         "titulo": "Una lista que circula",
         "original": "El tablón de la escuela", "copia": "La foto que circula en el chat",
         "lineas": [
@@ -178,7 +178,7 @@ COMPARAR = [
         ],
     },
     {
-        "id": "c_suero", "temas": ["salud"], "misiones": ["influencer_posto"],
+        "id": "c_suero", "temas": ["salud"], "misiones": [],
         "titulo": "Un afiche del puesto de salud",
         "original": "El afiche original del puesto", "copia": "La imagen que usa el reto en redes",
         "lineas": [
@@ -189,7 +189,7 @@ COMPARAR = [
         ],
     },
     {
-        "id": "c_volante", "temas": ["politica", "estafa"], "misiones": ["candidato_igreja"],
+        "id": "c_volante", "temas": ["politica", "estafa"], "misiones": [],
         "titulo": "Un volante de la parroquia",
         "original": "El volante en el atrio", "copia": "El volante que circula en las redes",
         "lineas": [
@@ -249,7 +249,7 @@ CRONOLOGIA = [
         "cierre": {"v": "El tablero oficial fue lo primero; lo demás lo fue repitiendo.", "f": "El primer mensaje era anónimo y los demás lo repitieron sin comprobarlo."},
     },
     {
-        "id": "k_escuela", "temas": ["evento"], "misiones": ["generica_escola"],
+        "id": "k_escuela", "temas": ["evento"], "misiones": [],
         "titulo": "¿Hay clases mañana?",
         "intro": "Todos preguntan: «{rumor}». Ordénalo para ver de dónde salió.",
         "items": [
@@ -264,7 +264,7 @@ CRONOLOGIA = [
         "cierre": {"v": "El aviso de la dirección estaba en el portón desde el primer momento.", "f": "Nadie mostró el aviso original."},
     },
     {
-        "id": "k_feira", "temas": ["evento", "comercio"], "misiones": ["generica_feira", "ciudadano_feira", "generica_feira_turno"],
+        "id": "k_feira", "temas": ["evento", "comercio"], "misiones": ["generica_feira"],
         "titulo": "La feria del fin de semana",
         "intro": "En el chat dicen: «{rumor}». Pon los mensajes en el orden en que aparecieron.",
         "items": [
@@ -279,7 +279,7 @@ CRONOLOGIA = [
         "cierre": {"v": "El aviso con sello fue lo primero; lo demás lo repitió.", "f": "No había aviso: empezó como un audio sin autor."},
     },
     {
-        "id": "k_panaderia", "temas": ["comercio", "evento", "dinero"], "misiones": ["ciudadano_padaria", "influencer_padaria"],
+        "id": "k_panaderia", "temas": ["comercio", "evento", "dinero"], "misiones": [],
         "titulo": "La oferta de la panadería",
         "intro": "Corre la voz: «{rumor}». ¿Cómo se fue pasando?",
         "items": [
@@ -336,7 +336,7 @@ CHAT = [
         ],
     },
     {
-        "id": "h_lanhouse", "temas": ["datos", "estafa"], "misiones": ["generica_lanhouse"],
+        "id": "h_lanhouse", "temas": ["datos", "estafa"], "misiones": [],
         "titulo": "Chat «Los de la lan house»", "amigo": "Nico",
         "intro": "Dicen que la lan house exige documento y teléfono para el wifi. Tu amigo Nico ya se los dio.",
         "turnos": [
@@ -355,7 +355,7 @@ CHAT = [
         ],
     },
     {
-        "id": "h_bar", "temas": ["datos", "dinero", "seguridad"], "misiones": ["generica_bar", "influencer_bar"],
+        "id": "h_bar", "temas": ["datos", "dinero", "seguridad"], "misiones": [],
         "titulo": "Chat «Amigos del bar»", "amigo": "Tito",
         "intro": "Dicen que el bar cobra una cuota por «seguridad». Tito te pide que lo cubras en el chat.",
         "turnos": [
@@ -374,7 +374,7 @@ CHAT = [
         ],
     },
     {
-        "id": "h_parroquia", "temas": ["datos", "dinero"], "misiones": ["generica_igreja"],
+        "id": "h_parroquia", "temas": ["datos", "dinero"], "misiones": [],
         "titulo": "Chat «Comunidad parroquial»", "amigo": "Padre Julián",
         "intro": "La parroquia publicó una cuenta para reparar el techo. Hay gente que te pide más datos de los necesarios.",
         "turnos": [
@@ -440,7 +440,7 @@ SENALES = [
         ],
     },
     {
-        "id": "s_cupon", "temas": ["estafa", "dinero"], "misiones": ["generica_supermercado"],
+        "id": "s_cupon", "temas": ["estafa", "dinero"], "misiones": [],
         "titulo": "Un cupón de descuento", "max_marcas": 3,
         "zonas": [
             {"id": "z1", "texto": "CUPON 80 % DE DESCUENTO EN TODA LA COMPRA", "lupa": "El titular del cupón", "falla": True,
@@ -458,7 +458,7 @@ SENALES = [
         ],
     },
     {
-        "id": "s_tarifa", "temas": ["dinero"], "misiones": ["generica_mototaxi"],
+        "id": "s_tarifa", "temas": ["dinero"], "misiones": [],
         "titulo": "Una captura de recibos", "max_marcas": 3,
         "zonas": [
             {"id": "z1", "texto": "Recibo de carrera: R$ 36", "lupa": "El monto del recibo", "falla": True,
@@ -476,7 +476,7 @@ SENALES = [
         ],
     },
     {
-        "id": "s_encuesta", "temas": ["politica", "estafa"], "misiones": ["candidato_salao"],
+        "id": "s_encuesta", "temas": ["politica", "estafa"], "misiones": [],
         "titulo": "Una encuesta «cerrada»", "max_marcas": 3,
         "zonas": [
             {"id": "z1", "texto": "Ganó el candidato X: ya no hace falta votar", "lupa": "El titular", "falla": True,
@@ -494,7 +494,7 @@ SENALES = [
         ],
     },
     {
-        "id": "s_luces", "temas": ["seguridad", "imagen"], "misiones": ["generica_mirante", "generica_salao"],
+        "id": "s_luces", "temas": ["seguridad", "imagen"], "misiones": [],
         "titulo": "Una foto de luces extrañas", "max_marcas": 3,
         "zonas": [
             {"id": "z1", "texto": "Luces sobre la ciudad", "lupa": "El cielo de la foto", "falla": True,
@@ -519,7 +519,7 @@ SENALES = [
 # =====================================================================================================================
 CONTRARRELOJ = [
     {
-        "id": "t_salud", "temas": ["salud"], "misiones": ["generica_santa_casa", "generica_posto"],
+        "id": "t_salud", "temas": ["salud"], "misiones": ["generica_santa_casa"],
         "titulo": "Hora pico del chat: lo que se dice de la salud",
         "cartas": [
             {"texto": "Hay vacunas del calendario oficial gratis en el puesto de salud hasta las 5.", "veraz": True, "ritmo": 12},
@@ -529,7 +529,7 @@ CONTRARRELOJ = [
         ],
     },
     {
-        "id": "t_seguridad", "temas": ["seguridad"], "misiones": ["influencer_parque", "generica_varzea", "influencer_mirante"],
+        "id": "t_seguridad", "temas": ["seguridad"], "misiones": ["influencer_parque"],
         "titulo": "Hora pico del chat: lo que pasa en la calle",
         "cartas": [
             {"texto": "La guardia cierra el paso al puente por obras, mañana de 9 a 12.", "veraz": True, "ritmo": 12},
@@ -539,7 +539,7 @@ CONTRARRELOJ = [
         ],
     },
     {
-        "id": "t_servicios", "temas": ["servicios", "evento", "general"], "misiones": ["generica_estacao_alto", "ciudadano_posto"],
+        "id": "t_servicios", "temas": ["servicios", "evento", "general"], "misiones": [],
         "titulo": "Hora pico del chat: lo que pasa con los servicios",
         "cartas": [
             {"texto": "El agua se corta mañana de 8 a 12 por mantenimiento (aviso oficial).", "veraz": True, "ritmo": 13},
@@ -549,7 +549,7 @@ CONTRARRELOJ = [
         ],
     },
     {
-        "id": "t_comercio", "temas": ["dinero", "estafa", "comercio", "datos"], "misiones": ["generica_padaria"],
+        "id": "t_comercio", "temas": ["dinero", "estafa", "comercio", "datos"], "misiones": [],
         "titulo": "Hora pico del chat: lo que se compra y se vende",
         "cartas": [
             {"texto": "La feria del domingo abre a las 8 en la plaza (cartel de la organización).", "veraz": True, "ritmo": 13},

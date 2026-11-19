@@ -16,7 +16,7 @@ import math
 import os
 import time
 
-from panda3d.core import LVecBase4, ScissorEffect, TextNode
+from panda3d.core import TextNode
 from ursina import Entity, Mesh, Text, camera, color, window
 
 from backend.datos.nombres_visibles import nombre_visible
@@ -24,7 +24,7 @@ from backend.logica import ajustes as modelo_ajustes
 from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 from backend.logica.roles import ROLES
 from frontend import (
-    diseno_adaptable, diseno_adaptable_calculos, estilo, hud_calculos, iconos, minimapa_calculos as mm, mundo_config,
+    diseno_adaptable, diseno_adaptable_calculos, estilo, hud_calculos, iconos, minimapa_calculos as mm,
     notificaciones_calculos)
 from frontend.componentes import (
     BarraIndicador, BotonAccion, BotonPrimario, a_unidades, destruir_arbol, escala_fuente,
@@ -377,7 +377,7 @@ class Minimapa(Entity):
 
     # rotacion_libre (mundo 3D): el yaw se cambia cada frame con fijar_yaw() y la escala no depende de él.
     # registro: RegistroMinimapa del que se leen marcadores y zonas (None = el global de minimapa_calculos).
-    # gestor_ajustes: de dónde salen zoom, giro y detalle (None = el global; sin ajustes activos se queda en lo de siempre).
+    # gestor_ajustes: de dónde salen giro y detalle (None = el global; sin ajustes activos se queda en lo de siempre).
     def __init__(self, mapa, yaw_grados=None, rotacion_libre=False, registro=None, gestor_ajustes=None, **opciones):
         super().__init__(**opciones)
         self._mapa = mapa
@@ -388,14 +388,8 @@ class Minimapa(Entity):
         self.fondo_satelite = None
         self.densidad = 2                      # nivel de detalle 1..3 (minimapa_calculos.detalle)
         self._yaw_camara = yaw                 # yaw real de la cámara (la geometría usa el efectivo según el modo)
-        self._casas_obsoletas = False          # (mundo grande) las casas no se dibujaron por el detalle y toca rehacerlas
-        # Mundo grande (con chunks): minimapa LOCAL, solo lo que rodea al jugador (ver GeometriaMinimapaLocal).
-        self._local = mundo_config.es_mundo_grande(mapa)
-        if self._local:
-            self.geometria = mm.GeometriaLocalAjustable(mapa, (self.ANCHO, self.ALTO), yaw)
-        else:
-            self.geometria = hud_calculos.GeometriaMinimapa(
-                mapa, (self.ANCHO, self.ALTO), yaw, rotacion_libre=rotacion_libre)
+        self.geometria = hud_calculos.GeometriaMinimapa(
+            mapa, (self.ANCHO, self.ALTO), yaw, rotacion_libre=rotacion_libre)
         self.position = (window.aspect_ratio / 2 - MARGEN - self.ANCHO / 2,
                          0.5 - MARGEN - self.ALTO / 2)
 
@@ -429,11 +423,8 @@ class Minimapa(Entity):
         self.reconstrucciones_casas = 0   # cuántas veces se rehicieron las mallas (lo usan los tests)
         self._yaw_casas = None            # yaw con el que se construyeron las mallas
         self._yaw_mapa = None             # yaw con el que se colocaron calles y plazas
-        if self._local:
-            self._construir_local()
-        else:
-            self._construir_mapa()
-            self._reconstruir_casas()
+        self._construir_mapa()
+        self._reconstruir_casas()
         self.marcador_destino = Entity(parent=self.capa_lugares, model="circle", z=0.0005,
                                        color=rgb(COLOR_DESTINO), enabled=False)
         # Etiqueta corta del destino, bajo el minimapa (chip oscuro con el nombre en amarillo).
@@ -509,13 +500,9 @@ class Minimapa(Entity):
             return
         self.geometria.girar(yaw_grados)
         self._girar_satelite()
-        if not self._local and hud_calculos.diferencia_yaw(yaw_grados, self._yaw_capas) > self._umbral_capas():
+        if hud_calculos.diferencia_yaw(yaw_grados, self._yaw_capas) > self._umbral_capas():
             self._capas_sucias = True                   # marcadores y zonas se proyectan con el yaw
         self._girar_capa_extra()
-        if self._local:                    # una sola transformación de la capa estática; no se rehace nada
-            self._aplicar_capa_local()
-            self._firma_ruta = None
-            return
         if (self.GIRO_SUAVE_MAPA and self._yaw_mapa is not None
                 and hud_calculos.diferencia_yaw(yaw_grados, self._yaw_mapa) <= self.YAW_MIN_MAPA_SUAVE):
             self._girar_capas_mapa()
@@ -556,7 +543,7 @@ class Minimapa(Entity):
         return self.YAW_MIN_CAPAS_SUAVE if self._giro_suave_capas() else 1.0
 
     def _girar_capa_extra(self):
-        if self._local or self.capa_extra is None or self._yaw_capas is None or not self._giro_suave_capas():
+        if self.capa_extra is None or self._yaw_capas is None or not self._giro_suave_capas():
             return
         delta = (self.geometria.yaw - self._yaw_capas + 180) % 360 - 180
         self.capa_extra.rotation_z = -delta
@@ -574,9 +561,6 @@ class Minimapa(Entity):
     # Rehace las dos mallas (casas y escaleras) con el yaw actual. Mundo sin obstaculos() o
     # escaleras() (mapa 2D): no hay nada que dibujar y las mallas quedan apagadas.
     def _reconstruir_casas(self):
-        if self._local:
-            self._reconstruir_casas_local()
-            return
         g = self.geometria
         obstaculos = getattr(self._mapa, "obstaculos", None)
         escaleras = getattr(self._mapa, "escaleras", None)
@@ -597,7 +581,7 @@ class Minimapa(Entity):
     # una ventana de ~90 m centrada en el jugador, ampliada y recortada al recuadro. Las capas vectoriales (calles, casas, ruta,
     # plazas, jugadores) se apagan y Minimapa.actualizar / fijar_yaw se lo delegan. Cualquier fallo deja el minimapa de siempre.
     def poner_satelite(self, satelite):
-        if satelite is None or self._local or self._satelite is not None:
+        if satelite is None or self._satelite is not None:
             return
         foto = None
         try:
@@ -635,58 +619,8 @@ class Minimapa(Entity):
         if self.fondo_satelite is not None:
             self.fondo_satelite.fijar_yaw(self.geometria.yaw, self._yaw_camara)
 
-    # -- Modo local (mundo grande) --
-
-    COLOR_FLECHA_DESTINO = COLOR_DESTINO
-
-    # Capas estáticas en coordenadas absolutas escaladas (calles, plazas, casas: una malla cada una, sin recolocar nada)
-    # dentro de `capa_mundo`, que se mueve y gira UNA vez por frame (_aplicar_capa_local). Lo que asoma del recuadro se
-    # recorta con un scissor de pantalla (_ajustar_recorte).
-    def _construir_local(self):
-        g = self.geometria
-        self.capa_mundo = Entity(parent=self)
-        for capa, z in ((self.capa_calles, -0.001), (self.capa_casas, -0.0015), (self.capa_plazas, -0.003)):
-            capa.parent = self.capa_mundo
-            capa.z = z
-        self._cache_casas = hud_calculos.CacheCasasMinimapa(self._mapa, g.escala_base, self.ANCHO_MIN_ESCALERA)
-        self._chunk_centro = None
-        self._firma_recorte = None
-        self.contornos_plazas = Entity(parent=self.capa_plazas, z=0.0002)
-        self.malla_plazas = Entity(parent=self.capa_plazas)
-        self._malla_estatica_local()
-        self.flecha_destino = Entity(
-            parent=self, z=-0.0065, scale=self.LARGO_FLECHA * 0.9, double_sided=True,
-            color=rgb(self.COLOR_FLECHA_DESTINO), enabled=False,
-            model=Mesh(vertices=[(0, 1, 0), (-0.42, 0, 0), (0, 0.28, 0), (0.42, 0, 0)],
-                       triangles=[(0, 1, 2), (0, 2, 3)]))
-        self._aplicar_capa_local()
-        self._reconstruir_casas_local()
-        self._ajustar_recorte()
-
-    # Mallas de calles y plazas en coordenadas de la escala base. Con zoom la capa entera se escala, así que los grosores
-    # mínimos (en pantalla) se dividen por el zoom para que no se afinen al alejar el mapa. Se rehacen solo al cambiar el zoom.
-    def _malla_estatica_local(self):
-        g = self.geometria
-        zoom = g.zoom
-        ancho = max(self._mapa.ancho_calle * g.escala_base, self.ANCHO_MIN_CALLE / zoom)
-        rectangulos = [hud_calculos.segmento_a_rectangulo(g.absoluto(*self._mapa.coordenada(a)),
-                                                          g.absoluto(*self._mapa.coordenada(b)), ancho)
-                       for a, b in self._mapa.segmentos()]
-        self.capa_calles.color = rgb(self.COLOR_CALLES)
-        self.capa_calles.model = self._malla_de_cuadrilateros(rectangulos)
-        radio = max(self._mapa.radio_plaza * g.escala_base, self.RADIO_MIN_PLAZA / zoom)
-        contornos, plazas = [], []
-        for lugar in self._mapa.lugares():
-            x, v = g.absoluto(*self._mapa.coordenada(lugar))
-            contornos.append((x, v, radio * 1.22, estilo.TINTA))
-            plazas.append((x, v, radio, self.color_de_lugar(lugar)))
-        self.contornos_plazas.model = self._malla_de_poligonos(contornos)
-        self.malla_plazas.model = self._malla_de_poligonos(plazas)
-
-    ANCHO_MIN_CALLE = 0.0045         # grosor mínimo de una calle en camera.ui (a 150 m por lado una calle de 8 m es fina)
-    RADIO_MIN_PLAZA = 0.0075
-
-    # Una sola Mesh de polígonos regulares [(u, v, radio, rgb)], cada uno de su color (colores por vértice).
+    # Una sola Mesh de polígonos regulares [(u, v, radio, rgb)], cada uno de su color (colores por vértice). La usan también
+    # el minimapa de foto (minimapa_foto.py) y el mapa a pantalla completa (mapa_grande_vista.py).
     @staticmethod
     def _malla_de_poligonos(poligonos, lados=14):
         vertices, triangulos, colores = [], [], []
@@ -699,76 +633,7 @@ class Minimapa(Entity):
             colores += [rgb(tono)] * (lados + 1)
         return Mesh(vertices=vertices, triangles=triangulos, colors=colores)
 
-    def _aplicar_capa_local(self):
-        px, py, giro = self.geometria.transformacion_capa()
-        self.capa_mundo.x, self.capa_mundo.y = px, py
-        self.capa_mundo.rotation_z = giro
-
-    # El jugador activo es el centro: se centra la geometría, se mueve la capa y, al cambiar de chunk, se rehacen las
-    # mallas de casas (nada más se reconstruye jamás).
-    def _seguir_al_activo(self, posiciones, activo):
-        g = self.geometria
-        for nombre, _, x, z in posiciones:
-            if nombre == activo:
-                g.centrar(x, z)
-                break
-        else:
-            return
-        self._aplicar_capa_local()
-        if self._mapa.chunk_de(*g.centro_mundo) != self._chunk_centro:
-            self._reconstruir_casas_local()
-        self._ajustar_recorte()
-
-    def _reconstruir_casas_local(self):
-        g = self.geometria
-        if not self._casas_activas():           # detalle básico o capa apagada: no se gasta en mallas que no se ven
-            self._chunk_centro = self._mapa.chunk_de(*g.centro_mundo)
-            self._casas_obsoletas = True
-            self.malla_casas.enabled = self.malla_escaleras.enabled = False
-            return
-        self._chunk_centro = self._mapa.chunk_de(*g.centro_mundo)
-        self._casas_obsoletas = False
-        casas, escaleras = self._cache_casas.vertices(g.chunks_de_ventana(self._mapa))
-        self._yaw_casas = g.yaw
-        self.reconstrucciones_casas += 1
-        for entidad, vertices in ((self.malla_casas, casas), (self.malla_escaleras, escaleras)):
-            n = len(vertices) // 4
-            entidad.enabled = n > 0
-            entidad.model = (Mesh(vertices=vertices, triangles=hud_calculos.triangulos_de_cuadros(n))
-                             if n else None)
-
-    # Recorta la capa estática al recuadro del minimapa (scissor en fracciones de pantalla). Se rehace solo si el
-    # recuadro cambió de sitio, de tamaño o de proporción de ventana.
-    def _ajustar_recorte(self):
-        aspecto = diseno_adaptable.aspecto()
-        pos, escala = self.get_pos(camera.ui), self.get_scale(camera.ui)
-        firma = (round(pos.x, 5), round(pos.y, 5), round(escala.x, 5), round(escala.y, 5), round(aspecto, 4))
-        if firma == self._firma_recorte:
-            return
-        self._firma_recorte = firma
-        mitad_x, mitad_y = (self.ANCHO / 2 - 0.003) * escala.x, (self.ALTO / 2 - 0.003) * escala.y   # 3 px menos: respeta las esquinas del fondo
-        izq, der = (pos.x - mitad_x) / aspecto + 0.5, (pos.x + mitad_x) / aspecto + 0.5
-        aba, arr = pos.y - mitad_y + 0.5, pos.y + mitad_y + 0.5
-        self.capa_mundo.set_effect(ScissorEffect.make_screen(LVecBase4(izq, der, aba, arr)))
-
-    # Destino dentro del recuadro: su marca de siempre; fuera: flecha en el borde hacia él (con el destino lejos de la
-    # ventana el GPS sigue diciendo por dónde ir).
-    def _marcar_destino_local(self, destino):
-        g = self.geometria
-        flecha = (None if destino is None else
-                  g.flecha_de_borde(*self._mapa.coordenada(destino), margen=self.LARGO_FLECHA * 0.9))
-        self.marcador_destino.enabled = destino is not None and flecha is None
-        self.flecha_destino.enabled = flecha is not None
-        if destino is None:
-            return
-        if flecha is None:
-            self.marcador_destino.position = g.lugar(destino)
-            self.marcador_destino.scale = max(g.diametro_plaza(), 2 * self.RADIO_MIN_PLAZA) * 1.6
-        else:
-            self.flecha_destino.position = (flecha[0], flecha[1])
-            self.flecha_destino.rotation_z = flecha[2]
-
-    # -- Capas de marcadores y zonas (frontend/minimapa_calculos.py) y controles (zoom, giro, detalle) --
+    # -- Capas de marcadores y zonas (frontend/minimapa_calculos.py) y controles (giro, detalle) --
 
     ICONO = 0.0085                   # radio en pantalla (camera.ui) de un marcador
     BORDE_ZONA = 0.0025              # grosor en pantalla del borde de una zona
@@ -793,14 +658,12 @@ class Minimapa(Entity):
     def _casas_activas(self):
         return mm.detalle(self.densidad)["casas"] and self.registro.capa_visible("edificios") and self._satelite is None
 
-    # Ajustes en vivo: giro («camara» / «norte»), detalle (1..3) y zoom (solo mundo grande: el chico ya cabe entero).
+    # Ajustes en vivo: giro («camara» / «norte») y detalle (1..3).
     def _al_cambiar_ajustes(self, ajustes, cambiadas):
         if "minimapa_densidad" in cambiadas:
             self.densidad = ajustes.minimapa_densidad
             self._aplicar_detalle()
             self._capas_sucias = True
-        if "minimapa_zoom" in cambiadas:
-            self._aplicar_zoom(ajustes.minimapa_zoom)
         if "minimapa_rotacion" in cambiadas:
             self.modo_rotacion = ajustes.minimapa_rotacion
             self.flecha_mirada.enabled = self.modo_rotacion == "norte" and self._satelite is None
@@ -812,21 +675,6 @@ class Minimapa(Entity):
         self.capa_jugadores.enabled = self.registro.capa_visible("jugador") and self._satelite is None
         activas = self._casas_activas()
         self.capa_casas.enabled = activas
-        if activas and self._local and self._casas_obsoletas:
-            self._reconstruir_casas()
-
-    # Zoom del minimapa local: se escala la capa estática entera (las mallas se rehacen una vez para conservar los grosores).
-    def _aplicar_zoom(self, zoom):
-        g = self.geometria
-        if not self._local or abs(g.zoom - zoom) < 1e-9:
-            return
-        g.fijar_zoom(zoom)
-        self.capa_mundo.scale = g.zoom
-        self._malla_estatica_local()
-        self._aplicar_capa_local()
-        self._reconstruir_casas_local()         # el radio de cobertura de chunks cambió
-        self._capas_sucias = True
-        self._firma_ruta = None
 
     # Un paso: pregunta a las fuentes (unas 15 veces por segundo), rehace marcadores y zonas solo si cambiaron, y
     # coloca la flecha de mirada y los rótulos de altura en la posición del jugador activo.
@@ -846,18 +694,15 @@ class Minimapa(Entity):
         reg, g = self.registro, self.geometria
         if self.capa_extra is not None:
             destruir_arbol(self.capa_extra)
-        padre = self.capa_mundo if self._local else self
-        self.capa_extra = extra = Entity(parent=padre, z=-0.0035)
+        self.capa_extra = extra = Entity(parent=self, z=-0.0035)
         self._version_capas = reg.version
         self._capas_sucias = False
         self._yaw_capas = g.yaw
         self.reconstrucciones_capas += 1
-        if self._local:        # la capa se escala con el zoom: tamaños de pantalla / zoom, coordenadas de escala base
-            proyectar, radio, grosor = g.absoluto, self.ICONO / g.zoom, self.BORDE_ZONA / g.zoom
-        else:                  # mundo chico: coordenadas de pantalla con el yaw; los vértices se acotan al recuadro
-            def proyectar(x, z):
-                return g.acotar(*g.punto(x, z))
-            radio, grosor = self.ICONO, self.BORDE_ZONA
+        # coordenadas de pantalla con el yaw; los vértices se acotan al recuadro
+        def proyectar(x, z):
+            return g.acotar(*g.punto(x, z))
+        radio, grosor = self.ICONO, self.BORDE_ZONA
         for tono, grupo in mm.plan_zonas(reg.zonas(), proyectar, grosor).items():
             vertices, triangulos = grupo["relleno"]
             if triangulos:
@@ -865,9 +710,7 @@ class Minimapa(Entity):
                        color=color.rgba32(*tono, int(255 * mm.ALFA_RELLENO_ZONA)))
             Entity(parent=extra, z=0.0005, model=self._malla_de_cuadrilateros(grupo["borde"]),
                    color=color.rgba32(*tono, int(255 * mm.ALFA_BORDE_ZONA)))
-        marcadores = reg.marcadores()
-        if not self._local:
-            marcadores = [m for m in marcadores if g.contiene(*g.punto(m.x, m.z))]
+        marcadores = [m for m in reg.marcadores() if g.contiene(*g.punto(m.x, m.z))]
         if marcadores:
             vertices, triangulos, colores = mm.plan_marcadores(marcadores, proyectar, radio)
             Entity(parent=extra, model=Mesh(vertices=vertices, triangles=triangulos,
@@ -888,7 +731,7 @@ class Minimapa(Entity):
         rotulos = []
         if pos is not None and mm.detalle(self.densidad)["rotulos"] and reg.capa_visible("alturas"):
             rotulos = mm.rotulos_de_altura(reg.marcadores(["alturas"]), pos[0], pos[1], reg.altura_jugador,
-                                           self.MAX_ROTULOS, g.radio_cobertura() if self._local else None)
+                                           self.MAX_ROTULOS, None)
         usados = 0
         for marcador, texto, nivel in rotulos:
             u, v = g.punto(marcador.x, marcador.z)
@@ -944,8 +787,6 @@ class Minimapa(Entity):
                 from frontend import mapa_satelite
                 mapa_satelite._avisar_una_vez("minimapa_frame", error)
                 self._quitar_satelite()
-        if self._local:
-            self._seguir_al_activo(posiciones, activo)
         presentes = {nombre for nombre, _, _, _ in posiciones}
         for nombre, (aro, punto) in self.puntos.items():
             if nombre not in presentes:          # jugador de una partida anterior: se oculta
@@ -967,9 +808,7 @@ class Minimapa(Entity):
             punto.z = -0.0005 if es_activo else 0.001     # los demás, detrás del activo
 
         self._poner_etiqueta_destino(destino)
-        if self._local:
-            self._marcar_destino_local(destino)
-        elif destino is None:
+        if destino is None:
             self.marcador_destino.enabled = False
         else:
             self.marcador_destino.enabled = True
@@ -1394,13 +1233,13 @@ class HudMundo(Entity):
         diseno_adaptable.anclar(self.minimapa, "derecha")
         diseno_adaptable.anclar(self.telefono_ui, "derecha")
         diseno_adaptable.suscribir(self.panel_turno.ajustar_ancho)
-        # Mapa grande a pantalla casi completa (tecla N): solo con el mundo grande; el mundo chico no cambia.
+        # Mapa a pantalla casi completa (tecla N): solo con la foto aérea (satélite) del mundo 3D.
         self.puede_abrir_mapa = None       # callable() -> bool que pone la escena (pausa, cinemática, otros paneles)
         self.mapa_grande = None
-        # Con SATÉLITE (frontend/mapa_satelite.py) el mundo chico 3D también tiene mapa grande: la foto aérea de la ciudad con
+        # Con SATÉLITE (frontend/mapa_satelite.py) el mundo 3D tiene mapa a pantalla completa: la foto aérea de la ciudad con
         # las plazas, el destino de la misión y la ruta (la foto la pone EscenaMundo con poner_satelite()).
         from frontend import mapa_satelite
-        if mundo_config.es_mundo_grande(mapa) or (rotacion_libre and mapa_satelite.activo()):
+        if rotacion_libre and mapa_satelite.activo():
             from frontend.mapa_grande_vista import MapaGrandeVista
             self.mapa_grande = MapaGrandeVista(
                 mapa, self._puede_abrir_mapa_grande, parent=self,
@@ -1414,9 +1253,9 @@ class HudMundo(Entity):
         if self.mapa_grande is not None:
             self.mapa_grande.poner_satelite(satelite)
 
-    # La foto no salió: el mundo chico se queda como antes (sin mapa grande); el grande conserva el suyo.
+    # La foto no salió: el mundo se queda como antes (sin mapa a pantalla completa).
     def sin_satelite(self):
-        if self.mapa_grande is not None and not mundo_config.es_mundo_grande(self._mapa):
+        if self.mapa_grande is not None:
             self.mapa_grande.enabled = False          # ya no recibe la N aunque Ursina tarde un frame en retirarlo
             destruir_arbol(self.mapa_grande)
             self.mapa_grande = None

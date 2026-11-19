@@ -1,9 +1,10 @@
 # «Chat del barrio» visual (Ursina): el mismo minijuego (frontend/minijuegos/chat.py, lógica chat_calculos) como un chat de
 # grupo VIVO que presiona:
-#   - el panel del chat va dentro de un teléfono de Civitas (frontend/telefono_marco.py) con hora y batería;
+#   - el panel del chat va dentro de un teléfono de PAPEL (piezas_chat.TelefonoPapel: borde de tinta 3 px y sombra dura) con hora y batería;
 #   - cada mensaje nuevo llega tras unos puntitos de «X está escribiendo…» (cada vez más gente escribiendo a la vez), con
 #     el sonido de mensaje; los avatares del grupo se enrojecen con la presión;
-#   - una viñeta oscura cierra la pantalla poco a poco con la presión y el teléfono vibra al cruzar cada umbral;
+#   - el reloj de papel muestra los segundos que quedan en número grande y el teléfono vibra al cruzar cada umbral de presión
+#     (ya no hay viñeta oscura: la mesa de papel de detrás la pone la capa común);
 #   - al pasar el foco por una respuesta se resaltan en rojo los DATOS que entregaría (leídos del texto, nunca del valor);
 #   - al final: si protegiste a tu amigo su avatar se ilumina con un «¡gracias!»; si cediste datos, el dato «vuela» por la
 #     red hasta un perfil desconocido.
@@ -27,6 +28,7 @@ from frontend import estilo, tipografia
 from frontend.componentes import a_unidades, escala_fuente
 from frontend.minijuegos import ui
 from frontend.minijuegos.chat import MinijuegoChat
+from frontend.minijuegos.limite_texto import MAX_OPCION, limitar_texto
 from frontend.minijuegos_visual import chat_piezas_calculos as pc
 from frontend.minijuegos_visual import chat_visual_calculos as calc
 from frontend.minijuegos_visual import piezas_chat as pz
@@ -35,10 +37,17 @@ from frontend.minijuegos_visual.capa import CapaVisual
 CHAT_VISUAL = True
 VARIABLE = "ALCALDE_CHAT_VISUAL"
 
-ANCHO_TEL = 0.56               # pantalla de papel del móvil
-X_TEL = -0.36
-RESERVA_ABAJO = 0.058          # franja inferior del panel para avatares y «escribiendo…»
+ANCHO_TEL = 0.56               # ancho base del móvil (antes del +15 %, pc.ESCALA_TELEFONO)
+X_TEL = -0.34
+Y_AREA_ARRIBA = 0.315          # franja útil: debajo del rumor y encima del panel de resultado
+Y_AREA_ABAJO = -0.25
+RESERVA_ABAJO = 0.058          # franja inferior de la pantalla para «escribiendo…»
+RELOJ_C = (0.745, 0.235)       # reloj de papel arriba a la derecha, sobre las respuestas
+RELOJ_D = 0.15
+Y_RESPUESTAS_CENTRO = -0.055   # las respuestas se centran en vertical en lo que queda bajo el reloj
+Y_RESPUESTAS_TOPE = 0.16
 ROJO = (235, 87, 87)
+ROJO_TEXTO = (150, 36, 36)     # rojo oscuro para texto sobre papel (contraste >= 4,5)
 VERDE = (88, 214, 141)
 TONOS_AVATAR = ((120, 170, 230), (230, 170, 90), (170, 130, 220), (110, 200, 170))
 DUR_FINAL = 2.4
@@ -99,56 +108,57 @@ class ChatVisual(CapaVisual, MinijuegoChat):
     # -- Construcción --
 
     def _construir_vista(self):
-        from frontend.telefono_marco import MarcoTelefono
-        cy = self.y_panel - self.alto_chat / 2
         self.vista = Entity(parent=self)
-        self.x_tel = X_TEL
         # Se oculta lo de la vista base (se conserva: el tutorial o el cierre pueden tocarlo).
         for e in (self.panel, self.texto_chat, self.rotulo, self.barra, self.pie):
             e.enabled = False
         self._valores_log = {}
-        self.telefono = MarcoTelefono(ANCHO_TEL, self.alto_chat, (self.x_tel, cy), parent=self.vista)
-        self._barra_estado_en_tinta()
-        ui.rect(self.vista, ANCHO_TEL, self.alto_chat, estilo.PAPEL, (self.x_tel, cy), z=0.006, radio_px=12)
-        # Cabecera amarilla con avatar del grupo.
-        y_cab = self.y_panel - 0.055
-        ui.rect(self.vista, ANCHO_TEL, 0.07, estilo.COLOR_ACENTO, (self.x_tel, y_cab), z=0.005, radio_px=8)
-        pz.avatar(self.vista, "Grupo", 3, (self.x_tel - ANCHO_TEL / 2 + 0.04, y_cab - 0.004), 0.04, z=-0.001)
-        Text("Chat del barrio", parent=self.vista, origin=(-0.5, 0), position=(self.x_tel - ANCHO_TEL / 2 + 0.075, y_cab + 0.008, -0.003),
-             scale=escala_fuente(15), font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA, 1))
-        Text("3 en línea", parent=self.vista, origin=(-0.5, 0), position=(self.x_tel - ANCHO_TEL / 2 + 0.075, y_cab - 0.014, -0.003),
-             scale=escala_fuente(11), color=_rgba(estilo.TINTA, 0.8))
-        self.y_burb_abajo = self.y_panel - self.alto_chat + RESERVA_ABAJO + 0.01
-        self.y_burb_arriba = self.y_panel - 0.115
+        self.x_tel = X_TEL
+        ancho, alto, y_arriba, cy = pc.medidas_telefono(Y_AREA_ARRIBA - Y_AREA_ABAJO, (Y_AREA_ARRIBA + Y_AREA_ABAJO) / 2,
+                                                          ancho_base=ANCHO_TEL)
+        self.ancho_tel, self.alto_tel, self.y_tel = ancho, alto, cy
+        self.telefono = pz.TelefonoPapel(ancho, alto, (self.x_tel, cy), parent=self.vista)
+        px_, py_, pw, ph = self.telefono.pantalla()
+        self.pant = (px_, py_, pw, ph)
+        pant_izq, pant_arriba, pant_abajo = px_ - pw / 2, py_ + ph / 2, py_ - ph / 2
+        # Cabecera amarilla con el retrato del grupo (filo de tinta debajo).
+        alto_cab = 0.075
+        y_cab = pant_arriba - alto_cab / 2
+        ui.rect(self.vista, pw, alto_cab + a_unidades(3), estilo.TINTA, (px_, y_cab - a_unidades(1.5)), z=0.0055, radio_px=8)
+        ui.rect(self.vista, pw, alto_cab, estilo.COLOR_ACENTO, (px_, y_cab), z=0.005, radio_px=8)
+        pz.avatar(self.vista, "Grupo", 3, (pant_izq + 0.05, y_cab), 0.052, z=-0.001)
+        Text("Chat del barrio", parent=self.vista, origin=(-0.5, 0), position=(pant_izq + 0.095, y_cab + 0.012, -0.003),
+             scale=escala_fuente(17), font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA, 1))
+        Text("3 en línea", parent=self.vista, origin=(-0.5, 0), position=(pant_izq + 0.095, y_cab - 0.014, -0.003),
+             scale=escala_fuente(13), color=_rgba(estilo.TINTA, 1))
+        self.y_burb_abajo = pant_abajo + RESERVA_ABAJO + 0.01
+        self.y_burb_arriba = pant_arriba - alto_cab - 0.02
         self.burbujas = Entity(parent=self.vista, z=-0.01)
-        # Presión: reloj circular + tres avatares «esperando».
+        # Presión: reloj de papel con los segundos en número grande (se quitó la fila de avatares «esperando»).
         nombres = [calc.nombre_corto(t["de"]) for t in self.partida.turnos]
         self.nombres = list(dict.fromkeys(nombres))[:4] or ["Grupo"]
-        rx, ry = pc.RELOJ_CENTRO
-        self.reloj = pz.RelojPresion(pc.RELOJ_DIAMETRO, parent=self.vista, position=(rx, ry, -0.02))
+        self.reloj = pz.RelojPresion(RELOJ_D, parent=self.vista, position=(RELOJ_C[0], RELOJ_C[1], -0.02))
         self.avatares = []
         self._avatares_raiz = []
-        for i in range(3):
-            nombre = self.nombres[i % len(self.nombres)]
-            x = pc.X_AVATARES + i * pc.PASO_AVATARES
-            raiz, cara = pz.avatar(self.vista, nombre, i, (x, ry), 0.036, z=-0.02)
-            tono = pc.color_de_rol(nombre, i)
-            self._avatares_raiz.append(raiz)
-            self.avatares.append((raiz, cara, tono))
-        self.alarma = Text("!", parent=self.vista, origin=(0, 0), position=(pc.X_AVATARES - 0.04, ry, -0.03),
-                           scale=escala_fuente(18), font=tipografia.FUENTE_TITULO, color=_rgba(ROJO, 1), enabled=False)
+        self.alarma = Entity(parent=self.vista, position=(RELOJ_C[0] - RELOJ_D / 2 - 0.13, RELOJ_C[1], -0.03), enabled=False)
+        ui.rect(self.alarma, 0.2 + a_unidades(6), 0.058 + a_unidades(6), estilo.TINTA, (0, 0), z=0.002, radio_px=8)
+        ui.rect(self.alarma, 0.2, 0.058, estilo.PAPEL, (0, 0), z=0.001, radio_px=6)
+        Text("¡Rápido!", parent=self.alarma, origin=(0, 0), position=(0, 0, -0.002), scale=escala_fuente(19),
+             font=tipografia.FUENTE_TITULO, color=_rgba(ROJO_TEXTO, 1))
         # Franja inferior del móvil: «escribiendo…» del grupo.
-        y_franja = self.y_panel - self.alto_chat + RESERVA_ABAJO / 2 + 0.004
-        self.escribiendo_txt = Text("", parent=self.vista, origin=(-0.5, 0),
-                                    position=(self.x_tel - ANCHO_TEL / 2 + 0.03, y_franja, -0.008),
-                                    scale=escala_fuente(12), color=_rgba(estilo.TINTA, 0.8))
-        # Aviso de datos (debajo de las respuestas) y resalte rojo de la respuesta con el foco.
+        y_franja = pant_abajo + RESERVA_ABAJO / 2 + 0.004
+        self.escribiendo_txt = Text("", parent=self.vista, origin=(-0.5, 0), position=(pant_izq + 0.03, y_franja, -0.008),
+                                    scale=escala_fuente(13), color=_rgba(estilo.TINTA, 1))
+        # Aviso de datos (en una placa de papel bajo las respuestas) y resalte rojo de la respuesta con el foco.
         self.resalte = Entity(parent=self.vista, model="quad", color=_rgba(ROJO, 0.0), enabled=False)
-        self.aviso_txt = ui.texto(self.vista, "", 15, pc.ANCHO_RESPUESTAS, ROJO, (pc.X_RESPUESTAS - pc.ANCHO_RESPUESTAS / 2, -0.2), negrita=True)
-        # Viñeta de presión (delante de todo, sin colisionador: no tapa los clics).
-        self.vineta_e = Entity(parent=self.vista, model="quad", texture=textura_vineta(), scale=(16 / 9, 1), z=-0.25,
-                               color=_rgba((255, 255, 255), 0.0))
-        self.vineta_e.setTransparency(TransparencyAttrib.M_alpha)
+        self.aviso_placa = Entity(parent=self.vista, enabled=False)
+        self._placa_borde = Entity(parent=self.aviso_placa, model="quad", color=_rgba(estilo.TINTA), z=0.002)
+        self._placa_fondo = Entity(parent=self.aviso_placa, model="quad", color=_rgba(estilo.PAPEL), z=0.001)
+        self.aviso_txt = ui.texto(self.vista, "", 16, pc.ANCHO_RESPUESTAS - 0.04, estilo.TINTA,
+                                  (pc.X_RESPUESTAS - pc.ANCHO_RESPUESTAS / 2 + 0.02, -0.2), negrita=True)
+        self.aviso_txt.z = -0.02
+        # Sin viñeta oscura (la mesa la pone la capa común): se conserva la entidad, apagada, por compatibilidad.
+        self.vineta_e = Entity(parent=self.vista, enabled=False)
         self.final = Entity(parent=self.vista, z=-0.2, enabled=False)
 
     def _quitar_vista(self):
@@ -192,27 +202,20 @@ class ChatVisual(CapaVisual, MinijuegoChat):
             turno = self.partida.turno_actual()
             if turno is None:
                 return
-            y = pc.Y_RESPUESTAS_ARRIBA
+            altos = [ui.Tarjeta.alto_necesario(limitar_texto(o["texto"], MAX_OPCION), pc.ANCHO_RESPUESTAS, 17, "", 13, minimo=0.085,
+                                               reserva=pz.GloboRespuesta.RESERVA) for o in turno["opciones"]]
+            ys, _arriba = pc.reparto_respuestas(altos, Y_RESPUESTAS_CENTRO, Y_RESPUESTAS_TOPE)
             for i, o in enumerate(turno["opciones"]):
-                alto = ui.Tarjeta.alto_necesario(o["texto"], pc.ANCHO_RESPUESTAS, 17, "", 13, minimo=0.085,
-                                                 reserva=pz.GloboRespuesta.RESERVA)
-                t = pz.GloboRespuesta(pc.ANCHO_RESPUESTAS, alto, o["texto"], i + 1, 17, parent=self,
-                                      position=(pc.X_RESPUESTAS, y - alto / 2), al_clic=lambda i=i: self.responder(i),
+                t = pz.GloboRespuesta(pc.ANCHO_RESPUESTAS, altos[i], limitar_texto(o["texto"], MAX_OPCION), i + 1, 17, parent=self,
+                                      position=(pc.X_RESPUESTAS, ys[i]), al_clic=lambda i=i: self.responder(i),
                                       al_cursor=lambda i=i: self.poner_foco(i))
                 self.opciones.append(t)
                 self.focables.append(t)
-                y -= alto + pc.SEPARACION_RESPUESTAS
             self.foco = 0
             self._pintar_foco()
         except Exception as error:      # noqa: BLE001
             bv.avisar_una_vez("chat_visual", error)
             self._quitar_vista()
-
-    def _barra_estado_en_tinta(self):
-        """La barra de estado del móvil (hora, «Civitas», señal, batería) es clara: sobre el papel crema se pasa a tinta."""
-        for e in self.telefono.children:
-            if e.z <= -0.027 and e is not self.telefono._bateria:
-                e.color = _rgba(estilo.TINTA, 0.9)
 
     def responder(self, i):
         """Igual que siempre; además anota si la respuesta protegió (palomita) o cedió un dato (aspa y temblor corto)."""
@@ -245,8 +248,8 @@ class ChatVisual(CapaVisual, MinijuegoChat):
         escribiendo = self._t_escribiendo is not None and self._t_escribiendo < calc.DEMORA_ESCRIBIENDO
         if escribiendo and log and log[-1][2] == "msg":
             log = log[:-1]
-        px = 15
-        ancho_max = 0.36
+        px = 16
+        ancho_max = 0.40
         items = []
         for idx, (quien, cuerpo, tipo) in enumerate(log):
             tx = "En visto" if self._es_en_visto(cuerpo, tipo) else cuerpo
@@ -259,35 +262,36 @@ class ChatVisual(CapaVisual, MinijuegoChat):
         if escribiendo:
             items.append(("", "puntos", [], 0.1, 0.05, -1))
         pos = pc.posiciones_burbujas([it[4] for it in items], self.y_burb_abajo, self.y_burb_arriba)
-        x_izq = self.x_tel - ANCHO_TEL / 2 + 0.075
-        x_der = self.x_tel + ANCHO_TEL / 2 - 0.03
+        x_izq = self.pant[0] - self.pant[2] / 2 + 0.085
+        x_der = self.pant[0] + self.pant[2] / 2 - 0.03
         self._puntos = []
         for i, y in pos:
             quien, tipo, lineas, ancho, alto, idx = items[i]
             if tipo == "msg" or tipo == "puntos":
                 nombre = quien or calc.nombre_corto(self.partida.turno_actual()["de"] if self.partida.turno_actual() else "")
                 cx = x_izq + ancho / 2
-                pz.globo(self.burbujas, ancho, alto, (cx, y), estilo.PAPEL, "izq")
-                pz.avatar(self.burbujas, nombre, self.nombres.index(calc.nombre_corto(nombre)) if calc.nombre_corto(nombre) in self.nombres else 0,
-                          (x_izq - 0.04, y - alto / 2 + 0.025), 0.05)
+                indice = self.nombres.index(calc.nombre_corto(nombre)) if calc.nombre_corto(nombre) in self.nombres else 0
+                de_rol = self._de_completo(nombre)
+                pz.globo(self.burbujas, ancho, alto, (cx, y), pc.tono_globo(de_rol, indice), "izq")
+                pz.avatar(self.burbujas, de_rol, indice, (x_izq - 0.05, y - alto / 2 + 0.03), 0.056)
                 if tipo == "puntos":
                     for k in range(3):
                         self._puntos.append(Entity(parent=self.burbujas, model="circle", scale=0.012, color=_rgba(estilo.TINTA),
                                                    position=(cx - 0.025 + k * 0.025, y, -0.01)))
                 else:
                     Text(calc.nombre_corto(quien), parent=self.burbujas, origin=(-0.5, 0),
-                         position=(cx - ancho / 2 + 0.014, y + alto / 2 - 0.016, -0.01), scale=escala_fuente(11),
-                         font=tipografia.FUENTE_TITULO, color=_rgba(pc.color_de_rol(quien), 1))
+                         position=(cx - ancho / 2 + 0.014, y + alto / 2 - 0.017, -0.01), scale=escala_fuente(12),
+                         font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA, 1))
                     self._texto_globo(lineas, px, cx - ancho / 2 + 0.014, y + alto / 2 - 0.03, estilo.TINTA)
             elif tipo == "tu":
                 cx = x_der - ancho / 2
-                pz.globo(self.burbujas, ancho, alto, (cx, y), pc.COLOR_CIAN, "der")
+                pz.globo(self.burbujas, ancho, alto, (cx, y), estilo.COLOR_ACENTO, "der")
                 self._texto_globo(lineas, px, cx - ancho / 2 + 0.014, y + alto / 2 - 0.012, estilo.TINTA)
                 tipo_marca = pc.marca_de_valor(self._valores_log.get(idx))
                 if tipo_marca:       # palomita verde (protegió) o aspa roja (cedió un dato), en una chapa sobre el globo
-                    px_m, py_m = cx - ancho / 2 - 0.032, y
-                    Entity(parent=self.burbujas, model="circle", color=_rgba(estilo.TINTA), position=(px_m, py_m, -0.012), scale=0.05)
-                    Entity(parent=self.burbujas, model="circle", color=_rgba(estilo.PAPEL), position=(px_m, py_m, -0.013), scale=0.044)
+                    px_m, py_m = cx - ancho / 2 - 0.036, y
+                    Entity(parent=self.burbujas, model="circle", color=_rgba(estilo.TINTA), position=(px_m, py_m, -0.012), scale=0.054)
+                    Entity(parent=self.burbujas, model="circle", color=_rgba(estilo.PAPEL), position=(px_m, py_m, -0.013), scale=0.047)
                     pz.marca(self.burbujas, tipo_marca, (px_m, py_m), 0.026, z=-0.016)
             elif tipo == "visto":    # tiempo agotado: burbuja gris «En visto» a tu lado del chat
                 cx = x_der - ancho / 2
@@ -297,6 +301,14 @@ class ChatVisual(CapaVisual, MinijuegoChat):
                 cx = self.x_tel
                 pz.globo(self.burbujas, ancho, alto, (cx, y), (214, 214, 220), "izq", con_cola=False)
                 self._texto_globo(lineas, px, cx - ancho / 2 + 0.014, y + alto / 2 - 0.012, estilo.TINTA)
+
+    def _de_completo(self, nombre):
+        """«Marcela» -> «Marcela (organizadora)» (el rol decide color y retrato); si no se encuentra, el mismo texto."""
+        corto = calc.nombre_corto(nombre)
+        for t in self.partida.turnos:
+            if calc.nombre_corto(t["de"]) == corto:
+                return t["de"]
+        return nombre
 
     @staticmethod
     def _es_en_visto(cuerpo, tipo):
@@ -321,16 +333,31 @@ class ChatVisual(CapaVisual, MinijuegoChat):
         texto = ""
         if turno is not None and tarjeta is not None and not self.terminado and self.foco < len(turno["opciones"]):
             texto = calc.aviso_datos(turno["opciones"][self.foco]["texto"])
-        self.aviso_txt.text = "\n".join(ui.lineas_de(texto, 15, pc.ANCHO_RESPUESTAS)) if texto else ""
+        ancho_txt = pc.ANCHO_RESPUESTAS - 0.04
+        lineas = ui.lineas_de(texto, 16, ancho_txt, negrita=True) if texto else []
+        self.aviso_txt.text = "\n".join(lineas)
         if texto and tarjeta is not None:
             ultimo = self.opciones[-1]
-            self.aviso_txt.y = ultimo.y - ultimo.alto / 2 - 0.02
+            alto_txt = len(lineas) * a_unidades(16) * ui.LINEA + 0.02
+            ancho_placa = min(pc.ANCHO_RESPUESTAS, max(ui.medir(l, 16, negrita=True) for l in lineas) + 0.05)
+            y_placa = ultimo.y - ultimo.alto / 2 - 0.03 - alto_txt / 2
+            x_placa = pc.X_RESPUESTAS - pc.ANCHO_RESPUESTAS / 2 + ancho_placa / 2
+            borde = a_unidades(estilo.GROSOR_BORDE_PX)
+            self._placa_borde.model = ui.modelo_redondeado(ancho_placa + 2 * borde, alto_txt + 2 * borde, 8)
+            self._placa_borde.scale = (ancho_placa + 2 * borde, alto_txt + 2 * borde)
+            self._placa_fondo.model = ui.modelo_redondeado(ancho_placa, alto_txt, 6)
+            self._placa_fondo.scale = (ancho_placa, alto_txt)
+            self.aviso_placa.position = (x_placa, y_placa, -0.015)
+            self.aviso_placa.enabled = True
+            self.aviso_txt.x = x_placa - ancho_placa / 2 + 0.025
+            self.aviso_txt.y = y_placa + alto_txt / 2 - 0.01
             self.resalte.model = ui.modelo_redondeado(tarjeta.ancho, tarjeta.alto, 8)
             self.resalte.scale = (tarjeta.ancho, tarjeta.alto)
             self.resalte.position = (tarjeta.x, tarjeta.y, -0.06)
             self.resalte.color = _rgba(ROJO, 0.16)
             self.resalte.enabled = True
         else:
+            self.aviso_placa.enabled = False
             self.resalte.enabled = False
 
     # -- Bucle visual --
@@ -355,14 +382,14 @@ class ChatVisual(CapaVisual, MinijuegoChat):
                 self._pintar_chat()
                 _sonar("mensaje_civitas", 0.6)
         presion = 0.0 if self.terminado else self.partida.presion()
-        # Viñeta y avatares enfadados.
-        self.vineta_e.color = _rgba((255, 255, 255), calc.vineta(presion, reducir))
+        # Avatares enfadados (ya no hay fila de avatares ni viñeta oscura: la presión la dicen el reloj y el temblor).
         enfado = calc.enfado(presion)
         for i, (raiz, cara, tono) in enumerate(self.avatares):
             mezcla = tuple(tono[k] + (ROJO[k] - tono[k]) * enfado for k in range(3))
             cara.color = _rgba(mezcla, 1)
             raiz.rotation_z = 0.0 if reducir else pc.inclinacion_avatar(presion, i)
-        self.reloj.fijar(0.0 if self.terminado else 1.0 - presion)
+        self.reloj.fijar(0.0 if self.terminado else 1.0 - presion,
+                         0 if self.terminado else pc.segundos_restantes(self.partida.restante))
         self.alarma.enabled = (not self.terminado) and pc.muestra_alarma(presion)
         for k, punto in enumerate(getattr(self, "_puntos", [])):
             if not punto.is_empty():
@@ -402,28 +429,27 @@ class ChatVisual(CapaVisual, MinijuegoChat):
         self.resalte.enabled = False
         self.aviso_txt.text = ""
         self.escribiendo_txt.text = ""
-        self.vineta_e.color = _rgba((255, 255, 255), 0.0)
+        self.aviso_placa.enabled = False
         for e in [self.reloj, self.alarma] + self._avatares_raiz:      # la presión ya no corre: se quita
             e.enabled = False
         self._protegido = self.partida.datos_cedidos() == 0
-        # Tapa todo el chat entre el título y la franja de avatares.
-        arriba = self.y_panel - 0.095          # por debajo de la cabecera amarilla del móvil
-        abajo = self.y_panel - self.alto_chat + RESERVA_ABAJO + 0.006
-        cx, cy = self.x_tel, (arriba + abajo) / 2
-        ancho, alto = ANCHO_TEL - 0.012, arriba - abajo
+        # Tapa todo el chat entre la cabecera amarilla y la franja inferior de la pantalla del móvil.
+        px_, py_, pw, ph = self.pant
+        arriba = py_ + ph / 2 - 0.085          # por debajo de la cabecera amarilla del móvil
+        abajo = py_ - ph / 2 + RESERVA_ABAJO + 0.006
+        cx, cy = px_, (arriba + abajo) / 2
+        ancho, alto = pw - 0.012, arriba - abajo
         self._caja_final = (cx, cy, ancho, alto)
         ui.rect(self.final, ancho, alto, estilo.PAPEL, (cx, cy), z=0.002, radio_px=10)
         if self._protegido:
             self._halo = Entity(parent=self.final, model="circle", color=_rgba(VERDE, 0.0), position=(cx, cy + 0.02, 0.001),
-                                scale=0.11)
-            Entity(parent=self.final, model="circle", color=_rgba(estilo.TINTA, 1), position=(cx, cy + 0.02, 0), scale=0.078)
-            Entity(parent=self.final, model="circle", color=_rgba(TONOS_AVATAR[1], 1), position=(cx, cy + 0.02, -0.001),
-                   scale=0.07)
-            Text("Tu amigo", parent=self.final, origin=(0, 0), position=(cx, cy - 0.045, -0.002), scale=escala_fuente(14),
+                                scale=0.15)
+            pz.avatar(self.final, "Dani (amigo)", 1, (cx, cy + 0.02), 0.11, z=-0.001)
+            Text("Tu amigo", parent=self.final, origin=(0, 0), position=(cx, cy - 0.062, -0.002), scale=escala_fuente(15),
                  color=_rgba(estilo.TINTA, 1))
             self._gracias = Text("¡Gracias por no pasar mis datos!", parent=self.final, origin=(0, 0),
-                                 position=(cx, cy + 0.09, -0.002), scale=escala_fuente(17), font=tipografia.FUENTE_TITULO,
-                                 color=_rgba(VERDE, 1))
+                                 position=(cx, cy + 0.11, -0.002), scale=escala_fuente(18), font=tipografia.FUENTE_TITULO,
+                                 color=_rgba(estilo.TINTA, 1))
         else:
             self._ruta = [(cx + x * ancho, cy + y * alto) for x, y in calc.ruta_dato()]
             for x, y in self._ruta[1:-1]:
@@ -435,21 +461,24 @@ class ChatVisual(CapaVisual, MinijuegoChat):
                        position=((ax + bx) / 2, (ay + by) / 2, 0.001), scale=(largo, 0.004),
                        rotation_z=-math.degrees(math.atan2(by - ay, bx - ax)))
             fx_, fy = self._ruta[-1]
-            Entity(parent=self.final, model="circle", color=_rgba(ROJO, 1), position=(fx_, fy, 0), scale=0.06)
-            Text("?", parent=self.final, origin=(0, 0), position=(fx_, fy, -0.002), scale=escala_fuente(24),
+            Entity(parent=self.final, model="circle", color=_rgba(estilo.TINTA, 1), position=(fx_, fy, 0.001), scale=0.07)
+            Entity(parent=self.final, model="circle", color=_rgba(ROJO, 1), position=(fx_, fy, 0), scale=0.064)
+            Text("?", parent=self.final, origin=(0, 0), position=(fx_, fy, -0.002), scale=escala_fuente(26),
                  font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA, 1))
-            Text("Perfil desconocido", parent=self.final, origin=(0, 0), position=(fx_ - 0.06, fy - 0.05, -0.002),
-                 scale=escala_fuente(12), color=_rgba(ROJO, 1))
-            Text("El dato salió del grupo y ya no sabes quién lo tiene.", parent=self.final, origin=(0, 0),
-                 position=(cx, cy + alto / 2 - 0.07, -0.002), scale=escala_fuente(14), color=_rgba(estilo.TINTA, 1))
+            Text("Perfil desconocido", parent=self.final, origin=(0, 0), position=(fx_ - 0.06, fy - 0.058, -0.002),
+                 scale=escala_fuente(14), font=tipografia.FUENTE_TITULO, color=_rgba(ROJO_TEXTO, 1))
+            Text("\n".join(ui.lineas_de("El dato salió del grupo y ya no sabes quién lo tiene.", 14, ancho - 0.05)), parent=self.final,
+                 origin=(0, 0), position=(cx, cy + alto / 2 - 0.085, -0.002), scale=escala_fuente(14),
+                 color=_rgba(estilo.TINTA, 1))
             sx, sy = self._ruta[0]
-            Entity(parent=self.final, model="circle", color=_rgba(TONOS_AVATAR[0], 1), position=(sx, sy, 0), scale=0.05)
-            Text("Tú", parent=self.final, origin=(0, 0), position=(sx, sy, -0.002), scale=escala_fuente(13),
+            pz.avatar(self.final, "Tú (ciudadano)", 0, (sx, sy), 0.06, z=-0.001)
+            Text("Tú", parent=self.final, origin=(0, 0), position=(sx, sy - 0.05, -0.002), scale=escala_fuente(14),
                  font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA, 1))
             # La ficha termina justo encima del perfil desconocido (no lo tapa).
             self._ruta_chip = self._ruta[:-1] + [(fx_ - 0.04, fy + 0.055)]
-            self._chip = Entity(parent=self.final, position=(sx, sy + 0.045, -0.01))
-            ui.rect(self._chip, 0.11, 0.032, ROJO, (0, 0), z=0.001, radio_px=6)
+            self._chip = Entity(parent=self.final, position=(sx, sy + 0.06, -0.01))
+            ui.rect(self._chip, 0.11 + a_unidades(6), 0.034 + a_unidades(6), estilo.TINTA, (0, 0), z=0.002, radio_px=6)
+            ui.rect(self._chip, 0.11, 0.034, ROJO, (0, 0), z=0.001, radio_px=5)
             Text("el dato", parent=self._chip, origin=(0, 0), z=-0.002, scale=escala_fuente(13),
                  font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA, 1))
         resumen = pc.resumen_final(self.partida.respuestas)
@@ -458,8 +487,10 @@ class ChatVisual(CapaVisual, MinijuegoChat):
                  position=(cx, cy + alto / 2 - 0.03, -0.002), scale=escala_fuente(13), color=_rgba(estilo.TINTA, 1))
         self.final.enabled = True
         if self._fx is not None:
-            self._vigilar(self._fx.sello, "A SALVO" if self._protegido else "DATOS REGALADOS", (cx, cy - alto / 2 + 0.05),
-                          estilo.ESTADO_EXITO if self._protegido else estilo.ESTADO_ERROR)
+            # Más pequeño y pegado al borde inferior del panel: no tapa «Tu amigo» ni se sale del móvil.
+            self._vigilar(lambda: self._fx.sello("A SALVO" if self._protegido else "REGALADOS", (cx, cy - alto / 2 + 0.04),
+                                                 estilo.ESTADO_EXITO if self._protegido else estilo.ESTADO_ERROR,
+                                                 escala=0.7))
         retardo = 1.4
         self._t_final = -retardo
 

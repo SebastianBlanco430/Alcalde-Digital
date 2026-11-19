@@ -11,10 +11,11 @@
 # esconde su fondo. No cambia la partida ni el resultado. APAGADO: ALCALDE_COMPARAR_VISUAL=0. GUARDIÁN: un fallo deshace
 # lo añadido y deja la vista de siempre.
 
-from ursina import Entity, Mesh, Text, color
+from ursina import Entity, Mesh, Text, color, destroy
 
 from frontend import banderas_visuales as bv
-from frontend import estilo
+from frontend import estilo, tipografia
+from frontend.componentes import escala_fuente
 from frontend.minijuegos import ui
 from frontend.minijuegos.comparar import MinijuegoComparar
 from frontend.minijuegos_visual.capa import CapaVisual
@@ -40,13 +41,14 @@ ROJO = estilo.ESTADO_ERROR
 VERDE = estilo.ESTADO_EXITO
 TINTA_SUAVE = (70, 72, 86)
 CAFE = (150, 106, 66)
+AZUL_TINTA = (30, 90, 200)
 
-X_ORIGINAL, X_COPIA, Y_HOJA = -0.42, 0.42, -0.01
-ANCHO_HOJA, ALTO_HOJA = 0.76, 0.74
+X_ORIGINAL, X_COPIA, Y_HOJA = -0.42, 0.42, 0.02
+ANCHO_HOJA, ALTO_HOJA = 0.76, 0.66
 GIRO_ORIGINAL, GIRO_COPIA = -1.5, 1.2
-Y0_RENGLON, PASO_RENGLON = 0.27, 0.105
-ANCHO_FILA, ALTO_FILA = ANCHO_HOJA - 0.04, 0.096
-Y_BOTONES, ANCHO_BOTON, ALTO_BOTON = -0.425, 0.38, 0.052
+Y0_RENGLON, PASO_RENGLON = 0.295, 0.097
+ANCHO_FILA, ALTO_FILA = ANCHO_HOJA - 0.04, 0.088
+Y_BOTONES, ANCHO_BOTON, ALTO_BOTON = -0.39, 0.40, 0.08       # alto >= 56 px lógicos (80 px a 720)
 DUR_RESALTADOR = 0.18
 
 
@@ -94,6 +96,7 @@ def _cinta(parent, pos, giro):
 
 
 def _sello(parent, texto, pos, tono, giro):
+    tono = estilo.tono_legible(tono, PAPEL_VIEJO)         # el texto del sello llega a contraste 4,5 sobre el papel
     if pp is not None:
         try:
             return pp.sello_goma(parent, texto, pos, tono, giro=giro, escala=(0.2, 0.06))
@@ -135,6 +138,21 @@ def _aro(parent, pos, rx, ry):
         except Exception:               # noqa: BLE001
             pass
     return _elipse(parent, (pos[0], pos[1], -0.006), rx, ry, ROJO, 4)
+
+
+def _txt_num(parent, cadena, pos):
+    """Número del selector central (14 px, tinta)."""
+    return Text(cadena, parent=parent, origin=(0, 0), position=(pos[0], pos[1], -0.004), scale=escala_fuente(14),
+                font=tipografia.FUENTE_TITULO, color=_rgba(TINTA))
+
+
+def _trazo(parent, puntos):
+    if pp is not None:
+        try:
+            return pp.trazo_rotulador(parent, puntos, tono=AZUL_TINTA, grosor=4, z=-0.004)
+        except Exception:               # noqa: BLE001
+            pass
+    return Entity(parent=parent)
 
 
 def _progreso(t, reducir):
@@ -182,10 +200,7 @@ class CompararVisual(CapaVisual, MinijuegoComparar):
         _cinta(self.hoja_original, (-w + 0.02, h - 0.02), 35)
         _cinta(self.hoja_original, (w - 0.02, h - 0.02), -35)
         _sello(self.hoja_original, "ORIGINAL", (w - 0.14, -h + 0.045), VERDE, -8)
-        for pos, escala, giro in (((-0.12, 0.14, -0.001), (0.34, 0.0025), 18), ((0.14, -0.06, -0.001), (0.42, 0.0025), -12),
-                                  ((-0.05, -0.24, -0.001), (0.28, 0.0025), 6)):
-            _quad(self.hoja_copia, pos, escala, TINTA, 0.2, giro)
-        _quad(self.hoja_copia, (-w + 0.09, -h + 0.06, -0.0008), (0.085, 0.07), CAFE, 0.18, 20).model = "circle"
+        _sello(self.hoja_copia, "COPIA", (-w + 0.14, -h + 0.045), ROJO, 8)     # simétrico al sello ORIGINAL
 
         n = len(self.tarjetas)
         self._ys = [Y0_RENGLON - PASO_RENGLON * k - Y_HOJA for k in range(n)]
@@ -198,25 +213,55 @@ class CompararVisual(CapaVisual, MinijuegoComparar):
                     _quad(hoja, (0, ly - PASO_RENGLON / 2, -0.001), (ANCHO_HOJA - 0.06, 0.0018), TINTA, 0.16)
 
         # Pasarela de puntos entre las hojas y foco (banda cian en ambas hojas + marcador amarillo en la copia).
-        self._puntos = []
+        self._puntos, self._aros = [], []
         for k in range(n):
             y = Y0_RENGLON - PASO_RENGLON * k
-            _quad(self.mesa, (0, y, -0.001), (0.024, 0.024), TINTA).model = "circle"
-            punto = _quad(self.mesa, (0, y, -0.002), (0.015, 0.015), PAPEL)
+            aro = _quad(self.mesa, (0, y, -0.001), (0.04, 0.04), TINTA)
+            aro.model = "circle"
+            punto = _quad(self.mesa, (0, y, -0.002), (0.034, 0.034), PAPEL)
             punto.model = "circle"
+            punto.numero = _txt_num(self.mesa, str(k + 1), (0, y))
             self._puntos.append(punto)
-        self._bandas = [_quad(hoja, (0, 0, -0.0015), (ANCHO_FILA + 0.01, ALTO_FILA), CIAN, 0.25)
-                        for hoja in (self.hoja_original, self.hoja_copia)]
+            self._aros.append(aro)
+        # Línea activa: subrayado de rotulador (dos trazos) en ambas hojas, en lugar de un relleno de color.
+        self._bandas = []
+        for hoja in (self.hoja_original, self.hoja_copia):
+            for puntos in (pc.subrayado_rotulador(ANCHO_FILA, semilla=3) if pc is not None else []):
+                trazo = _trazo(hoja, puntos)
+                trazo.dy = -ALTO_FILA / 2 + 0.024 + (puntos[0][1] if puntos else 0)
+                self._bandas.append(trazo)
         self._marcador = Entity(parent=self.hoja_copia)
         _quad(self._marcador, (0, 0, 0.0005), (0.018, ALTO_FILA - 0.01), TINTA)
         _quad(self._marcador, (0, 0, 0), (0.011, ALTO_FILA - 0.017), AMARILLO)
 
         # Botones debajo de las hojas, lado a lado, con su tecla en la etiqueta.
+        self._boton_confirmar_alto()
         self.boton_confirmar.position = (-ANCHO_BOTON / 2 - 0.03, Y_BOTONES)
+        self._boton_igual_tinta()
         self.boton_igual.position = (ANCHO_BOTON / 2 + 0.03, Y_BOTONES)
         self.boton_confirmar.fijar_etiqueta("Confirmar (C)")
         self.boton_igual.fijar_etiqueta("No veo diferencias (N)")
         self._pintar_foco_papel()
+
+    def _boton_confirmar_alto(self):
+        """«Confirmar» a >= 56 px lógicos de alto (mismo atributo, misma acción y misma tecla; sigue siendo el botón amarillo)."""
+        viejo = self.boton_confirmar
+        nuevo = ui.Boton(viejo._etiqueta, viejo.al_clic, ANCHO_BOTON, ALTO_BOTON, 18, primario=True, parent=self,
+                         position=viejo.position)
+        self.focables = [nuevo if f is viejo else f for f in self.focables]
+        self.boton_confirmar = nuevo
+        destroy(viejo)
+        nuevo.fijar_foco(False)
+
+    def _boton_igual_tinta(self):
+        """«No veo diferencias» pasa del azul pizarra al botón de papel y tinta (mismo atributo, misma acción y misma tecla)."""
+        viejo = self.boton_igual
+        nuevo = ui.BotonTinta(viejo._etiqueta, viejo.al_clic, ANCHO_BOTON, ALTO_BOTON, 18, parent=self,
+                              position=viejo.position)
+        self.focables = [nuevo if f is viejo else f for f in self.focables]
+        self.boton_igual = nuevo
+        destroy(viejo)
+        nuevo.fijar_foco(False)
 
     def _colocar_fila(self, tarjeta, hoja, ly, etiqueta, valor):
         tarjeta.parent = hoja
@@ -227,11 +272,12 @@ class CompararVisual(CapaVisual, MinijuegoComparar):
                 parte.enabled = False
         tarjeta.golpe.scale = (ANCHO_FILA, ALTO_FILA)
         tarjeta.etiqueta.color = _rgba(TINTA)
+        tarjeta.etiqueta.scale = escala_fuente(17)          # «SOSPECHOSA», «ESTABA BIEN», «TE LA PERDISTE»: >= 17 px
         tarjeta.etiqueta.position = (ANCHO_FILA / 2 - 0.02, ALTO_FILA / 2 - 0.006, -0.02)
         x0 = -ANCHO_FILA / 2 + 0.02
-        tarjeta.papel_micro = ui.texto(tarjeta, str(etiqueta).upper(), 12, ANCHO_FILA - 0.2, TINTA_SUAVE,
-                                       (x0, ALTO_FILA / 2 - 0.008), negrita=True)
-        px = 16 if len(ui.lineas_de(valor, 16, ANCHO_FILA - 0.04)) == 1 else 14
+        tarjeta.papel_micro = ui.texto(tarjeta, str(etiqueta).upper(), 17, ANCHO_FILA - 0.3, TINTA_SUAVE,
+                                       (x0, ALTO_FILA / 2 - 0.005), negrita=True)
+        px = 17 if len(ui.lineas_de(valor, 17, ANCHO_FILA - 0.04)) == 1 else 15
         tarjeta.papel_valor = ui.texto(tarjeta, valor, px, ANCHO_FILA - 0.04, TINTA, (x0, ALTO_FILA / 2 - 0.036))
 
     def _deshacer_papel(self):
@@ -272,11 +318,12 @@ class CompararVisual(CapaVisual, MinijuegoComparar):
         fila = self.foco if (not self.terminado and self.focables and self.foco < len(self.tarjetas)) else None
         for k, punto in enumerate(self._puntos):
             punto.color = _rgba(CIAN if k == fila else PAPEL)
-            punto.scale = (0.017, 0.017) if k == fila else (0.012, 0.012)
+            punto.scale = (0.036, 0.036) if k == fila else (0.032, 0.032)
+            self._aros[k].scale = (0.046, 0.046) if k == fila else (0.04, 0.04)
         for banda in self._bandas + [self._marcador]:
             banda.enabled = fila is not None
             if fila is not None:
-                banda.y = self._ys[fila]
+                banda.y = self._ys[fila] + getattr(banda, "dy", 0.0)
         if fila is not None:
             self._marcador.x = -ANCHO_HOJA / 2 + 0.012
 
@@ -325,10 +372,10 @@ class CompararVisual(CapaVisual, MinijuegoComparar):
                 ancho = min(ANCHO_FILA - 0.04, t.papel_valor.width * 1.02 if t.papel_valor.width else ANCHO_FILA - 0.04)
                 _quad(t, (-ANCHO_FILA / 2 + 0.02, -0.003, -0.025), (ancho, 0.005), ROJO, 1.0, origen=(-0.5, 0))
             elif t.estado == "perdida":
-                _aro(t, (0, -0.004, -0.025), ANCHO_FILA / 2 - 0.005, ALTO_FILA / 2 + 0.004)
+                _aro(t, (-0.1, -0.012, -0.025), ANCHO_FILA / 2 - 0.12, ALTO_FILA / 2 - 0.014)   # solo rodea el valor: «TE LA PERDISTE» queda legible
 
     def posicion_estrellas(self):
-        return (0.70, 0.415)              # encima de la copia, no sobre su primer renglón
+        return (0.30, 0.46)               # arriba, a la izquierda del sello: ni sobre la copia ni sobre el sello
 
     # -- Bucle visual --
 

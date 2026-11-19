@@ -27,13 +27,11 @@ import asyncio
 import concurrent.futures
 import ipaddress
 import logging
-import math
 import secrets
 import socket
 import threading
 import time
 
-from backend.logica import viaje_rapido
 from backend.logica.roles import ORDEN_ROLES, ROLES
 from backend.logica.sesion import MAX_JUGADORES
 from backend.red import huellas, protocolo, saneado
@@ -57,10 +55,7 @@ _MAX_IP_EN_ALTAS = 64                 # desde aquí se poda `_altas_por_ip` (IP 
 # Tasas por tipo (msg/s) además de las del protocolo: ningún tipo de acción debe poder usarse
 # como arma (p. ej. salir_edificio repetido para recargar el presupuesto de movimiento).
 LIMITES_POR_TIPO = dict(protocolo.LIMITES_POR_TIPO, salir_edificio=2, interactuar=5, rol=3, listo=5,
-                        adios=2, hola=1, iniciar=2, montar=4, bajar=4, viaje=1)
-ESPERA_VIAJE_S = 5.0                # s mínimos entre dos viajes rápidos de un mismo jugador (v4)
-GRACIA_VIAJE_S = 4.0                # s tras un viaje en que un `pos` en vuelo desde el ORIGEN se ignora sin culpa
-RADIO_GRACIA_VIAJE = 60.0           # m alrededor del origen en que ese `pos` viejo se considera «en vuelo»
+                        adios=2, hola=1, iniciar=2, montar=4, bajar=4)
 TIEMPOS_DEFECTO = {
     "handshake": protocolo.T_HANDSHAKE,
     "silencio": protocolo.T_SILENCIO_PING,
@@ -159,8 +154,6 @@ def calcular_huellas(mundo, semilla, catalogo, noticias=None, grafo_social=None)
     calles = sorted(sorted([a, b]) for a, b in mundo.segmentos())
     limites = [round(float(v), 2) for v in mundo.limites_recorribles()]
     datos_mundo = {"semilla": int(semilla), "lugares": lugares, "calles": calles, "limites": limites}
-    if hasattr(mundo, "firma_datos"):          # mapa grande: las casas (generadas) también deben coincidir; el chico no cambia
-        datos_mundo["casas"] = mundo.firma_casas()
     h_mundo = huellas.huella_mundo(datos_mundo)
     if noticias is None:
         from backend.datos.noticias_semilla import NOTICIAS_SEMILLA as noticias
@@ -206,8 +199,7 @@ class _Rechazo:
 # Un jugador conectado
 # ---------------------------------------------------------------------------
 class _Par:
-    __slots__ = ("id", "conn", "ip", "validador", "ultimo_decision", "cierre", "reemplazado",
-                 "viaje_libre", "viaje_hasta", "viaje_origen", "viaje_destino")
+    __slots__ = ("id", "conn", "ip", "validador", "ultimo_decision", "cierre", "reemplazado")
 
     def __init__(self, id_jugador, conn, ip, validador):
         self.id = id_jugador
@@ -217,10 +209,6 @@ class _Par:
         self.ultimo_decision = -1
         self.cierre = None          # motivo si la salida ya se gestionó (adios, expulsado...)
         self.reemplazado = False    # otra conexión (reconexión) ocupó su lugar
-        self.viaje_libre = 0.0      # instante (reloj del anfitrión) desde el que puede viajar otra vez
-        self.viaje_hasta = 0.0      # hasta cuándo dura la gracia de los `pos` en vuelo tras un viaje
-        self.viaje_origen = None    # (x, z) de donde salió
-        self.viaje_destino = None   # (x, z) a donde llegó
 
 
 class Anfitrion:
@@ -229,7 +217,7 @@ class Anfitrion:
                  ambito="lan", puerto=0, abierto=False, reloj=time.monotonic, hz_snap=protocolo.HZ_SNAP,
                  tiempos=None, exigir_anfitrion_local=True, auto_iniciar=False,
                  cuenta_inicio=CUENTA_INICIO, bloquear_loopback=False, max_por_ip=protocolo.MAX_CONEXIONES_POR_IP,
-                 max_infracciones=20, sndbuf=None, altas_por_minuto=ALTAS_POR_IP_MINUTO, vehiculos=False, viajes=None):
+                 max_infracciones=20, sndbuf=None, altas_por_minuto=ALTAS_POR_IP_MINUTO, vehiculos=False):
         codigo = huellas.normalizar_codigo(codigo)
         if codigo is None:
             raise ValueError("Código de sala inválido.")
@@ -279,8 +267,6 @@ class Anfitrion:
         self.reserva_veh = None
         if vehiculos:
             self.reserva_veh = vehiculos_coop.ReservaVehiculos(vehiculos_coop.aparcados_para_mundo(mundo))
-        # v4: viaje rápido (mototáxi y teleférico). Solo existe en el mundo grande; en el chico `viaje` recibe «desactivado».
-        self.viajes = viaje_rapido.disponible(mundo) if viajes is None else bool(viajes)
 
     # ======================================================================
     # API pública (hilo del llamador)
@@ -708,8 +694,6 @@ class Anfitrion:
             self._montar(par, msg["veh"])
         elif t == "bajar":
             self._bajar(par)
-        elif t == "viaje":
-            self._viaje(par, msg["destino"])
         elif t == "interactuar":
             if self.reserva_veh is not None and self.reserva_veh.de_jugador(i) is not None:
                 par.conn.enviar({"t": "rechazo_interactuar", "motivo": "Baja del vehículo primero."})
@@ -743,8 +727,6 @@ class Anfitrion:
         partida = self.partida
         if partida.fase != FASE_JUEGO:
             return
-        if self._pos_viejo_tras_viaje(par, msg):
-            return                          # v4: un `pos` que ya iba en camino desde el origen cuando se viajó
         # El validador espera solo los campos de movimiento (sin la clave «t» del protocolo).
         res = par.validador.validar({k: v for k, v in msg.items() if k != "t"})
         if res.aceptado:
@@ -761,52 +743,6 @@ class Anfitrion:
                                             mascara_a_banderas(msg["f"]))
         elif res.corregir:
             par.conn.enviar({"t": "corregir", "x": res.x, "z": res.z, "y": res.y, "seq": res.seq})
-
-    # ---- Viaje rápido (v4): mototáxi y teleférico ----
-    # El cliente pide `viaje{destino}`. El anfitrión no se fía: comprueba fase, que no esté «dentro» ni montado, la espera
-    # entre viajes y, con viaje_rapido.resolver_viaje, que su posición AUTORIZADA esté cerca de una parada/estación y el
-    # destino sea de la lista fija. Si todo va bien reubica con ValidadorMovimiento.colocar() y responde `viaje_ok{destino,x,z,y}`
-    # (el cobro es local del cliente: online no sincroniza dinero). Si no, `viaje_no{motivo}`.
-    def _viaje(self, par, destino):
-        def no(motivo):
-            par.conn.enviar({"t": "viaje_no", "motivo": motivo})
-        if not self.viajes:
-            return no("desactivado")
-        partida = self.partida
-        jugador = partida.sesion.por_id(par.id)
-        if partida.fase != FASE_JUEGO or jugador is None or not jugador.conectado:
-            return no("fase")
-        if "dentro" in jugador.banderas:
-            return no("dentro")
-        if self.reserva_veh is not None and self.reserva_veh.de_jugador(par.id) is not None:
-            return no("montado")
-        v = par.validador
-        if not v.tiene_posicion:
-            return no("fase")
-        ahora = self._reloj()
-        if ahora < par.viaje_libre:
-            return no("espera")
-        res = viaje_rapido.resolver_viaje(self.mundo, destino, v.x, v.z)
-        if not res.ok:
-            return no(res.motivo)
-        par.viaje_origen = (v.x, v.z)
-        par.viaje_destino = (res.x, res.z)
-        par.viaje_libre = ahora + ESPERA_VIAJE_S
-        par.viaje_hasta = ahora + GRACIA_VIAJE_S
-        v.colocar(res.x, res.z, res.y)
-        partida.actualizar_posicion(par.id, res.x, res.z, res.y, jugador.rumbo, 0.0, mascara_a_banderas(0))
-        par.conn.enviar({"t": "viaje_ok", "destino": res.destino, "x": round(res.x, 3), "z": round(res.z, 3),
-                         "y": round(res.y, 3)})
-
-    # Tras un viaje, los `pos` que el cliente mandó desde el origen antes de enterarse (la red no es instantánea) no son
-    # trampa ni error: se descartan en silencio durante GRACIA_VIAJE_S. Solo los que están cerca del ORIGEN y lejos del destino.
-    def _pos_viejo_tras_viaje(self, par, msg):
-        if par.viaje_origen is None or self._reloj() >= par.viaje_hasta:
-            return False
-        ox, oz = par.viaje_origen
-        dx, dz = par.viaje_destino
-        x, z = msg["x"], msg["z"]
-        return (math.hypot(x - ox, z - oz) <= RADIO_GRACIA_VIAJE and math.hypot(x - dx, z - dz) > RADIO_GRACIA_VIAJE)
 
     # ---- Vehículos (T9) ----
     def _montar(self, par, veh):

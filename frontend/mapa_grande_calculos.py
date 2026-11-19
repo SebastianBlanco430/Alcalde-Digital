@@ -1,7 +1,7 @@
-# Cálculos del mapa grande a pantalla casi completa (frontend/mapa_grande_vista.py). Python puro: NO importa ursina; se
+# Cálculos del mapa a pantalla casi completa (frontend/mapa_grande_vista.py). Python puro: NO importa ursina; se
 # prueba con pytest sin ventana.
 #
-# El mapa se dibuja con mallas ESTÁTICAS sin casas (en un mundo de ~4.600 casas serían ruido): fondo de terreno
+# El mapa se dibuja con mallas ESTÁTICAS sin casas: fondo de terreno
 # suavizado por altura con sombreado de ladera, calles, plazas de los lugares con su color, y encima el jugador, el
 # destino y la ruta del GPS. Aquí está lo que se decide con números: cómo encajar el mundo en el área libre de la
 # pantalla (16:9 o 4:3), el color de cada punto del terreno y dónde caben las etiquetas sin pisarse.

@@ -281,8 +281,9 @@ class EfectosUI(Entity):
 
     # -- Sello, estrellas y medalla --
 
-    def sello(self, texto, posicion=(0.45, 0.385), tono=None, al_golpe=None, retardo=0.0):
-        """Sello que cae sobre `posicion` y golpea (sonido + temblor del sello). Uno por pantalla."""
+    def sello(self, texto, posicion=(0.45, 0.385), tono=None, al_golpe=None, retardo=0.0, escala=1.0):
+        """Sello que cae sobre `posicion` y golpea (sonido + temblor del sello). Uno por pantalla. `escala` (por defecto 1)
+        reduce el sello entero (caja y texto) sin cambiar su caída."""
         if self.roto or not texto:
             return
         tono = tono or (VERDE if texto == "VERIFICADO" else ROJO)
@@ -297,10 +298,26 @@ class EfectosUI(Entity):
         self.sello_e.rotation_z = -9
         self._sello_txt.text = texto
         self._sello_tono = tono
+        self._escala_sello = max(0.2, float(escala))
+        if self._escala_sello != 1.0:           # sello reducido a petición: la caja se ajusta al texto (nunca lo desborda)
+            self._ajustar_caja_sello()
         self._al_golpe = al_golpe
         self._t_sello = -retardo
         self._pintar_sello(0.0)
         self.sello_e.enabled = True
+
+    def _ajustar_caja_sello(self):
+        try:
+            ancho = max(0.34, float(self._sello_txt.width) * float(self._sello_txt.scale_x) + 0.06)
+            if abs(ancho - getattr(self, "_ancho_sello", 0.34)) < 0.004:
+                return
+            self._ancho_sello = ancho
+            self._sello_borde.model = modelo_redondeado(ancho, 0.092, 10)
+            self._sello_borde.scale = (ancho, 0.092)
+            self._sello_fondo.model = modelo_redondeado(ancho - 0.02, 0.074, 8)
+            self._sello_fondo.scale = (ancho - 0.02, 0.074)
+        except Exception:                       # noqa: BLE001  adorno: si falla, queda la caja de siempre
+            pass
 
     def _pintar_sello(self, alfa):
         self._sello_borde.color = _rgba(self._sello_tono, alfa)
@@ -332,13 +349,13 @@ class EfectosUI(Entity):
         if self.roto:
             return
         if self.medalla_e is None:
-            self.medalla_e = Text("", parent=self, origin=(0.5, 0), scale=escala_fuente(15), font=tipografia.FUENTE_TITULO,
+            self.medalla_e = Text("", parent=self, origin=(0.5, 0), scale=escala_fuente(17), font=tipografia.FUENTE_TITULO,
                                   color=_rgba(DORADO, 1))
         self.medalla_e.text = texto
         self.medalla_e.position = (posicion[0], posicion[1], -0.04)
         self.medalla_e.enabled = True
         self._t_medalla = -retardo
-        self.medalla_e.scale = 0.0 if not self.reducir else escala_fuente(15)
+        self.medalla_e.scale = 0.0 if not self.reducir else escala_fuente(17)
 
     # -- Programar --
 
@@ -376,7 +393,7 @@ class EfectosUI(Entity):
         if self._t_sello is not None:
             self._t_sello += dt
             escala, alfa, golpe = calc.caida_sello(self._t_sello, reducir=self.reducir)
-            self.sello_e.scale = escala
+            self.sello_e.scale = escala * getattr(self, "_escala_sello", 1.0)
             self._pintar_sello(alfa)
             if golpe:
                 self._t_sello = None
@@ -393,7 +410,7 @@ class EfectosUI(Entity):
         if self._t_medalla is not None:
             self._t_medalla += dt
             if not self.reducir:
-                self.medalla_e.scale = escala_fuente(15) * calc.rebote(self._t_medalla, desde=0.0)
+                self.medalla_e.scale = escala_fuente(17) * calc.rebote(self._t_medalla, desde=0.0)
             if self._t_medalla > calc.DUR_REBOTE:
                 self._t_medalla = None
 

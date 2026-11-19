@@ -205,3 +205,36 @@ def aro_discontinuo(parent, pos, rx, ry, color=ESTADO_ERROR):
     except Exception:
         pass
     return raiz
+
+
+def polaroid_retrato(parent, texto, pos, giro=2, piel=(224, 172, 132), pelo=(52, 38, 34), camisa=(70, 120, 170)):
+    """Polaroid con la cabeza y los hombros de un personaje (la foto del jugador) y la leyenda a rotulador debajo."""
+    raiz = hoja(parent, pos, (0.19, 0.24), color=PAPEL, giro=giro)
+    try:
+        Entity(parent=raiz, model="quad", position=(0, 0.025, -0.001), scale=(0.16, 0.15), color=_rgba((196, 214, 226)))
+        centro, radio, hombros = pc.cabeza_retrato()
+        base = (0, 0.025, -0.002)
+        poli = [(x, y + 0.0) for x, y in hombros]
+        Entity(parent=raiz, model=_poligono([(x, y + 0.0) for x, y in poli]), position=base, color=_rgba(camisa))
+        Entity(parent=raiz, model="circle", position=(centro[0], centro[1] + 0.006, -0.003), scale=radio * 2.5,
+               color=_rgba(pelo))
+        Entity(parent=raiz, model="circle", position=(centro[0], centro[1], -0.004), scale=radio * 2.0, color=_rgba(piel))
+        for dx in (-0.011, 0.011):
+            Entity(parent=raiz, model="circle", position=(dx, centro[1] + 0.003, -0.005), scale=0.006, color=_rgba(TINTA))
+        for hijo in raiz.children:
+            hijo.double_sided = True
+        _texto(raiz, texto, (0, -0.075), 0.03, TINTA)
+        Entity(parent=raiz, model=Mesh(vertices=[(-0.045, -0.097, 0), (-0.01, -0.1, 0), (0.02, -0.096, 0), (0.046, -0.099, 0)],
+                                       mode="line", thickness=3), position=(0, 0, -0.003), color=_rgba(TINTA))
+    except Exception:
+        pass
+    return raiz
+
+
+def trazo_rotulador(parent, puntos, tono=(30, 90, 200), grosor=4, z=-0.004):
+    """Polilínea suelta de rotulador (una entidad); `puntos` [(x, y)] locales."""
+    try:
+        return Entity(parent=_padre(parent), model=Mesh(vertices=[(x, y, 0) for x, y in puntos], mode="line", thickness=grosor),
+                      position=(0, 0, z), color=_rgba(tono))
+    except Exception:
+        return Entity(parent=_padre(parent))

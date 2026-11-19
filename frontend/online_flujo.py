@@ -270,7 +270,6 @@ class FlujoEnLinea:
         self._teletransportes = set()
         self._correccion = None
         self.vehiculos_snap = []        # T9: último `veh` del snapshot [{i,k,x,z,r,p?}] (vacío sin VEHICULOS_ONLINE)
-        self.eventos_viaje = []         # v4: viaje_ok / viaje_no por consumir (frontend/viaje_rapido.py)
         self.eventos_vehiculo = []      # T9: monta_ok / monta_no / desmontado por consumir (IntegracionVehiculosOnline)
 
         # Estado de la partida / interacción
@@ -531,22 +530,6 @@ class FlujoEnLinea:
 
     def tomar_eventos_vehiculo(self):
         eventos, self.eventos_vehiculo = self.eventos_vehiculo, []
-        return eventos
-
-    # v4: respuestas del anfitrión a `viaje`. NO mueven al jugador aquí: la escena reubica con el fundido en negro
-    # (frontend/viaje_rapido.py); si no hay escena de viaje el evento se descarta (tope de 8).
-    def _ev_viaje_ok(self, ev):
-        self._encolar_viaje(ev)
-
-    def _ev_viaje_no(self, ev):
-        self._encolar_viaje(ev)
-
-    def _encolar_viaje(self, ev):
-        self.eventos_viaje.append(dict(ev))
-        del self.eventos_viaje[:-8]
-
-    def tomar_eventos_viaje(self):
-        eventos, self.eventos_viaje = self.eventos_viaje, []
         return eventos
 
     def _ev_corregir(self, ev):

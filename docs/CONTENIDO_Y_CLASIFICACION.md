@@ -26,8 +26,7 @@ Novedades de la ronda 7:
   No se disparan ni se usan; no hay combate en el juego.
 - **Decorado preexistente** `puesto_talco` («TALCO SUSPEITO / só pra bebê ;)») y `armeria_juguete` («ARSENAL DE
   BRINQUEDO / só água!», pistolas de agua de colores), bajo la bandera de huevos de pascua (`EASTER_EGGS`).
-- **Mapa más grande** con lugares como Posto de Saúde, Bar do Cabo e Igreja (referencias a salud, alcohol en un
-  bar y religión; sin consumo representado).
+- **Mapa más grande** (Posto de Saúde, Bar do Cabo, Igreja): retirado del juego el 2026-11-18; ya no existe el mundo de 24 lugares.
 - **Online:** sigue sin sincronizar inventario ni dinero (ver `docs/PRIVACIDAD_ONLINE.md`). Trabajar en línea está
   apagado (`TRABAJO_ONLINE = False`).
 
@@ -146,8 +145,9 @@ la distribución en ese país.
   tienda y país; texto final de la ficha.
 - Si las armas, aun tras bandera apagada y sin uso, deben declararse (el código está en el paquete).
 - Edad mínima, consentimiento y menores en el modo online.
-- Uso de nombres, lugares o símbolos religiosos (Igreja) y de salud (Posto de Saúde) sin dar a entender que
-  son reales.
+- Uso de nombres, lugares o símbolos religiosos y de salud sin dar a entender que son reales (la Igreja y el
+  Posto de Saúde ya no son lugares del mapa tras retirar el mapa grande, pero la iglesia aún aparece en textos de
+  algún caso de minijuego).
 
 ## 7. Preguntas para el dueño
 

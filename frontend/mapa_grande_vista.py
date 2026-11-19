@@ -1,4 +1,4 @@
-# Mapa grande a pantalla casi completa (solo en el mundo grande, ~900 x 650 m). Se abre y se cierra con la tecla «N»
+# Mapa a pantalla casi completa (el mundo, ~280 x 230 m). Se abre y se cierra con la tecla «N»
 # (frontend/mapa_grande_calculos.py: TECLA_MAPA; «M» es «Seguir misión» y «Tab» el teléfono) y también se cierra con
 # Escape (EscenaMundo.alternar_pausa llama a HudMundo.cerrar_mapa_grande antes de abrir la pausa).
 #
@@ -8,10 +8,10 @@
 #
 # Capas (frontend/minimapa_calculos.py, registro global): zonas, misiones, objetivos y NPC se dibujan encima del terreno
 # y se rehacen solo si el registro cambia. Controles locales con el mapa abierto: + / - zoom (centrado en el jugador) y R
-# alterna «norte arriba» / «gira con la cámara» (los rótulos se mantienen derechos). Solo existe con el mundo grande.
+# alterna «norte arriba» / «gira con la cámara» (los rótulos se mantienen derechos). Existe cuando hay foto aérea (satélite).
 #
 # Mallas ESTÁTICAS SIN CASAS: fondo de terreno suavizado por altura (colores por vértice con sombreado de ladera), calles,
-# plazas de los 24 lugares con su color y su nombre corto, y encima los jugadores, el destino de la misión y la ruta del
+# plazas de los lugares con su color y su nombre corto, y encima los jugadores, el destino de la misión y la ruta del
 # GPS (esto último es lo único que cambia por frame). Todo se compone al abrir y solo se rehace si cambia la proporción
 # de la ventana. Lo que se decide con números está en frontend/mapa_grande_calculos.py (con pruebas sin ventana).
 
@@ -39,7 +39,7 @@ class MapaGrandeVista(Entity):
     Z_PANEL = -2.0                     # delante de todo el HUD
     LARGO_FLECHA_JUGADOR = 0.05
 
-    # mapa: MundoGrande. puede_abrir: callable() -> bool (partida en curso, sin pausa ni cinemática ni otro panel).
+    # mapa: MundoCiudad. puede_abrir: callable() -> bool (partida en curso, sin pausa ni cinemática ni otro panel).
     # ocultar: entidades del HUD que se esconden mientras el mapa está abierto.
     def __init__(self, mapa, puede_abrir=None, ocultar=(), **opciones):
         opciones.setdefault("parent", camera.ui)
@@ -49,8 +49,7 @@ class MapaGrandeVista(Entity):
         self._ocultar = list(ocultar)
         self._previos = []
         self.abierto = False
-        terreno = getattr(mapa, "terreno", None)
-        self._extension = tuple(terreno.extension) if terreno is not None and hasattr(terreno, "extension") else mapa.limites()
+        self._extension = tuple(mapa.limites())
         self._rejilla = None                # (xs, zs, colores, triangulos): se calcula la primera vez que se abre
         self._aspecto = None
         self._encaje = None
@@ -73,7 +72,7 @@ class MapaGrandeVista(Entity):
     def poner_satelite(self, satelite):
         """Fondo = la foto aérea de la ciudad. Si el mapa ya estaba compuesto se rehace al abrirlo."""
         self.satelite = satelite
-        try:                                   # la foto cubre la ciudad: el mapa se encaja a sus límites, no a los del terreno
+        try:                                   # la foto cubre la ciudad: el mapa se encaja a sus límites
             self._extension = tuple(float(v) for v in self._mapa.limites())
         except Exception:                      # noqa: BLE001
             pass

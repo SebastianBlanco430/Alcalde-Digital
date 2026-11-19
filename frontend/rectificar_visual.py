@@ -378,15 +378,11 @@ class VistaRectificar:
 
 
 def _personajes_del_mundo(escena):
-    """Cuerpos de NPC del mundo que admiten postura: peatones del mundo chico y actores de la multitud del grande."""
+    """Cuerpos de NPC del mundo que admiten postura: los peatones."""
     peatones = getattr(escena, "peatones", None)
     for personaje in getattr(peatones, "personajes", None) or ():
         if hasattr(personaje, "aplicar_postura"):
             yield personaje
-    multitud = getattr(escena, "multitud", None)
-    for actor in getattr(multitud, "_actores", None) or ():
-        if hasattr(actor, "aplicar_postura"):
-            yield actor
 
 
 def registrar(gestor, conexion, escena_mundo):

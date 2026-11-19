@@ -1,7 +1,7 @@
 # Puntos de entrega del trabajo «Mototaxi y entregas» (datos puros). Cada punto es la puerta de un lugar del mapa
 # (`lugar`, la misma clave que usan las misiones y el GPS) y quien recibe allí el pedido: un vecino o un puesto de
 # trabajo, con lo que se le lleva. Un lugar puede tener varios destinatarios: así dos turnos seguidos no se parecen.
-# Los lugares que no existan en el mapa activo (mapa grande o chico) se descartan solos (backend/logica/entregas.py).
+# Los lugares que no existan en el mapa activo se descartan solos (backend/logica/entregas.py).
 
 from backend.logica.entregas import PuntoEntrega
 

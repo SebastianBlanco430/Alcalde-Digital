@@ -133,3 +133,101 @@ def resumen_final(respuestas):
     if visto:
         partes.append("te quedaste en visto %d %s" % (visto, "vez" if visto == 1 else "veces"))
     return ", ".join(partes) + "."
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Rediseño de papel/tinta (E3): color por personaje desde estilo.COLORES_ROL_PROPUESTOS, retratos de cómic, reloj con número
+# grande y reparto vertical del teléfono y de las respuestas. Todo puro (sin ursina). Lo añadido NO cambia lo de arriba.
+# ---------------------------------------------------------------------------------------------------------------------
+
+from frontend import estilo as _estilo
+
+# Rol del chat -> rol de estilo.COLORES_ROL_PROPUESTOS (decisión del dueño: ciudadano azul, periodista verde, influencer rosa).
+ALIAS_ROL_ESTILO = {
+    "organizadora": "influencer", "influencer": "influencer",
+    "amigo": "periodista", "amiga": "periodista", "periodista": "periodista",
+    "vecino": "ciudadano", "vecina": "ciudadano", "ciudadano": "ciudadano",
+    "candidato": "candidato",
+}
+ESCALA_TELEFONO = 1.15          # el teléfono mide un 15 % más que antes
+ALTO_TELEFONO_BASE = 0.56       # alto que tenía el teléfono (Y_CONTENIDO_ARRIBA - (-0.26))
+ANCHO_TELEFONO_BASE = 0.56
+# Colores del arco del reloj sobre papel: claros, para que el número de tinta se lea (contraste >= 4,5 con la tinta).
+COLORES_RELOJ_PAPEL = {"alto": (96, 214, 240), "medio": (240, 200, 80), "bajo": (244, 120, 108)}
+PIELES = ((240, 200, 160), (222, 172, 128), (190, 138, 100), (246, 214, 180))
+PELOS = ((60, 44, 40), (120, 80, 50), (30, 28, 30), (170, 120, 60))
+ESTILOS_PELO_RETRATO = ("corto", "largo", "largo")
+ACCESORIOS_RETRATO = ("ninguno", "gafas", "barba", "ninguno")
+
+
+def rol_de(de):
+    """Rol (en minúsculas) del texto «Nombre (rol)»; '' si no trae."""
+    texto = str(de or "")
+    if "(" not in texto:
+        return ""
+    return texto.split("(", 1)[1].split(")")[0].strip().lower()
+
+
+def color_personaje(de, indice=0):
+    """Color del personaje tomado de estilo.COLORES_ROL_PROPUESTOS (vía alias del rol); si no hay rol, un tono de respaldo."""
+    rol = rol_de(de)
+    for clave, alias in ALIAS_ROL_ESTILO.items():
+        if clave in rol and alias in _estilo.COLORES_ROL_PROPUESTOS:
+            return tuple(_estilo.COLORES_ROL_PROPUESTOS[alias])
+    return TONOS_RESPALDO[int(indice) % len(TONOS_RESPALDO)]
+
+
+def mezclar(a, b, fraccion):
+    """Mezcla lineal de dos colores RGB (fraccion = peso de b, 0..1)."""
+    f = max(0.0, min(1.0, fraccion))
+    return tuple(int(round(a[k] + (b[k] - a[k]) * f)) for k in range(3))
+
+
+def tono_globo(de, indice=0, papel=None):
+    """Relleno del globo de un personaje: su color muy diluido en papel (el texto de tinta siempre se lee)."""
+    return mezclar(papel or _estilo.PAPEL, color_personaje(de, indice), 0.30)
+
+
+def _semilla(texto):
+    return sum((i + 1) * ord(c) for i, c in enumerate(str(texto or "")))
+
+
+def retrato_de(de, indice=0):
+    """Dict `retrato` (formato de dialogo_retratos) estable para un personaje: ropa del color de su rol, resto por nombre."""
+    s = _semilla(de)
+    return {"piel": list(PIELES[s % len(PIELES)]), "pelo": list(PELOS[(s // 3) % len(PELOS)]),
+            "pelo_estilo": ESTILOS_PELO_RETRATO[(s // 5) % len(ESTILOS_PELO_RETRATO)],
+            "ropa": list(color_personaje(de, indice)), "accesorio": ACCESORIOS_RETRATO[(s // 7) % len(ACCESORIOS_RETRATO)]}
+
+
+def segundos_restantes(restante):
+    """Número entero de segundos que se muestra en el reloj (hacia arriba: «1» hasta que se acaba; nunca negativo)."""
+    return max(0, int(math.ceil(max(0.0, float(restante)) - 1e-9)))
+
+
+def color_reloj_papel(restante):
+    return COLORES_RELOJ_PAPEL[tercio_presion(restante)]
+
+
+def medidas_telefono(alto_area, y_centro, ancho_base=ANCHO_TELEFONO_BASE, alto_base=ALTO_TELEFONO_BASE,
+                     escala=ESCALA_TELEFONO):
+    """(ancho, alto, y_arriba, y_centro) del teléfono ampliado `escala`, centrado en vertical en la franja útil; si no cabe,
+    se limita al alto de la franja."""
+    ancho, alto = ancho_base * escala, alto_base * escala
+    if alto > alto_area:
+        ancho, alto = ancho * alto_area / alto, alto_area
+    return ancho, alto, y_centro + alto / 2, y_centro
+
+
+def reparto_respuestas(altos, y_centro, y_tope, separacion=SEPARACION_RESPUESTAS):
+    """Y del centro de cada respuesta (de arriba abajo): el bloque queda centrado en `y_centro`, pero su borde superior nunca
+    pasa de `y_tope` (deja sitio al reloj). Devuelve (lista_de_y, y_arriba_del_bloque)."""
+    if not altos:
+        return [], y_centro
+    total = sum(altos) + separacion * (len(altos) - 1)
+    arriba = min(y_centro + total / 2, y_tope)
+    ys, y = [], arriba
+    for a in altos:
+        ys.append(y - a / 2)
+        y -= a + separacion
+    return ys, arriba

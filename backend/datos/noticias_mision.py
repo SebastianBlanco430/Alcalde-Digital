@@ -183,7 +183,7 @@ DELTA_LOTE_PLENO = 15.0
 
 # Misiones cuyo rumor trata de datos personales de los vecinos (cuentas, documentos, teléfonos): difundirlo sin comprobar
 # los expone. Solo ids que existen en backend/datos/misiones_semilla.py (lo vigila tests/test_efectos_retardados.py).
-MISIONES_DATOS_PERSONALES = frozenset({"generica_mutirao", "generica_lanhouse"})
+MISIONES_DATOS_PERSONALES = frozenset({"generica_mutirao"})
 
 # {cuando} = «Ayer» / «Hace dos días»; {rumor} = el rumor de la misión, recortado.
 MENSAJES_RETARDO = {

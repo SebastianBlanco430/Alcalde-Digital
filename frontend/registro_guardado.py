@@ -7,13 +7,13 @@
 
 import sys
 
-from backend.logica import guardado, guardado_aviso, mundo_config
+from backend.logica import guardado, guardado_aviso
 
 INTERVALO = 10.0        # s entre dos autoguardados
 
 
 def _mundo_id(mundo):
-    return ("grande" if mundo_config.es_mundo_grande(mundo) else "chico"), getattr(mundo, "semilla", None)
+    return "chico", getattr(mundo, "semilla", None)
 
 
 def guardar_ahora(escena_mundo):

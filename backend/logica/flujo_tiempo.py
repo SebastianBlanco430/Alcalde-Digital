@@ -34,7 +34,7 @@
 #
 # FINAL PONDERADO (equilibrio, docs/PLAN_FINAL.md §7): con GameState el final ya no sale solo de la confianza por grupo.
 # El índice es PESO_CIUDAD · índice de los tres indicadores de la ciudad + (1 - PESO_CIUDAD) · índice de los grupos
-# (ponderar_final). Motivo: los deltas por grupo están escalados a acertar TODO el catálogo (47 misiones en el mapa grande)
+# (ponderar_final). Motivo: los deltas por grupo están escalados a acertar TODO el catálogo (47 misiones en el antiguo mapa grande, hoy borrado)
 # y en 7 días se juegan 14-20, así que el final «bueno» era inalcanzable y «compartirlo todo» podía quedar «neutro» con la
 # ciudad hundida. FINAL_PONDERADO = False (o ALCALDE_FINAL_PONDERADO=0) vuelve al final de antes (solo grupos).
 #

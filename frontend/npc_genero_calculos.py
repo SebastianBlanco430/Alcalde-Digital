@@ -91,6 +91,15 @@ def sin_influencer(modelo, indice, semilla):
     return modelo_para_genero(indice, semilla, MUJER)
 
 
+# Modelo de respaldo cuando un modelo nuevo no carga: uno de los 4 de siempre, pero sin la influencer si es solo jugable
+# (plan_npc la cambiaría por una mujer nueva, justo la que no carga, y el NPC acabaría como muñeco procedural).
+def modelo_de_respaldo(modelo, indice, modelos_de_siempre):
+    if modelo[0] != ARCHIVO_INFLUENCER or not influencer_solo_jugable():
+        return modelo
+    otros = [m for m in modelos_de_siempre if m[0] != ARCHIVO_INFLUENCER]
+    return otros[indice % len(otros)] if otros else modelo
+
+
 # Nombre de un NPC anónimo (peatón, multitud) acorde al género de su modelo: «Peatón N» si la bandera está apagada o
 # el modelo no se conoce. Determinista por (índice, semilla). Hoy las etiquetas de los peatones están ocultas; el
 # nombre queda en `personaje.nombre` para quien lo muestre (diálogos, depuración).

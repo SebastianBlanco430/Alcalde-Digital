@@ -1,7 +1,7 @@
 # Colisión de la fuente de la Praça da Sé (Python puro: NO importa ursina).
 #
 # La fuente (frontend/props_mundo.fuente) se dejó sin cuerpo el 2026-11-13 porque está en el centro de la plaza, donde se
-# cruzan las calles: los peatones decorativos y la multitud del mapa grande van de centro de plaza en centro de plaza.
+# cruzan las calles: los peatones decorativos van de centro de plaza en centro de plaza.
 # Desde 2026-11-15 (petición del usuario) es sólida para el jugador y los vehículos: un círculo del radio del borde de
 # piedra que la ciudad 3D entrega a MundoCiudad.agregar_obstaculos con su propio origen («fuente»). Para que la gente que
 # pasea no la atraviese, su posición DIBUJADA se aparta al borde (apartar_de_circulos): su recorrido lógico no cambia

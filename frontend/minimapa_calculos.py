@@ -23,7 +23,7 @@
 import math
 from dataclasses import dataclass
 
-from frontend import estilo, hud_calculos
+from frontend import estilo
 
 # --- Capas ---------------------------------------------------------------------------------------------------------------
 
@@ -536,28 +536,3 @@ def yaw_efectivo(modo, yaw_camara):
 def detalle(nivel):
     nivel = max(1, min(3, int(nivel)))
     return {"casas": nivel >= 2, "rotulos": nivel >= 3}
-
-
-# --- Geometría local con zoom (mundo grande) -----------------------------------------------------------------------------
-
-# GeometriaMinimapaLocal + zoom. Las capas estáticas se construyen SIEMPRE con la escala base (`absoluto`) y la vista las
-# escala con `capa_mundo.scale = zoom`; `punto()` y todo lo que dibuja en pantalla usan la escala efectiva (base * zoom).
-# Subclase aparte para no tocar frontend/hud_calculos.py: con zoom 1 se comporta exactamente como la clase base.
-class GeometriaLocalAjustable(hud_calculos.GeometriaMinimapaLocal):
-
-    def __init__(self, mapa, tamano, yaw_grados, zoom=1.0, **opciones):
-        super().__init__(mapa, tamano, yaw_grados, **opciones)
-        self.escala_base = self.escala
-        self.radio_base = self.radio_ventana
-        self.zoom = 1.0
-        self.fijar_zoom(zoom)
-
-    def fijar_zoom(self, zoom):
-        zoom = float(zoom) if _finito(zoom) and zoom > 0 else 1.0
-        self.zoom = max(0.25, min(8.0, zoom))
-        self.escala = self.escala_base * self.zoom
-        self.radio_ventana = self.radio_base / self.zoom
-
-    # Coordenadas de la capa estática (escala base, sin girar ni centrar).
-    def absoluto(self, x, z):
-        return (self.escala_base * x, self.escala_base * z)

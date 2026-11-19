@@ -1,5 +1,8 @@
 # Rediseño visual de 5 minijuegos: coordinación de las partes A y B (2026-11-17)
 
+> Nota 2026-11-18: el «mapa grande» (47 misiones, `ALCALDE_MAPA_GRANDE`) se borró del juego. Donde este plan dice 47 misiones, hoy son 14 y
+> el mundo es uno solo; los humos ya no piden esa variable. El resto del plan es histórico.
+
 Documento de coordinación. Lo leen las DOS instancias de Claude (Parte A y Parte B) y quien integre al final. Es de solo
 lectura para las partes: si una parte necesita cambiar algo de aquí, lo pide (sección 10); no lo edita.
 
@@ -559,12 +562,12 @@ mínimos con `try/except` y parámetros por defecto. Nada de cifras de indicador
   `tests/` está ignorada por git: el cerrojo no ensucia el repo.
 - Suite completa: `venv/bin/python -m pytest -q -p no:cacheprovider -rfE tests > <tu scratchpad>/suite.txt 2>&1`, y
   luego los ID: `grep -E "^(FAILED|ERROR) tests/" suite.txt | sed -E 's/ - .*//' | sort` frente al anexo.
-- Humo base (prueba de que la vista base sigue igual): `ALCALDE_MAPA_GRANDE=1 ALCALDE_TUTORIAL=0 ALCALDE_RUTAS=0
+- Humo base (prueba de que la vista base sigue igual): `ALCALDE_TUTORIAL=0 ALCALDE_RUTAS=0
   ALCALDE_MINIJUEGOS_INTRO=0 ALCALDE_TUTORIAL_MISION=0 ALCALDE_MISIONES_VISUALES=0 venv/bin/python
   tests/humo_minijuegos_mundo.py` -> debe imprimir `HUMO MINIJUEGOS OK 47 misiones`.
-- Humo visual: `ALCALDE_MAPA_GRANDE=1 ALCALDE_TUTORIAL=0 ALCALDE_RUTAS=0 venv/bin/python tests/humo_minijuegos_visual.py`
+- Humo visual: `ALCALDE_TUTORIAL=0 ALCALDE_RUTAS=0 venv/bin/python tests/humo_minijuegos_visual.py`
   (con las banderas de rediseño que se quieran probar) -> `HUMO MINIJUEGOS VISUAL OK 47 misiones` + la lista de clases usadas.
-- Humo del tutorial: `ALCALDE_MAPA_GRANDE=1 venv/bin/python tests/humo_tutorial_mision.py` (o su envoltorio
+- Humo del tutorial: `venv/bin/python tests/humo_tutorial_mision.py` (o su envoltorio
   `tests/humo_tutorial_mision_visual.py` si existe, ver C16) ->
   `HUMO TUTORIAL MISION OK` (pasos 6, 7, 7b y 8; el 7b juega el tutorial de rastrear, comparar, cronología, chat y señales
   con las vistas que den las banderas; el 8, Contrarreloj).

@@ -63,8 +63,8 @@ if ! ./venv/bin/python -m pip install --upgrade pip; then
 fi
 
 echo "Instalando dependencias de requirements.txt dentro del entorno virtual..."
-if ! ./venv/bin/python -m pip install -r requirements.txt; then
-    echo "[ERROR] No se pudieron instalar las dependencias de requirements.txt."
+if ! ./venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt; then
+    echo "[ERROR] No se pudieron instalar las dependencias de requirements.txt / requirements-dev.txt."
     echo "Revisa tu conexion a internet."
     exit 1
 fi

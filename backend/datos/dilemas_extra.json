@@ -497,8 +497,10 @@
           "id": "callar_meme",
           "etiqueta": "No reírte ni decir nada",
           "inmediato": {
-            "texto": "No te ríes, pero tampoco escribes. El meme sigue arriba del todo en el grupo.",
-            "deltas": {},
+            "texto": "No te ríes, pero tampoco escribes. Te ahorras el roce con el grupo, aunque el meme sigue arriba del todo.",
+            "deltas": {
+              "convivencia": 1
+            },
             "confianza": {}
           },
           "retardado": {
@@ -511,7 +513,7 @@
         },
         {
           "id": "apoyar_y_reportar",
-          "etiqueta": "Escribirle a Lucas y reportar el meme con captura",
+          "etiqueta": "Apoyar a Lucas y reportar el meme",
           "inmediato": {
             "texto": "Le escribes a Lucas «eso no está bien, ¿estás ok?» y reportas el meme. Alguien del grupo te llama aguafiestas.",
             "deltas": {"convivencia": -1},
@@ -555,7 +557,7 @@
           "retardado": {
             "horas": 48,
             "clave": "dilema_grupo_ana_audio",
-            "mensaje": "{cuando} mandaste un audio al grupo contra Ana: alguien se lo reenvió a ella. Hoy no abrió la panadería y su mamá dice que no quiere salir de casa.",
+            "mensaje": "{cuando} mandaste un audio al grupo contra Ana: alguien se lo reenvió a ella. Hoy Ana está muy triste y su mamá tuvo que ir a hablar con la escuela.",
             "deltas": {"convivencia": -7, "confianza": -3},
             "confianza": {"ciudadanos": -2}
           }
@@ -564,8 +566,10 @@
           "id": "salir_callado",
           "etiqueta": "Salirte del grupo sin decir nada",
           "inmediato": {
-            "texto": "Te sales. Nadie lo nota mucho; el grupo sigue sin ti.",
-            "deltas": {},
+            "texto": "Te sales. Nadie lo nota mucho, te ahorras discusiones y tu nombre deja de salir en el grupo.",
+            "deltas": {
+              "convivencia": 1
+            },
             "confianza": {}
           },
           "retardado": {
@@ -578,7 +582,7 @@
         },
         {
           "id": "pruebas_y_adulto",
-          "etiqueta": "Guardar capturas, apoyar a Ana y avisar a un adulto",
+          "etiqueta": "Guardar capturas y avisar a un adulto",
           "inmediato": {
             "texto": "Guardas las capturas, le cuentas a la orientadora y le escribes a Ana que no está sola. Dos del grupo te dejan de hablar.",
             "deltas": {"convivencia": -1},

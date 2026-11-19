@@ -244,7 +244,7 @@ class Selector(Entity):
         return self._habilitado
 
     # Deshabilitado: flechas apagadas, fila tenue y, si hay `motivo`, se lee en lugar del valor
-    # («Solo en el mapa grande»). El valor guardado no cambia.
+    # (p. ej. «No disponible»). El valor guardado no cambia.
     def fijar_habilitado(self, valor, motivo=None):
         self._habilitado = bool(valor)
         self._motivo = None if self._habilitado else motivo

@@ -5,7 +5,7 @@
 #   estado      EstadoPartida.a_dict(): indicadores, noticias ya vistas del mazo y la que está en mesa
 #   misiones    SistemaMisiones.a_dict(): la misión activa y su estado, las completadas y sus veredictos
 #   game_state  GameState.a_dict() (confianza, relaciones, flags y el ArbolImpactos) o None si la partida no lo tiene
-#   mapa        "grande" | "chico" y la semilla del mundo: un guardado de otro mapa o de otra semilla NO se carga
+#   mapa        "chico" y la semilla del mundo: un guardado de otro mapa o de otra semilla NO se carga
 #   reloj, efectos_retardados, aislamiento, ambiente   OPCIONALES (plan final): las pone FlujoConTiempo.tiempo_a_dict()
 #               si el flujo tiene reloj. Un guardado sin ellas (anterior al reloj) carga igual, en el día 1 a las 08:00;
 #               VERSION sigue en 1 porque el formato solo creció con claves que el código viejo ignora.

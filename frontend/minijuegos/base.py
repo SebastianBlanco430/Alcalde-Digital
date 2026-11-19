@@ -9,7 +9,7 @@
 #   encabezado  y 0,50 .. 0,36   |   contenido  y 0,34 .. -0,27   |   banner de resultado de la escena  y -0,28 .. -0,45
 #   pie con teclas  y -0,485
 
-from ursina import Entity
+from ursina import Entity, destroy
 
 from frontend import estilo
 from frontend.componentes import a_unidades
@@ -74,6 +74,31 @@ class Minijuego(Entity):
     # -- Encabezado y pie --
 
     def _encabezado(self):
+        if self._encabezado_marco():
+            return
+        self._encabezado_simple()
+
+    def _encabezado_marco(self):
+        """Mesa de papel + título con contorno + rumor en tira de papel (frontend/minijuegos_visual/marco_mesa.py). Con la
+        bandera ALCALDE_MARCO_VISUAL=0, o si algo falla, devuelve False y se pinta el encabezado de siempre."""
+        try:
+            from frontend.minijuegos_visual import marco_calculos, marco_mesa
+            if not marco_calculos.activo():
+                return False
+            rumor = getattr(self.mision, "rumor", "") or self.caso.get("intro", "")
+            self.mesa = marco_mesa.montar_mesa(self)
+            _, self.rumor, _ = marco_mesa.cabecera(self, self.TITULO, rumor, ANCHO_UTIL)
+            self.pie = ui.texto(self, ui.ayuda_legible(self.AYUDA), marco_calculos.PX_AYUDA, ANCHO_UTIL,
+                                marco_calculos.TEXTO_SOBRE_MESA, (-ANCHO_UTIL / 2, -0.462))
+            return True
+        except Exception as error:      # noqa: BLE001  guardián: el encabezado de siempre
+            from frontend import banderas_visuales as bv
+            bv.avisar_una_vez("marco_encabezado", error)
+            for hijo in list(self.children):
+                destroy(hijo)
+            return False
+
+    def _encabezado_simple(self):
         ui.texto(self, self.TITULO, 26, ANCHO_UTIL, estilo.COLOR_TEXTO, (-ANCHO_UTIL / 2, Y_ENCABEZADO), negrita=True)
         rumor = getattr(self.mision, "rumor", "") or self.caso.get("intro", "")
         self.rumor = ui.texto(self, "Rumor a verificar: «" + rumor + "»", 17, ANCHO_UTIL, estilo.COLOR_ACENTO,

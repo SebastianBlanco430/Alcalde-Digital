@@ -37,7 +37,7 @@ DISTANCIA_MIN_COLISION = 1.2  # la cámara nunca se mete más cerca del pivote q
 # estaba a menos de ~1.6 m de él. False = comportamiento de antes.
 CAMARA_ANALITICA = True
 # Rejilla para la colisión analítica del mapa chico (camara_calculos.IndiceCamara): mismo resultado, menos cajas por
-# frame. ALCALDE_CAMARA_REJILLA=0 vuelve a recorrer la lista entera. El mapa grande ya pasa solo las cajas cercanas.
+# frame. ALCALDE_CAMARA_REJILLA=0 vuelve a recorrer la lista entera.
 CAMARA_REJILLA = os.environ.get("ALCALDE_CAMARA_REJILLA") != "0"
 MINIMO_ANALITICO = 0.3        # m: lo más cerca del pivote que la colisión analítica deja la cámara
 # AVATAR PEGADO A LA PARED (aditivo): con la cámara a menos de DISTANCIA_OCULTAR_AVATAR del pivote (el jugador de

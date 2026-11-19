@@ -23,14 +23,8 @@ from backend.datos.nombres_visibles import nombre_visible
 from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 
 # Nombres con que main.py registra las escenas en el gestor.
-INICIO = "inicio"
-SELECCION_ROL = "seleccion_rol"
-MUNDO = "mundo"
-JUEGO = "juego"
-INTERIOR = "interior"
-TRABAJO = "trabajo"      # minijuego 2D de un puesto de trabajo (frontend/escenas/escena_trabajo.py)
-MUNDO_DIGITAL = "mundo_digital"   # Ola 2, subagente A
-PARKOUR = "parkour"               # Ola 2, subagente B
+from frontend.flujo_constantes import (INICIO, INTERIOR, JUEGO, MUNDO, MUNDO_DIGITAL, PARKOUR,  # noqa: F401 (reexporta)
+                                       SELECCION_ROL, TRABAJO)
 
 
 class ConexionFlujo:

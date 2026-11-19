@@ -64,7 +64,7 @@ class VehiculosOnline:
         # en línea los vehículos de los demás se mueven sin montar/bajar aquí: su colisión quedaría vieja
         self.mundo.colision = False
         self.mundo.sincronizar_colision()
-        self.mundo.recortar(protocolo.N_VEHICULOS_MAX)     # tope del protocolo v4: 24 (el grande los usa todos; el chico tiene 8)
+        self.mundo.recortar(protocolo.N_VEHICULOS_MAX)     # tope del protocolo: 8
         self.flujo = flujo
         self._avisar = avisar or (lambda texto: None)
         self._obtener_bucle = obtener_bucle or (lambda: None)

@@ -385,7 +385,7 @@ def extremo_de_miembro(angulo1, angulo2, l1, l2):
 # y ninguna debe estar sobre una escalera (los vehículos no suben peldaños). El mapa puede no tener escaleras().
 def posicion_valida(mapa, x, z, rumbo, perfil):
     puntos = [(x, z)] + list(puntos_de_contacto(x, z, rumbo, perfil.semi_largo))
-    # con índice (MundoCiudad.hay_escalera_en) solo se miran las escaleras de la celda, no las 364 del mapa grande
+    # con índice (MundoCiudad.hay_escalera_en) solo se miran las escaleras de la celda, no todas (eran 364 en el antiguo mapa grande, hoy borrado)
     hay_escalera = getattr(mapa, "hay_escalera_en", None)
     if hay_escalera is None:
         escaleras = getattr(mapa, "escaleras", None)

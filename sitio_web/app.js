@@ -48,7 +48,7 @@
     var esMac = /mac/i.test(plataforma) && !/iphone|ipad/i.test(navigator.userAgent);
     var id = esMac ? "so-mac" : (esLinux ? "so-lin" : "so-win");
     var tab = document.getElementById(id);
-    var recomendado = document.getElementById(id === "so-win" ? "dl-win" : "dl-mac");
+    var recomendado = document.getElementById(id === "so-mac" ? "dl-mac" : (id === "so-lin" ? "dl-lin" : "dl-win"));
     if (recomendado) { recomendado.classList.add("recomendado"); }
     if (tab) { so.elegir(tab, false); }
   }

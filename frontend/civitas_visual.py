@@ -304,7 +304,7 @@ class VistaCivitas:
                  color=_rgba((90, 60, 10)))
             self._monedas.append(moneda)
         self._n_monedas = n
-        from frontend.registro_reloj import ALTO_CHIP, MARGEN
+        from frontend.reloj_constantes import ALTO_CHIP, MARGEN
         media = diseno_adaptable.aspecto() / 2
         self._origen_monedas = (-media + MARGEN + 0.1, -0.5 + MARGEN + ALTO_CHIP / 2)
         self._t_monedas = 0.0 if not bv.reducir_movimiento() else calc.duracion_monedas(n)

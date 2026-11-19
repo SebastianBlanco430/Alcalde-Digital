@@ -125,7 +125,7 @@ class DecoracionTrabajo:
         return None if t is None else t.motor
 
     def _jugando(self):
-        from frontend.escenas.escena_trabajo import JUGANDO
+        from frontend.trabajo_constantes import JUGANDO
         e = self.escena
         return e.fase == JUGANDO and e.turno is not None and not e.turno.terminado()
 
@@ -186,7 +186,7 @@ class DecoracionTrabajo:
 
     def _icono(self, i):
         if i not in self.vuelos:
-            from frontend.escenas.escena_trabajo import dibujar_icono
+            from frontend.trabajo_dibujos import dibujar_icono
             productos = self.escena.trabajo.opciones
             self.vuelos[i] = dibujar_icono(self.at_frente, productos[i] if i < len(productos) else "", (0, 0), 0.06, z=0)
         return self.vuelos[i]
@@ -213,7 +213,7 @@ class DecoracionTrabajo:
             self._frame_barra()
 
     def _frame_atender(self, dt):
-        from frontend.escenas.escena_trabajo import dibujar_cliente
+        from frontend.trabajo_dibujos import dibujar_cliente
         e = self.escena
         reducir = bv.reducir_movimiento()
         if self._n_cliente != e._n_pedido:          # cliente nuevo: la fila avanza y la paciencia se rellena
@@ -263,7 +263,7 @@ class DecoracionTrabajo:
         self.reparado.enabled = self._t_reparado > 0 and not self.azul.enabled
 
     def _frame_barra(self):
-        from frontend.escenas.escena_trabajo import ANCHO_BARRA
+        from frontend.trabajo_constantes import ANCHO_BARRA
         t = self.escena.turno
         pos, zona = t.posicion_barra(), t.zona_barra()
         x = -ANCHO_BARRA / 2 + pos * ANCHO_BARRA
@@ -472,7 +472,7 @@ class VigiaEntregas(Entity):
 def registrar(gestor, conexion, escena_mundo):
     if not activo():
         return None
-    from frontend.conexion_flujo import TRABAJO
+    from frontend.flujo_constantes import TRABAJO
     escena = getattr(gestor, "_escenas", {}).get(TRABAJO)
     deco = envolver_escena(escena)
     vigia = VigiaEntregas(escena_mundo) if escena_mundo is not None else None

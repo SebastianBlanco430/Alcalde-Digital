@@ -271,15 +271,52 @@ class EscenaMinijuego(Escena):
         self._pintar_banner(resultado)
 
     def _pintar_banner(self, resultado):
-        bien = resultado.bien
         self.banner = Entity(parent=self, z=-0.1)
-        panel_tinta(self.banner, ANCHO_BANNER, ALTO_BANNER, tono=estilo.COLOR_PANEL, position=(0, Y_BANNER, 0))
-        titulo = "Verificaste bien" if bien else "Se te escapó algo"
+        try:
+            from frontend.minijuegos_visual import marco_calculos
+            if marco_calculos.activo():
+                self._pintar_banner_papel(resultado)
+                return
+        except Exception as error:               # noqa: BLE001  guardián: el banner de siempre
+            from frontend import banderas_visuales as bv
+            bv.avisar_una_vez("marco_resultado", error)
+            destruir_arbol(self.banner)
+            self.banner = Entity(parent=self, z=-0.1)
+        self._pintar_banner_simple(resultado)
+
+    def _graduacion(self, resultado):
         # Con la consecuencia graduada, el título adelanta la propina (lo mismo que aplicará el flujo al cerrar).
         # En línea (EstadoRemoto, sin cartas_mision) no hay economía ni consecuencia graduada: no se promete propina.
         local = getattr(self.estado, "cartas_mision", None) is not None
-        graduacion = (consecuencia_graduada.calcular(resultado.a_dict(), self.mision)
-                      if consecuencia_graduada.activo() and local else None)
+        return (consecuencia_graduada.calcular(resultado.a_dict(), self.mision)
+                if consecuencia_graduada.activo() and local else None)
+
+    def _pintar_banner_papel(self, resultado):
+        """Panel de resultado como marco de papel con sello redondo y palabra (sin «[OK]»)."""
+        from frontend.minijuegos_visual import marco_calculos as mc
+        from frontend.minijuegos_visual import marco_mesa
+        bien = resultado.bien
+        graduacion = self._graduacion(resultado)
+        propina = graduacion.propina if graduacion is not None else 0
+        por_poco = graduacion is not None and propina <= 0 and graduacion.retardado is not None
+        veredicto = mc.veredicto(getattr(self.mision, "es_verdadera", False))
+        pista = mc.frase_pista(glosar_texto(self.mision.destino), self.mision.pista)
+        medidas = marco_mesa.panel_resultado(self.banner, ANCHO_BANNER, bien, mc.titulo_resultado(bien, por_poco),
+                                             resultado.detalle, pista, veredicto=veredicto)
+        x_boton = medidas["x_boton"]
+        etiqueta = mc.chip_propina(propina) or mc.chip_por_poco(por_poco)
+        if etiqueta:
+            marco_mesa.chip(self.banner, etiqueta, x_boton, medidas["alto"] / 2 - a_unidades(17))
+        self.boton = BotonPrimario("Continuar", al_clic=self.continuar, ancho=0.3, alto=0.07, parent=self.banner,
+                                   position=(x_boton, -0.004, -0.01), tamano_fuente_px=22)
+        Text("Enter o Espacio", parent=self.banner, origin=(0, 0), position=(x_boton, -medidas["alto"] / 2 + a_unidades(13), -0.01),
+             scale=escala_fuente(17), color=rgb(mc.TEXTO_SUAVE))
+
+    def _pintar_banner_simple(self, resultado):
+        bien = resultado.bien
+        panel_tinta(self.banner, ANCHO_BANNER, ALTO_BANNER, tono=estilo.COLOR_PANEL, position=(0, Y_BANNER, 0))
+        titulo = "Verificaste bien" if bien else "Se te escapó algo"
+        graduacion = self._graduacion(resultado)
         if graduacion is not None and graduacion.propina > 0:
             titulo += f"  ·  propina R$ {graduacion.propina}"
         elif graduacion is not None and graduacion.retardado is not None:
@@ -294,8 +331,8 @@ class EscenaMinijuego(Escena):
                  (x0, Y_BANNER + ALTO_BANNER / 2 - a_unidades(46)))
         self.boton = BotonPrimario("Continuar", al_clic=self.continuar, ancho=0.3, alto=0.075, parent=self.banner,
                                    position=(ANCHO_BANNER / 2 - 0.2, Y_BANNER + 0.01, -0.01), tamano_fuente_px=22)
-        Text("Enter o Espacio", parent=self.banner, origin=(0.5, 0), position=(ANCHO_BANNER / 2 - 0.2, Y_BANNER - 0.045, -0.01),
-             scale=escala_fuente(13), color=rgb(estilo.COLOR_TEXTO_TENUE))
+        Text("Enter o Espacio", parent=self.banner, origin=(0.5, 0), position=(ANCHO_BANNER / 2 - 0.2, Y_BANNER - 0.047, -0.01),
+             scale=escala_fuente(17), color=rgb(estilo.COLOR_TEXTO_TENUE))
 
     def continuar(self):
         """«Continuar»: traduce el resultado a decisiones y cierra la misión (o enseña el grafo social antes)."""

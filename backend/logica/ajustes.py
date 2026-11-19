@@ -36,7 +36,8 @@ MODO_POR_DEFECTO = "ninguno"
 # Gráficos (la matemática del pixelado vive en frontend/pixelado_calculos.py; aquí solo se sanea el dato).
 PRESETS_GRAFICOS = ("retro", "nitido", "normal", "personalizado")
 PRESET_GRAFICO_POR_DEFECTO = "nitido"
-# Minimapa: zoom (factor sobre la ventana de ±150 m), modo de giro y nivel de detalle (densidad).
+# Minimapa: zoom (campo conservado por compatibilidad con ajustes.json antiguos; ya no tiene fila en Ajustes), modo de giro y
+# nivel de detalle (densidad).
 MINIMAPA_ZOOMS = (0.5, 0.75, 1.0, 1.5, 2.0, 3.0)      # escalones del zoom (el valor guardado siempre cae en uno)
 MODOS_ROTACION_MINIMAPA = ("camara", "norte")
 MINIMAPA_DENSIDAD_MIN, MINIMAPA_DENSIDAD_MAX = 1, 3

@@ -71,3 +71,63 @@ def progreso_barrido(t, dur=0.18, reducir=False):
     if reducir or dur <= 0:
         return 1.0
     return max(0.0, min(1.0, t / dur))
+
+
+# -- Rastrear / Comparar (rediseño de papel y tinta) --
+
+def grano_corcho(n, ancho, alto, cy=0.0, semilla=11):
+    """Motitas finas del corcho: [(x, y, radio, oscuro, alfa)]. Muchas, pequeñas y repartidas (determinista)."""
+    import random
+    azar = random.Random(semilla)
+    n = max(0, int(n))
+    salida = []
+    for _ in range(n):
+        oscuro = azar.random() < 0.6
+        salida.append((azar.uniform(-ancho / 2 + 0.008, ancho / 2 - 0.008),
+                       cy + azar.uniform(-alto / 2 + 0.008, alto / 2 - 0.008),
+                       azar.uniform(0.002, 0.0055) if oscuro else azar.uniform(0.002, 0.004),
+                       oscuro, azar.uniform(0.35, 0.7)))
+    return salida
+
+
+def esquinas_oscuras(ancho, alto, cy=0.0, capas=3, lado=0.2, alfa=0.1):
+    """Viñeta de las 4 esquinas del corcho: rectángulos [(cx, cy, w, h, alfa)] anidados que se apilan hacia la esquina."""
+    capas = max(1, int(capas))
+    salida = []
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            for k in range(capas):
+                w = lado * (1.0 - k / capas)
+                h = lado * 0.6 * (1.0 - k / capas)
+                salida.append((sx * (ancho / 2 - w / 2), cy + sy * (alto / 2 - h / 2), w, h, alfa))
+    return salida
+
+
+def alto_nota(n_lineas, reenviado=False, cabecera=0.05, renglon=0.03, minimo=0.15, maximo=0.34):
+    """Alto de una nota candidata ajustado a su texto: cabecera + renglones + hueco (más si lleva sello de reenviado)."""
+    n = max(1, int(n_lineas))
+    alto = cabecera + 0.03 + n * renglon + (0.06 if reenviado else 0.0)
+    return max(minimo, min(maximo, alto))
+
+
+def subrayado_rotulador(ancho, semilla=0, tramos=12, amplitud=0.0012):
+    """Dos trazos de rotulador (polilíneas [(x, y)]) con un temblor leve, para subrayar una línea de `ancho`."""
+    import random
+    azar = random.Random(semilla)
+    trazos = []
+    for k, dy in enumerate((0.0, -0.007)):
+        tramos_k = max(2, int(tramos))
+        extra = azar.uniform(-0.02, 0.0) if k else 0.0
+        x0, x1 = -ancho / 2 + 0.01 + (0.03 if k else 0.0), ancho / 2 - 0.01 + extra
+        puntos = []
+        for i in range(tramos_k + 1):
+            t = i / tramos_k
+            puntos.append((x0 + (x1 - x0) * t, dy + azar.uniform(-amplitud, amplitud) + 0.002 * (t - 0.5)))
+        trazos.append(puntos)
+    return trazos
+
+
+def cabeza_retrato(radio=0.036):
+    """Pieza mínima de un retrato: (centro de la cabeza, radio, trapecio de hombros) en coordenadas de la foto."""
+    hombros = [(-radio * 2.0, -0.062), (-radio * 1.25, -0.022), (radio * 1.25, -0.022), (radio * 2.0, -0.062)]
+    return (0.0, 0.012), radio, hombros

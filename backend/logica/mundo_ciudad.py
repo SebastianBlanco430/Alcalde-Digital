@@ -49,7 +49,7 @@ COLISION_DECORADO = True
 
 
 # Índice de escaleras por celdas (rendimiento): es_transitable en un talud, perfil_escalera_en (jugador, 2 por frame) y
-# los vehículos (posicion_valida: 3 puntos por intento) recorrían TODAS las escaleras (364 en el mapa grande). El índice
+# los vehículos (posicion_valida: 3 puntos por intento) recorrían TODAS las escaleras (364 en el antiguo mapa grande, hoy borrado). El índice
 # devuelve las de la celda en su orden original: el resultado es idéntico. ALCALDE_ESCALERAS_INDICE=0 = la lista entera.
 ESCALERAS_INDICE = True
 CELDA_ESCALERAS = 8.0
@@ -339,7 +339,7 @@ class MundoCiudad:
                   if not any(o.choca(x, z, self.radio_jugador) for x, z in protegidos)]
         viejos = self._extra.get(origen, [])
         self._extra[origen] = libres
-        # Incremental: rehacer la rejilla entera costaba ~24 ms en el mapa grande (6000 obstáculos) en cada montar/bajar.
+        # Incremental: rehacer la rejilla entera costaba ~24 ms en el antiguo mapa grande, hoy borrado (6000 obstáculos) en cada montar/bajar.
         # Solo se tocan las celdas de lo que sale y de lo que entra (el orden dentro de una celda no cambia el resultado).
         fuera = {id(o) for o in viejos}
         self._fisicos = [o for o in self._fisicos if id(o) not in fuera] + libres

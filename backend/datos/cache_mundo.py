@@ -1,4 +1,4 @@
-# Caché en disco del mundo construido (Python puro). Construir el mundo grande son ~13 s de cálculo determinista: mismo
+# Caché en disco del mundo construido (Python puro). Construir el mundo es un cálculo determinista: mismo
 # código y misma semilla dan siempre el mismo mundo, así que se guarda ya construido (pickle, ~8 MB) y los arranques
 # siguientes lo cargan en ~0,05 s.
 #

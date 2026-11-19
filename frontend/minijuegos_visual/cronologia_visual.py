@@ -5,7 +5,8 @@
 #   - las viñetas están en una cuadrícula que se LEE como un cómic: de izquierda a derecha y de arriba abajo. Ese orden de
 #     lectura ES el orden cronológico: ordenar los hechos = ordenar la historieta. El último hueco es la portada;
 #   - se agarra una viñeta (Enter / Espacio / clic), las flechas la llevan antes o después y se suelta; «C» comprueba;
-#   - al comprobar: sellos «EN SU PUESTO» / «ERA LA 3.ª» y la historieta se «lee» en su orden REAL mientras el rumor CRECE
+#   - al comprobar: marca discreta por viñeta (palomita «EN SU PUESTO» / aspa «ERA LA 3.ª»), UN sello «EN ORDEN» sobre la
+#     portada si todo está bien, y la historieta se «lee» en su orden REAL mientras el rumor CRECE
 #     con cada reenvío (mayúsculas, signos y «¡¡COMPARTE YA!!»).
 # APAGADO: ALCALDE_CRONOLOGIA_VISUAL=0. GUARDIÁN: si la página falla al montarse, el minijuego se construye como siempre
 # (la lista); si falla después, se avisa una vez y lo añadido se queda quieto. REDUCIR MOVIMIENTO: sin levantar ni latir.
@@ -21,6 +22,7 @@ from frontend.minijuegos import ui
 from frontend.minijuegos.base import ANCHO_UTIL, Y_CONTENIDO_ARRIBA
 from frontend.minijuegos.cronologia import ANCHO_BOTONES, MinijuegoCronologia
 from frontend.minijuegos.cronologia_calculos import PartidaOrden
+from frontend.minijuegos_visual import cronologia_marcas_calculos as marcas
 from frontend.minijuegos_visual import cronologia_vinetas_calculos as vin
 from frontend.minijuegos_visual import pistas_visuales_calculos as calc
 from frontend.minijuegos_visual.capa import CapaVisual
@@ -37,8 +39,9 @@ PAPEL = (252, 248, 232)
 AMARILLO = (255, 214, 60)
 FOCO = (255, 214, 60)
 AGARRE = (80, 200, 255)          # cian: se distingue del amarillo del foco
-VERDE = (60, 170, 90)
+VERDE = (22, 112, 58)             # marcas y sello «EN ORDEN»: texto/palomita de papel encima (contraste 5,6)
 ROJO = (210, 50, 50)
+ROJO_MARCA = (185, 38, 38)        # relleno de la marca «ERA LA 3.ª» (texto de papel encima, contraste 5,7)
 DUR_PASO = 1.0
 ESCALA_MAX_BURBUJA = 1.1
 
@@ -135,10 +138,16 @@ class Vineta(Entity):
         Entity(parent=self.agarre, model="quad", scale=(min(ancho - 0.036, 0.334), 0.028), color=_rgba(AGARRE), z=0.001)
         Text("AGARRADA: muévela con las flechas", parent=self.agarre, origin=(0, 0), scale=escala_fuente(10),
              font=tipografia.FUENTE_TITULO, color=_rgba(vin.TINTA))
-        self.sello = Entity(parent=self, position=(0, self.y_escena - 0.01, -0.05), rotation_z=-8, enabled=False)
-        self.sello_borde = Entity(parent=self.sello, model="quad", scale=(ancho * 0.72, 0.06), z=0.001)
-        self.sello_fondo = Entity(parent=self.sello, model="quad", scale=(ancho * 0.72 - 0.01, 0.05))
-        self.sello_txt = Text("", parent=self.sello, origin=(0, 0), z=-0.001, scale=escala_fuente(17),
+        # Marca del resultado (discreta, en la esquina inferior izquierda de la escena): icono (palomita / aspa) + texto corto.
+        # Se llama `sello` por contrato histórico (el tutorial y los humos la conocen por ese nombre).
+        self._alto_marca = 0.04
+        self._y_marca = self.y_escena - alto_escena / 2 + self._alto_marca / 2 + 0.01
+        self._x_marca = -ancho / 2 + BORDE + 0.01
+        self.sello = Entity(parent=self, position=(self._x_marca, self._y_marca, -0.05), enabled=False)
+        self.sello_borde = Entity(parent=self.sello, model="quad", z=0.001)
+        self.sello_fondo = Entity(parent=self.sello, model="quad")
+        self.sello_icono = Entity(parent=self.sello)
+        self.sello_txt = Text("", parent=self.sello, origin=(-0.5, 0), z=-0.001, scale=escala_fuente(17),
                               font=tipografia.FUENTE_TITULO, color=_rgba(PAPEL))
         # Zona de clic.
         self.golpe = Entity(parent=self, model="quad", scale=(ancho, alto), collider="box", color=_rgba((0, 0, 0), 0),
@@ -191,14 +200,31 @@ class Vineta(Entity):
         self.rotation_z = -2 if levantar else 0           # la agarrada se inclina y crece un poco: «está en la mano»
         self.scale = 1.03 if levantar else 1.0
         if self.estado in ("correcta", "incorrecta"):
-            tono = VERDE if self.estado == "correcta" else ROJO
-            self.sello.enabled = True
-            self.sello_borde.color = _rgba(PAPEL)
-            self.sello_fondo.color = _rgba(tono)
-            texto = self._etiqueta or ("EN SU PUESTO" if self.estado == "correcta" else "FUERA DE SITIO")
-            self.sello_txt.text = texto.replace("ERA EL", "ERA LA").replace(".º", ".ª")
+            self._pintar_marca(self.estado == "correcta")
         else:
             self.sello.enabled = False
+
+    def _pintar_marca(self, correcta):
+        tono = VERDE if correcta else ROJO_MARCA
+        texto = marcas.etiqueta_marca(self.estado, self._etiqueta) if not correcta else ""
+        alto = self._alto_marca
+        # Correcta: solo una palomita pequeña (el «EN ORDEN» y «n de 5 en su puesto» ya lo dicen); incorrecta: aspa + «ERA LA 3.ª».
+        ancho = alto if not texto else min(marcas.ancho_marca(ui.medir(texto, 17, True), alto), self.ancho - 2 * BORDE - 0.02)
+        self.sello.enabled = True
+        self.sello.x = self._x_marca + ancho / 2
+        self.sello_borde.scale = (ancho, alto)
+        self.sello_borde.color = _rgba(PAPEL)
+        self.sello_fondo.scale = (ancho - 0.008, alto - 0.008)
+        self.sello_fondo.color = _rgba(tono)
+        for hijo in list(self.sello_icono.children):
+            destruir_arbol(hijo)
+        self.sello_icono.position = ((-ancho / 2 + alto / 2 + 0.004) if texto else 0.0, 0, -0.001)
+        for x1, y1, x2, y2 in (marcas.palomita(alto) if correcta else marcas.aspa(alto)):
+            cx, cy, largo, ang = marcas.trazo(x1, y1, x2, y2)
+            Entity(parent=self.sello_icono, model="quad", position=(cx, cy, 0), scale=(largo, 0.007), rotation_z=-ang,
+                   color=_rgba(PAPEL))
+        self.sello_txt.x = -ancho / 2 + alto + 0.008
+        self.sello_txt.text = texto
 
     def _clic(self):
         if not self.is_empty() and self.habilitada and self.al_clic is not None:
@@ -243,9 +269,7 @@ class CronologiaVisual(CapaVisual, MinijuegoCronologia):
         self.agarrado = False
         n = len(p.orden)
         y = Y_CONTENIDO_ARRIBA
-        texto_intro = ("Ordena la historieta para ver cómo se fue contando el rumor. Se lee de izquierda a derecha y de "
-                       "arriba abajo: la viñeta 1 es lo que se dijo primero. Fíjate en la hora de cada cartela.")
-        self.intro = ui.texto(self, texto_intro, 16, ANCHO_UTIL, estilo.COLOR_TEXTO, (-ANCHO_UTIL / 2, y))
+        self.intro = self._cintas_intro(y)
         y -= self.intro.alto + 0.018
         self.y0 = y
         # Página: a la izquierda; la columna de botones, a la derecha (como en el resto de minijuegos).
@@ -283,14 +307,32 @@ class CronologiaVisual(CapaVisual, MinijuegoCronologia):
                                        alto_escena) for item in p.correcto]
         self.alto_fila, self.paso = alto, alto + CANAL
         # Botones (los mismos que el minijuego base, con nombres de historieta).
-        self.boton_subir = ui.Boton("Mover antes", lambda: self._mover(-1), ANCHO_BOTONES, 0.07, 17, parent=self,
-                                    position=(x_der, y - 0.035))
-        self.boton_bajar = ui.Boton("Mover después", lambda: self._mover(+1), ANCHO_BOTONES, 0.07, 17, parent=self,
-                                    position=(x_der, y - 0.125))
+        self.boton_subir = ui.BotonTinta("Mover antes", lambda: self._mover(-1), ANCHO_BOTONES, 0.07, 17, parent=self,
+                                         position=(x_der, y - 0.035))
+        self.boton_bajar = ui.BotonTinta("Mover después", lambda: self._mover(+1), ANCHO_BOTONES, 0.07, 17, parent=self,
+                                         position=(x_der, y - 0.125))
         self.boton_comprobar = ui.Boton("Comprobar el orden", self.comprobar, ANCHO_BOTONES, 0.08, 17, primario=True,
                                         parent=self, position=(x_der, y - 0.235))
         self.nota = ui.texto(self, "", 15, ANCHO_BOTONES, estilo.COLOR_TEXTO_TENUE, (x_der - ANCHO_BOTONES / 2, y - 0.3))
         self.focables = self.filas + [self.boton_comprobar]
+
+    def _cintas_intro(self, y):
+        """La instrucción en 3 pasos cortos (3 cintas de tinta con su número). Devuelve el contenedor, con `.alto`."""
+        px, ancho_num = 16, 0.05
+        reparto = marcas.cintas(ANCHO_UTIL, len(marcas.PASOS), 0.02)
+        lineas = [ui.lineas_de(t, px, reparto[0][1] - ancho_num - 0.02) for t in marcas.PASOS]
+        alto = ui.alto_de(max(len(x) for x in lineas), px) + 0.026
+        raiz = Entity(parent=self, position=(-ANCHO_UTIL / 2, y, 0))
+        raiz.alto = alto
+        for i, (cx, ancho) in enumerate(reparto):
+            cinta = Entity(parent=raiz, position=(cx, -alto / 2, 0))
+            ui.rect(cinta, ancho, alto, vin.TINTA, (0, 0), z=0.002, radio_px=8)
+            Entity(parent=cinta, model="circle", scale=0.04, position=(-ancho / 2 + 0.032, 0, -0.001), color=_rgba(AMARILLO))
+            Text(str(i + 1), parent=cinta, origin=(0, 0), position=(-ancho / 2 + 0.032, 0, -0.002),
+                 scale=escala_fuente(17), font=tipografia.FUENTE_TITULO, color=_rgba(vin.TINTA))
+            Text("\n".join(lineas[i]), parent=cinta, origin=(-0.5, 0), position=(-ancho / 2 + ancho_num + 0.012, 0, -0.002),
+                 scale=escala_fuente(px), color=_rgba(PAPEL), line_height=1.1)
+        return raiz
 
     def _portada(self, sitio, ancho, alto):
         """El último hueco: la portada del cómic con el título del caso y cómo se lee."""
@@ -308,6 +350,7 @@ class CronologiaVisual(CapaVisual, MinijuegoCronologia):
              font=tipografia.FUENTE_TITULO, color=_rgba(vin.TINTA))
         banda_y = 0.04 - caja_alto / 2 - 0.05
         Entity(parent=portada, model="quad", scale=(ancho - 2 * BORDE, 0.05), y=banda_y, z=0.001, color=_rgba(vin.TINTA))
+        self._ancho_portada, self._alto_portada, self._sitio_portada = ancho, alto, portada
         self.portada_txt = Text("Se lee de izquierda a derecha", parent=portada, origin=(0, 0),
                                 position=(0, banda_y, -0.001), scale=escala_fuente(14), font=tipografia.FUENTE_TITULO,
                                 color=_rgba(PAPEL))
@@ -337,14 +380,61 @@ class CronologiaVisual(CapaVisual, MinijuegoCronologia):
         if getattr(self, "_listo", False) and not self._reloj_roto and self.foco != antes and self._fx is not None:
             self._vigilar(self._fx.pulso, self.filas[self.foco])
 
+    def posicion_sello(self):
+        return (0.62, 0.43)               # arriba a la derecha, completo dentro de pantalla, sin tocar el rumor ni la página
+
+    def escala_sello(self):
+        return 0.6
+
+    def posicion_estrellas(self):
+        return (0.64, 0.36)               # entre el sello y el globo de reenvío
+
+    def posicion_medalla(self):
+        # Sobre la franja del rumor, a la izquierda del sello: no choca con la página ni con los globos de reenvío.
+        return (0.47, 0.463)
+
+    def texto_sello_final(self, resultado):
+        # El veredicto del rumor solo se estampa si el orden salió bien: con errores contradeciría «Se te escapó algo».
+        return super().texto_sello_final(resultado) if getattr(resultado, "bien", False) else None
+
     # -- Momento estrella: la historieta se lee en su orden real y el rumor crece con cada reenvío --
 
     def al_terminar_propio(self, resultado):
         super().al_terminar_propio(resultado)
         if getattr(self, "_listo", False) and not self._reloj_roto:
+            self._subir_pagina()
             self._vigilar(self._empezar_reproduccion)
             bien = sum(1 for x in self.partida.en_su_puesto() if x)
             self.portada_txt.text = f"{bien} de {len(self.filas)} en su puesto"
+            if marcas.todo_en_orden(self.partida.en_su_puesto()):
+                self._vigilar(self._sello_en_orden)
+
+    def _subir_pagina(self):
+        """Al cerrar, las 3 cintas de instrucciones ya no hacen falta: la página sube a su sitio para que el panel de resultado
+        (que ocupa el pie) no tape la segunda fila de viñetas."""
+        intro = getattr(self, "intro", None)
+        if intro is None or getattr(self, "_pagina_subida", False):
+            return
+        self._pagina_subida = True
+        delta = intro.alto + 0.018 + 0.02
+        intro.enabled = False
+        self.pagina.y += delta
+        self.y0 += delta
+
+    def _sello_en_orden(self):
+        """UN solo sello sobre el conjunto (en la portada, arriba, sin tapar ninguna viñeta)."""
+        ancho, alto = self._ancho_portada, self._alto_portada
+        sello = Entity(parent=self._sitio_portada, position=(0, alto / 2 - 0.034, -0.05), rotation_z=-4)
+        w = min(ancho - 0.05, ui.medir(marcas.TEXTO_EN_ORDEN, 17, True) + 0.1)
+        ui.rect(sello, w, 0.05, PAPEL, (0, 0), z=0.002, radio_px=8)
+        ui.rect(sello, w - 0.01, 0.04, VERDE, (0, 0), z=0.001, radio_px=6)
+        for x1, y1, x2, y2 in marcas.palomita(0.04):
+            cx, cy, largo, ang = marcas.trazo(x1 - w / 2 + 0.03, y1, x2 - w / 2 + 0.03, y2)
+            Entity(parent=sello, model="quad", position=(cx, cy, -0.001), scale=(largo, 0.007), rotation_z=-ang,
+                   color=_rgba(PAPEL))
+        Text(marcas.TEXTO_EN_ORDEN, parent=sello, origin=(0, 0), position=(0.025, 0, -0.001), scale=escala_fuente(17),
+             font=tipografia.FUENTE_TITULO, color=_rgba(PAPEL))
+        self.sello_en_orden = sello
 
     def _empezar_reproduccion(self):
         x_der = ANCHO_UTIL / 2 - ANCHO_BOTONES / 2

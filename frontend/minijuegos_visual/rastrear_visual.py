@@ -138,6 +138,7 @@ def _ovillo(parent, pos, encendido=True):
 
 
 def _sello(parent, texto, pos, tono, giro=-8, escala=(0.17, 0.06)):
+    tono = estilo.tono_legible(tono, PAPEL)               # el texto del sello llega a contraste 4,5 sobre el papel
     if pp is not None:
         try:
             return pp.sello_goma(parent, texto, pos, tono, giro=giro, escala=escala)
@@ -160,15 +161,20 @@ class NotaCandidata(Entity):
 
     def __init__(self, opcion, numero, giro=0.0, al_clic=None, al_cursor=None, **opciones):
         super().__init__(**opciones)
-        self.ancho, self.alto = NOTA
+        reenvio = _es_reenvio(opcion)
+        lineas = ui.lineas_de(str(opcion.get("texto", "")), 16, NOTA[0] - 0.05)
+        n_lineas = min(3, len(lineas))
+        w = NOTA[0]
+        h = pc.alto_nota(n_lineas, reenvio) if pc is not None else NOTA[1]
+        self.ancho, self.alto = w, h
         self.al_clic, self.al_cursor = al_clic, al_cursor
         self.habilitada = True
         self.estado = "normal"
         self._foco = False
+        self.sello_reenvio = None
+        self.y = self.y + NOTA[1] / 2 - h / 2          # borde superior fijo: las notas cuelgan de la misma línea
         self._y0 = self.y
         self.rotation_z = giro
-        w, h = NOTA
-        reenvio = _es_reenvio(opcion)
         self.marco = Entity(parent=self, model="quad", scale=(w + 0.03, h + 0.03), z=0.01, color=_rgba(AMARILLO),
                             enabled=False)
         _hoja(self, (0, 0), (w, h), PAPEL, z=0, doblez=reenvio)
@@ -183,7 +189,6 @@ class NotaCandidata(Entity):
         self.titulo = _txt(self, f"{numero}   {quien}" + (f"  ·  {hora}" if hora else ""), 14,
                            pos=(-w / 2 + 0.016, y_cab), origen=(-0.5, 0))
         # Cuerpo: 16 px, máximo 3 líneas.
-        lineas = ui.lineas_de(str(opcion.get("texto", "")), 16, w - 0.05)
         if len(lineas) > 3:
             lineas = lineas[:3]
             lineas[-1] = lineas[-1].rstrip(" .,") + "…"
@@ -191,7 +196,7 @@ class NotaCandidata(Entity):
                            origen=(-0.5, 0.5), negrita=False)
         self.cuerpo.line_height = 1.15
         if reenvio:
-            _chip(self, ">>", (-w / 2 + 0.05, -h / 2 + 0.035))
+            self.sello_reenvio = _sello(self, "REENVIADO", (w / 2 - 0.15, -h / 2 + 0.04), ROJO, giro=-6, escala=(0.19, 0.048))
         _chincheta(self, (0, h / 2 + 0.002), GRIS_PIN)
         # Descartada: velo de corcho (la nota queda a ~35 %) y sello.
         self.velo = Entity(parent=self, model="quad", scale=(w + 0.012, h + 0.012), z=-0.006,
@@ -219,6 +224,8 @@ class NotaCandidata(Entity):
         descartada = self.estado in ("descartada", "incorrecta")
         self.velo.enabled = descartada
         self.sello.enabled = descartada
+        if self.sello_reenvio is not None:
+            self.sello_reenvio.enabled = not descartada      # el sello DESCARTADA manda
         enfocada = self._foco and not descartada
         self.marco.enabled = enfocada
         self.y = self._y0 + (0.02 if enfocada else 0.0)
@@ -256,25 +263,25 @@ class RastrearVisual(CapaVisual, MinijuegoRastrear):
         self._ocultos = [h for h in self.children if id(h) not in antes and isinstance(h, Text)]
         for h in self._ocultos:
             h.enabled = False
-        self.y_ronda = Y_NOTAS + NOTA[1] / 2 + 0.02          # el origen (tarjeta de siempre) sale en la franja baja
+        self.y_ronda = Y_NOTAS + NOTA[1] / 2 - 0.02          # el origen (tarjeta de siempre) sale en la franja baja
         self.tablero = Entity(parent=self, z=0.1)
         _hoja(self.tablero, (0, Y_CORCHO), (ANCHO_CORCHO, ALTO_CORCHO), CORCHO, z=0.05)
-        azar = random.Random(11)
-        for _ in range(55):
-            Entity(parent=self.tablero, model="circle", color=_rgba(CORCHO_OSC, 0.8), z=0.04,
-                   scale=azar.uniform(0.005, 0.012),
-                   position=(azar.uniform(-ANCHO_CORCHO / 2 + 0.01, ANCHO_CORCHO / 2 - 0.01),
-                             azar.uniform(Y_CORCHO - ALTO_CORCHO / 2 + 0.01, Y_CORCHO + ALTO_CORCHO / 2 - 0.01)))
+        self._grano_y_esquinas()
         # Tira del medio: pregunta del salto + puntos del progreso; a la derecha, los ovillos de los rodeos.
         self.tira = _hoja(self.tablero, (-0.13, Y_TIRA), (1.36, 0.062), PAPEL, z=0.0)
         self.puntos = Entity(parent=self.tira, z=-0.004)
         self.pregunta = _txt(self.tira, "", 15, pos=(-0.60, 0), origen=(-0.5, 0), negrita=False)
         self.ovillos = [_ovillo(self.tablero, (0.66 + 0.05 * k, Y_TIRA, -0.01)) for k in range(max(1, MAX_ERRORES - 1))]
+        n_ov = len(self.ovillos)
+        x_ov = 0.66 + 0.05 * (n_ov - 1) / 2
+        etiqueta = _hoja(self.tablero, (x_ov, Y_TIRA - 0.054), (0.25, 0.044), PAPEL, z=-0.005)
+        # Con cifra («INTENTOS: 2 de 2»): las vidas no dependen solo del color del ovillo.
+        self.rotulo_intentos = _txt(etiqueta, f"INTENTOS: {n_ov} de {n_ov}", 17, pos=(0, 0))
         # Cadena: polaroid «TÚ» + notas clavadas + hilos.
         self.cadena = Entity(parent=self.tablero, z=-0.01)
         if pp is not None:
             try:
-                self.polaroid = pp.polaroid(self.cadena, "TÚ", (X_TU, Y_CADENA), giro=2)
+                self.polaroid = pp.polaroid_retrato(self.cadena, "TÚ", (X_TU, Y_CADENA), giro=2)
             except Exception:           # noqa: BLE001
                 self.polaroid = None
         else:
@@ -289,6 +296,16 @@ class RastrearVisual(CapaVisual, MinijuegoRastrear):
         self._t_fuente = None
         self._pendiente = None
         self.fuente = None
+
+    def _grano_y_esquinas(self):
+        """Corcho: grano fino (muchas motas pequeñas, algunas claras) y las cuatro esquinas más oscuras."""
+        if pc is None:
+            return
+        for x, y, r, oscuro, alfa in pc.grano_corcho(170, ANCHO_CORCHO, ALTO_CORCHO, Y_CORCHO):
+            Entity(parent=self.tablero, model="circle", z=0.04, scale=r * 2,
+                   color=_rgba(CORCHO_OSC if oscuro else (176, 134, 92), alfa), position=(x, y))
+        for cx, cy, w, h, alfa in pc.esquinas_oscuras(ANCHO_CORCHO, ALTO_CORCHO, Y_CORCHO, capas=12, lado=0.26, alfa=0.02):
+            Entity(parent=self.tablero, model="quad", z=0.03, scale=(w, h), position=(cx, cy), color=_rgba((60, 38, 22), alfa))
 
     def _quitar_tablero(self):
         self._tablero_roto = True
@@ -353,6 +370,42 @@ class RastrearVisual(CapaVisual, MinijuegoRastrear):
         restantes = max(0, MAX_ERRORES - 1 - self.partida.errores)
         for k, ovillo in enumerate(self.ovillos):
             ovillo.encender(k < restantes)
+            self._aspa_perdido(ovillo, k >= restantes)
+        if getattr(self, "rotulo_intentos", None) is not None:
+            self.rotulo_intentos.text = f"INTENTOS: {restantes} de {len(self.ovillos)}"
+
+    @staticmethod
+    def _aspa_perdido(ovillo, perdido):
+        """Forma además del color: un ovillo gastado lleva un aspa de tinta encima."""
+        aspa = getattr(ovillo, "_aspa_e", None)
+        if aspa is None:
+            aspa = Entity(parent=ovillo, z=-0.02)
+            for giro in (45, -45):
+                Entity(parent=aspa, model="quad", scale=(0.034, 0.006), rotation_z=giro, color=_rgba(TINTA))
+            ovillo._aspa_e = aspa
+        aspa.enabled = bool(perdido)
+
+    # -- Hilo guía: del último eslabón de la cadena a la nota enfocada (el hilo «recorre» la cadena) --
+
+    def _pintar_foco(self):
+        super()._pintar_foco()
+        if getattr(self, "_listo", False) and not self._tablero_roto:
+            try:
+                self._pintar_guia()
+            except Exception as error:      # noqa: BLE001
+                bv.avisar_una_vez("rastrear_visual", error)
+
+    def _pintar_guia(self):
+        if getattr(self, "guia", None) is None:
+            self.guia = Linea(ROJO, 2, alfa=0.55, parent=self.cadena, z=-0.006)
+        activa = (not self.terminado and self.focables and 0 <= self.foco < len(self.focables)
+                  and self.focables[self.foco].habilitada and not self.partida.llegado)
+        if not activa:
+            self.guia.fijar([])
+            return
+        # Cabo suelto: sale del último eslabón hacia el hueco donde irá la siguiente nota.
+        origen = self._pin(len(self.notas_cadena))
+        self.guia.fijar(calc.catenaria(origen, (origen[0] - 0.13, origen[1] - 0.045), 0.03))
 
     # -- Elegir: hilo que se tensa o nota que tiembla --
 
@@ -382,6 +435,7 @@ class RastrearVisual(CapaVisual, MinijuegoRastrear):
             if self._fx is not None:
                 self._fx.error(nota)
         self._pintar_tira(self.partida.salto_actual())
+        self._pintar_guia()
 
     def _pintar_cadena(self):
         xs = calc.posiciones_rastro(len(self.elegidos), X_TU, PASO_CADENA, -0.78)
@@ -392,9 +446,10 @@ class RastrearVisual(CapaVisual, MinijuegoRastrear):
             giro = 0.0 if bv.reducir_movimiento() else (pc.giro_por_id(nombre, 1.5) if pc is not None else 0.0)
             nota = _hoja(self.cadena, (xs[k], Y_CADENA), NOTA_CADENA, PAPEL, giro=giro)
             nota.ancho, nota.alto = NOTA_CADENA
-            _txt(nota, calc.recortar(nombre, 18), 13, pos=(0, 0.012))
+            partes = ui.lineas_de(str(nombre), 13, NOTA_CADENA[0] - 0.02)[:2]
+            _txt(nota, "\n".join(partes), 13, pos=(0, 0.02 if len(partes) > 1 else 0.012))
             if hora:
-                _txt(nota, hora, 12, pos=(0, -0.026), negrita=False)
+                _txt(nota, hora, 12, pos=(0, -0.04 if len(partes) > 1 else -0.026), negrita=False)
             _chincheta(nota, (0, NOTA_CADENA[1] / 2 - 0.004), VERDE)
             self.notas_cadena.append(nota)
             self.hilos.append(Linea(ROJO, 3, parent=self.cadena, z=-0.008))
@@ -427,7 +482,7 @@ class RastrearVisual(CapaVisual, MinijuegoRastrear):
         self.fuente = Entity(parent=self.cadena, position=(nota.x, nota.y, 0.003))
         Entity(parent=self.fuente, model="quad", scale=(NOTA_CADENA[0] + 0.05, NOTA_CADENA[1] + 0.05),
                color=_rgba(AMARILLO))
-        self.sello_fuente = _sello(self.cadena, "FUENTE", (nota.x, nota.y - NOTA_CADENA[1] / 2 - 0.005), TINTA,
+        self.sello_fuente = _sello(self.cadena, "FUENTE", (nota.x, nota.y - NOTA_CADENA[1] / 2 - 0.022), TINTA,
                                    giro=-6, escala=(0.15, 0.05))
         self.sello_fuente.z = -0.02
         self._t_fuente = 0.0
@@ -442,7 +497,7 @@ class RastrearVisual(CapaVisual, MinijuegoRastrear):
         return (-0.48, 0.25)              # el hueco libre de la cadena (izquierda), no encima de las notas
 
     def posicion_estrellas(self):
-        return (-0.48, 0.15)
+        return (-0.2, 0.15)               # a la derecha del sello: la medalla (a la izquierda de las estrellas) cabe en pantalla
 
     # -- Bucle visual --
 

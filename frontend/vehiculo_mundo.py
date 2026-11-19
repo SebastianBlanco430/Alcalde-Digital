@@ -24,7 +24,7 @@ from frontend.piezas import silenciar
 from frontend.piloto_glb import crear_piloto_skin
 from frontend.vehiculo_modelo import ELEVACION_SUELO, VehiculoModelo
 
-N_VEHICULOS_GRANDE = 24        # vehículos aparcados en el mapa grande (el chico conserva 8)
+N_VEHICULOS = 8                # vehículos aparcados
 TEXTO_MONTAR = "E: montar {nombre}"
 TEXTO_BAJAR = "E: bajar de la {nombre}"
 SEGUNDOS_RATON = 1.5           # tras mover el ratón la cámara no se recoloca sola durante este tiempo
@@ -101,7 +101,7 @@ class MundoVehiculos(Entity):
                     obstaculos += vc.obstaculos_aparcado(v.estado.x, v.estado.z, v.estado.rumbo, v.perfil)
         agregar(obstaculos, origen="vehiculos")
 
-    # Deja solo los `n` primeros vehículos (online: el protocolo v4 admite N_VEHICULOS_MAX = 24; los primeros n son los
+    # Deja solo los `n` primeros vehículos (online: el protocolo admite N_VEHICULOS_MAX = 8; los primeros n son los
     # mismos en todos los equipos porque puntos_de_aparcamiento elige de forma incremental).
     def recortar(self, n):
         if self.conduciendo:
@@ -271,8 +271,8 @@ class IntegracionVehiculos:
 
     def __init__(self, escena, n=None):
         self.escena = escena
-        if n is None:       # mapa grande: más vehículos repartidos por todo el mapa; el chico, los 8 de siempre
-            n = N_VEHICULOS_GRANDE if hasattr(escena._mundo, "contenido_de_chunk") else 8
+        if n is None:
+            n = N_VEHICULOS
         self.mundo = MundoVehiculos(escena._mundo, n=n, parent=escena)
         self.jugador = None
         self._texto = None

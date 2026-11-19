@@ -49,7 +49,6 @@ from frontend.hud import HudMundo
 from frontend.marcadores_mundo import Baliza, RutaPiso
 from frontend.menu_pausa import MenuPausa
 from frontend import economia_config, online_config
-from frontend import mundo_config
 from frontend.niebla import activar_niebla, desactivar_niebla
 from frontend.peatones import Peatones
 from frontend.personaje_modelo import crear_personaje
@@ -80,41 +79,23 @@ class EscenaMundo(Escena):
         self.escala_tiempo = escala_tiempo       # 0 = cinemáticas instantáneas
         self._cinematica = False                 # ¿hay una cinemática en curso?
 
-        # Mapa grande (frontend/mundo_config.py): ciudad por chunks con niebla y plano lejano propios; el mundo chico sigue en Ciudad3D.
-        self._grande = mundo_config.mapa_grande_activo() and mundo_config.es_mundo_grande(mundo)
-        if self._grande:
-            from frontend.ciudad_chunks import crear_ciudad_grande
-            self.ciudad = crear_ciudad_grande(mundo, sombras=sombras, parent=self)
-        else:
-            self.ciudad = Ciudad3D(mundo, sombras=sombras, parent=self)
-        self._niebla = {"fin": mundo_config.FIN_NIEBLA_GRANDE} if self._grande else {}
-        if self._grande:
-            from backend.logica.navegacion_grande import CacheRutaGps
-            self._gps_local = CacheRutaGps(en_hilo=mundo_config.GPS_EN_HILO)   # el A* no bloquea el frame
+        self.ciudad = Ciudad3D(mundo, sombras=sombras, parent=self)
+        self._niebla = {}
         self.camara = CamaraTerceraPersona(self.ciudad.raiz_colisiones, suelo=mundo.altura,
-                                           obstaculos=None if self._grande else mundo, parent=self)
+                                           obstaculos=mundo, parent=self)
         self.camara.objetivo = self._posicion_del_activo
-        if self._grande:
-            self.ciudad.enlazar_escena(self)
         self.controlador = ControladorJugador(
             self, mundo, al_interactuar, velocidad=VELOCIDAD_CAMINAR, velocidad_correr=VELOCIDAD_CORRER,
             obtener_yaw=lambda: self.camara.yaw)
         self.director = DirectorCinematica(parent=self)
-        self.multitud = None
-        if self._grande and mundo_config.multitud_grande_activo():     # mapa grande: la multitud (3 niveles) en vez de 12 peatones
-            from frontend.multitud import Multitud
-            self.peatones = Peatones(mundo, cantidad=0, parent=self)
-            self.multitud = Multitud(mundo, jugador=self._posicion_jugador_para_multitud,
-                                     conducta=mundo_config.multitud_conducta_activa(), parent=self)
-        else:
-            self.peatones = Peatones(mundo, parent=self)      # gente que pasea (decoración)
+        self.peatones = Peatones(mundo, parent=self)      # gente que pasea (decoración)
         self.baliza = Baliza(parent=self, enabled=False)
         self._ayudas_para = None         # (jugador activo, destino seguido) con que se pusieron baliza y bandera
         self.ruta_piso = RutaPiso(suelo=mundo.altura, parent=self)
 
         # HUD 2D (camera.ui): hermano de la escena, no hijo (la escena cuelga de `scene`).
         self.hud = HudMundo(mundo, lambda: self.flujo, al_menu=al_menu, rotacion_libre=True)
-        self.hud.puede_abrir_mapa = self._puede_abrir_mapa      # mapa grande (tecla N): solo con el mundo grande
+        self.hud.puede_abrir_mapa = self._puede_abrir_mapa      # mapa a pantalla completa (tecla N)
         self.texto_turno = self.hud.panel_turno.texto_turno
         self.texto_mision = self.hud.panel_turno.texto_mision
         self.menu_pausa = MenuPausa(
@@ -161,10 +142,6 @@ class EscenaMundo(Escena):
         activar_niebla(**self._niebla)          # tras construir la ciudad: solo afecta a lo que ya existe
         self._capturar_satelite()
         self.camara.preparar_camara()
-        if self._grande:
-            camera.clip_plane_far = mundo_config.PLANO_LEJANO_GRANDE
-            if self.flujo is not None:
-                self.ciudad.preparar_anillo(self._posicion_del_activo())     # chunks de alrededor, con barra de progreso
         self._restablecer_tras_cinematica()
         self._cinematica = salida is not None     # al salir de un edificio hay cinemática (y panel de fin oculto)
         if self.flujo is None:
@@ -190,10 +167,10 @@ class EscenaMundo(Escena):
 
     _satelite_hecho = False
 
-    # Foto aérea de la ciudad (frontend/mapa_satelite.py) para el minimapa y el mapa grande: una sola vez y solo en el mundo
-    # chico (el grande es por chunks y no está entero en memoria). Cualquier fallo deja los mapas vectoriales de siempre.
+    # Foto aérea de la ciudad (frontend/mapa_satelite.py) para el minimapa y el mapa a pantalla completa: una sola vez.
+    # Cualquier fallo deja los mapas vectoriales de siempre.
     def _capturar_satelite(self):
-        if self._satelite_hecho or self._grande:
+        if self._satelite_hecho:
             return
         self._satelite_hecho = True
         try:
@@ -352,13 +329,6 @@ class EscenaMundo(Escena):
         activo = self.flujo.jugador_activo()
         return (activo.x, activo.z)
 
-    def _posicion_jugador_para_multitud(self):
-        """(x, z) del jugador al que esquivan los peatones, o None si no hay partida en curso."""
-        try:
-            return self._posicion_del_activo()
-        except Exception:
-            return None
-
     def _reconstruir_personajes(self):
         for avatar in self.avatares.values():
             destruir_arbol(avatar)
@@ -455,7 +425,7 @@ class EscenaMundo(Escena):
                 try:
                     alto = self._mundo.edificio_de(destino).alto
                 except ValueError:
-                    alto = ALTO_BALIZA_SIN_EDIFICIO      # lugar al aire libre (mapa grande): una baliza a la altura de un techo bajo
+                    alto = ALTO_BALIZA_SIN_EDIFICIO      # lugar al aire libre: una baliza a la altura de un techo bajo
             self.baliza.colocar(px, pz, alto + 2.2, suelo=self._mundo.altura(px, pz))
             self.baliza.enabled = True
         for lugar, bandera in self.ciudad.banderas.items():
@@ -478,10 +448,7 @@ class EscenaMundo(Escena):
         if destino is None or self.flujo.partida_terminada():
             self.ruta_piso.actualizar([])
             return
-        if self._grande:                      # mapa grande: tramo local desde el barrio hasta la calle (con caché)
-            puntos = self._gps_local.ruta(self._mundo, activo.x, activo.z, destino)
-        else:
-            puntos = navegacion.ruta_gps_hasta_puerta(self._mundo, activo.x, activo.z, destino)
+        puntos = navegacion.ruta_gps_hasta_puerta(self._mundo, activo.x, activo.z, destino)
         exacto = self._punto_exacto_de_mision()
         if exacto is not None:                # misión digital: la línea sigue hasta el terminal (donde está la baliza)
             puntos = list(puntos) + [exacto]

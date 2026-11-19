@@ -72,11 +72,12 @@ def zonas_contagiadas(focos):
 
 
 def texto_contagio(n, total=len(ZONAS)):
+    """Mensaje del cierre (cabe en UNA línea de 17 px dentro de la cinta de noticias)."""
     if n == 0:
         return "Ninguna zona del barrio quedó contagiada."
     if n == 1:
-        return "1 zona del barrio quedó contagiada por un bulo."
-    return f"{n} de {total} zonas del barrio quedaron contagiadas por bulos."
+        return "1 zona del barrio quedó contagiada."
+    return f"{n} de {total} zonas quedaron contagiadas."
 
 
 def pitch_musica(t, duracion):

@@ -4,6 +4,9 @@
 import os
 from pathlib import Path
 
+from frontend import rutas_app
+rutas_app.preparar()    # no hace nada salvo en el ejecutable congelado (PyInstaller)
+
 import ursina as ursina_paquete
 
 from panda3d.core import ClockObject, Filename, WindowProperties, loadPrcFileData
@@ -25,7 +28,7 @@ from frontend import compat_macos, daltonismo, diseno_adaptable, estilo, medidor
 from frontend import gpu_dedicada, rendimiento, telemetria
 from frontend import pantalla_completa      # ajuste «Pantalla completa» y F11 por el almacén de ajustes
 from frontend import audio_enganches      # sonido: observa el juego y dispara efectos/música (frontend/audio.py)
-from frontend import mundo_config      # bandera del mapa grande (MAPA_GRANDE / ALCALDE_MAPA_GRANDE); apagada = el mundo de siempre
+from backend.logica import mundo_config      # el mundo de la partida y su catálogo de misiones
 from frontend.componentes import preparar_fuente, rgb
 from frontend.conexion_flujo import INICIO, INTERIOR, JUEGO, MUNDO, SELECCION_ROL, TRABAJO, ConexionFlujo
 from backend.logica import ajustes as ajustes_jugador

@@ -8,11 +8,10 @@
 #      luz     ciudad.luz.color y ciudad.ambiente.color (la DIRECCIÓN del sol no se toca: las sombras horneadas siguen valiendo)
 #      cielo   ciudad.cielo.color (factor sobre los colores por vértice del domo: sol, nubes, cerros y mar se tiñen juntos)
 #      niebla  frontend.niebla.activar_niebla(color, fin, intensidad) con color = horizonte x tinte del cielo: cielo y niebla
-#              siguen siendo el MISMO color (sin costura). scene.fog_color/fog_density recorren las entidades que ya existen y
-#              cada chunk nuevo copia el valor al instalarse (ciudad_chunks._aplicar_niebla), así que llegan a todos.
+#              siguen siendo el MISMO color (sin costura). scene.fog_color/fog_density recorren las entidades que ya existen y las nuevas copian el valor al crearse.
 #              Si otro módulo vuelve a llamar activar_niebla con sus valores (al entrar al mundo), se detecta y se reaplica.
 #    No hay tinte global por posproceso: el FilterManager es de frontend/daltonismo.
-# 2. CAPAS (objetos pequeños, SIN reconstruir chunks): piscinas fijas de entidades creadas UNA vez, repartidas entre sitios
+# 2. CAPAS (objetos pequeños, SIN reconstruir la ciudad): piscinas fijas de entidades creadas UNA vez, repartidas entre sitios
 #    fijos (azar de frontend/azar_fijo) cercanos a la cámara, que aparecen y desaparecen con fundido de escala:
 #      basura (bolsas, papeles, cajas) · grafitis en paredes · carteles torcidos de «sin conexión» · flores vivas o marchitas ·
 #      guirnaldas con banderines y bombillas cálidas entre farolas · farolas apagadas (capuchón oscuro sobre el foco) ·
@@ -37,7 +36,7 @@ MOVIMIENTO_CAPAS = 1.5           # m que debe moverse la cámara para repartir d
 TINTE_OBJETOS = 0.88             # los objetos de las capas no tienen sombreado: se bajan un poco para casar con la ciudad
 ALTURA_ACERA = 0.19              # m sobre el terreno de las aceras (ciudad_3d: ALTO_ACERA 0.20)
 ALTURA_PLAZA = 0.16
-ALTURA_FOCO = 4.25               # m del foco de la farola sobre el suelo (objetos_chunk.farola: suelo - 0.1 + 4.35)
+ALTURA_FOCO = 4.25               # m del foco de la farola sobre el suelo (la farola: suelo - 0.1 + 4.35)
 ALTURA_GUIRNALDA = 3.75          # m a los que se cuelga la guirnalda (algo por debajo del foco)
 SALES = {"basura": 1.0, "flores": 2.0, "marchitas": 6.0, "carteles": 4.0, "apagados": 5.0, "bancos": 8.0, "corros": 9.0,
          "guirnaldas": 11.0, "grafitis": 3.0}
@@ -590,7 +589,7 @@ def _libre(mundo, x, z):
 
 
 def sitios_de_la_ciudad(mundo):
-    """Todos los sitios fijos de las capas, a partir del mundo (chico o grande). Devuelve un dict nombre -> [Punto] / datos.
+    """Todos los sitios fijos de las capas, a partir del mundo. Devuelve un dict nombre -> [Punto] / datos.
     Determinista: el mismo mundo da siempre los mismos sitios (nada de random)."""
     suelo = mundo.altura
     segs = _segmentos(mundo)
@@ -660,7 +659,7 @@ def sitios_de_la_ciudad(mundo):
 class PropagadorNiebla:
     """Cambia la niebla de la escena SIN recorrer todas las entidades de golpe. `scene.fog_color`/`scene.fog_density` de Ursina
     recorren las ~3000 entidades con has_ancestor() (medido: ~50 ms de un solo frame). Aquí: (1) se actualizan de una vez los
-    valores de la escena (los chunks que se instalen después copian estos), y (2) las entidades con shader de niebla que YA
+    valores de la escena (las entidades que se creen después copian estos), y (2) las entidades con shader de niebla que YA
     existen reciben los nuevos valores en tandas de POR_FRAME por frame (un paso son ~4 microsegundos por entidad).
     Si Ursina cambiara por dentro (atributos privados ausentes) se usa `activar_niebla`, que hace lo mismo más despacio."""
 
@@ -723,7 +722,6 @@ class PropagadorNiebla:
 
 def crear_controlador(escena, atmosfera=True, capas=True):
     from ursina import Color, Entity, camera, scene, time
-    from frontend import mundo_config
     from frontend.ciudad_3d import COLOR_LUZ_AMBIENTE, COLOR_LUZ_SOL, rgb_luz
     from frontend.cielo import COLOR_HORIZONTE
     from frontend.niebla import FIN_NIEBLA, INTENSIDAD_NIEBLA, activar_niebla

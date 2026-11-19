@@ -4,14 +4,15 @@
 import math
 
 X_CINTA = 0.60
-Y_CINTA_ARRIBA = 0.30
-Y_LINEA_ROJA = -0.205
+Y_CINTA_ARRIBA = 0.31
+Y_LINEA_ROJA = -0.20
 ALTO_TARJETA_MAX = 0.13
-ALTO_TARJETA_MIN = 0.09
+ALTO_TARJETA_MIN = 0.088
+SEPARACION_TARJETAS = 8 / 720.0      # 8 px entre papeles: se ve el hueco entre notas y el sello FRENADA no las funde
 FRACCION_ROJA = 0.25         # último cuarto del tiempo: el cronómetro se pone rojo
 
 
-def huecos_cinta(n, y_arriba=Y_CINTA_ARRIBA, y_abajo=Y_LINEA_ROJA + 0.02, separacion=0.006):
+def huecos_cinta(n, y_arriba=Y_CINTA_ARRIBA, y_abajo=Y_LINEA_ROJA + 0.02, separacion=SEPARACION_TARJETAS):
     """(alto, [y_centro...]) de las n tarjetas de la cinta, apiladas de arriba abajo."""
     n = max(1, int(n))
     paso = (y_arriba - y_abajo) / n

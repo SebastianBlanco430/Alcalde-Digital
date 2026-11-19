@@ -1,0 +1,24 @@
+ALCALDE DIGITAL - Aviso antes de instalar
+
+Alcalde Digital es un juego educativo gratuito, un proyecto de aprendizaje. Se ofrece "tal cual", sin garantia
+de ningun tipo. Todas las personas, lugares, misiones y el dinero (R$) del juego son inventados.
+
+- No envia telemetria, estadisticas ni informes de errores. No tiene cuentas, publicidad ni compras reales.
+- La unica conexion de red posible es el modo online opcional, que solo se activa cuando tu creas una sala o te unes a una.
+- Por defecto se instala solo para tu usuario (no pide permisos de administrador). El asistente de Windows puede
+  ofrecerte instalarlo para todos los usuarios; en ese caso si pedira administrador. No modifica el sistema ni el
+  registro mas alla de lo que necesita el desinstalador de Windows.
+- El instalador no lleva firma digital de un editor reconocido: Windows (SmartScreen) puede mostrar un aviso.
+  Comprueba antes la huella SHA-256 publicada junto a la descarga.
+- Al desinstalar se borra el programa. Tus partidas guardadas, que el juego escribe en tu carpeta personal, no se borran.
+
+- Contenido: el juego incluye dilemas sobre desinformacion y ciberacoso entre companeros (burlas por chat, memes,
+  grupos para humillar), tratados con tono educativo y sin violencia. Con menores, mejor jugar con un adulto.
+  Los personajes son ficticios; cualquier parecido con personas reales es casual.
+
+Avisos legales completos (uso, privacidad, creditos de modelos, sonidos y fuentes, clasificacion):
+  - En la pagina web del juego: legal.html
+  - En el repositorio: docs/AVISOS_LEGALES_Y_ACTIVOS.md y docs/SITIO_WEB_TEXTOS_LEGALES.md
+
+Borrador para revision legal antes de publicar. Estos textos son un borrador de aprendizaje, no son asesoria legal
+y no sustituyen una revision legal.

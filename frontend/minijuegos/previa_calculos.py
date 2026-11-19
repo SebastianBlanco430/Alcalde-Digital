@@ -128,3 +128,11 @@ def repartir(ancho_util, corta=False, ancho_ilustracion=0.5, separacion=0.05, n_
     ancho_paso = (ancho_derecha - (n - 1) * hueco_pasos) / n
     return {"x0": x0, "ancho_ilustracion": ancho_ilustracion, "x_derecha": x_derecha, "ancho_derecha": ancho_derecha,
             "ancho_paso": ancho_paso, "hueco_pasos": hueco_pasos, "n_pasos": n, "con_pasos": not corta}
+
+
+def y_botones(y_fin_columna, alto, y_defecto=-0.397, separacion=0.045, y_min=-0.405):
+    """Centro vertical de la fila «Empezar» / «Ver tutorial»: justo bajo el último bloque de la columna de texto (`y_fin_columna`,
+    borde inferior) con `separacion`, sin bajar de `y_min`. Sin dato de columna: `y_defecto`."""
+    if y_fin_columna is None:
+        return y_defecto
+    return max(y_min, float(y_fin_columna) - separacion - alto / 2)

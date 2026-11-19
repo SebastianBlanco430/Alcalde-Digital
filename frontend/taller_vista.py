@@ -17,7 +17,8 @@ from ursina import Entity, color
 from backend.logica import taller_ritmo as tr
 from frontend import estilo
 from frontend.componentes import destruir_arbol, panel_tinta, rgb
-from frontend.escenas.escena_trabajo import NOMBRE_DIRECCION, Capa, _caja, _seguro, _texto, dibujar_flecha
+from frontend.trabajo_constantes import NOMBRE_DIRECCION
+from frontend.trabajo_dibujos import Capa, _caja, _seguro, _texto, dibujar_flecha
 
 # Taller
 FONDO_TALLER = (58, 62, 78)

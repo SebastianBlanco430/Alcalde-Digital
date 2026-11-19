@@ -1,5 +1,8 @@
 # Plan final — base de backend: reloj, ambiente, manillas, efectos retardados y equilibrio
 
+Nota 2026-11-18: el «mapa grande» (900 x 650 m, 47 misiones, multitud, transporte) se borró del juego; las filas «grande» y las
+medidas con ese mapa son históricas y ya no se pueden reproducir. El mundo es uno solo (14 misiones).
+
 Estado: 2026-11-11, rama `plan-de-trabajo-final`, sin commit. Todo lo de este documento es **backend puro** (sin ursina ni
 panda3d, sin importar `frontend/`), determinista (relojes y azar inyectables) y serializable a JSON. El reloj, el chip, los
 avisos y la pantalla final ya están cableados en el juego (§9); el resto del frontend: ver «Lo que falta cablear».
@@ -268,7 +271,7 @@ elemento: {"t": "texto", "dia_min": 3}      # dia_min opcional (1..7): la frase 
 
 ## 8. Dilemas jugables (`backend/datos/dilemas_extra.json`, `backend/logica/dilemas.py`, `frontend/registro_dilemas.py`)
 
-Por qué va aparte: las 47 misiones de verificar y el mazo de 18 noticias tienen **una respuesta correcta** (`Mision`
+Por qué va aparte: las 14 misiones de verificar (antes 47, con el mapa grande ya retirado) y el mazo de 18 noticias tienen **una respuesta correcta** (`Mision`
 exige `es_verdadera`, y la pista siempre permite deducir el veredicto). Un dilema no tiene veredicto, así que no cabe en
 `Mision` ni en `CONSECUENCIAS_RETARDADAS` sin tocar código. El archivo trae 9 dilemas listos para que otro agente los
 conecte (ya conectados: ver «Conexión» abajo).
@@ -402,8 +405,8 @@ reloj queda parado en el día 1). `ALCALDE_RELOJ=0` o el juego en línea: no hac
 Módulos: `frontend/ambiente_vivo.py` (punto único de lectura del Ambiente suavizado y de la hora/día de la partida),
 `backend/logica/conducta_estados.py` (conducta y densidad, Python puro), `backend/logica/globos.py` (qué frase y cuándo,
 Python puro), `frontend/globos_npc.py` (piscina de globos) y `frontend/registro_ambiente_npc.py` (controlador por frame, lo
-engancha `frontend/extensiones.py`). Ediciones a código existente: solo `Multitud.densidad = None` + 2 líneas que lo
-aplican en `frontend/multitud.py` (con `densidad = None` la multitud es la de antes).
+engancha `frontend/extensiones.py`). (La multitud del «mapa grande», `frontend/multitud.py`, y su gancho `Multitud.densidad` se
+borraron el 2026-11-18: hoy solo hay los 12 peatones del mundo.)
 
 | Bandera | Constante / entorno | Qué apaga |
 |---|---|---|
@@ -426,12 +429,10 @@ El controlador alimenta `ambiente_vivo` SIEMPRE (aunque las tres banderas estén
 | aislado | cabizbajo | 0,86 | casi no se detiene y se abre de lado (1,6 m) para no cruzarse con nadie |
 | enojado | tenso | 1,30 | no se detiene y no aguanta cola: a los 2 s adelanta |
 
-- Mapa grande, nivel A (actores): postura + movimiento. Nivel B (figuras horneadas): **solo movimiento**; una variante de
-  figura por estado exigiría hornear 5x figuras (memoria y tiempo de carga) y a 10-40 m la postura no se distingue: no se hizo.
-- Mapa chico (12 peatones): postura, ritmo (`caminante.velocidad`) y paradas «mirando el celular» (`_espera`).
+- Peatones (12): postura, ritmo (`caminante.velocidad`) y paradas «mirando el celular» (`_espera`).
 - NPC clave del mercado: postura según su estado; mientras atienden al jugador (`mirando`) los de celular/aislado quedan en
   neutro para no parecer que lo ignoran. Su diálogo y su giro no se tocan.
-- **En línea**: `ConductaConEstado.modular = False` y los peatones conservan su velocidad: la posición de la multitud sigue
+- **En línea**: `ConductaConEstado.modular = False` y los peatones conservan su velocidad: la posición de los NPC sigue
   siendo función pura de (t, ruta, semilla) y nada viaja por la red. Quedan solo postura, globos y densidad (locales y visuales).
   Sin reloj de partida (`hora() = None`) el factor horario no recorta.
 
@@ -446,10 +447,8 @@ fundido de 0,35 s; memoria de las 8 últimas frases (no se repiten); frase = 60 
 horaria, filtrada por `dia_min`. Los globos NO se glosan (`nombres_visibles.glosar_texto`): se muestran tal cual el JSON. Se
 ocultan en pausa y en cinemáticas. Cero fugas: los `Text` se crean una vez en `GlobosNPC.__init__`.
 
-**Medido** (esta máquina, macOS, 2026-11-11; ver la nota 45 de la bóveda): `tests/test_ambiente_npc_humo.py` (offscreen, mapa
-grande y chico), `tests/test_multitud_ventana.py` (ventana real, 1000 frames: 0 entidades nuevas, Python de la multitud
-0,16 ms de media), `tests/medir_fps_npc.py` (ventana real sin tope de 60 fps: ~96-104 fps con 20-40 figuras dibujadas, igual
-con el ambiente encendido o apagado dentro del ruido de ±4 %).
+**Medido** (esta máquina, macOS, 2026-11-11; ver la nota 45 de la bóveda): `tests/test_ambiente_npc_humo.py` (offscreen, peatones del
+mundo). (Las pruebas `test_multitud_ventana.py` y `medir_fps_npc.py` de la multitud del mapa grande se borraron el 2026-11-18.)
 
 ## 10. Manillas de Bonfim en el juego (punto 6: `frontend/registro_manillas.py`, `manillas_calculos.py`, `manillas_dibujo.py`)
 
@@ -501,11 +500,11 @@ antes; `ALCALDE_CIUDAD_VIVA_ATMOSFERA=0` y `ALCALDE_CIUDAD_VIVA_CAPAS=0` apagan 
 - Cielo: `ciudad.cielo.color` (factor sobre los colores por vértice): gris frío abajo (0,64/0,74/0,88), dorado arriba.
 - Niebla: color = horizonte x tinte del cielo (sin costura), distancia x0,55 (rota) .. x1,15 (sana), fuerza x1,30 .. x0,85.
   Se aplica con `PropagadorNiebla`: `scene.fog_color/fog_density` de Ursina recorren ~3000 entidades (medido 25-50 ms de un frame),
-  así que se fijan los valores de la escena de una vez (los chunks nuevos copian esos) y las entidades existentes con shader de
+  así que se fijan los valores de la escena de una vez (las entidades nuevas copian esos) y las entidades existentes con shader de
   niebla reciben el valor en tandas de 120 por frame. Si otro módulo llama `activar_niebla` (p. ej. al entrar al mundo) se detecta y se reaplica.
 - Sin tinte global por posproceso (el FilterManager es de `daltonismo`).
 
-**Capas** (piscinas fijas de 129 entidades `unlit` creadas una vez, sin colisión, sin reconstruir chunks, fundido de escala de 1,5 s,
+**Capas** (piscinas fijas de 129 entidades `unlit` creadas una vez, sin colisión, sin reconstruir la ciudad, fundido de escala de 1,5 s,
 umbral fijo por sitio con histéresis de 0,03; azar de `azar_fijo`):
 
 | Capa | Se ve con | Sitios |
@@ -516,7 +515,7 @@ umbral fijo por sitio con histéresis de 0,03; azar de `azar_fijo`):
 | flores vivas / flores marchitas | salud > 0,55 / < 0,42 | mismos puntos (se cruzan al pasar de una a otra) |
 | guirnaldas con banderines y bombillas cálidas | salud > 0,62 | entre farolas vecinas a 6-24 m (las del mundo) |
 | farolas apagadas (capuchón oscuro sobre el foco) | salud < 0,40 (hasta 85 %) | las farolas del mundo |
-| bancos ocupados (1-2 personas sentadas) | actividad de plazas | los bancos del mundo (48 en el grande) |
+| bancos ocupados (1-2 personas sentadas) | actividad de plazas | los bancos del mundo (48 en el antiguo mapa grande, ya retirado) |
 | corros (5 personas y una bocina) | actividad de plazas alta | 2 puntos por plaza |
 
 Radio de aparición 42-70 m de la cámara; reparto cada 0,3 s solo si la cámara se movió 1,5 m o cambió el Ambiente.
@@ -525,8 +524,7 @@ Radio de aparición 42-70 m de la cámara; reparto cada 0,3 s solo si la cámara
 media por frame (p99 2,3 ms, máx 2,6 ms); 129 entidades constantes tras 600 frames con teletransportes y cambios de ambiente; la niebla llega a
 534/534 entidades existentes; guirnalda con error 0,0 m en el extremo; fps sin tope de 60, ambiente roto: 97,8 con capas vs 106,5 sin las capas
 vs 109,2 con la ciudad viva apagada. Capturas: `scripts/captura_ciudad_viva.py`.
-**No verificado**: partida jugada a mano; en línea en ventana; ventanas con GPU integrada; los LOD1 (chunks lejanos con `unlit_shader`) que se
-instalan nuevos nacen sin niebla, como ya ocurría antes de este módulo.
+**No verificado**: partida jugada a mano; en línea en ventana; ventanas con GPU integrada; los LOD1 del antiguo mapa grande (borrado el 2026-11-18).
 
 ## Lo que falta cablear (frontend; fuera de este encargo)
 
@@ -546,4 +544,4 @@ días, guardado viejo/nuevo/dañado, pureza de los módulos) y `test_equilibrio_
 
 ---
 ## ACTUALIZACIÓN 2026-11-12 (minijuegos, nota 53)
-- Las 47 misiones de verificar tienen 6 minijuegos distintos (rastrear, comparar, ordenar cadena, chat, señales, contrarreloj), con respaldo a la pantalla de siempre y `ALCALDE_MINIJUEGOS=0` para apagarlos. Ver [[53 Minijuegos de verificar]]. Sin commit.
+- Las misiones de verificar (47 entonces; hoy 14, tras retirar el mapa grande el 2026-11-18) tienen 6 minijuegos distintos (rastrear, comparar, ordenar cadena, chat, señales, contrarreloj), con respaldo a la pantalla de siempre y `ALCALDE_MINIJUEGOS=0` para apagarlos. Ver [[53 Minijuegos de verificar]]. Sin commit.

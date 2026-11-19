@@ -25,8 +25,7 @@ from frontend import reloj_calculos as rc
 
 RELOJ_HUD = True                # False (o ALCALDE_RELOJ_HUD=0): ni chip ni enganche; el reloj queda parado en el día 1
 Y_AVISO = 0.12                  # borde inferior (centro de una línea) del aviso en camera.ui; el de veredicto/pagos está en 0,30
-ANCHO_CHIP, ALTO_CHIP = 0.27, 0.052
-MARGEN = 0.02
+from frontend.reloj_constantes import ALTO_CHIP, ANCHO_CHIP, CINE_FINAL, MARGEN  # noqa: F401 (reexporta)
 
 
 def activo():
@@ -175,7 +174,7 @@ class ControlReloj:
 # Cinemática del final (finales por etapas, frontend/cinematica_final.py): se muestra UNA vez por partida, antes de la
 # pantalla final, si el final es bueno o malo. «sesion» identifica la partida: otra sesión (Partida nueva) reinicia la marca.
 SEGUNDOS_VINETA_FINAL = None    # None = lo que diga cinematica_final (≈ 4 s); los scripts de humo lo bajan
-_cine_final = {"sesion": None, "vista": False, "entidad": None}
+_cine_final = CINE_FINAL      # mismo dict que reloj_constantes.CINE_FINAL
 
 
 def _cinematica_del_final(escena_mundo, panel, resumen):

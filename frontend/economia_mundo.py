@@ -160,7 +160,7 @@ class IntegracionEconomia(Entity):
 
     def _instalar_modulos(self):
         for bandera, nombre in ((cfg.COMERCIOS, "comercios_mundo"), (cfg.VENDEDOR_CALLE, "vendedor_calle"),
-                                (cfg.TRABAJOS, "trabajo_mundo"), (getattr(cfg, "TRANSPORTE", False), "transporte_mundo")):
+                                (cfg.TRABAJOS, "trabajo_mundo")):
             if not bandera:
                 continue
             try:

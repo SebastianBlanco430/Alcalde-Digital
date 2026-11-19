@@ -8,7 +8,7 @@
 #   2. LEYENDA (tecla B): qué es cada manilla (ciudad, vecinos y cómo leer nivel/tejido/nudos), con la frase actual de cada
 #      indicador. No bloquea el juego; B o Escape-pausa la cierran.
 #   3. CINTAS EN LOS NPC (ControlCintasNPC): una cinta algo exagerada de tamaño en la muñeca izquierda de los NPC cercanos
-#      (nivel A de la multitud, peatones del mundo chico y NPC clave), con el color/tejido de su estado emocional
+#      (peatones y NPC clave), con el color/tejido de su estado emocional
 #      (npc_postura.estado_de). PISCINA FIJA de CAPACIDAD_NPC cintas que se reparten entre los NPC cercanos
 #      (manillas_calculos.elegir_cintas_npc): no se crea ni se destruye nada tras el arranque.
 #
@@ -707,9 +707,6 @@ def _crear_cintas_npc(escena):
             yaw = math.radians(camera.world_rotation_y)
             fx, fz = math.sin(yaw), math.cos(yaw)
             cuerpos = []
-            m = getattr(escena, "multitud", None)
-            if m is not None:
-                cuerpos += [a for a in m._actores if a.enabled]
             p = getattr(escena, "peatones", None)
             if p is not None:
                 cuerpos += [a for a in p.personajes if a.enabled]

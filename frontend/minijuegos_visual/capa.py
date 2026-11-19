@@ -98,8 +98,8 @@ class CapaVisual:
         for i, pieza in enumerate(self.focables):
             self._fx.foco(pieza, False)
         retardo = self.repasar_revision()
-        texto = calc.texto_sello(getattr(self.mision, "es_verdadera", None))
-        self._fx.sello(texto, posicion=self.posicion_sello(), retardo=retardo + 0.15)
+        texto = self.texto_sello_final(resultado)
+        self._fx.sello(texto, posicion=self.posicion_sello(), retardo=retardo + 0.15, escala=self.escala_sello())
         cantidad = calc.estrellas(resultado.fraccion, resultado.bien, resultado.completado)
         self._fx.estrellas(cantidad, posicion=self.posicion_estrellas(), retardo=retardo + 0.55)
         if getattr(self, "es_tutorial", False):      # tutorial de la primera vez: se ve el sello y las estrellas, pero NO se anota nada
@@ -108,8 +108,7 @@ class CapaVisual:
         perfecto = cantidad == 3
         anotado = logros_minijuegos.registrar(getattr(self.mision, "id", ""), resultado.minijuego, cantidad, perfecto)
         if anotado.get("medalla_nueva"):
-            x, y = self.posicion_estrellas()
-            self._fx.medalla("¡Medalla nueva: primer perfecto!", posicion=(x - 0.04, y), retardo=retardo + 1.0)
+            self._fx.medalla("¡Medalla nueva: primer perfecto!", posicion=self.posicion_medalla(), retardo=retardo + 1.0)
 
     def repasar_revision(self):
         """Destello / temblor sobre cada tarjeta de la revisión, en orden. Devuelve cuánto dura el repaso (s)."""
@@ -124,11 +123,28 @@ class CapaVisual:
                 self._fx.programar(i * paso, lambda t=tarjeta, s=sonar: self._fx.error(t, sonar=s))
         return len(tarjetas) * paso
 
+    def texto_sello_final(self, resultado):
+        """Texto del sello final (None = sin sello). Por defecto, el veredicto real del rumor; las vistas pueden afinarlo."""
+        return calc.texto_sello(getattr(self.mision, "es_verdadera", None))
+
+    def escala_sello(self):
+        """Tamaño del sello (1 = el de siempre). Con el marco de papel es menor, para que entre entero en la franja de arriba
+        sin cortarse por el borde ni tapar el rumor; sin marco, el de siempre."""
+        from frontend.minijuegos_visual import marco_calculos
+        return 0.62 if marco_calculos.activo() else 1.0
+
     def posicion_sello(self):
-        return (0.45, 0.385)
+        # Con el marco de papel el rumor ocupa la franja y 0,35 .. 0,43: el sello va a su derecha, arriba, sin taparlo.
+        from frontend.minijuegos_visual import marco_calculos
+        return (0.73, 0.445) if marco_calculos.activo() else (0.45, 0.385)
 
     def posicion_estrellas(self):
         return (0.64, 0.335)
+
+    def posicion_medalla(self):
+        """Rótulo de la medalla (alineado a la derecha): a la izquierda de las estrellas, como siempre."""
+        x, y = self.posicion_estrellas()
+        return (max(x - 0.04, -0.40), y)          # el rótulo mide ~0,5 y se alinea a la derecha: no se sale por la izquierda
 
     # -- Bucle --
 

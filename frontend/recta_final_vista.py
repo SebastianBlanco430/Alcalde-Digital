@@ -84,7 +84,7 @@ def lineas_desenlace(datos):
 
 def _leer(gestor):
     """(info | None, desenlace | None, terminada). Nunca lanza."""
-    from frontend.conexion_flujo import MUNDO
+    from frontend.flujo_constantes import MUNDO
     escena = gestor._escenas.get(MUNDO)
     flujo = getattr(escena, "flujo", None) if escena is not None else None
     if flujo is None:
@@ -106,8 +106,8 @@ def _leer(gestor):
 
 def _cinematica_final_en_pantalla():
     try:
-        from frontend import registro_reloj
-        return registro_reloj._cine_final.get("entidad") is not None
+        from frontend.reloj_constantes import CINE_FINAL
+        return CINE_FINAL.get("entidad") is not None
     except Exception:
         return False
 
@@ -212,7 +212,7 @@ def _vigia_cls():
             self._latir_barras(mult)
 
         def _latir_barras(self, mult):
-            from frontend.conexion_flujo import JUEGO
+            from frontend.flujo_constantes import JUEGO
             if self.gestor.nombre_actual() != JUEGO:
                 return
             barras = getattr(self.gestor._escenas.get(JUEGO), "barras", None) or {}

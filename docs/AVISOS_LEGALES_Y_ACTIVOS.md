@@ -59,7 +59,7 @@ registrar su nombre real).
   iglesia real ni el nombre de la fiesta como marca.
 - Sugerencia de texto de ficha: «Inspiradas en una tradición popular de Salvador (Brasil). Aquí son solo un
   recurso de juego y no representan ninguna práctica religiosa». Que alguien de la comunidad cultural o el profesor
-  lo lea antes de publicar. La iglesia del mapa («Nossa Senhora da Esperança») es ficticia; debe decirse así.
+  lo lea antes de publicar. La iglesia («Nossa Senhora da Esperança», que estaba en el mapa grande ya retirado; el nombre sigue en datos de nombres visibles) es ficticia; debe decirse así si vuelve a aparecer.
 
 ## 4. Nombres de personas y marcas reales
 
@@ -67,7 +67,7 @@ Revisado el texto del juego (`backend/` y `frontend/`):
 
 | Hallazgo | Dónde | Riesgo | Acción sugerida |
 |---|---|---|---|
-| ~~«Escola Municipal **Paulo Freire**»~~ **RESUELTO** | `ciudad_grande.py`, `nombres_visibles.py`, `misiones_semilla.py`, `dilemas_extra.json` y otros | Era el nombre de una persona real (educador) | Renombrada a «Escola Bairro Esperança» (visible: «Escuela Barrio Esperanza»), nombre inventado, en todos los archivos |
+| ~~«Escola Municipal **Paulo Freire**»~~ **RESUELTO** | `ciudad_grande.py` (borrado el 2026-11-18), `nombres_visibles.py`, `misiones_semilla.py`, `dilemas_extra.json` y otros | Era el nombre de una persona real (educador) | Renombrada a «Escola Bairro Esperança» (visible: «Escuela Barrio Esperanza»), nombre inventado, en todos los archivos |
 | ~~**WhatsApp**~~ **RESUELTO** (traducción de «zap», «corrente do zap», «Zap do Morro») | `nombres_visibles.py` | Era marca real en texto visible | Ahora «chat», «cadena del chat», «chat del cerro». Una prueba (`tests/test_pulido_legal.py`) vigila que no vuelvan nombres reales ni marcas en `backend/` y `frontend/` |
 | «Globo» | `globos.py` etc. | Falso positivo (globo de texto) | Ninguno |
 | Nombres de pila (Dani, doña Marta, Kauã, doña Cida, Seu Zé, doña Lu) | dilemas, frases | Comunes y ficticios | Ninguno; no se hallaron apellidos de personas reales |
@@ -133,7 +133,7 @@ Fecha: [...]
 - **Topes de longitud**: cada texto de `dilemas_extra.json` admite como máximo 400 caracteres (si no, el cargador
   rechaza el archivo con el id del dilema) y el mensaje de un efecto retardado se recorta a 400 caracteres también
   cuando viene de un guardado manipulado. Así un JSON editado a mano no puede desbordar los paneles.
-- **Riesgo del `pickle` (`backend/datos/cache_mundo.py`)**: la caché del mundo grande se guarda con `pickle`
+- **Riesgo del `pickle` (`backend/datos/cache_mundo.py`)**: la caché del mundo se guarda con `pickle`
   (~8 MB, en `~/.alcalde_digital/cache`, o `$ALCALDE_CACHE_DIR`). `pickle.load` puede ejecutar código arbitrario si
   alguien sustituye ese archivo. Mitigaciones actuales: el archivo lo escribe el propio juego en la carpeta del
   usuario, nunca se carga desde la red ni desde el repositorio, su nombre incluye una huella del código y de los datos,

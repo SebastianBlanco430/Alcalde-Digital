@@ -5,22 +5,19 @@
 #   1. ALIMENTA frontend/ambiente_vivo.py (el Ambiente suavizado que leen los demás módulos). Esto se hace SIEMPRE,
 #      aunque las tres banderas de abajo estén apagadas.
 #   2. CONDUCTA (NPC_CONDUCTA / ALCALDE_NPC_CONDUCTA=0): cada NPC toma el estado de ambiente_ciudad.estado_npc(su semilla)
-#      y lo muestra en la postura (npc_postura.aplicar) y en cómo camina (backend/logica/conducta_estados.py): multitud
-#      del mapa grande (nivel A: postura + movimiento; nivel B: solo movimiento), peatones del mundo chico (postura,
-#      ritmo y paradas «mirando el celular») y NPC clave con los que se habla (solo postura; mientras atienden al jugador
-#      no se ponen de espaldas al mundo: ver _postura_de_reactivo).
+#      y lo muestra en la postura (npc_postura.aplicar) y en cómo camina (backend/logica/conducta_estados.py): peatones
+#      (postura, ritmo y paradas «mirando el celular») y NPC clave con los que se habla (solo postura; mientras atienden
+#      al jugador no se ponen de espaldas al mundo: ver _postura_de_reactivo).
 #   3. DENSIDAD (NPC_DENSIDAD / ALCALDE_NPC_DENSIDAD=0): gente en la calle = densidad_poblacion(amb) x factor horario de
-#      la hora de la PARTIDA (ambiente_vivo.hora()). Multitud: gancho Multitud.densidad (el Asignador aplaza altas y bajas
-#      a la vista a menos de RADIO_APARICION m). Mundo chico: `enabled` por peatón, con la misma regla.
+#      la hora de la PARTIDA (ambiente_vivo.hora()). `enabled` por peatón (altas y bajas fuera de la vista, a menos de
+#      RADIO_APARICION m no).
 #   4. GLOBOS (NPC_GLOBOS / ALCALDE_NPC_GLOBOS=0): frontend/globos_npc.py + backend/logica/globos.py.
 #
-# EN LÍNEA: la conducta deja de tocar el MOVIMIENTO (ConductaConEstado.modular = False: la multitud camina exactamente
-# como antes; los peatones del mundo chico conservan su velocidad). Quedan la postura, los globos y la densidad, que son
+# EN LÍNEA: la conducta deja de tocar el MOVIMIENTO (los peatones conservan su velocidad). Quedan la postura, los globos y la densidad, que son
 # solo locales y visuales (nada viaja por la red ni cambia el modelo de la partida).
 #
-# Rendimiento: el estado de los agentes se recalcula cada PERIODO_ESTADOS frames (180 comparaciones) y solo si el Ambiente
-# cambió; la postura se revisa cada PERIODO_POSTURA frames para los actores dibujados (hasta 10); los candidatos a globo
-# son los actores de nivel A (hasta 10). Ver tests/humo_ambiente_npc.py para las cifras.
+# Rendimiento: el estado de los agentes se recalcula cada PERIODO_ESTADOS frames y solo si el Ambiente cambió; la postura
+# se revisa cada PERIODO_POSTURA frames para los peatones dibujados. Ver tests/humo_ambiente_npc.py para las cifras.
 
 import math
 import os
@@ -42,7 +39,7 @@ PERIODO_POSTURA = 4              # frames entre dos repasos de la postura de los
 PERIODO_REACTIVOS = 30           # frames entre dos repasos de los NPC clave
 RADIO_GLOBO = 16.0               # m de la cámara: más lejos nadie «habla» (no se leería)
 COS_GLOBO = 0.78                 # a menos de ~39 grados del eje de la cámara
-COS_VISTA = 0.6                  # a la vista para aparecer / desaparecer (como frontend/multitud.py)
+COS_VISTA = 0.6                  # a la vista para aparecer / desaparecer
 PESO_CHARLA = 3.0                # quien está charlando habla más
 SEMILLA_GLOBOS = 2026
 
@@ -125,30 +122,11 @@ def _crear_controlador(escena):
             self.densidad = _Densidad()
             self.factor = 1.0
             self.globos = None
-            self._estados_multitud = None        # EstadosNPC si la multitud no tiene ConductaConEstado
-            self._instalar_multitud()
             self._instalar_peatones()
             if globos_activos():
                 self._instalar_globos()
 
         # -- Instalación (una vez) --
-
-        def _instalar_multitud(self):
-            m = getattr(escena, "multitud", None)
-            if m is None:
-                return
-            if self.con_densidad:
-                m.densidad = self.densidad
-            if not self.conducta:
-                return
-            from backend.logica import multitud_conducta as cd
-            if type(m.conducta) is cd.Conducta:                     # la variante con estados sustituye a la base
-                nueva = ce.ConductaConEstado(m.agentes)
-                for i in m.conducta.activos:
-                    nueva.entrar(i, m._t)
-                m.conducta = nueva
-            if not isinstance(m.conducta, ce.ConductaConEstado):
-                self._estados_multitud = ce.EstadosNPC([a.semilla for a in m.agentes])
 
         def _instalar_peatones(self):
             p = getattr(escena, "peatones", None)
@@ -170,8 +148,7 @@ def _crear_controlador(escena):
                 azar = random.Random(SEMILLA_GLOBOS)
                 plan = gl.PlanificadorGlobos(gl.SelectorFrases(catalogo, azar), azar)
                 self.globos = GlobosNPC(self, plan)
-                m = getattr(escena, "multitud", None)               # las anclas de cabeza se crean ya (no al hablar)
-                cuerpos = list(m._actores) if m is not None else []
+                cuerpos = []                                        # las anclas de cabeza se crean ya (no al hablar)
                 if self._peatones is not None:
                     cuerpos += list(self._peatones.personajes)
                 for cuerpo in cuerpos:
@@ -201,7 +178,6 @@ def _crear_controlador(escena):
             yaw = math.radians(camera.world_rotation_y)
             vista = (camera.world_x, camera.world_z, math.sin(yaw), math.cos(yaw))
             candidatos = []
-            self._multitud(linea, vista, candidatos)
             if self._peatones is not None:
                 self._mundo_chico(dt, linea, vista, candidatos)
             if self.conducta and self._frame % PERIODO_REACTIVOS == 2:
@@ -214,50 +190,8 @@ def _crear_controlador(escena):
         def _fijar_estados(self, amb):
             if not self.conducta:
                 return
-            m = getattr(escena, "multitud", None)
-            if m is not None:
-                if isinstance(m.conducta, ce.ConductaConEstado):
-                    m.conducta.fijar_ambiente(amb)
-                elif self._estados_multitud is not None:
-                    self._estados_multitud.fijar_ambiente(amb)
             if self._peatones is not None:
                 self._estados_peatones.fijar_ambiente(amb)
-
-        def _estado_agente(self, m):
-            c = m.conducta
-            if isinstance(c, ce.ConductaConEstado):
-                return c.estado
-            return None if self._estados_multitud is None else self._estados_multitud.estado
-
-        # Multitud del mapa grande: postura de los actores de nivel A y candidatos a globo.
-        def _multitud(self, linea, vista, candidatos):
-            m = getattr(escena, "multitud", None)
-            if m is None:
-                return
-            c = m.conducta
-            con_estado = isinstance(c, ce.ConductaConEstado)
-            if con_estado:
-                c.modular = self.conducta and not linea
-            estados = self._estado_agente(m) if self.conducta else None
-            revisar = self._frame % PERIODO_POSTURA == 0
-            if not revisar and self.globos is None:
-                return
-            cx, cz, fx, fz = vista
-            recurso, actores, pos = m.asignador.recurso, m._actores, m._pos
-            for i in m._en_a:
-                actor = actores[recurso[i]]
-                estado = estados[i] if estados is not None else ce.NEUTRO
-                estado = getattr(actor, "_postura_forzada", None) or estado     # misiones visuales (rectificar_visual.py)
-                if revisar and estados is not None and npc_postura.estado_de(actor) != estado:
-                    npc_postura.aplicar(actor, estado)
-                if self.globos is not None:
-                    e = pos[i]
-                    if e is None:
-                        continue
-                    d = math.hypot(e[0] - cx, e[1] - cz)
-                    if d < RADIO_GLOBO and en_cono(e[0], e[1], cx, cz, fx, fz, COS_GLOBO):
-                        peso = PESO_CHARLA if con_estado and c.charla_hasta[i] > m._t else 1.0
-                        candidatos.append((("m", i), estado, d, peso, actor))
 
         # Peatones del mundo chico: estado -> postura, ritmo, paradas del celular, y `enabled` por densidad.
         def _mundo_chico(self, dt, linea, vista, candidatos):
@@ -306,16 +240,9 @@ def _crear_controlador(escena):
                     npc_postura.aplicar(cuerpo, estado)
 
         def estadisticas(self):
-            m = getattr(escena, "multitud", None)
-            cuenta = {}
-            if m is not None and self.conducta:
-                estados = self._estado_agente(m)
-                if estados is not None:
-                    for i in list(m._en_a) + list(m._en_b):
-                        cuenta[estados[i]] = cuenta.get(estados[i], 0) + 1
-            return {"factor": round(self.factor, 3), "estados_dibujados": cuenta,
+            return {"factor": round(self.factor, 3), "estados_dibujados": {},
                     "globos_mostrados": 0 if self.globos is None else self.globos.mostrados,
-                    "charlas": getattr(getattr(m, "conducta", None), "charlas", 0) if m is not None else 0}
+                    "charlas": 0}
 
     return ControladorAmbienteNPC(parent=escena)
 

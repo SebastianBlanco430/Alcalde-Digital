@@ -1,5 +1,7 @@
-# Multitud del mapa grande (Python puro: NO importa ursina ni panda3d). Circuitos CÍCLICOS de peatones sobre el grafo
-# de calles y becos del mundo grande, y la posición ANALÍTICA de cada agente en cada instante.
+# Núcleo de la multitud (Python puro: NO importa ursina ni panda3d). Circuitos CÍCLICOS de peatones sobre el grafo
+# de calles y becos de un mundo, y la posición ANALÍTICA de cada agente en cada instante. NOTA 2026-11-18: la multitud del
+# «mapa grande» (frontend/multitud.py) se borró; este módulo queda porque lo comparten la conducta por estados de los
+# peatones (conducta_estados.py, registro_ambiente_npc.py) y sus pruebas.
 #
 #   construir_grafo(mundo)                      grafo peatonal: lugares (plazas), cruces calle-beco y vértices de becos.
 #   crear_poblacion(mundo, cantidad, semilla)   Poblacion(rutas, agentes): rutas validadas contra mundo.es_transitable.
@@ -60,7 +62,7 @@ PESO_BECO_BASE = 0.12           # primer vértice de un beco a la altura de su c
 SUBIDA_BECO = 6.0               # m de subida sobre la calle que dividen a la mitad el peso (becos altos: menos gente)
 EXPONENTE_PESO = 0.6            # suaviza el sesgo al elegir el siguiente nodo del camino
 
-# Niveles de la multitud (ver frontend/multitud.py).
+# Niveles de la multitud.
 NIVEL_C, NIVEL_B, NIVEL_A = 0, 1, 2
 RADIO_A, HISTERESIS_A = 25.0, 4.0
 RADIO_B, HISTERESIS_B = 90.0, 8.0

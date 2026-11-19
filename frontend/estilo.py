@@ -132,3 +132,17 @@ def contraste(rgb_a, rgb_b):
         return 0.2126 * lineal[0] + 0.7152 * lineal[1] + 0.0722 * lineal[2]
     claro, oscuro = sorted((luminancia(rgb_a), luminancia(rgb_b)), reverse=True)
     return (claro + 0.05) / (oscuro + 0.05)
+
+
+# Tono LEGIBLE: el mismo color, oscurecido lo justo para que el contraste con `fondo` sea >= `minimo` (por defecto 4,5 de WCAG AA
+# para texto). Si ya lo cumple, se devuelve igual. Se usa en sellos y rótulos de color sobre papel (verde y rojo claros no llegan).
+def tono_legible(tono, fondo, minimo=4.5):
+    tono = tuple(int(v) for v in tono[:3])
+    if contraste(tono, fondo) >= minimo:
+        return tono
+    for paso in range(1, 40):
+        k = 1.0 - paso * 0.025
+        candidato = tuple(max(0, int(v * k)) for v in tono)
+        if contraste(candidato, fondo) >= minimo:
+            return candidato
+    return (0, 0, 0)

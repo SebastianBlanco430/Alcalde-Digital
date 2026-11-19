@@ -56,7 +56,7 @@ echo Actualizando pip dentro del entorno virtual...
 if errorlevel 1 goto :pip_fallo
 
 echo Instalando dependencias de requirements.txt dentro del entorno virtual...
-.\venv\Scripts\python.exe -m pip install -r requirements.txt
+.\venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-dev.txt
 if errorlevel 1 goto :deps_fallo
 
 echo ====================================================

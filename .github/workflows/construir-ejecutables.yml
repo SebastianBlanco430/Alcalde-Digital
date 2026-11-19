@@ -1,0 +1,121 @@
+# SIN PROBAR (solo el camino macOS arm64 se probo localmente). Ubicacion propuesta: .github/workflows/construir-ejecutables.yml
+# Construye UN archivo por sistema: Windows instalador .exe (Inno Setup, instala sin administrador), macOS .dmg (con .app dentro), Linux .AppImage.
+# Se lanza a mano (workflow_dispatch) o al subir una etiqueta v*. Con etiqueta crea un BORRADOR de Release (nadie lo ve hasta que el dueno lo publique).
+name: construir-ejecutables
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+jobs:
+  construir:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, etiqueta: Windows-x64 }
+          - { os: macos-latest, etiqueta: macOS-arm64 }
+          - { os: macos-15-intel, etiqueta: macOS-x64 }
+          - { os: ubuntu-latest, etiqueta: Linux-x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.14"
+      - name: Dependencias
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt "pyinstaller==6.22.3"
+      - name: Dependencias del sistema (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgl1 libopenal1 libx11-6 libfuse2 xvfb
+      # ---------- Windows: instalador .exe (PyInstaller onedir + Inno Setup 6.4.3 fijado) ----------
+      - name: Construir (Windows, onedir)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          ALCALDE_RAIZ="$PWD" ALCALDE_MODO=onedir pyinstaller --noconfirm --distpath dist --workpath work empaquetado/alcalde.spec
+          test -f dist/AlcaldeDigital/AlcaldeDigital.exe
+      - name: Instalar Inno Setup (version fijada)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # choco verifica el checksum incluido en el paquete; la version queda fijada.
+          choco install innosetup --version=6.4.3 --no-progress -y
+          if ($LASTEXITCODE -ne 0) { throw "choco install innosetup fallo" }
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { throw "No se encontro ISCC.exe" }
+      - name: Compilar instalador (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.0.0-dev' }
+          New-Item -ItemType Directory -Force salida | Out-Null
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DOrigen=$PWD\dist\AlcaldeDigital" "/DSalida=$PWD\salida" "/DVersion=$version" empaquetado\instalador_windows.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC fallo" }
+          if (-not (Test-Path salida\AlcaldeDigital-Setup-Windows.exe)) { throw "No se genero el instalador" }
+      - name: Probar instalacion y desinstalacion silenciosas (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'AD-prueba'
+          $p = Start-Process -FilePath "$PWD\salida\AlcaldeDigital-Setup-Windows.exe" -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=$dir" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "El instalador termino con codigo $($p.ExitCode)" }
+          if (-not (Test-Path "$dir\AlcaldeDigital.exe")) { throw "Falta AlcaldeDigital.exe tras instalar" }
+          if (-not (Test-Path "$dir\unins000.exe")) { throw "Falta el desinstalador" }
+          $u = Start-Process -FilePath "$dir\unins000.exe" -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -Wait -PassThru
+          if ($u.ExitCode -ne 0) { throw "El desinstalador termino con codigo $($u.ExitCode)" }
+      # ---------- macOS: .dmg con la .app firmada ad-hoc (no notarizada) ----------
+      - name: Construir (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          PYTHON=python SALIDA="$PWD/salida" bash empaquetado/construir_ejecutable.sh
+          mv salida/AlcaldeDigital-macOS-*.dmg "salida/AlcaldeDigital-${{ matrix.etiqueta }}.dmg"
+          rm -f salida/*.sha256
+      # ---------- Linux: AppImage (un archivo con permiso de ejecucion incluido en el propio formato) ----------
+      - name: Construir (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          ALCALDE_RAIZ="$PWD" ALCALDE_MODO=onedir pyinstaller --noconfirm --distpath dist --workpath work empaquetado/alcalde.spec
+          mkdir -p AppDir/usr/bin && cp -R dist/AlcaldeDigital/. AppDir/usr/bin/
+          printf '#!/bin/sh\nHERE="$(dirname "$(readlink -f "$0")")"\nexec "$HERE/usr/bin/AlcaldeDigital" "$@"\n' > AppDir/AppRun && chmod +x AppDir/AppRun
+          printf '[Desktop Entry]\nType=Application\nName=Alcalde Digital\nExec=AlcaldeDigital\nIcon=alcalde\nCategories=Game;\n' > AppDir/alcalde.desktop
+          python -c "import struct,zlib;w=h=64;raw=b''.join(b'\x00'+b'\xff\xd5\x2a'*w for _ in range(h));c=lambda t,d:struct.pack('>I',len(d))+t+d+struct.pack('>I',zlib.crc32(t+d));open('AppDir/alcalde.png','wb').write(b'\x89PNG\r\n\x1a\n'+c(b'IHDR',struct.pack('>IIBBBBB',w,h,8,2,0,0,0))+c(b'IDAT',zlib.compress(raw))+c(b'IEND',b''))"
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          # SHA-256 de appimagetool-x86_64.AppImage 1.9.1 (calculado al descargar la release; verificar antes de dar permisos)
+          echo "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  appimagetool" | sha256sum -c -
+          chmod +x appimagetool
+          mkdir salida && ARCH=x86_64 ./appimagetool --appimage-extract-and-run AppDir "salida/AlcaldeDigital-${{ matrix.etiqueta }}.AppImage"
+      - name: SHA-256
+        shell: bash
+        run: |
+          cd salida
+          for f in *; do if command -v sha256sum >/dev/null; then sha256sum "$f"; else shasum -a 256 "$f"; fi; done | tee SHA256-${{ matrix.etiqueta }}.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: AlcaldeDigital-${{ matrix.etiqueta }}
+          path: salida/*
+          if-no-files-found: error
+  publicar:
+    # Solo con etiqueta v*. Unico job con permiso de escritura. Crea un borrador; el dueno lo revisa y lo publica a mano.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: construir
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: entrega
+          merge-multiple: true
+      - name: Borrador de Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd entrega
+          cat SHA256-*.txt > SHA256.txt && rm SHA256-*.txt
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --title "Alcalde Digital $GITHUB_REF_NAME" --notes "Un archivo por sistema (Windows: instalador .exe; macOS: .dmg; Linux: .AppImage). Verifica con SHA256.txt." *

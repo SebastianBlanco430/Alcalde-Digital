@@ -14,6 +14,7 @@ from ursina import Entity, Text, color
 
 from frontend import estilo, tipografia
 from frontend.componentes import a_unidades, escala_fuente, modelo_redondeado, rgb
+from frontend.minijuegos.limite_texto import MAX_PREDETERMINADO, limitar_texto
 from frontend.texto import envolver_texto
 
 ANCHO = 16 / 9
@@ -42,10 +43,11 @@ def medir(cadena, px, negrita=False):
     return nodo.calcWidth(cadena) * a_unidades(px)
 
 
-def lineas_de(texto, px, ancho, negrita=False):
-    """Texto envuelto a `ancho` unidades: lista de líneas (respeta los saltos de línea del original)."""
+def lineas_de(texto, px, ancho, negrita=False, maximo=MAX_PREDETERMINADO):
+    """Texto envuelto a `ancho` unidades: lista de líneas (respeta los saltos de línea del original). Límite de `maximo`
+    caracteres y sin «<» ni «>» (datos de partidas en línea)."""
     salida = []
-    for parrafo in str(texto).split("\n"):
+    for parrafo in limitar_texto(texto, maximo).split("\n"):
         salida += envolver_texto(parrafo, lambda c: medir(c, px, negrita), ancho) or [""]
     return salida
 
@@ -61,11 +63,11 @@ def alto_de(n_lineas, px):
 
 
 def texto(parent, cadena, px=18, ancho=None, tono=None, posicion=(0, 0), origen=(-0.5, 0.5), negrita=False,
-          centrado=False):
+          centrado=False, maximo=MAX_PREDETERMINADO):
     """Text envuelto a `ancho`. `posicion` es la esquina superior izquierda (origen por defecto). Devuelve el Text con
     `.n_lineas` y `.alto`."""
-    cadena = str(cadena)
-    lineas = lineas_de(cadena, px, ancho, negrita) if ancho else cadena.split("\n")
+    cadena = limitar_texto(cadena, maximo)
+    lineas = lineas_de(cadena, px, ancho, negrita, maximo) if ancho else cadena.split("\n")
     entidad = Text("\n".join(lineas), parent=parent, origin=(0, 0.5) if centrado else origen,
                    position=(posicion[0], posicion[1], Z_TEXTO), scale=escala_fuente(px),
                    color=rgb(tono or estilo.COLOR_TEXTO), font=tipografia.FUENTE_TITULO if negrita else tipografia.FUENTE_TEXTO)
@@ -262,3 +264,77 @@ class Barra(Entity):
         self.relleno.scale_x = max(0.0001, (self.ancho - a_unidades(4)) * fraccion)
         self.relleno.x = -self.ancho / 2 + a_unidades(2)
         self.relleno.color = rgb(tono or self.tono)
+
+
+class BotonTinta(Boton):
+    """Botón SECUNDARIO de tinta (T3): relleno de papel, borde de tinta de 3 px, sombra dura (4, -5) y texto de tinta. El amarillo
+    queda para la acción primaria (Boton con primario=True). Misma interfaz que Boton (al_clic, fijar_foco, fijar_habilitado,
+    fijar_etiqueta, habilitado, texto, fondo, borde): se puede cambiar un Boton por un BotonTinta sin tocar a quien lo usa.
+    Foco: borde amarillo más grueso Y el marcador «>>» (nunca solo color). Hover: la sombra se encoge."""
+
+    PAPEL = estilo.PAPEL
+    PAPEL_HOVER = (255, 240, 190)
+    PAPEL_APAGADO = (206, 200, 186)
+    TEXTO_APAGADO = (104, 94, 84)
+
+    def __init__(self, etiqueta, al_clic, ancho=0.3, alto=0.09, px=19, **opciones):
+        opciones.pop("primario", None)
+        self._hover = False
+        super().__init__(etiqueta, al_clic, ancho, alto, px, False, **opciones)
+        dx, dy = estilo.DESPLAZAMIENTO_SOMBRA_PX
+        self._desp_sombra = (a_unidades(dx), a_unidades(dy))
+        self.sombra = Entity(parent=self, model=modelo_redondeado(ancho + a_unidades(6), alto + a_unidades(6), 8),
+                             scale=(ancho + a_unidades(6), alto + a_unidades(6)), color=color.rgba32(*estilo.TINTA, estilo.ALFA_SOMBRA),
+                             position=(self._desp_sombra[0], self._desp_sombra[1], 0.0045))
+        self.fijar_foco(self._foco)
+
+    def _entra(self):
+        if not self.is_empty() and self.habilitado:
+            self._hover = True
+            self.fijar_foco(self._foco)
+
+    def _sale(self):
+        if not self.is_empty():
+            self._hover = False
+            self.fijar_foco(self._foco)
+
+    def fijar_foco(self, valor):
+        self._foco = bool(valor)
+        if self.is_empty():
+            return
+        if not self.habilitado:
+            self.fondo.color = rgb(self.PAPEL_APAGADO)
+            self.texto.color = rgb(self.TEXTO_APAGADO)
+        else:
+            self.fondo.color = rgb(self.PAPEL_HOVER if self._hover else self.PAPEL)
+            self.texto.color = rgb(estilo.TINTA)
+        extra = a_unidades(6 if self._foco else estilo.GROSOR_BORDE_PX)
+        if getattr(self, "_foco_pintado", None) != self._foco:
+            self._foco_pintado = self._foco
+            self.borde.model = modelo_redondeado(self.ancho + 2 * extra, self.alto + 2 * extra, 9)
+            self.borde.scale = (self.ancho + 2 * extra, self.alto + 2 * extra)
+        self.borde.color = rgb(COLOR_FOCO if self._foco else estilo.TINTA)
+        sombra = getattr(self, "sombra", None)
+        if sombra is not None:
+            k = 0.5 if self._hover and self.habilitado else 1.0
+            sombra.position = (self._desp_sombra[0] * k, self._desp_sombra[1] * k, 0.0045)
+        self.texto.text = (">> " + self._etiqueta) if self._foco else self._etiqueta
+
+
+class BotonTintaPrimario(BotonTinta):
+    """Variante PRIMARIA de BotonTinta: mismo borde de tinta de 3 px y sombra dura (4, -5), pero relleno amarillo de acción
+    principal y esquinas de 6 px. No cambia BotonTinta. El foco se ve en el borde grueso de TINTA (el amarillo del foco
+    se confundiría con el relleno)."""
+
+    PAPEL = estilo.COLOR_ACENTO
+    PAPEL_HOVER = (255, 232, 110)
+
+    def __init__(self, etiqueta, al_clic, ancho=0.3, alto=0.09, px=19, **opciones):
+        super().__init__(etiqueta, al_clic, ancho, alto, px, **opciones)
+        self.primario = True
+        self.fondo.model = modelo_redondeado(ancho, alto, 6)
+
+    def fijar_foco(self, valor):
+        super().fijar_foco(valor)
+        if not self.is_empty():
+            self.borde.color = rgb(estilo.TINTA)

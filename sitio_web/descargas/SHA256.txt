@@ -1,2 +1,1 @@
-3e0c22077b0676009f01ced8a09eec486fef430a32b76c282e8efbf12dd68029  AlcaldeDigital-Windows.zip
-94517a62316ccd29e5cfeffda1fe616ab8e6276569587a6df02e0dae4946eb9d  AlcaldeDigital-macOS-Linux.zip
+7b8e62db5afdff2a956a8117682474ee3953eb72a0bfe4dc2e7d6239b3ed9c41  AlcaldeDigital-macOS.dmg
