@@ -1,6 +1,6 @@
 # Alcalde Digital 🏛️
 
-**Alcalde Digital** es un juego 3D educativo sobre la **desinformación** y el uso responsable de las redes sociales, ambientado en una favela brasileña en ladera. Recorre la ciudad, verifica rumores y decide qué compartir y qué reportar antes de que sus habitantes voten por su alcalde.
+**Alcalde Digital** es un juego 3D educativo sobre la **desinformación** y el uso responsable de las redes sociales, ambientado en una favela brasileña. Recorre la ciudad, verifica rumores y decide qué compartir y qué reportar antes de que sus habitantes voten por su alcalde.
 
 
 ---
