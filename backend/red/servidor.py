@@ -45,7 +45,7 @@ def construir_anfitrion(puerto=0, ambito="lan", semilla=SEMILLA_CASAS, abierto=F
         escala_mundo=ESCALA_MUNDO, punto_interaccion=mundo.punto_interaccion,
         radio_interaccion=RADIO_INTERACCION, **{"consecuencias": True, **(partida_opciones or {})})
     recta_final.preparar_coop(partida)        # recta final en el anfitrión (ALCALDE_SIN_RECTA_FINAL=1 la apaga)
-    h_mundo, h_contenido = calcular_huellas(mundo, semilla, catalogo)
+    h_mundo, h_contenido = calcular_huellas(mundo, semilla, catalogo, vehiculos=opciones.get("vehiculos"))
     return Anfitrion(partida, mundo, semilla, codigo, h_mundo, h_contenido, ambito=ambito,
                      puerto=puerto, abierto=abierto, **opciones)
 
@@ -86,6 +86,14 @@ def _confirmar_abierto():
         return False
 
 
+def _terminada_y_vacia(anfitrion):
+    try:
+        estado = anfitrion.estado()
+    except Exception:          # noqa: BLE001
+        return False
+    return estado.get("fase") == "fin" and not estado.get("conexiones")
+
+
 def main(argv=None):
     args = _leer_argumentos(argv)
     abierto = args.ambito == "abierto"
@@ -94,6 +102,7 @@ def main(argv=None):
         return 1
     try:
         anfitrion = construir_anfitrion(
+            partida_opciones={"anfitrion_cierra": False},      # NET-001: aquí nadie es «el anfitrión» que cierra
             puerto=args.puerto, ambito=args.ambito, semilla=args.semilla, abierto=abierto,
             exigir_anfitrion_local=not args.primero_cualquiera, auto_iniciar=not args.sin_auto_iniciar,
             vehiculos=_vehiculos_online() and not args.sin_vehiculos,
@@ -126,7 +135,9 @@ def main(argv=None):
     threading.Thread(target=leer_ordenes, name="alcalde-servidor-ordenes", daemon=True).start()
     try:
         while anfitrion.activo() and not terminar.wait(0.5):
-            pass
+            if _terminada_y_vacia(anfitrion):            # NET-002: tras el fin y sin nadie dentro, se apaga solo
+                print("La partida terminó y no queda nadie conectado.")
+                break
     except KeyboardInterrupt:
         pass
     finally:

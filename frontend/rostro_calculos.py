@@ -20,6 +20,7 @@
 #   bandas:   False para color plano sin bandas de luz, opcional
 #   detalle:  (segmentos, anillos) de la malla en vez de los que da malla_calculos.detalle_para, opcional
 
+from frontend import tinta_calculos as _tinta   # T1: fuente única del grosor de tinta
 import math
 
 HUESO_CABEZA = "DEF-spine.006"
@@ -33,8 +34,8 @@ MARGEN_VOLUMEN = 0.06                      # m: lo que una pieza puede sobresali
 
 CONTORNO_ESCALA = 1.07                     # (heredado) el casco negro era un 7 % mayor
 CONTORNO_COLOR = (0.07, 0.078, 0.125)      # TINTA (18, 20, 32) / 255, el mismo color de tinta de todo el juego
-GROSOR_CONTORNO = 0.0095                   # m: casco de tinta del pelo, la gorra y los accesorios grandes
-GROSOR_CONTORNO_FINO = 0.0045              # m: accesorios pequeños
+GROSOR_CONTORNO = _tinta.grosor("rostro")                    # m: casco de tinta del pelo, la gorra y los accesorios grandes
+GROSOR_CONTORNO_FINO = _tinta.grosor("rostro_fino")               # m: accesorios pequeños
 
 BLANCO_OJO = (0.98, 0.97, 0.93)
 NEGRO_PUPILA = (0.04, 0.035, 0.05)

@@ -58,13 +58,18 @@ venv\Scripts\python main.py
 | Tecla | Acción |
 |---|---|
 | `W` `A` `S` `D` / Ratón | Moverse y mover la cámara |
-| `E` | Entrar, comprar y trabajar |
+| `Shift` | Correr (en vehículo: caballito) |
+| `Ctrl` | Turbo (en vehículo) |
+| `Espacio` | Saltar (en vehículo: frenar) |
+| `E` | Entrar, montar, comprar y trabajar |
 | `Tab` | Teléfono (misiones y novedades) |
-| `N` / `M` | Mapa grande / mostrar u ocultar la ruta |
-| `B` | Significado de las pulseras |
+| `M` | Seguir la misión (mostrar u ocultar la ruta) |
+| `N` | Mapa (el minimapa en grande; `N` o `Esc` lo cierran) |
 | `L` | Bandeja de Civitas |
 | `K` | Dilemas |
-| `Esc` | Pausa y «Cómo se juega» |
+| `B` | Significado de las pulseras |
+| `I` | Mochila |
+| `Esc` | Pausa (ahí está también esta lista) |
 
 También se puede jugar con **mando**.
 

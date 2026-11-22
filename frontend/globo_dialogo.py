@@ -24,6 +24,11 @@ Y_BAJO_TITULO = -0.07           # borde de arriba del texto bajo el título
 PX_BAJO_TITULO = 22
 MAX_LINEAS = 4
 
+# M3.4 (ALCALDE_HUD_TAMANOS): subtítulos más grandes (el bocadillo ya es de papel opaco).
+from frontend import hud_tamanos_calculos as _ht  # noqa: E402
+if _ht.activo():
+    PX_TEXTO, PX_BAJO_TITULO = _ht.PX_SUBTITULO, _ht.PX_SUBTITULO_BAJO_TITULO
+
 
 def _partir(texto_entidad, cadena, ancho):
     from frontend import hud as hud_mod

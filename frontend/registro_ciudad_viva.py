@@ -8,12 +8,14 @@
 #   CIUDAD_VIVA            / ALCALDE_CIUDAD_VIVA=0            nada de esto: la ciudad queda exactamente como antes
 #   CIUDAD_VIVA_ATMOSFERA  / ALCALDE_CIUDAD_VIVA_ATMOSFERA=0  sin cambios de luz, cielo ni niebla
 #   CIUDAD_VIVA_CAPAS      / ALCALDE_CIUDAD_VIVA_CAPAS=0      sin objetos que aparecen y desaparecen
+#   COLOR_SALUD            / ALCALDE_COLOR_SALUD=0            sin escala de color del mundo por salud (M2 plan ambiente)
 import os
 import sys
 
 CIUDAD_VIVA = True
 CIUDAD_VIVA_ATMOSFERA = True
 CIUDAD_VIVA_CAPAS = True
+COLOR_SALUD = False             # M2 plan ambiente: escala de color del mundo por salud. APAGADA: no llega a las Entity (ver ciudad_viva)
 
 
 def _bandera(nombre, constante):
@@ -37,6 +39,10 @@ def capas_activas():
     return _bandera("ALCALDE_CIUDAD_VIVA_CAPAS", CIUDAD_VIVA_CAPAS)
 
 
+def color_salud_activo():
+    return _bandera("ALCALDE_COLOR_SALUD", COLOR_SALUD)
+
+
 def registrar(gestor, conexion, escena_mundo):
     if not activo():
         return None
@@ -45,7 +51,8 @@ def registrar(gestor, conexion, escena_mundo):
         return None
     try:
         from frontend.ciudad_viva import crear_controlador
-        controlador = crear_controlador(escena_mundo, atmosfera=con_atm, capas=con_capas)
+        controlador = crear_controlador(escena_mundo, atmosfera=con_atm, capas=con_capas,
+                                        color_salud=color_salud_activo())
         conexion.ciudad_viva = controlador
         return controlador
     except Exception as error:

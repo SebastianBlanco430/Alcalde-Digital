@@ -27,6 +27,7 @@ import sys
 from backend.logica import ambiente_ciudad as ac
 from backend.logica import conducta_estados as ce
 from backend.logica import globos as gl
+from frontend import npc_reaccion_calculos as nr
 from backend.logica import multitud_calculos as mc
 from frontend import ambiente_vivo
 
@@ -125,6 +126,7 @@ def _crear_controlador(escena):
             self._instalar_peatones()
             if globos_activos():
                 self._instalar_globos()
+            self._instalar_reacciones()
 
         # -- Instalación (una vez) --
 
@@ -140,6 +142,69 @@ def _crear_controlador(escena):
             self._velocidad_base = [c.velocidad for c in p.caminantes]
             self._ritmo_peatones = [1.0] * n
             self._semilla_parada = [1000 + k for k in range(n)]
+
+        # M8 (ALCALDE_NPC_REACCION): la gente reacciona al jugador y comenta el cambio de nivel.
+        def _instalar_reacciones(self):
+            self.reacciones = None
+            self._temporales = {}                 # k -> (fin, rumbo, postura forzada puesta por nosotros o None)
+            if not nr.activo() or self._peatones is None or self.globos is None:
+                return
+            try:
+                import json
+                with open(gl.RUTA_FRASES, encoding="utf-8") as archivo:
+                    self._textos_reaccion = json.load(archivo)
+                self.reacciones = nr.ReaccionesNPC()
+                self._evento_visto = ambiente_vivo.ultimo_evento()[0] if hasattr(ambiente_vivo, "ultimo_evento") else None
+                self._dichos = 0
+            except Exception as error:
+                _aviso(f"reacciones no instaladas ({type(error).__name__}: {error})")
+                self.reacciones = None
+
+        def _reaccionar(self, dt, amb, candidatos):
+            jugador = escena.flujo.jugador_activo() if escena.flujo is not None else None
+            if jugador is None or escena.en_pausa or escena._cinematica:
+                return
+            p = self._peatones
+            pos = (jugador.x, jugador.z)
+            npcs = [(k, c.x, c.z) for k, (c, pers) in enumerate(zip(p.caminantes, p.personajes)) if pers.enabled]
+            ya = {c[0] for c in candidatos}
+            for k, tipo in self.reacciones.actualizar(dt, npcs, pos, amb.nivel):
+                caminante, personaje = p.caminantes[k], p.personajes[k]
+                rumbo = nr.yaw_hacia((caminante.x, caminante.z), pos, alejarse=(tipo == nr.ESPALDA))
+                caminante._espera = max(getattr(caminante, "_espera", 0.0), nr.DURACION)
+                forzada = None
+                if tipo == nr.CELULAR and getattr(personaje, "_postura_forzada", None) is None:
+                    personaje._postura_forzada = forzada = ce.CELULAR
+                    npc_postura.aplicar(personaje, ce.CELULAR)
+                self._temporales[k] = (self._t + nr.DURACION, rumbo, forzada)
+                self._decir(("p", k), nr.elegir_frase(self._textos_reaccion, nr.grupo_frases(tipo), k, self._dichos),
+                            personaje, caminante, pos, candidatos, ya)
+            if hasattr(ambiente_vivo, "ultimo_evento"):
+                contador, evento = ambiente_vivo.ultimo_evento()
+                if contador != self._evento_visto:
+                    self._evento_visto = contador
+                    if evento is not None:
+                        for k in nr.comentan_cambio(npcs, pos):
+                            texto = nr.elegir_frase(self._textos_reaccion, nr.grupo_cambio(evento.direccion), k, self._dichos)
+                            self._decir(("p", k), texto, p.personajes[k], p.caminantes[k], pos, candidatos, ya)
+            for k, (fin, rumbo, forzada) in list(self._temporales.items()):
+                personaje = p.personajes[k]
+                if self._t >= fin:
+                    if forzada is not None and getattr(personaje, "_postura_forzada", None) == forzada:
+                        personaje._postura_forzada = None
+                    del self._temporales[k]
+                    continue
+                personaje.mirar_hacia(rumbo)
+                personaje.girar(dt)
+
+        def _decir(self, clave, texto, personaje, caminante, pos, candidatos, ya):
+            if not texto or self.globos.plan.forzar(clave, texto) is None:
+                return
+            self._dichos += 1
+            if clave not in ya:                    # el globo necesita al NPC entre los candidatos de este frame
+                d = math.hypot(caminante.x - pos[0], caminante.z - pos[1])
+                candidatos.append((clave, ce.NEUTRO, d, 1.0, personaje))
+                ya.add(clave)
 
         def _instalar_globos(self):
             try:
@@ -182,6 +247,8 @@ def _crear_controlador(escena):
                 self._mundo_chico(dt, linea, vista, candidatos)
             if self.conducta and self._frame % PERIODO_REACTIVOS == 2:
                 self._reactivos(amb)
+            if self.reacciones is not None and self._peatones is not None:
+                self._reaccionar(dt, amb, candidatos)
             if self.globos is not None:
                 if escena.en_pausa or escena._cinematica:
                     candidatos = []

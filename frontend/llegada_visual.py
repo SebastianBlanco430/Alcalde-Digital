@@ -105,6 +105,7 @@ class VigiaLlegada(Entity):
         self._vibrar(dt, reducir)
         self._pintar_columna(mision, estado, reducir)
         self._pintar_vecinos(mision, estado, dt)
+        self._apartar_globos_del_hud()
         # Al pulsar E (EN_RADIO -> EN_MINIJUEGO) el teléfono se acerca a la cámara durante el fundido.
         if self._estado_previo == "en_radio" and estado == "en_minijuego":
             self._t_telefono = 0.0
@@ -247,6 +248,55 @@ class VigiaLlegada(Entity):
                 globo.enabled = True
         for globo in self.globos[len(elegidos):]:
             globo.enabled = False
+
+    # Cierre (punto 3): ningún globo queda bajo el panel de misión ni los otros bloques de arriba del HUD.
+    def _apartar_globos_del_hud(self):
+        if not calc.globos_sin_hud_activo():
+            return
+        from panda3d.core import LVecBase4f, Point3
+        from ursina import application, window
+        lente = camera.lens
+        matriz = lente.getProjectionMat()
+        nodo_cam = application.base.cam
+        ancho_px, alto_px = (int(v) for v in window.size)
+        if alto_px <= 0:
+            return
+        aspecto = ancho_px / alto_px
+        clave = (ancho_px, alto_px)
+        if getattr(self, "_clave_obstaculos", None) != clave:
+            self._clave_obstaculos = clave
+            from frontend import hud_esquinas_calculos as he
+            self._obstaculos = calc.obstaculos_hud(ancho_px, alto_px)
+            self._piso = he.zona_segura(ancho_px, alto_px).y0
+        for globo in self.globos:
+            if not globo.enabled:
+                continue
+            globo.position = (0, 0.35, 0)              # siempre desde la posición de base: sin acumular
+            fondo = globo.background_entity
+            # El globo es billboard: en el espacio de la cámara es un rectángulo de frente (y-up-left: z = profundidad).
+            c = nodo_cam.getRelativePoint(fondo, Point3(0, 0, 0))
+            w, h = abs(fondo.world_scale_x), abs(fondo.world_scale_y)
+            if c.z <= 0.05:
+                globo.visible = True
+                continue
+            film = []
+            for sx, sy in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
+                v = matriz.xform(LVecBase4f(c.x + sx * w / 2, c.y + sy * h / 2, c.z, 1.0))
+                if v[3] <= 1e-6:
+                    break
+                film.append((v[0] / v[3], v[1] / v[3]))
+            if len(film) < 4:
+                globo.visible = True
+                continue
+            rect = calc.rect_desde_film(film, aspecto)
+            dy = calc.bajada_globo(rect, self._obstaculos, self._piso)
+            metros = None if dy is None else dy * calc.metros_por_unidad_ui(c.z, lente.getFov()[1]) * calc.MARGEN_INCLINACION
+            if metros is None or metros > calc.MAX_BAJADA_M:
+                globo.visible = False
+                continue
+            globo.visible = True
+            if metros > 0:
+                globo.world_y = globo.world_y - metros
 
     def _soltar_vecinos(self, esconder=True):
         for npc in self._vecinos:

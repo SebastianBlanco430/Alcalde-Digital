@@ -19,13 +19,14 @@ from ursina import Entity, color, destroy, time
 
 from frontend import contorno_calculos as cc
 from frontend import estilo, geometria_mundo, poses
+from frontend import toon_duro
 from frontend import rostro_animacion_calculos as ra
 from frontend import rostro_calculos as rc
 from frontend.componentes import rgb
 from frontend import sombra_calculos as sc
 from frontend.rostro_modelo import colocar_rostro_procedural
 from frontend.sombra_contacto import SombraContacto, crear_aro
-from frontend.piezas import COLOR_MARCADOR, COLOR_PIEL, etiqueta, limitar_etiqueta, silenciar
+from frontend.piezas import COLOR_MARCADOR, COLOR_PIEL, etiqueta, limitar_etiqueta, modo_etiqueta_jugador, silenciar
 from frontend.piezas import malla_unida as _malla_unida_base
 
 CONTORNO_ACTIVO = True            # contorno de tinta (casco invertido) en cada pieza del muñeco
@@ -44,6 +45,7 @@ COLOR_ZAPATO = color.rgb32(30, 30, 36)
 # nombre y firma que piezas.malla_unida, así no hizo falta tocarlo.
 def malla_unida(padre, piezas, **opciones):
     soporte = _malla_unida_base(padre, piezas, **opciones)
+    toon_duro.aplicar_pieza(soporte)        # T5: lit-toon duro en vez del lit_with_shadows (no-op con la bandera apagada)
     if CONTORNO_ACTIVO:
         try:
             casco_piezas = []
@@ -59,6 +61,13 @@ def malla_unida(padre, piezas, **opciones):
             casco.setTextureOff(1)
         except Exception as error:          # el contorno es adorno: nunca debe impedir crear al personaje
             print(f"[assets] contorno de tinta no disponible ({error})")
+    return soporte
+
+
+# Detalle de ropa sin casco propio (cinturón, raya, emblema): con el mismo sombreado que el cuerpo (T5).
+def _detalle(padre, piezas):
+    soporte = _malla_unida_base(padre, piezas)
+    toon_duro.aplicar_pieza(soporte)
     return soporte
 
 
@@ -185,16 +194,16 @@ class Personaje(Entity):
         puno = color.rgb32(235, 232, 220)
         oscuro = color.rgb32(38, 32, 34)
         # sin casco propio: el contorno de la pieza grande que los lleva ya los rodea (y son menos dibujos)
-        _malla_unida_base(self.pivotes["pelvis"], [
+        _detalle(self.pivotes["pelvis"], [
             dict(model="cube", color=oscuro, position=(0, 0.072, 0), scale=(0.375, 0.05, 0.215)),
             dict(model="cube", color=color.rgb32(250, 205, 70), position=(0, 0.072, 0.108), scale=(0.07, 0.042, 0.02)),
         ])
         if rasgos == "ciudadano":     # raya blanca en el pecho
-            _malla_unida_base(self.pivotes["torso"], [
+            _detalle(self.pivotes["torso"], [
                 dict(model="cube", color=puno, position=(0, 0.32, 0), scale=(0.43, 0.055, 0.25))])
         elif rasgos == "influencer":  # emblema de corazón en el pecho: dos lóbulos y una punta
             rosa = color.rgb32(255, 245, 250)
-            _malla_unida_base(self.pivotes["torso"], [
+            _detalle(self.pivotes["torso"], [
                 dict(model="sphere", color=rosa, position=(-0.032, 0.33, 0.121), scale=0.06),
                 dict(model="sphere", color=rosa, position=(0.032, 0.33, 0.121), scale=0.06),
                 dict(model="cube", color=rosa, position=(0, 0.305, 0.121), scale=(0.05, 0.05, 0.012)),
@@ -310,6 +319,7 @@ class Personaje(Entity):
         self.aro.enabled = activo
         self.etiqueta.color = COLOR_MARCADOR if activo else rgb(estilo.COLOR_TEXTO)
         self.etiqueta.y = self._y_etiqueta()
+        modo_etiqueta_jugador(self.etiqueta, activo)   # M1.1: sin el nombre propio; los demás, al 60 % y con fundido
 
     def esta_resaltado(self):
         return self._activo

@@ -28,6 +28,7 @@ PIE_RESULTADO = "E / Intro: continuar"
 AVISO_RETARDO = "Lo que elijas puede traer consecuencias en uno o dos días."
 SIN_CAMBIOS = "casi nada cambia a la vista"
 CHIP_PENDIENTE = "K  ·  Mensaje sin responder"
+SIN_PENDIENTES = "No hay dilemas pendientes"           # VIS-007: K sin nada que responder
 
 
 def cuantia(valor):

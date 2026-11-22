@@ -23,7 +23,10 @@ def construir_mundo_activo(semilla):
 def _construir(semilla):
     from backend.datos import cache_mundo
     from backend.datos.ciudad_3d import construir_mundo_3d
-    return cache_mundo.construir_con_cache("chico", semilla, lambda: construir_mundo_3d(semilla=semilla))
+    from backend.logica import feria
+    # La feria alargada (ALCALDE_PUESTOS_FIJOS) cambia la zona y las casas de alrededor: otro archivo de caché.
+    nombre = "chico_feria" if feria.puestos_fijos_activo() else "chico"
+    return cache_mundo.construir_con_cache(nombre, semilla, lambda: construir_mundo_3d(semilla=semilla))
 
 
 def catalogo_misiones(mundo, con_game_state=False):

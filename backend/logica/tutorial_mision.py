@@ -58,9 +58,15 @@ SEGUNDOS_CAMARA = 2.5
 # ---------------------------------------------------------------- banderas
 
 def activo():
-    """¿Hay tutoriales de misión? Bandera propia + la maestra de las misiones visuales."""
-    from frontend import banderas_visuales as bv
-    return bv.activa(TUTORIAL_MISION, VARIABLE)
+    """¿Está encendida la bandera PROPIA de los tutoriales de misión? (ALCALDE_TUTORIAL_MISION manda sobre la constante.)
+    ARQ-004: backend/ no importa frontend; la bandera maestra de las misiones visuales la suma el controlador
+    (frontend/registro_tutorial_mision.activo)."""
+    valor = os.environ.get(VARIABLE, "").strip().lower()
+    if valor in ("0", "false", "no", "off"):
+        return False
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    return bool(TUTORIAL_MISION)
 
 
 def forzar():
@@ -249,14 +255,5 @@ def rotulo_progreso(etapa, total=3):
 
 # ---------------------------------------------------------------- línea de tiempo
 
-def construir_linea(pasos, ejecutor, al_terminar=None):
-    """LineaDeTiempo (frontend/cinematica) con un tramo por paso. `ejecutor` implementa, por acción, un método con su nombre
-    (bocadillo(paso, i), mover(paso, i), tecla(paso, i), esperar(paso, i), error_demo(paso, i), turno_jugador(paso, i),
-    camara(paso, i)) que se llama al EMPEZAR el tramo. El turno del jugador dura «infinito»: se cierra con linea.saltar()."""
-    from frontend.cinematica import LineaDeTiempo, Tramo
-    tramos = []
-    for i, paso in enumerate(pasos):
-        metodo = getattr(ejecutor, paso["accion"])
-        tramos.append(Tramo(f"{i}:{paso['accion']}", duracion_paso(paso),
-                            al_empezar=lambda m=metodo, p=paso, n=i: m(p, n)))
-    return LineaDeTiempo(tramos, al_terminar=al_terminar)
+# ARQ-004: construir_linea (la LineaDeTiempo de frontend/cinematica con un tramo por paso) vive ahora en quien la usa,
+# frontend/tutorial_mision_vista.construir_linea: backend/ no importa frontend.

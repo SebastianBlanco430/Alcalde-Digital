@@ -336,3 +336,92 @@ def objetivo_altura_parkour(y_jugador, alto_soporte, en_aire, y_apoyo,
 # Un paso del suavizado exponencial hacia `objetivo` (independiente de los fps).
 def suavizar_altura(actual, objetivo, dt, rapidez):
     return actual + (objetivo - actual) * (1 - math.exp(-rapidez * max(0.0, dt)))
+
+
+# -- Protección contra el suelo continua (R1 retoques) --
+# Antes, al bajar una ladera con el pitch al mínimo, el tramo pivote -> cámara cortaba la ladera de atrás y
+# distancia_libre_de_suelo acortaba la distancia por escalones de `paso` m; con el suavizado asimétrico (adentro al
+# instante, afuera lento) eso era un diente de sierra: la cámara temblaba. Con la bandera la protección sube el PITCH
+# EFECTIVO (el menor que deja el tramo libre, por bisección: continuo) con suavizado en ambos sentidos; la distancia
+# solo la acortan las paredes (igual que antes). El pitch que pide el jugador no se toca.
+# CAMARA_SUELO_SUAVE = False (o ALCALDE_CAMARA_SUELO_SUAVE=0) deja la protección de antes.
+CAMARA_SUELO_SUAVE = True
+MARGEN_SUELO = 0.4             # m que el tramo pivote -> cámara deja sobre el suelo (el de distancia_libre_de_suelo)
+MARGEN_SUELO_CAMARA = 0.3      # m mínimos de la cámara sobre el suelo bajo ella (red de seguridad)
+PITCH_TOPE_SUELO = 80.0        # grados: lo más que la protección levanta la cámara
+RAPIDEZ_PITCH_SUBIR = 20.0     # el pitch efectivo sube rápido (librar la ladera) ...
+RAPIDEZ_PITCH_BAJAR = 6.0      # ... y vuelve al pedido sin saltos
+ITERACIONES_PITCH = 14
+
+
+def camara_suelo_suave_activa():
+    import os
+    valor = os.environ.get("ALCALDE_CAMARA_SUELO_SUAVE", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(CAMARA_SUELO_SUAVE)
+
+
+# Menor pitch >= `pitch` con el que el tramo pivote -> cámara (a `distancia`) no pasa a menos de `margen` del suelo.
+# Es continuo en la posición del pivote (cada muestra del tramo es continua en el pitch), sin escalones.
+# Si ni con `tope` queda libre devuelve `tope` (la distancia se encarga del resto).
+def pitch_libre_de_suelo(pivote, yaw, pitch, distancia, altura_suelo, margen=MARGEN_SUELO,
+                         tope=PITCH_TOPE_SUELO, iteraciones=ITERACIONES_PITCH):
+    def libre(p):
+        return distancia_libre_de_suelo(pivote, posicion_orbital(pivote, yaw, p, distancia),
+                                        altura_suelo, margen) is None
+    if pitch >= tope or libre(pitch):
+        return pitch
+    if not libre(tope):
+        return tope
+    bajo, alto = pitch, tope
+    for _ in range(iteraciones):
+        medio = (bajo + alto) / 2
+        if libre(medio):
+            alto = medio
+        else:
+            bajo = medio
+    return alto
+
+
+def suavizar_pitch(actual, objetivo, dt, subir=RAPIDEZ_PITCH_SUBIR, bajar=RAPIDEZ_PITCH_BAJAR):
+    rapidez = subir if objetivo > actual else bajar
+    return actual + (objetivo - actual) * (1 - math.exp(-rapidez * max(0.0, dt)))
+
+
+# Un cuadro de la colisión de la cámara de tercera persona contra suelo y paredes (lo que hacía actualizar()).
+# impacto_paredes(pitch) -> distancia del raycast al primer obstáculo (o None); tope_paredes(deseada) -> distancia
+# máxima libre de la colisión analítica (o None). Devuelve (distancia_real, pitch_efectivo, posicion).
+# suave=False: exactamente la protección de antes (pitch_efectivo = pitch).
+def paso_camara_suelo(pivote, yaw, pitch, pedida, distancia_real, pitch_efectivo, altura_suelo, dt,
+                      impacto_paredes=None, tope_paredes=None, margen=MARGEN_SUELO, dmin=1.2, suave=False):
+    if suave:
+        objetivo_pitch = pitch_libre_de_suelo(pivote, yaw, pitch, pedida, altura_suelo, margen)
+        if pitch_efectivo is None or dt <= 0:
+            usado = objetivo_pitch
+        else:
+            usado = max(pitch, suavizar_pitch(pitch_efectivo, objetivo_pitch, dt))
+    else:
+        objetivo_pitch = usado = pitch
+    impacto = impacto_paredes(usado) if impacto_paredes is not None else None
+    deseada = posicion_orbital(pivote, yaw, usado, pedida)
+    if not suave or objetivo_pitch >= PITCH_TOPE_SUELO:
+        impacto_suelo = distancia_libre_de_suelo(pivote, deseada, altura_suelo)
+        if impacto_suelo is not None:
+            impacto = impacto_suelo if impacto is None else min(impacto, impacto_suelo)
+    objetivo = distancia_con_colision(pedida, impacto, margen, dmin)
+    if tope_paredes is not None:
+        tope = tope_paredes(deseada)
+        if tope is not None:
+            objetivo = min(objetivo, tope)
+    suave_d = suavizar_distancia(distancia_real, objetivo, dt)
+    # Hacia adentro nunca por detrás de la pared: el suavizado solo afloja el alejarse.
+    distancia_real = min(suave_d, objetivo)
+    posicion = posicion_orbital(pivote, yaw, usado, distancia_real)
+    if suave:
+        piso = altura_suelo(posicion[0], posicion[2]) + MARGEN_SUELO_CAMARA
+        if posicion[1] < piso:
+            posicion = (posicion[0], piso, posicion[2])
+    return distancia_real, usado, posicion

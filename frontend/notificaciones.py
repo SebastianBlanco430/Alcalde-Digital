@@ -15,6 +15,7 @@
 
 import sys
 
+from frontend import hud_tamanos_calculos
 from frontend import notificaciones_calculos as nc
 from frontend.notificaciones_calculos import REMITENTE, ColaTarjetas, activo  # noqa: F401  (API pública)
 
@@ -175,7 +176,8 @@ def _crear_pila(escena):
                  scale=escala_fuente(16), color=rgb(estilo.TINTA), font=tipografia.FUENTE_TITULO)
             x_texto = izquierda + LADO_ICONO + RELLENO
             Text(hud_mod._seguro(tarjeta.remitente), parent=self, origin=(-0.5, 0.5), position=(x_texto, arriba, -0.001),
-                 scale=escala_fuente(PX_REMITENTE), color=rgb(tono), font=tipografia.FUENTE_TITULO)
+                 scale=escala_fuente(PX_REMITENTE), font=tipografia.FUENTE_TITULO,
+                 color=rgb(hud_tamanos_calculos.tono_texto(tono) if hud_tamanos_calculos.activo() else tono))  # M3.4
             cuerpo.position = (x_texto, arriba - a_unidades(PX_REMITENTE) * 1.4, -0.001)
             # Para el fundido de salida: el alfa propio de cada pieza (la sombra ya es translúcida).
             self._piezas = [(e, e.color[3]) for e in self._descendientes(self) if hasattr(e, "color")]

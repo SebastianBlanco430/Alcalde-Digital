@@ -287,6 +287,8 @@ class AmbienteSuave:
         self._confianzas = None         # {grupo: valor suavizado} o None sin GameState
         self._indice = None             # índice 0-100 suavizado (finales por etapas) o None = salud de siempre
         self._ambiente = AMBIENTE_INICIAL
+        self._tau_acelerado = None      # aceleración visual temporal (momento_nivel); no se guarda en a_dict
+        self._aceleracion = 0.0         # s de dt que le quedan a la aceleración
 
     def ambiente(self):
         return self._ambiente
@@ -313,7 +315,11 @@ class AmbienteSuave:
         objetivo_indice = _leer_indice(indice)
         if self._indicadores is None:
             return self.fijar(objetivo, objetivo_grupos, objetivo_indice)
-        paso = 1.0 - math.exp(-min(float(dt), DT_MAX) / self._tau)
+        tau = self._tau
+        if self._aceleracion > 0.0:                  # aceleración temporal: τ menor mientras dure (cuenta por dt)
+            tau = min(self._tau, self._tau_acelerado)
+            self._aceleracion = max(0.0, self._aceleracion - float(dt))
+        paso = 1.0 - math.exp(-min(float(dt), DT_MAX) / tau)
         for nombre in NOMBRES_INDICADORES:
             self._indicadores[nombre] += (objetivo[nombre] - self._indicadores[nombre]) * paso
         if objetivo_grupos is None or self._confianzas is None:
@@ -327,6 +333,19 @@ class AmbienteSuave:
             self._indice += (objetivo_indice - self._indice) * paso
         self._ambiente = calcular_ambiente(self._indicadores, self._confianzas, self._ambiente.nivel, indice=self._indice)
         return self._ambiente
+
+    # Aceleración visual temporal: durante los próximos `duracion` s de dt, actualizar() usa min(tau propio, `tau`).
+    # Después vuelve sola al tau normal. No cambia tau() ni se serializa.
+    def acelerar(self, tau, duracion):
+        if isinstance(tau, bool) or not isinstance(tau, (int, float)) or not math.isfinite(tau) or tau <= 0:
+            raise ValueError(f"tau inválido: {tau!r}; debe ser un número positivo de segundos.")
+        if isinstance(duracion, bool) or not isinstance(duracion, (int, float)) or not math.isfinite(duracion):
+            raise ValueError(f"duración inválida: {duracion!r}; se esperaba un número de segundos.")
+        self._tau_acelerado = float(tau)
+        self._aceleracion = max(0.0, float(duracion))
+
+    def aceleracion_restante(self):
+        return self._aceleracion
 
     # -- Serialización (JSON) --
 

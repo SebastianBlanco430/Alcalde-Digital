@@ -36,7 +36,7 @@ from backend.logica import navegacion
 from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 from backend.logica.roles import ROLES
 from frontend import camara_calculos as cc
-from frontend import geometria_mundo, hud_calculos, poses, rendimiento
+from frontend import geometria_mundo, hud_calculos, pantalla_carga, poses, rendimiento
 from frontend.componentes import destruir_arbol
 from frontend import guion_cinematicas as guion
 from frontend.camara_tercera_persona import CamaraTerceraPersona
@@ -80,6 +80,7 @@ class EscenaMundo(Escena):
         self._cinematica = False                 # ¿hay una cinemática en curso?
 
         self.ciudad = Ciudad3D(mundo, sombras=sombras, parent=self)
+        pantalla_carga.avance("jugador")     # M7.3: barra de la pantalla de carga (no-op sin ella)
         self._niebla = {}
         self.camara = CamaraTerceraPersona(self.ciudad.raiz_colisiones, suelo=mundo.altura,
                                            obstaculos=mundo, parent=self)
@@ -88,7 +89,9 @@ class EscenaMundo(Escena):
             self, mundo, al_interactuar, velocidad=VELOCIDAD_CAMINAR, velocidad_correr=VELOCIDAD_CORRER,
             obtener_yaw=lambda: self.camara.yaw)
         self.director = DirectorCinematica(parent=self)
+        pantalla_carga.avance("peatones")
         self.peatones = Peatones(mundo, parent=self)      # gente que pasea (decoración)
+        pantalla_carga.avance("hud")
         self.baliza = Baliza(parent=self, enabled=False)
         self._ayudas_para = None         # (jugador activo, destino seguido) con que se pusieron baliza y bandera
         self.ruta_piso = RutaPiso(suelo=mundo.altura, parent=self)
@@ -117,6 +120,7 @@ class EscenaMundo(Escena):
         # la pintó y no se usan los paneles de siempre. None (o False) = los paneles de siempre.
         self.pintar_final = None
         self.vehiculos = None
+        pantalla_carga.avance("vehiculos")
         if VEHICULOS:
             from frontend.vehiculo_mundo import IntegracionVehiculos
             self.vehiculos = IntegracionVehiculos(self)
@@ -125,6 +129,7 @@ class EscenaMundo(Escena):
         self._bloqueadores = []
         self.economia = None             # inventario, dinero y E encadenada (frontend/economia_mundo.py)
         if economia_config.ECONOMIA:
+            pantalla_carga.avance("economia")
             from frontend.economia_mundo import IntegracionEconomia
             self.economia = IntegracionEconomia(self)
 
@@ -153,12 +158,13 @@ class EscenaMundo(Escena):
         if nueva_partida:
             self._sesion = self.flujo.sesion
             self._reconstruir_personajes()
+            if self.economia is not None:
+                self.economia.limpiar_suelo()       # BUG-003: nada de lo soltado en otra partida sigue en el suelo
             activar_niebla(**self._niebla)      # otra vez: los Personaje recién creados no la tenían (solo cuenta lo ya existente)
             rendimiento.precargar(self)    # ciudad, personajes y vehículos a la GPU ya: sin tirones al girar
         self.refrescar()
         if nueva_partida:
-            self.camara.yaw = self._yaw_hacia_el_destino()
-            self.camara.colocar_ya()
+            self.camara.colocar_libre(self._yaw_hacia_el_destino())     # EST-012: sin quedar pegada a una fachada
         else:
             self.camara.actualizar(0)
         self._sincronizar_raton()
@@ -222,6 +228,11 @@ class EscenaMundo(Escena):
         if self.flujo is None or self._sesion is None:
             return
         self.hud.actualizar(dt, self._sesion, yaw_grados=self.camara.yaw)
+        # NET-009: en línea la misión la asigna el servidor DESPUÉS de entrar; el panel solo se pintaba en refrescar()
+        # y se quedaba en «Sin misiones nuevas por ahora» (el GPS sí la seguía). Si cambió la misión, se refresca.
+        mision = self.flujo.mision_actual()
+        if getattr(mision, "id", mision) != getattr(self, "_mision_en_panel", None):
+            self.refrescar()
         if self._clave_ayudas(self._destino_seguido()) != self._ayudas_para:
             self._poner_ayudas_destino()       # se marcó o desmarcó «Seguir misión» (o cambió el destino)
         self._actualizar_ruta_piso()
@@ -290,6 +301,11 @@ class EscenaMundo(Escena):
         self.en_pausa = abierta
         self.menu_pausa.enabled = abierta
         self._sincronizar_raton()
+        try:                                      # R2: con la pausa abierta el pase final va neutro (sin tinte ni tinta)
+            from frontend import daltonismo
+            daltonismo.filtro().fijar_menu(abierta)
+        except Exception:                         # noqa: BLE001  sin pase de pantalla
+            pass
 
     def _ir_al_menu(self):
         self.alternar_pausa(False)
@@ -378,6 +394,7 @@ class EscenaMundo(Escena):
             avatar.resaltar(jugador is activo)
 
         mision = self.flujo.mision_actual()
+        self._mision_en_panel = getattr(mision, "id", mision)
         self.hud.panel_turno.fijar(
             (f"Turno de {activo.nombre} ({ROLES[activo.rol].nombre})" if self.texto_turno_fn is None
              else self.texto_turno_fn(activo)),

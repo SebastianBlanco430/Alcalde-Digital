@@ -97,5 +97,5 @@ class Fantasma:
         self.grabador.reiniciar()
 
     def esconder(self):
-        if self.cuerpo is not None:
+        if self.cuerpo is not None and not self.cuerpo.is_empty():     # EST-013: ya destruido con el mundo viejo
             self.cuerpo.enabled = False

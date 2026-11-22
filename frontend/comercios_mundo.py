@@ -9,7 +9,8 @@
 # Colisión: el mostrador y el fondo de cada puesto chocan (comercios_calculos.obstaculos_puesto, entregado al modelo con
 # agregar_obstaculos, origen «puestos»; bandera ALCALDE_COLISION_PROPS). La colocación (frontend/comercios_calculos.py)
 # evita que un puesto pise edificios, asfalto, escaleras u obstáculos con la huella de ~2,6 x 2,4 m (gira el puesto o
-# lo corre unos metros desde su ancla si hace falta).
+# lo corre unos metros desde su ancla si hace falta). Con ALCALDE_PUESTOS_FIJOS los puestos del catálogo tienen sitio
+# fijo revisado a mano (backend/datos/comercios_semilla.ANCLAS_FIJAS): no se corren ni se giran.
 
 import math
 import sys
@@ -19,7 +20,9 @@ from ursina import Text
 from backend.datos.comercios_semilla import CATALOGO_COMERCIOS
 from backend.logica.comercios import resolver_comercios
 from backend.logica.perfil_economia import perfil_de
-from frontend.comercios_calculos import Ocupacion, elegir_puesto, huellas_mercadito, obstaculos_puesto
+from frontend.comercios_calculos import (Ocupacion, colocar_puesto, huellas_mercadito, muestras_huella,
+                                        obstaculos_puesto)
+from frontend import trabajo_npc_calculos
 from frontend.componentes import rgb
 from frontend.props_mundo import Malla, anillo, caja, icosfera, prisma
 from frontend.tienda_calculos import ControlTienda
@@ -313,7 +316,9 @@ def _surtido_tienda_general(L, e):
         _mochila(L, -0.95 + k * 0.48, 1.62, tono)                                                  # mochilas colgadas
     for k, tono in enumerate(((60, 120, 210), (220, 70, 60), (70, 160, 100))):
         _mochila(L, -0.7 + k * 0.7, 1.05 + 0.0, tono)
-    for da in (0.95, 1.25):                                                                        # botijones de gas
+    # botijones de gas (0,34 m de diámetro): antes en 0,95 y 1,25 (llegaban a 1,42 m, el borde de la losa, y asomaban por
+    # el lateral, en el hueco con la Banca da Feira al fondo de la feria); ahora hasta 1,09 m, dentro del puesto
+    for da in (0.6, 0.92):
         L.cilindro(da, 0.0, -0.45, 0.34, 0.62, (232, 124, 40), 10)
         L.esfera(da, 0.62, -0.45, 0.33, 0.18, 0.33, (232, 124, 40), 0)
         L.cilindro(da, 0.7, -0.45, 0.07, 0.1, (60, 60, 66), 6)
@@ -358,6 +363,8 @@ def _poner_letrero(escena, comercio, x, y, z, rumbo):
     L = _Local(Malla(), x, y, z, rumbo)
     texto = Text(comercio.nombre, parent=escena, origin=(0, 0), position=L.p(0, 3.08, 1.37), rotation_y=rumbo + 180,
                  scale=6.0, color=rgb(e["letras"]))
+    from frontend.piezas import texto_sin_tinta
+    texto_sin_tinta(texto)
     try:
         ancho = texto.width
         if ancho > 2.0:
@@ -491,9 +498,7 @@ class ComercioMundo:
         return math.hypot(x - self.x, z - self.z) <= RADIO_PUESTO
 
     def texto_aviso(self):
-        if self.comercio.tipo == "puesto_trabajo":
-            return f"E: Trabajar en {self.comercio.nombre}"
-        return f"E: Hablar con {self.nombre} / comprar"
+        return trabajo_npc_calculos.texto_aviso(self.comercio, self.nombre)      # «… comprar o trabajar» con la bandera
 
     def aviso(self, jugador, x, z):
         if not self._cerca(x, z):
@@ -551,17 +556,33 @@ def instalar(economia, comercios=None, crear_npc=None):
     for comercio, (x, z, _rumbo) in resueltos:
         if comercio.tipo == "vendedor_calle":
             ocupacion.agregar_circulo(x, z, RADIO_SEU_ZE)
-    panel = PanelTienda(None, titulo_fn=lambda: _titulo(panel), parent=escena.hud)
+    panel = PanelTienda(None, titulo_fn=lambda: _titulo(panel), parent=escena.hud,
+                        extra_fn=lambda: _accion_trabajar(panel, economia))
     panel.comercio_actual = None
     economia.modales.append(panel)
     malla = Malla()
     puestos = []
     suelo = mundo.altura
+    # ALCALDE_PUESTOS_FIJOS: los fijos (revisados a mano) van primero y tal cual; se miran contra el mundo, no contra el
+    # círculo de reserva de sus vecinos (dos fijos lado a lado lo rozan sin pisarse: tests/test_puestos_fijos.py).
+    fijos = {}
+    for orden, (comercio, (x, z, rumbo)) in enumerate(resueltos):
+        if comercio.tipo != "vendedor_calle" and comercio.ancla.get("fijo"):
+            px, pz, prumbo, violaciones = colocar_puesto(ocupacion, x, z, rumbo, fijo=True)
+            if violaciones:
+                print(f"[comercios] {comercio.id}: el puesto fijo pisa "
+                      f"{ocupacion.motivos(muestras_huella(px, pz, prumbo))}", file=sys.stderr)
+            fijos[orden] = (px, pz, prumbo)
+    for px, pz, _r in fijos.values():
+        ocupacion.agregar_circulo(px, pz, RADIO_PUESTO_OCUPADO)
     for orden, (comercio, (x, z, rumbo)) in enumerate(resueltos):
         if comercio.tipo == "vendedor_calle":
             continue
-        px, pz, prumbo, _v = elegir_puesto(ocupacion, x, z, rumbo)
-        ocupacion.agregar_circulo(px, pz, RADIO_PUESTO_OCUPADO)
+        if orden in fijos:
+            px, pz, prumbo = fijos[orden]
+        else:
+            px, pz, prumbo, _v = colocar_puesto(ocupacion, x, z, rumbo)
+            ocupacion.agregar_circulo(px, pz, RADIO_PUESTO_OCUPADO)
         puestos.append((orden, comercio, px, pz, prumbo))
     for orden, comercio, px, pz, prumbo in puestos:
         dibujar_puesto(malla, comercio.id, px, suelo(px, pz), pz, prumbo)
@@ -574,14 +595,30 @@ def instalar(economia, comercios=None, crear_npc=None):
     if mesh is not None:
         from frontend.piezas import pieza
         economia.puestos_malla = pieza(parent=escena, model=mesh, name="comercios_puestos")
+    economia.letreros_puestos = letreros = []        # M1.3: los lee frontend/registro_textos_mundo.py
     for orden, comercio, px, pz, prumbo in puestos:
-        _poner_letrero(escena, comercio, px, suelo(px, pz), pz, prumbo)
+        letreros.append(_poner_letrero(escena, comercio, px, suelo(px, pz), pz, prumbo))
         indice = indice_vestido(INDICE_NPC_BASE + orden, usados, es_dependienta(comercio.npc))
         usados.add(indice)
         npc = _crear_dependiente(escena, indice, comercio.npc or comercio.nombre, px, pz, prumbo, crear_npc)
         registrados.append(economia.registrar(ComercioMundo(escena, comercio, px, pz, prumbo, npc, panel)))
     economia.comercios_mundo = registrados
     return registrados
+
+
+# ALCALDE_TRABAJO_EN_NPC: el panel de una tienda con trabajo ofrece «Trabajar aquí» -> (texto, al_usar) o None.
+# Cierra la tienda y pide el turno como siempre (economia.al_trabajar -> trabajo_mundo.pedir_turno: menú o motivo).
+def _accion_trabajar(panel, economia):
+    actual = getattr(panel, "comercio_actual", None)
+    if actual is None or not trabajo_npc_calculos.ofrece_trabajo_en_tienda(actual.comercio):
+        return None
+
+    def trabajar():
+        jugador = economia.jugador()
+        economia.cerrar_modales()
+        if jugador is not None:
+            actual._trabajar(jugador, economia)
+    return (trabajo_npc_calculos.TEXTO_BOTON, trabajar)
 
 
 def _titulo(panel):

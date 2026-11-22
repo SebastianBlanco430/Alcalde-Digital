@@ -1,4 +1,5 @@
-# Tutoriales de la bandeja de Civitas (tecla L: estafas, publicar foto, tiempo de pantalla), de Rectificar y de los Dilemas (tecla K).
+# Tutoriales de la bandeja de Civitas (tecla L: estafas, publicar foto, tiempo de pantalla), de Rectificar y de los Dilemas.
+# Los de la bandeja salen antes de abrirla; el de los Dilemas YA NO sale al abrir K: solo desde la pausa («Cómo se juega»).
 #
 # CÓMO SE ENGANCHA. `instalar(conexion, escena_mundo)` envuelve el `abrir` de los dos controles reales (conexion.habitos_ui y
 # conexion.dilemas_ui) SIN editar registro_habitos.py ni registro_dilemas.py: justo antes de abrir el panel de verdad, si toca el
@@ -21,6 +22,7 @@ from backend.logica import habitos_digitales as hd
 
 RUTA_CIVITAS = Path(__file__).resolve().parent.parent / "backend" / "datos" / "casos_demo" / "tutorial_civitas.json"
 HORA_DEMO = "hoy 20:00"
+ID_DILEMAS = "dilemas"           # tutorial guiado de los dilemas: solo desde la pausa
 MINUTOS_FEED_DEMO = 30
 
 
@@ -445,14 +447,48 @@ def instalar(conexion, escena_mundo):
 
         control.abrir = abrir
 
+    def ver_dilemas():
+        """Tutorial guiado de los dilemas desde la pausa («Cómo se juega»): siempre (aunque ya se haya visto), con el flujo
+        de demo. No abre el panel real al terminar ni toca la partida. True si se abrió."""
+        if abierto():
+            return False
+        try:
+            from ursina import camera
+
+            def al_terminar(saltado, fallo):
+                from frontend.componentes import destruir_arbol
+                t, estado["tutorial"] = estado["tutorial"], None
+                if t is not None:
+                    try:
+                        destruir_arbol(t)
+                    except Exception:                 # noqa: BLE001
+                        pass
+                try:
+                    escena_mundo._sincronizar_raton()
+                except Exception:                     # noqa: BLE001
+                    pass
+
+            estado["tutorial"] = rtm.abrir_si_toca(camera.ui, ID_DILEMAS, al_terminar, forzar_ver=True,
+                                                   contexto={"escena": escena_mundo})
+            return estado["tutorial"] is not None
+        except Exception as error:                    # noqa: BLE001
+            from frontend import banderas_visuales as bv
+            bv.avisar_una_vez("tutorial_dilemas_pausa", error)
+            return False
+
+    estado["ver_dilemas"] = ver_dilemas
     habitos = getattr(conexion, "habitos_ui", None)
-    dilemas = getattr(conexion, "dilemas_ui", None)
     if habitos is not None:
         def id_habitos(control):
             if control.pendiente() is None:
                 return "civitas_pantalla" if hd.tiempo_pantalla_activo() else None
             return id_de_evento(control.pendiente())
         envolver(habitos, id_habitos)
-    if dilemas is not None:
-        envolver(dilemas, lambda control: "dilemas" if control.pendiente() is not None else None)
+    # Dilemas (K o el teléfono): ya NO se envuelven. Al llegar un dilema sale solo la tarjeta de primera vez del teléfono
+    # («Lo que circula en tu red» y compañía) y después el dilema real; el tutorial guiado queda en la pausa
+    # («Cómo se juega» › Dilemas), que llama a `conexion.tutorial_dilemas`.
+    try:
+        conexion.tutorial_dilemas = ver_dilemas
+    except Exception:                                 # noqa: BLE001  conexión sin atributos libres (pruebas)
+        pass
     return estado

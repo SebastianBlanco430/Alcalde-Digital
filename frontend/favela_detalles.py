@@ -13,6 +13,7 @@
 
 import math
 
+from backend.logica import feria
 from frontend import favela_calculos as fc
 from frontend.azar_fijo import azar_de
 from frontend.props_mundo import Malla, anillo, caja, icosfera, prisma
@@ -444,8 +445,6 @@ TOLDOS = (((226, 52, 60), (250, 246, 232)), ((250, 200, 40), (60, 130, 220)), ((
 # Puestos con toldo a rayas a lo largo del eje largo de la zona, en dos filas con pasillo en medio.
 def mercadito(m, zona, y):
     cx, cz, ancho, fondo = zona.cx, zona.cz, zona.ancho, zona.fondo
-    largo_x = ancho >= fondo
-    L, A = (ancho, fondo) if largo_x else (fondo, ancho)
     alto = y + 0.05
     # suelo: losa de cemento claro
     esquinas = [(cx - ancho / 2, cz - fondo / 2), (cx + ancho / 2, cz - fondo / 2),
@@ -455,15 +454,13 @@ def mercadito(m, zona, y):
             m.vertices.append((esquinas[q][0], alto, esquinas[q][1]))
             m.normales.append((0.0, 1.0, 0.0))
             m.colores.append(_tono((206, 188, 160), 0.85))
-    puestos = max(2, int(L // 3.2))
-    for fila in (-1, 1):
-        for k in range(puestos):
-            a = -L / 2 + (k + 0.5) * L / puestos
-            b = fila * (A / 2 - 1.3)
-            px, pz = (cx + a, cz + b) if largo_x else (cx + b, cz + a)
-            rumbo = (0 if fila > 0 else 180) if largo_x else (90 if fila > 0 else 270)
-            rumbo = (rumbo + 180) % 360                              # el frente mira al pasillo central
-            _puesto(m, px, alto, pz, rumbo, TOLDOS[(k + (fila > 0)) % len(TOLDOS)], k + (fila > 0))
+    # Puestos: backend/logica/feria.py (la misma colocación que la colisión y las huellas de comercios_calculos). Con
+    # la feria alargada (ALCALDE_PUESTOS_FIJOS) ocupan la parte de la entrada; el fondo es de los dos puestos jugables.
+    decorativos = feria.puestos_decorativos(zona)
+    por_fila = len(decorativos) // 2
+    for i, (px, pz, rumbo) in enumerate(decorativos):
+        k, arriba = i % por_fila, i >= por_fila                      # fila -1 primero, luego la +1 (como siempre)
+        _puesto(m, px, alto, pz, rumbo, TOLDOS[(k + arriba) % len(TOLDOS)], k + arriba)
 
 
 def _puesto(m, x, y, z, rumbo, toldo, variante):

@@ -27,7 +27,10 @@ import math
 import os
 import sys
 
-from frontend import ambiente_vivo
+from frontend import ambiente_vivo, hud_esquinas_calculos
+from frontend import hud_contextual_calculos as hctx
+from frontend import panel_unico_calculos as pu
+from frontend import hud_tamanos_calculos
 from frontend import manillas_calculos as mcal
 
 MANILLAS = True
@@ -39,6 +42,8 @@ MANILLAS_NPC = True
 DOS_PULSERAS = len(mcal.INDICADORES_HUD) <= 2
 ANCHO_CHIP, ALTO_CHIP = (0.215, 0.226) if DOS_PULSERAS else (0.355, 0.2)
 PX_NOMBRE_CINTA = 11
+if hud_tamanos_calculos.activo():     # M3.4: «Conviv.», «Confianza» más grandes (>= 18 px a 1080p con holgura)
+    PX_NOMBRE_CINTA = hud_tamanos_calculos.PX_NOMBRE_CINTA
 NOMBRE_LADO = {"i": "izquierda", "d": "derecha"}
 PERIODO_PULSERAS = 6                  # frames entre dos revisiones de las pulseras del jugador (nivel y muñeca)
 MARGEN = 0.02
@@ -95,11 +100,16 @@ class ControlManillas:
     `vista`: pintar(aspectos|None, visible, dt), alternar_leyenda(aspectos|None), cerrar_leyenda(), leyenda_abierta(),
     cursor(punto_o_None)."""
 
-    def __init__(self, escena, vista):
+    def __init__(self, escena, vista, minis=None):
         self.escena, self.vista = escena, vista
+        self.minis = minis                    # M5.1 (ALCALDE_PULSERAS_VISIBLES): mini-pulseras junto al reloj, o None
         self.niveles = {}
         self.aspectos = None
         self.oculto = True
+        # HUD contextual (M3.2, ALCALDE_HUD_CONTEXTUAL): el brazalete está cerrado y solo se asoma 4 s cuando cambia una
+        # cinta o al pulsar B (y mientras la leyenda esté abierta o el tutorial lo señale). None = siempre a la vista.
+        self.revelado = hctx.Revelado() if hctx.activo() else None
+        self.detector = hctx.DetectorCambios()
 
     def _panel_abierto(self):
         escena = self.escena
@@ -141,8 +151,29 @@ class ControlManillas:
         self.aspectos = None if self.oculto else self.calcular()
         if self.oculto and self.vista.leyenda_abierta():
             self.vista.cerrar_leyenda()
-        self.vista.pintar(self.aspectos, not self.oculto and self.aspectos is not None, dt)
+        visible = not self.oculto and self.aspectos is not None
+        if self.revelado is not None:
+            visible = self._contextual(visible, dt)
+        self.vista.pintar(self.aspectos, visible, dt)
+        if self.minis is not None:            # no dependen del revelado de 4 s: su visibilidad la decide el ajuste M5.3
+            self.minis.pintar(self.aspectos, not self.oculto and self.aspectos is not None, dt)
         return self.aspectos
+
+    def _contextual(self, visible, dt):
+        """Visibilidad del brazalete con el HUD contextual; pasa el alfa a la vista (si sabe fundirse)."""
+        rev = self.revelado
+        if self.aspectos is not None and self.detector.cambio(
+                {k: mcal.clave_textura(a) for k, a in self.aspectos.items()}):
+            rev.revelar()
+        rev.mantener(visible and (self.vista.leyenda_abierta() or _tutorial_senalando()))
+        if not visible:
+            rev.ocultar_ya()                  # pausa, cinemática, panel...: fuera sin fundido, como antes
+            return False
+        alfa = rev.avanzar(dt)
+        fijar = getattr(self.vista, "fijar_alfa", None)
+        if fijar is not None:
+            fijar(alfa)
+        return rev.visible
 
     def input(self, key):
         """Tecla B: abre / cierra la leyenda (solo con el brazalete visible: no encima de la pausa ni de un panel)."""
@@ -153,6 +184,8 @@ class ControlManillas:
             return True
         if self.oculto:
             return False
+        if self.revelado is not None:
+            self.revelado.revelar()           # HUD contextual: B también asoma el brazalete (queda 4 s tras cerrar)
         self.vista.alternar_leyenda(self.aspectos)
         return True
 
@@ -247,9 +280,11 @@ def _crear_vista(escena_mundo):
             if self.t is None:
                 return
             self.t += dt
-            p = mcal.progreso_fundido(self.t)
+            duracion = hctx.tiempo("CINTA_HUD")          # M3.6: 0,6 -> 0,3 s en el HUD (las de los NPC no cambian)
+            # M3.6: ease-out (el smoothstep de siempre arranca lento: ease-in); sin la bandera, lo de antes
+            p = (hctx.ease_out(self.t / duracion) if hctx.animaciones_activas() else mcal.progreso_fundido(self.t, duracion))
             self.nueva.color = color.rgba(1, 1, 1, p)
-            if self.t >= mcal.DURACION_FUNDIDO:
+            if self.t >= duracion:
                 self.actual.texture = self.nueva.texture
                 self.nueva.enabled = False
                 self.t = None
@@ -258,8 +293,10 @@ def _crear_vista(escena_mundo):
 
         def __init__(self, escena):
             self.chip = Entity(parent=escena.hud, enabled=False)
+            # Estilo único (M3.3, ALCALDE_PANEL_UNICO): las pulseras son una «tarjeta» (radio 10, borde denso).
+            radio = pu.estilo_de("pulseras").radio_px if pu.activo() else estilo.RADIO_CHIP_PX
             self.chip.fondo = panel_tinta(self.chip, ANCHO_CHIP, ALTO_CHIP, tono=estilo.COLOR_FONDO,
-                                          radio_px=estilo.RADIO_CHIP_PX, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
+                                          radio_px=radio, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
             texto(self.chip, "Pulseras" if mcal.pulseras_jugador_activo() else "Manillas", 13, (-ANCHO_CHIP / 2 + 0.014, ALTO_CHIP / 2 - 0.022, -0.01), titulo=True)
             tecla = texto(self.chip, mcal.TECLA.upper(), 13, (ANCHO_CHIP / 2 - 0.014, ALTO_CHIP / 2 - 0.022, -0.01),
                           origen=(0.5, 0), titulo=True, tono=estilo.ACENTO_SECUNDARIO)
@@ -272,6 +309,8 @@ def _crear_vista(escena_mundo):
             x0 = -PASO_COLUMNA * (len(mcal.INDICADORES_HUD) - 1) / 2
             self.columnas = [Columna(self.chip, ind, x0 + k * PASO_COLUMNA) for k, ind in enumerate(mcal.INDICADORES_HUD)]
             self.chip.position = (-diseno_adaptable.aspecto() / 2 + MARGEN + ANCHO_CHIP / 2, Y_CENTRO)
+            if hud_esquinas_calculos.activo():   # mapa de esquinas (M3.1): mismo margen izquierdo que el resto
+                self.chip.x = hud_esquinas_calculos.x_pulseras(diseno_adaptable.aspecto(), ANCHO_CHIP)
             diseno_adaptable.anclar(self.chip, "izquierda")
             self.aspectos = None
             self._visible = False
@@ -323,6 +362,23 @@ def _crear_vista(escena_mundo):
             return indice
 
         # -- Brazalete --
+
+        def fijar_alfa(self, alfa):
+            """HUD contextual: fundido del brazalete entero (setAlphaScale baja por todo el árbol del chip)."""
+            alfa = round(float(alfa), 3)
+            if hctx.animaciones_activas():   # M3.6: fundido REAL, pieza a pieza (frontend/fundido_ui.py)
+                if getattr(self, "_fundido_chip", None) is None:
+                    from frontend.fundido_ui import FundidoArbol
+                    self._fundido_chip = FundidoArbol(self.chip)
+                self._fundido_chip.aplicar(alfa)
+                return
+            if alfa == getattr(self, "_alfa", None):
+                return
+            if getattr(self, "_alfa", None) is None:
+                from panda3d.core import TransparencyAttrib
+                self.chip.setTransparency(TransparencyAttrib.M_alpha)
+            self._alfa = alfa
+            self.chip.setAlphaScale(alfa)
 
         def pintar(self, aspectos, visible, dt):
             self.aspectos = aspectos
@@ -522,6 +578,16 @@ def _clase_cinta(reserva):
             for e in [self.aro] + self.colas:
                 e.unlit = True
             self.estado = None
+            self.realce = None
+
+        def realzar(self, grosor, realce):
+            """M5.2 (pulseras del jugador): aro y cola `grosor` veces más anchos (solo escala; el radio no cambia, el aro
+            crece hacia los dos lados de la muñeca) y el color empujado hacia el del nivel con `realce` (sin luz)."""
+            self.aro.scale_y = grosor
+            self.aro.y = -ALTO_ARO * (grosor - 1.0) / 2
+            for cola in self.colas:
+                cola.scale_x = ANCHO_COLA * grosor
+            self.realce = realce
 
         def poner(self, ancla, estado):
             m = mdl.manilla_de_npc(estado)
@@ -562,11 +628,17 @@ def _clase_cinta(reserva):
 
         def _pintar_clave(self, clave, alfa):
             r, g, b = clave[0]
-            self.aro.color = color.rgba32(r, g, b, int(255 * alfa))
+            if self.realce is None:
+                self.aro.color = color.rgba32(r, g, b, int(255 * alfa))
+                tinte = (1, 1, 1)
+            else:                            # M5.2: más brillante y hacia el color del nivel (se lee a 5 m)
+                from frontend import pulseras_visibles_calculos as pv
+                self.aro.color = color.rgba(*pv.color_aro_realzado((r, g, b), self.realce), alfa)
+                tinte = pv.color_realzado((r, g, b), self.realce)
             tex = textura(clave)
             for cola in self.colas:
                 cola.texture = tex
-                cola.color = color.rgba(1, 1, 1, alfa)
+                cola.color = color.rgba(*tinte, alfa)
 
         def avanzar_fundido(self, dt):
             """La cinta vieja se apaga y la nueva se enciende (DURACION_FUNDIDO en total, como en el HUD)."""
@@ -630,8 +702,17 @@ def _crear_pulseras_jugador(escena):
 
     from frontend import npc_postura
 
+    from frontend import pulseras_visibles_calculos as pv
+
     reserva = Entity(parent=escena, enabled=True)
-    Cinta = _clase_cinta(reserva)
+    ClaseCinta = _clase_cinta(reserva)
+
+    def Cinta():
+        cinta = ClaseCinta()
+        if pv.activo():                      # M5.2: más gruesas y con realce del color del nivel
+            cinta.realzar(pv.GROSOR_MUNECA, pv.REALCE_MUNECA)
+        return cinta
+
     estado = {"cintas": {i: Cinta() for i in mcal.INDICADORES_JUGADOR}}
 
     def personaje_activo():
@@ -746,11 +827,33 @@ def _crear_cintas_npc(escena):
 
 # ---------------------------------------------------------------- registro
 
-def _crear_vigia(escena_mundo):
+def _crear_minis(escena_mundo, conexion):
+    """Mini-pulseras del HUD (M5.1) o None con ALCALDE_PULSERAS_VISIBLES=0 (o si fallan: el brazalete sigue)."""
+    from frontend import pulseras_visibles_calculos as pv
+    if not pv.activo():
+        return None
+    try:
+        from frontend import pulseras_visibles_vista
+
+        def chip_reloj():
+            vigia = getattr(conexion, "vigia_reloj", None)
+            return getattr(getattr(vigia, "vista", None), "chip_entidad", None)
+
+        textura, _dije = texturas()
+        minis = pulseras_visibles_vista.crear(escena_mundo, textura, chip_reloj)
+        from frontend import hud_ajustes
+        hud_ajustes.registrar()               # fila «Pulseras en el HUD» (M5.3) aunque el ajuste del HUD esté apagado
+        return minis
+    except Exception as error:
+        _aviso(f"mini-pulseras no instaladas ({type(error).__name__}: {error})")
+        return None
+
+
+def _crear_vigia(escena_mundo, conexion=None):
     from ursina import Entity, time
 
     vista = _crear_vista(escena_mundo)
-    control = ControlManillas(escena_mundo, vista)
+    control = ControlManillas(escena_mundo, vista, _crear_minis(escena_mundo, conexion))
 
     class VigiaManillas(Entity):
 
@@ -770,7 +873,7 @@ def registrar(gestor, conexion, escena_mundo):
         return None
     if hud_activo():
         try:
-            conexion.vigia_manillas = _crear_vigia(escena_mundo)
+            conexion.vigia_manillas = _crear_vigia(escena_mundo, conexion)
         except Exception as error:
             _aviso(f"brazalete no instalado ({type(error).__name__}: {error})")
     if mcal.pulseras_jugador_activo():

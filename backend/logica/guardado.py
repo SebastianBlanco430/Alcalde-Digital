@@ -27,8 +27,10 @@
 # Bandera: GUARDADO = False (o ALCALDE_SIN_GUARDADO=1) desactiva la escritura y la lectura.
 
 import json
+import math
 import os
 import tempfile
+import threading
 from pathlib import Path
 
 from backend.logica import ajustes
@@ -87,17 +89,39 @@ def capturar(flujo, mapa, semilla):
 
 # -- Disco ------------------------------------------------------------------------------------------------------------
 
-def guardar(datos, ruta=None):
+_cerrojo = threading.Lock()
+
+
+def guardar(datos, ruta=None, segundo_plano=False):
+    """Escribe el guardado (atómico, con fsync). `segundo_plano`: la escritura va en un hilo (el autoguardado del juego:
+    sin tirones en el frame); devuelve True si se lanzó."""
     if not activo() or datos is None:
         return False
     ruta = Path(ruta) if ruta is not None else ruta_guardado()
     try:
         texto = json.dumps(datos, ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError):
+        return False
+    if segundo_plano:
+        threading.Thread(target=_escribir, args=(texto, ruta), name="alcalde-guardado", daemon=True).start()
+        return True
+    return _escribir(texto, ruta)
+
+
+def _escribir(texto, ruta):
+    with _cerrojo:
+        return _escribir_ya(texto, ruta)
+
+
+def _escribir_ya(texto, ruta):
+    try:
         ruta.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporal = tempfile.mkstemp(dir=str(ruta.parent), prefix=ruta.stem, suffix=".tmp")
         try:
             with os.fdopen(descriptor, "w", encoding="utf-8") as archivo:
                 archivo.write(texto)
+                archivo.flush()
+                os.fsync(archivo.fileno())          # EST-007: los datos en disco ANTES del rename (como los ajustes)
             os.replace(temporal, ruta)
         finally:
             if os.path.exists(temporal):
@@ -123,13 +147,27 @@ def cargar(ruta=None):
         return None
     ruta = Path(ruta) if ruta is not None else ruta_guardado()
     try:
-        if not ruta.is_file() or ruta.stat().st_size > TAMANO_MAX_ARCHIVO:
+        if not ruta.is_file():
+            return None
+        if ruta.stat().st_size > TAMANO_MAX_ARCHIVO:
+            apartar(ruta, "demasiado grande")
             return None
         with open(ruta, "r", encoding="utf-8") as archivo:
             datos = json.load(archivo)
-    except (OSError, ValueError, UnicodeDecodeError, RecursionError):
+    except OSError:
         return None
-    return datos if _forma_valida(datos) else None
+    except (ValueError, UnicodeDecodeError, RecursionError) as error:
+        apartar(ruta, type(error).__name__)                 # BUG-006: se aparta como partida.json.dañado
+        return None
+    if not _forma_valida(datos):
+        apartar(ruta, "formato desconocido u otra versión")
+        return None
+    return datos
+
+
+# Aparta el guardado que no se puede usar (partida.json -> partida.json.dañado; nunca se borra) y avisa por stderr.
+def apartar(ruta=None, motivo="dañado"):
+    return ajustes.apartar_danado(Path(ruta) if ruta is not None else ruta_guardado(), motivo)
 
 
 def existe(ruta=None):
@@ -138,11 +176,12 @@ def existe(ruta=None):
 
 def borrar(ruta=None):
     ruta = Path(ruta) if ruta is not None else ruta_guardado()
-    try:
-        ruta.unlink()
-        return True
-    except OSError:
-        return False
+    with _cerrojo:                     # espera a un autoguardado en vuelo: no puede reaparecer después de borrar
+        try:
+            ruta.unlink()
+            return True
+        except OSError:
+            return False
 
 
 # ¿El guardado es de este mundo? (mismo mapa y misma semilla).
@@ -171,6 +210,7 @@ def restaurar(datos, estado_partida, fabrica_flujo, escala_mundo=1.0, mapa=None,
         raise ValueError("Guardado con formato desconocido.")
     if mapa is not None and not compatible(datos, mapa, semilla):
         raise ValueError(f"El guardado es de otro mundo ({datos.get('mapa')!r}, semilla {datos.get('semilla')!r}).")
+    _validar_numeros(datos)
     try:
         sesion = SesionJuego.desde_dict(datos["sesion"], estado_partida, escala_mundo=escala_mundo)
         estado_partida.restaurar(datos["estado"])
@@ -187,8 +227,36 @@ def restaurar(datos, estado_partida, fabrica_flujo, escala_mundo=1.0, mapa=None,
         restaurar_recta = getattr(flujo, "restaurar_recta_final", None)
         if callable(restaurar_recta) and datos.get("recta_final") is not None:
             restaurar_recta(datos["recta_final"])
-    except (KeyError, TypeError, AttributeError) as error:
+        sin_jugadores = flujo.jugador_activo() is None
+    except (KeyError, TypeError, AttributeError, IndexError, OverflowError, RecursionError) as error:
         raise ValueError(f"Guardado incompleto o dañado: {type(error).__name__}: {error}") from error
-    if flujo.jugador_activo() is None:
+    if sin_jugadores:
         raise ValueError("Guardado sin jugadores.")
     return flujo
+
+
+def _numero_finito(valor):
+    if not isinstance(valor, (int, float)) or isinstance(valor, bool):
+        return False
+    try:
+        return math.isfinite(valor)
+    except OverflowError:
+        return False
+
+
+# BUG-006: valores que se restauraban «bien» y tumbaban el juego después (al avanzar el tiempo o completar una misión):
+# turno no entero, indicadores booleanos o no finitos. ValueError si aparece alguno.
+def _validar_numeros(datos):
+    sesion = datos["sesion"]
+    for clave in ("indice_turno", "numero_turno"):
+        valor = sesion.get(clave)
+        if not isinstance(valor, int) or isinstance(valor, bool) or valor < 0:
+            raise ValueError(f"Guardado dañado: {clave}={valor!r}.")
+    for origen in (sesion.get("indicadores"), datos["estado"].get("indicadores")):
+        if origen is None:
+            continue
+        if not isinstance(origen, dict):
+            raise ValueError("Guardado dañado: indicadores.")
+        for nombre, valor in origen.items():
+            if not _numero_finito(valor):
+                raise ValueError(f"Guardado dañado: indicador {nombre}={valor!r}.")

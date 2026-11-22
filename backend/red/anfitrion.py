@@ -1,7 +1,7 @@
 # Anfitrión del modo online cooperativo (solo stdlib). Un servidor asyncio en un HILO propio
 # que es el ÚNICO escritor del estado: ejecuta la PartidaCooperativa (backend.red.partida_coop),
 # acepta conexiones de hasta 4 jugadores, traduce sus mensajes a llamadas de la partida y
-# reparte los eventos de la partida como mensajes del protocolo v1 (backend.red.protocolo).
+# reparte los eventos de la partida como mensajes del protocolo (versión: backend.red.protocolo.PROTOCOLO_V).
 # El jugador anfitrión entra como un cliente más, por 127.0.0.1 (un solo camino de código).
 # Este módulo NUNCA importa ursina ni panda3d.
 #
@@ -140,7 +140,7 @@ def es_ip_local(ip, ip_local):
         return False
 
 
-def calcular_huellas(mundo, semilla, catalogo, noticias=None, grafo_social=None):
+def calcular_huellas(mundo, semilla, catalogo, noticias=None, grafo_social=None, vehiculos=None):
     """(huella_mundo, huella_contenido) que deben coincidir en anfitrión y clientes.
 
     Mundo: semilla, lugares con su coordenada, calles y límites. Contenido: versión del protocolo, misiones (con
@@ -154,6 +154,23 @@ def calcular_huellas(mundo, semilla, catalogo, noticias=None, grafo_social=None)
     calles = sorted(sorted([a, b]) for a, b in mundo.segmentos())
     limites = [round(float(v), 2) for v in mundo.limites_recorribles()]
     datos_mundo = {"semilla": int(semilla), "lugares": lugares, "calles": calles, "limites": limites}
+    # Feria alargada (ALCALDE_PUESTOS_FIJOS): mueve casas del barrio (colisión que valida el anfitrión). Solo entra con la
+    # bandera encendida, así la huella con la bandera en 0 es la de siempre y dos equipos con la bandera distinta no se
+    # emparejan (verían casas distintas).
+    zona_feria = next((z for z in getattr(mundo, "zonas", lambda: [])() if z.tipo == "mercado"), None)
+    if zona_feria is not None and getattr(zona_feria, "reserva", 0.0):
+        datos_mundo["feria"] = [round(float(zona_feria.cx), 2), round(float(zona_feria.cz), 2),
+                                round(float(zona_feria.ancho), 2), round(float(zona_feria.fondo), 2)]
+        # Y los puestos fijos (2026-11-22: Oficina do Beto y Zeca pasaron a la pared oeste de la Rodoviária): su colisión
+        # y sus NPC tienen que estar en el mismo sitio en todos los equipos.
+        try:
+            from backend.datos.comercios_semilla import CATALOGO_COMERCIOS
+            from backend.logica.comercios import resolver_comercios
+            datos_mundo["puestos"] = sorted([c.id, round(float(x), 2), round(float(z), 2), round(float(r), 1)]
+                                            for c, (x, z, r) in resolver_comercios(mundo, CATALOGO_COMERCIOS)
+                                            if c.ancla.get("fijo"))
+        except (ValueError, KeyError, AttributeError):          # mundo de pruebas sin esos lugares: sin la clave
+            pass
     h_mundo = huellas.huella_mundo(datos_mundo)
     if noticias is None:
         from backend.datos.noticias_semilla import NOTICIAS_SEMILLA as noticias
@@ -167,8 +184,18 @@ def calcular_huellas(mundo, semilla, catalogo, noticias=None, grafo_social=None)
     h_contenido = huellas.huella_contenido({
         "v": protocolo.PROTOCOLO_V, "misiones": misiones, "roles": list(ORDEN_ROLES), "noticias": lista_noticias,
         "ciudadanos": sorted(grafo_social.ciudadanos()), "relaciones": relaciones,
-        "ciudadano_por_rol": sorted(CIUDADANO_POR_ROL.items())})
+        "ciudadano_por_rol": sorted(CIUDADANO_POR_ROL.items()),
+        # NET-004: con bicis y motos en línea distintas, un equipo veía vehículos que el otro no podía montar: no se
+        # emparejan. Solo entra si quien llama lo dice (None = la huella de siempre, p. ej. en las pruebas).
+        **({} if vehiculos is None else {"vehiculos": bool(vehiculos)})})
     return h_mundo, h_contenido
+
+
+# NET-003: no solo la semilla cambia el mundo: también la feria alargada (ALCALDE_PUESTOS_FIJOS) y las bicis y motos en
+# línea (ALCALDE_VEHICULOS_ONLINE). El texto lo dice en vez de mandar a cambiar una semilla que ya era la misma.
+def texto_mundo_distinto(semilla):
+    return (f"Tu mundo es distinto: usa ALCALDE_SEMILLA={semilla} y las mismas opciones de mundo que el anfitrión "
+            "(ALCALDE_PUESTOS_FIJOS, ALCALDE_VEHICULOS_ONLINE) y el mismo código del juego.")
 
 
 def texto_version(v_cliente, juego=protocolo.JUEGO):
@@ -529,8 +556,7 @@ class Anfitrion:
             return None
         self.veto.registrar_exito(ip)
         if hola["huella_mundo"] != self.huella_mundo or hola["huella_contenido"] != self.huella_contenido:
-            await self._rechazar(conn, "mundo_distinto",
-                                 f"Tu mundo es distinto. Reinicia con ALCALDE_SEMILLA={self.semilla}.")
+            await self._rechazar(conn, "mundo_distinto", texto_mundo_distinto(self.semilla))
             return None
         if not self._alta_permitida(ip):
             await self._rechazar(conn, "lleno_de_conexiones", "Demasiadas entradas seguidas. Espera un momento.")

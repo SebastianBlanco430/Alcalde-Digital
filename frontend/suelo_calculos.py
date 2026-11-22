@@ -8,7 +8,9 @@
 # Todo es ajustable desde las constantes de abajo; para volver al suelo de antes basta con no pasar
 # `color_en` a la malla del terreno (ver ciudad_3d._malla_terreno).
 
+import colorsys
 import math
+import os
 
 from frontend.azar_fijo import azar_de, ruido_suave
 
@@ -171,9 +173,41 @@ BRILLO_PLAZA = 0.82
 BANDAS_PLAZA = 9                    # franjas concéntricas del disco (los colores de la paleta se repiten)
 
 
+# PLAZA SUAVE (pulido visual M1.5, diagnóstico D4): el disco gritaba más que el jugador (alta saturación y valores muy
+# separados en una superficie grande). Cada paleta pierde SATURACION_PLAZA de saturación y sus luminosidades se acercan
+# a la media de la paleta (CONTRASTE_PLAZA = lo que queda de la distancia a la media). Los tonos no cambian.
+# PLAZA_SUAVE = False o ALCALDE_PLAZA_SUAVE=0: las paletas de siempre.
+PLAZA_SUAVE = True
+SATURACION_PLAZA = 0.75             # -25 % de saturación
+CONTRASTE_PLAZA = 0.70              # luminosidades 30 % más juntas
+
+
+def plaza_suave_activa(entorno=None):
+    bruto = str((os.environ if entorno is None else entorno).get("ALCALDE_PLAZA_SUAVE", "")).strip().lower()
+    if bruto in ("0", "false", "no", "off"):
+        return False
+    if bruto in ("1", "true", "si", "sí", "on"):
+        return True
+    return PLAZA_SUAVE
+
+
+# Paleta RGB 0-255 con menos saturación y luminosidades más juntas (ver PLAZA SUAVE). Devuelve enteros 0-255.
+def suavizar_paleta(paleta, saturacion=SATURACION_PLAZA, contraste=CONTRASTE_PLAZA):
+    hls = [colorsys.rgb_to_hls(*(c / 255 for c in tono)) for tono in paleta]
+    media = sum(l for _, l, _ in hls) / len(hls)
+    salida = []
+    for h, l, s in hls:
+        r, g, b = colorsys.hls_to_rgb(h, media + (l - media) * contraste, s * saturacion)
+        salida.append(tuple(max(0, min(255, round(c * 255))) for c in (r, g, b)))
+    return tuple(salida)
+
+
 # Índice de la paleta que le toca a cada plaza (por su orden), y la paleta.
-def paleta_de_plaza(indice):
-    return PALETAS_PLAZA[indice % len(PALETAS_PLAZA)]
+def paleta_de_plaza(indice, suave=None):
+    paleta = PALETAS_PLAZA[indice % len(PALETAS_PLAZA)]
+    if suave if suave is not None else plaza_suave_activa():
+        return suavizar_paleta(paleta)
+    return paleta
 
 
 # Color RGB 0-1 del punto del disco de la plaza a la fracción de radio `r` (0-1) y el ángulo `theta` (rad):

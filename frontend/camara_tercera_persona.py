@@ -54,6 +54,7 @@ RAPIDEZ_SEGUIR = 10.0         # el pivote alcanza al jugador (caminando casi no 
 RAPIDEZ_VIAJE = 3.0           # cuando está lejos (cambio de turno) se desliza más despacio
 FOV_EXTRA_CORRER = 4.0        # grados de FOV que se suman al correr (sube en ~250 ms, baja en ~400 ms)
 VELOCIDAD_VIAJE = 32.0        # m/s máximos del pivote al viajar (sin tirón inicial al cambiar de turno)
+CAMARA_SUELO_SUAVE = cc.camara_suelo_suave_activa()   # R1: protección contra la ladera continua (=0 como antes)
 
 
 class CamaraTerceraPersona(Entity):
@@ -85,6 +86,7 @@ class CamaraTerceraPersona(Entity):
         self._meta_previa = None                 # (x, z) del objetivo en el frame anterior
         self._reposo = (0.0, 0.0)                # sesgo del recentrado del cursor (ver quitar_reposo)
         self._oculto_por_camara = None           # avatar que ESTA cámara ocultó (solo ese se vuelve a mostrar)
+        self._pitch_efectivo = None              # pitch con el que se coloca (>= self.pitch; lo sube la ladera)
 
     # -- Estado --
 
@@ -103,6 +105,7 @@ class CamaraTerceraPersona(Entity):
     def soltar_control(self):
         self.controlada = False
         self.distancia_real = self.distancia
+        self._pitch_efectivo = None
 
     def pivote(self):
         return self._pivote
@@ -112,7 +115,24 @@ class CamaraTerceraPersona(Entity):
         if self.objetivo is not None:
             self._pivote = tuple(self.objetivo())
             self.distancia_real = self.distancia
+            self._pitch_efectivo = None
             self.actualizar(0)
+
+    # EST-012: coloca la cámara de golpe con el rumbo `yaw_preferido` o, si la colisión de cámara (la de siempre) la
+    # acerca al pivote, con el rumbo más cercano a él que la deja más lejos (pasos de 45°). Al cargar junto a una puerta
+    # el rumbo hacia el destino podía dejarla pegada a la fachada. Devuelve el rumbo elegido.
+    def colocar_libre(self, yaw_preferido):
+        mejor_yaw, mejor_d = yaw_preferido, -1.0
+        for k in (0, 1, -1, 2, -2, 3, -3, 4):
+            self.yaw = yaw_preferido + 45.0 * k
+            self.colocar_ya()
+            if self.distancia_real >= self.distancia - 0.05:
+                return self.yaw
+            if self.distancia_real > mejor_d + 0.05:
+                mejor_yaw, mejor_d = self.yaw, self.distancia_real
+        self.yaw = mejor_yaw
+        self.colocar_ya()
+        return self.yaw
 
     # -- Frame --
 
@@ -163,21 +183,18 @@ class CamaraTerceraPersona(Entity):
         if self.altura_extra:
             pivote = (pivote[0], pivote[1] + self.altura_extra, pivote[2])
         pedida = self.distancia + self.distancia_extra
-        impacto = self._distancia_hasta_obstaculo(pivote)
-        deseada = cc.posicion_orbital(pivote, self.yaw, self.pitch, pedida)
-        impacto_suelo = cc.distancia_libre_de_suelo(pivote, deseada, self.suelo)
-        if impacto_suelo is not None:
-            impacto = impacto_suelo if impacto is None else min(impacto, impacto_suelo)
-        objetivo = cc.distancia_con_colision(
-            pedida, impacto, MARGEN_COLISION, DISTANCIA_MIN_COLISION)
+        tope = None
         if CAMARA_ANALITICA and self.obstaculos:
-            objetivo = min(objetivo, cc.distancia_libre_analitica(
-                pivote, deseada, self.obstaculos, MARGEN_COLISION, MINIMO_ANALITICO))
-        suave = cc.suavizar_distancia(self.distancia_real, objetivo, dt)
-        # Hacia adentro nunca por detrás de la pared: el suavizado solo afloja el alejarse.
-        self.distancia_real = min(suave, objetivo)
-        camera.position = cc.posicion_orbital(pivote, self.yaw, self.pitch, self.distancia_real)
-        camera.rotation = (self.pitch, self.yaw, 0)
+            def tope(deseada):
+                return cc.distancia_libre_analitica(pivote, deseada, self.obstaculos, MARGEN_COLISION, MINIMO_ANALITICO)
+        # R1: con ALCALDE_CAMARA_SUELO_SUAVE la ladera sube el pitch efectivo (continuo) en vez de acortar la distancia
+        # a escalones; con =0, paso_camara_suelo hace exactamente lo de antes (pitch efectivo = pitch pedido).
+        self.distancia_real, self._pitch_efectivo, posicion = cc.paso_camara_suelo(
+            pivote, self.yaw, self.pitch, pedida, self.distancia_real, self._pitch_efectivo, self.suelo, dt,
+            impacto_paredes=lambda pitch: self._distancia_hasta_obstaculo(pivote, pitch), tope_paredes=tope,
+            margen=MARGEN_COLISION, dmin=DISTANCIA_MIN_COLISION, suave=CAMARA_SUELO_SUAVE)
+        camera.position = posicion
+        camera.rotation = (self._pitch_efectivo, self.yaw, 0)
         self._actualizar_fov(meta, dt)
         if OCULTAR_AVATAR_CERCA:
             self._ocultar_avatar_si_tapa(pivote)
@@ -229,11 +246,11 @@ class CamaraTerceraPersona(Entity):
 
     # Distancia del pivote al primer obstáculo en dirección a la cámara deseada (None si
     # no hay). El raycast no toca personajes (`ignorar`) ni nada sin collider.
-    def _distancia_hasta_obstaculo(self, pivote):
+    def _distancia_hasta_obstaculo(self, pivote, pitch=None):
         if self.raiz_colisiones is None:
             return None
         pedida = self.distancia + self.distancia_extra
-        deseada = Vec3(*cc.posicion_orbital(pivote, self.yaw, self.pitch, pedida))
+        deseada = Vec3(*cc.posicion_orbital(pivote, self.yaw, self.pitch if pitch is None else pitch, pedida))
         origen = Vec3(*pivote)
         direccion = (deseada - origen).normalized()
         golpe = raycast(origen, direccion, distance=pedida,

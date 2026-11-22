@@ -16,9 +16,10 @@ import math
 import sys
 
 from panda3d.core import (AnimBundle, AnimBundleNode, AnimChannelMatrixXfmTable, AnimGroup, CharacterJoint,
-                          LMatrix3, LMatrix4, LVecBase3, PTA_stdfloat, decompose_matrix)
+                          LMatrix3, LMatrix4, LVecBase3, PTA_stdfloat, PandaSystem, decompose_matrix)
 
 from frontend import animacion_humana_calculos as ac
+from frontend import cache_animacion_calculos as cac
 
 FOTOGRAMAS = 24                  # fotogramas por ciclo de marcha
 FPS = 30.0
@@ -27,6 +28,8 @@ CLIP_ESCALON = "HumEscalon"
 CLIPS_SALTO = {"impulso": "HumImpulso", "ascenso": "HumAscenso", "caida": "HumCaida", "aterrizaje": "HumAterrizaje"}
 CLIPS_GESTO = {"dar": "HumEntregar", "recibir": "HumRecibir"}     # poses de 1 fotograma (traspaso de mano a mano)
 NOMBRES_MARCHA = tuple(f"{PREFIJO_MARCHA}{i}" for i in range(len(ac.VELS)))
+NOMBRES_BAJADA = tuple(f"HumBajada{i}" for i in range(len(ac.VELS)))     # ANI-002: marcha bajando escaleras
+CICLICOS = frozenset(NOMBRES_MARCHA + NOMBRES_BAJADA + ("HumEscalon",))
 TIEMPO_MEZCLA = 0.14             # s para cambiar de clip
 TIEMPO_GESTO = 0.32              # s para entrar y SALIR de Saludar/Hablar (cambio de pose grande: más suave)
 SUAVIZADO_VELOCIDAD = 8.0        # 1/s: la velocidad real (con ruido de colisiones) se suaviza antes de elegir clip
@@ -303,14 +306,63 @@ def _desenrollar(serie):
 
 def _construir_clip(esq, nombre, poses):
     # poses: lista de poses (una por fotograma). Devuelve el AnimBundle.
+    # Con ALCALDE_CACHE_ANIMACION (frontend/cache_animacion_calculos.py) las tablas salen de la caché si están (mismo
+    # esqueleto, mismas poses, mismo código) y, si no, se calculan como siempre y se guardan. Sin la bandera, igual que antes.
+    if not cac.cache_animacion_activa():
+        return _calcular_clip(esq, nombre, poses)
+    try:
+        clave = cac.clave_clip(_huella_esqueleto(esq), nombre, FPS, poses, PandaSystem.getVersionString())
+    except Exception:      # noqa: BLE001 — sin clave no hay caché, pero el clip se hornea igual
+        return _calcular_clip(esq, nombre, poses)
+    tablas = cac.obtener(clave)
+    if tablas is not None:
+        try:
+            return _banco_de_tablas(nombre, len(poses), tablas)
+        except Exception:      # noqa: BLE001 — tabla rara: se recalcula
+            pass
+    tablas = []
+    banco = _calcular_clip(esq, nombre, poses, tablas)
+    cac.guardar(clave, tablas)
+    return banco
+
+
+# Huella del esqueleto para la clave de la caché (una vez por Esqueleto).
+def _huella_esqueleto(esq):
+    huella = getattr(esq, "_huella_cache", None)
+    if huella is None:
+        filas = lambda m: tuple(m.getCell(i, j) for i in range(4) for j in range(4))
+        huella = cac.huella_esqueleto(esq.orden, esq.padre, {n: filas(m) for n, m in esq.local_rep.items()},
+                                      {n: filas(m) for n, m in esq.local_idle.items()})
+        esq._huella_cache = huella
+    return huella
+
+
+# AnimBundle rearmado con las tablas guardadas: mismos canales, mismos padres, mismo orden que _calcular_clip.
+def _banco_de_tablas(nombre, fotogramas, tablas):
+    banco = AnimBundle(nombre, FPS, fotogramas)
+    raiz = AnimGroup(banco, "<skeleton>")
+    canales = []
+    for nombre_hueso, padre, series in tablas:
+        canal = AnimChannelMatrixXfmTable(raiz if padre < 0 else canales[padre], nombre_hueso)
+        for k in "hprxyz":
+            canal.setTable(k.encode(), PTA_stdfloat(series[k]))
+        for k in "ijk":
+            canal.setTable(k.encode(), PTA_stdfloat([1.0]))
+        canales.append(canal)
+    return banco
+
+
+# El horneado de siempre. Si se pasa `tablas` (lista), además anota en ella lo que se puso en cada canal.
+def _calcular_clip(esq, nombre, poses, tablas=None):
     hornero = Hornero(esq)
     cuadros = [hornero.locales(p) for p in poses]
     banco = AnimBundle(nombre, FPS, len(poses))
     raiz = AnimGroup(banco, "<skeleton>")
     canales = {}
+    indices = {}
     escala, cizalla, hpr, pos = LVecBase3(), LVecBase3(), LVecBase3(), LVecBase3()
 
-    def crear(nombre_hueso, padre_grupo):
+    def crear(nombre_hueso, padre_grupo, padre_nombre):
         canal = AnimChannelMatrixXfmTable(padre_grupo, nombre_hueso)
         series = {k: [] for k in "hprxyz"}
         for c in cuadros:
@@ -319,17 +371,22 @@ def _construir_clip(esq, nombre, poses):
                 series[k].append(v)
         for k in "hpr":
             series[k] = _desenrollar(series[k])
+        puestas = {}
         for k, valores in series.items():
-            canal.setTable(k.encode(), PTA_stdfloat([valores[0]] if _constante(valores) else valores))
+            puestas[k] = [valores[0]] if _constante(valores) else valores
+            canal.setTable(k.encode(), PTA_stdfloat(puestas[k]))
         for k in "ijk":
             canal.setTable(k.encode(), PTA_stdfloat([1.0]))
         canales[nombre_hueso] = canal
+        if tablas is not None:
+            indices[nombre_hueso] = len(tablas)
+            tablas.append((nombre_hueso, -1 if padre_nombre is None else indices[padre_nombre], puestas))
         for hijo in esq.hijos[nombre_hueso]:
-            crear(hijo, canal)
+            crear(hijo, canal, nombre_hueso)
 
     for nombre_hueso in esq.orden:
         if esq.padre[nombre_hueso] is None:
-            crear(nombre_hueso, raiz)
+            crear(nombre_hueso, raiz, None)
     return banco
 
 
@@ -349,6 +406,7 @@ def hornear_clips(modelo_np, rol):
         clips = []
         for i, v in enumerate(ac.VELS):
             clips.append((NOMBRES_MARCHA[i], [ac.pose_marcha(k / FOTOGRAMAS, v, m) for k in range(FOTOGRAMAS)]))
+            clips.append((NOMBRES_BAJADA[i], [ac.pose_bajada(k / FOTOGRAMAS, v, m) for k in range(FOTOGRAMAS)]))
         clips.append((CLIP_ESCALON, [ac.pose_escalon(k / FOTOGRAMAS, m) for k in range(FOTOGRAMAS)]))
         for etapa, nombre in CLIPS_SALTO.items():
             clips.append((nombre, [ac.pose_salto(etapa, m)]))
@@ -388,6 +446,10 @@ class AnimadorHumano:
         except Exception:
             self.escala = 1.0
         self.fase_inicial = float(getattr(personaje, "_fase_marcha_inicial", lambda: 0.0)())
+        try:                                        # modelos de una caché de animación vieja: sin clips de bajada
+            self.con_bajada = self.actor.getAnimControl(NOMBRES_BAJADA[0]) is not None
+        except Exception:
+            self.con_bajada = False
         self.actor.getPartBundle("modelRoot").setFrameBlendFlag(True)   # interpolar fotogramas: movimiento suave
 
     # -- Objetivo de pesos --
@@ -431,6 +493,10 @@ class AnimadorHumano:
         if getattr(self.p, "_subiendo", False):
             return {IDLE: 1 - g, CLIP_ESCALON: g}, ac.cadencia_escalon(v)
         i, w, cadencia = ac.mezcla_marcha(v)
+        k = ac.peso_bajada(getattr(self.p, "_bajando", 0.0)) if self.con_bajada else 0.0
+        if k > 0.0:                                 # ANI-002: bajando una escalera, misma fase y cadencia
+            return {IDLE: 1 - g, NOMBRES_MARCHA[i]: g * (1 - w) * (1 - k), NOMBRES_MARCHA[i + 1]: g * w * (1 - k),
+                    NOMBRES_BAJADA[i]: g * (1 - w) * k, NOMBRES_BAJADA[i + 1]: g * w * k}, cadencia
         return {IDLE: 1 - g, NOMBRES_MARCHA[i]: g * (1 - w), NOMBRES_MARCHA[i + 1]: g * w}, cadencia
 
     # -- Aplicar al Actor --
@@ -442,7 +508,7 @@ class AnimadorHumano:
         for clip in set(self.pesos) | set(objetivo):
             meta = objetivo.get(clip, 0.0)
             actual = self.pesos.get(clip, 0.0)
-            if clip in (CLIP_ESCALON,) or clip in NOMBRES_MARCHA:
+            if clip in CICLICOS:
                 nuevo = meta if abs(meta - actual) < 0.5 else (min(meta, actual + paso) if meta > actual else max(meta, actual - paso))
             else:
                 nuevo = min(meta, actual + paso) if meta > actual else max(meta, actual - paso)
@@ -457,7 +523,7 @@ class AnimadorHumano:
             if clip not in self.reproduciendo:
                 self._arrancar(clip)
             self.pesos[clip] = nuevo
-            es_marcha = clip in NOMBRES_MARCHA or clip == CLIP_ESCALON
+            es_marcha = clip in CICLICOS
             # los pesos de la marcha quedan lineales (la cadencia exacta depende de ellos); el resto se suaviza
             actor.setControlEffect(clip, nuevo if es_marcha else ac._suave(nuevo))
             self._tasa(clip, cadencia)
@@ -469,9 +535,9 @@ class AnimadorHumano:
         if clip in CLIPS_SALTO.values() or clip in CLIPS_GESTO.values():
             actor.pose(clip, 0)
             return
-        if clip in NOMBRES_MARCHA or clip == CLIP_ESCALON:
+        if clip in CICLICOS:
             control = actor.getAnimControl(clip)
-            otros = [c for c in self.reproduciendo if c != clip and (c in NOMBRES_MARCHA or c == CLIP_ESCALON)]
+            otros = [c for c in self.reproduciendo if c != clip and c in CICLICOS]
             if otros:
                 cuadro = actor.getCurrentFrame(otros[0]) or 0
             else:
@@ -489,7 +555,7 @@ class AnimadorHumano:
             return
         if self.congelado:
             tasa = 0.0
-        elif clip in NOMBRES_MARCHA or clip == CLIP_ESCALON:
+        elif clip in CICLICOS:
             tasa = max(0.05, cadencia * FOTOGRAMAS / FPS)
         else:
             tasa = 1.0

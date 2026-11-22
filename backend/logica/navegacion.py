@@ -138,8 +138,117 @@ def ruta_gps_hasta_puerta(mundo, x, z, destino):
     except ValueError:
         edificio = None
     if edificio is None:
-        return puntos or [mundo.coordenada(destino)]
-    return puntos + [edificio.punto_entrada(), edificio.puerta()]
+        return rodear_obstaculos(mundo, (x, z), puntos) or [mundo.coordenada(destino)]
+    return rodear_obstaculos(mundo, (x, z), puntos + [edificio.punto_entrada()]) + [edificio.puerta()]
+
+
+# -- Rodeo de obstáculos (VIS-002 / EST-014 / REN-002) ---------------------------------------------------------------
+# Los puntos del GPS son centros de plaza: el de la Praça da Sé cae DENTRO de la fuente y la recta de la plaza del
+# Mercado cruza el toldo del puesto fijo de Seu Heitor. Con las colisiones reales del mundo (`es_transitable`):
+#   1. un punto de paso dentro de un obstáculo se mueve al punto libre más cercano (el que menos alarga la ruta);
+#   2. un tramo que cruza algo recibe un punto de desvío lateral (el menor que deja libres los dos tramos nuevos).
+# El último tramo (entrada -> puerta) no se toca: la puerta está en la fachada. Un mapa sin `es_transitable` (los
+# tests del mapa 2D) devuelve los puntos tal cual. Caché por tramo (los puntos de plaza no cambian) y del primer tramo
+# por la posición del jugador redondeada a 1 m.
+PASO_MUESTREO = 0.5                       # m entre muestras de un tramo
+DESVIOS = tuple(0.75 * i for i in range(1, 15))     # distancias laterales que se prueban (hasta 10,5 m)
+RADIOS_LIBRES = (0.6, 1.2, 1.8, 2.4, 3.0, 3.6, 4.5, 5.5, 7.0)
+_CACHE_TRAMOS = {}
+_CACHE_PUNTOS = {}
+_MAX_CACHE = 512
+
+
+def _transitable(mundo, p):
+    return mundo.es_transitable(p[0], p[1])
+
+
+def _tramo_libre(mundo, a, b):
+    largo = math.hypot(b[0] - a[0], b[1] - a[1])
+    n = max(1, int(largo / PASO_MUESTREO))
+    return all(_transitable(mundo, (a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n)) for i in range(1, n))
+
+
+def _anclas_del_bloqueo(a, b, mundo):
+    """Puntos del tramo desde los que se prueba el desvío: centro, principio y final del trozo bloqueado."""
+    largo = math.hypot(b[0] - a[0], b[1] - a[1])
+    n = max(1, int(largo / PASO_MUESTREO))
+    bloqueados = [i for i in range(1, n) if not _transitable(mundo, (a[0] + (b[0] - a[0]) * i / n,
+                                                                    a[1] + (b[1] - a[1]) * i / n))]
+    ts = ((bloqueados[0] + bloqueados[-1]) / 2 / n, bloqueados[0] / n, bloqueados[-1] / n)
+    return [(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t) for t in ts]
+
+
+def _desvio(mundo, a, b):
+    clave = (id(mundo), round(a[0], 1), round(a[1], 1), round(b[0], 1), round(b[1], 1))
+    if clave in _CACHE_TRAMOS:
+        return _CACHE_TRAMOS[clave]
+    desvio = []
+    if not _tramo_libre(mundo, a, b):
+        largo = math.hypot(b[0] - a[0], b[1] - a[1]) or 1.0
+        nx, nz = -(b[1] - a[1]) / largo, (b[0] - a[0]) / largo
+        for mx, mz in _anclas_del_bloqueo(a, b, mundo):
+            for d in DESVIOS:
+                hallado = None
+                for lado in (1.0, -1.0):
+                    w = (mx + nx * d * lado, mz + nz * d * lado)
+                    if _transitable(mundo, w) and _tramo_libre(mundo, a, w) and _tramo_libre(mundo, w, b):
+                        hallado = w
+                        break
+                if hallado is not None:
+                    desvio = [hallado]
+                    break
+            if desvio:
+                break
+    if len(_CACHE_TRAMOS) > _MAX_CACHE:
+        _CACHE_TRAMOS.clear()
+    _CACHE_TRAMOS[clave] = desvio
+    return desvio
+
+
+def _sacar_de_obstaculo(mundo, p, previo, siguiente):
+    if _transitable(mundo, p):
+        return p
+    clave = (id(mundo), round(p[0], 1), round(p[1], 1), previo is None, siguiente is None)
+    if clave in _CACHE_PUNTOS:
+        return _CACHE_PUNTOS[clave]
+    # El mejor punto libre alrededor: primero que deje libres los dos tramos que lo tocan, luego el que menos alarga.
+    mejor, mejor_clave = p, None
+    for r in RADIOS_LIBRES:
+        for k in range(16):
+            q = (p[0] + r * math.cos(k * math.pi / 8), p[1] + r * math.sin(k * math.pi / 8))
+            if not _transitable(mundo, q):
+                continue
+            libres = sum(1 for o in (previo, siguiente) if o is None or _tramo_libre(mundo, o, q))
+            costo = sum(math.hypot(q[0] - o[0], q[1] - o[1]) for o in (previo, siguiente) if o is not None)
+            orden = (-libres, costo)
+            if mejor_clave is None or orden < mejor_clave:
+                mejor, mejor_clave = q, orden
+        if mejor_clave is not None and mejor_clave[0] == -2:
+            break                                # el anillo más cercano con los dos tramos libres
+    if len(_CACHE_PUNTOS) > _MAX_CACHE:
+        _CACHE_PUNTOS.clear()
+    _CACHE_PUNTOS[clave] = mejor
+    return mejor
+
+
+def rodear_obstaculos(mundo, inicio, puntos):
+    """`puntos` del GPS (sin el jugador) con los rodeos de arriba; `inicio` = (x, z) del jugador."""
+    if not puntos or not callable(getattr(mundo, "es_transitable", None)):
+        return list(puntos)
+    try:
+        fijos = list(puntos)
+        for i in range(len(fijos) - 1):        # el último (punto de entrada / destino) no se mueve
+            previo = fijos[i - 1] if i > 0 else inicio
+            fijos[i] = _sacar_de_obstaculo(mundo, fijos[i], previo, fijos[i + 1])
+        salida = []
+        anterior = (round(inicio[0]), round(inicio[1]))
+        for p in fijos:
+            salida.extend(_desvio(mundo, anterior, p))
+            salida.append(p)
+            anterior = p
+        return salida
+    except Exception:                          # noqa: BLE001 — ante cualquier rareza del mundo, la ruta de siempre
+        return list(puntos)
 
 
 # Siguiente esquina del GPS, o None si ya llegó (o no hay camino).

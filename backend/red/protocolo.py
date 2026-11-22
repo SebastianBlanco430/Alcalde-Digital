@@ -1,4 +1,4 @@
-# Protocolo v1 del modo online: JSON por líneas UTF-8 terminadas en "\n".
+# Protocolo del modo online (versión en PROTOCOLO_V, abajo): JSON por líneas UTF-8 terminadas en "\n".
 # Módulo PURO (solo stdlib). Todo dato que llega de la red pasa por `decodificar`, que valida
 # tamaño, JSON estricto (sin NaN/Infinity ni claves duplicadas), profundidad, esquema y rangos.
 # Nada de lo que llega se usa como ruta, modelo ni escena: aquí solo se obtienen datos tipados.

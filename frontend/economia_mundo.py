@@ -17,7 +17,8 @@ from ursina import Entity, Text, color
 from backend.datos.items_semilla import CATALOGO_ITEMS
 from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 from backend.logica.perfil_economia import perfil_de
-from frontend import diseno_adaptable, economia_config as cfg, estilo, inventario_calculos as calc, tipografia
+from frontend import (
+    diseno_adaptable, economia_config as cfg, estilo, hud_esquinas_calculos, inventario_calculos as calc, tipografia)
 from frontend.componentes import a_unidades, escala_fuente, panel_tinta, rgb
 from frontend.inventario_calculos import ControlInventario
 from frontend.inventario_ui import PanelInventario
@@ -157,6 +158,11 @@ class IntegracionEconomia(Entity):
         destruir = getattr(interaccion, "destruir", None)
         if callable(destruir):
             destruir()
+
+    def limpiar_suelo(self):
+        """BUG-003: lo soltado al suelo es de la partida (y no se guarda): otra sesión (Partida nueva o Continuar) lo quita."""
+        for interaccion in [i for i in self.interacciones if isinstance(i, ObjetoSuelo)]:
+            self.quitar(interaccion)
 
     def _instalar_modulos(self):
         for bandera, nombre in ((cfg.COMERCIOS, "comercios_mundo"), (cfg.VENDEDOR_CALLE, "vendedor_calle"),
@@ -316,8 +322,14 @@ class IntegracionEconomia(Entity):
         self.chip.texto = Text("", parent=self.chip, origin=(0, 0), position=(0, 0, -0.01), scale=escala_fuente(17),
                                color=rgb(estilo.COLOR_TEXTO), font=tipografia.FUENTE_TITULO)
         self.chip.position = (-diseno_adaptable.aspecto() / 2 + MARGEN + ANCHO_CHIP / 2, -0.5 + MARGEN + ALTO_CHIP / 2)
+        if hud_esquinas_calculos.activo():       # mapa de esquinas (M3.1): base de la pila de abajo a la izquierda
+            self.chip.position = hud_esquinas_calculos.centro_chip_pila(diseno_adaptable.aspecto(), 0, ANCHO_CHIP, ALTO_CHIP)
         diseno_adaptable.anclar(self.chip, "izquierda")
         self._actualizar_chip(force=True)
+        # M3.5: en el HUD «mínimo» el dinero sale 4 s cuando cambia el saldo (no-op si el ajuste no aplica).
+        registrar = getattr(self.escena.hud, "registrar_bloque", None)
+        if callable(registrar):
+            registrar("dinero", self.chip, lambda: self.chip.texto.text or None)
 
     def _actualizar_chip(self, force=False):
         perfil = self.perfil()
@@ -346,7 +358,11 @@ class IntegracionEconomia(Entity):
             else:
                 modal.actualizar()
         self._actualizar_chip()
-        self.chip.enabled = self.chip.enabled and not self.escena._cinematica
+        # Visible si hay saldo y no hay cinemática. Antes era `enabled and not cinematica`: tras una cinemática el chip
+        # quedaba oculto hasta el siguiente cambio de dinero (se veía al acortar el arranque, M7.2).
+        visible = self._chip_saldo is not None and not self.escena._cinematica
+        if self.chip.enabled != visible:
+            self.chip.enabled = visible
         for inter in list(self.interacciones):
             inter.actualizar(dt)
         self._actualizar_aviso(flujo, jugador)

@@ -3,7 +3,7 @@
 > **Borrador para revisión legal antes de publicar.** El autor de este texto no es abogado. Es material de un
 > proyecto de aprendizaje con datos ficticios; no es asesoría legal.
 >
-> Versión 1.1 · 2026-10-24 · Protocolo de red v3
+> Versión 1.2 · 2026-11-22 · Protocolo de red v6
 
 El modo online permite jugar en cooperación en tiempo real hasta 4 personas. **Una persona aloja la partida** y
 las demás se conectan a su dirección IP y puerto. No hay servidores externos ni cuentas: todo ocurre entre los
@@ -20,8 +20,9 @@ Todos los jugadores deben arrancar el juego con las mismas opciones. Si difieren
 | Variable | Qué hace | Regla |
 |---|---|---|
 | `ALCALDE_ONLINE` | Modo online activo por defecto; `0` lo apaga y deja el juego de un solo equipo | Cada jugador |
-| `ALCALDE_VEHICULOS_ONLINE` | Bicis y motos en línea. Activo salvo que valga `0` | **Debe coincidir en todos** |
+| `ALCALDE_VEHICULOS_ONLINE` | Bicis y motos en línea. Activo salvo que valga `0` | **Debe coincidir en todos** (entra en la huella: si difiere, «Mundo distinto») |
 | `ALCALDE_SEMILLA=N` | Entero que decide la disposición de la favela | **Debe coincidir en todos** |
+| `ALCALDE_PUESTOS_FIJOS` | Puestos de comercio fijos y feria alargada (activo por defecto) | **Debe coincidir en todos** (cambia el mundo: si difiere, «Mundo distinto») |
 
 Ejemplo (macOS, desde la carpeta del proyecto):
 
@@ -55,6 +56,10 @@ Opciones:
 - `--sin-auto-iniciar`: no empieza sola; usa la orden `iniciar`.
 - `--primero-cualquiera`: el primer jugador puede venir de otro equipo (por defecto debe entrar desde el
   propio equipo anfitrión).
+
+En el servidor sin gráficos **nadie es «el anfitrión que cierra»**: si el primero en entrar se cae, recibe los mismos
+90 s de reconexión que los demás y la sala sigue. Al terminar la partida, en cuanto no queda nadie conectado, el
+servidor se apaga solo (para otra partida, se vuelve a lanzar).
 
 El programa imprime `IP:puerto` y el **código de sala**. Órdenes por teclado: `iniciar`, `estado`, `salir`.
 Con `abierto` te pide escribir `ABRIR` para confirmar.
@@ -106,7 +111,10 @@ Si se corta tu conexión, tienes unos **90 segundos** para reconectar y conserva
 ## 8. Límites conocidos
 
 - Máximo 4 jugadores y 8 conexiones totales; 2 conexiones por IP por defecto (`--max-por-ip` lo cambia).
-- Sin migración de anfitrión: si el anfitrión se va o se cae, **la sala se cierra** para todos.
+- Sin migración de anfitrión: si el anfitrión **con ventana** se va o se cae, **la sala se cierra** para todos (en el
+  servidor sin gráficos no: ver la sección 3).
+- Si un jugador se desconecta con misión, se le guarda 90 s para volver; pero si los demás ya no tienen nada que hacer,
+  se le da por salido enseguida y su misión pasa a otro (o termina la partida) en vez de esperar.
 - Una IP con 5 fallos de entrada en 60 s queda vetada 60 s; el veto afecta a todos los que comparten esa IP,
   incluidos jugadores legítimos que se reconectan.
 - Un máximo de 12 altas por IP por minuto.
@@ -120,11 +128,24 @@ Si se corta tu conexión, tienes unos **90 segundos** para reconectar y conserva
 ### Versiones y contenido compartido
 
 Todos los equipos deben tener **la misma versión del juego**. El anfitrión compara dos huellas (SHA-256): la del
-mundo (semilla, lugares, calles y límites) y la del contenido (misiones con sus textos, roles, noticias, el grafo
-social con sus relaciones y el ciudadano de cada rol). Si no coinciden, la sala rechaza la entrada.
+mundo (semilla, lugares, calles, límites y, con `ALCALDE_PUESTOS_FIJOS`, la feria alargada y los puestos fijos) y la del contenido
+(versión del protocolo, misiones con sus textos, roles, noticias, el grafo social con sus relaciones, el ciudadano de
+cada rol y, desde el 2026-11-22, si hay bicis y motos en línea). Si no coinciden, la sala rechaza la entrada.
 
-- **Protocolo v3 (2026-10-24):** el grafo social ganó la relación puente Luana–Nayara (la comunidad del Morro ya
-  no está separada de la red de Ana). Un equipo con la versión anterior recibe el rechazo «versión distinta».
+Versión actual del protocolo: **v6** (`backend/red/protocolo.PROTOCOLO_V`). Historia:
+
+- **v2 (2026-10):** banderas de `pos`/`snap` (caballito) y huellas que cubren calles, noticias, grafo y misiones.
+- **v3 (2026-10-24):** el grafo social ganó la relación puente Luana–Nayara (la comunidad del Morro ya no está
+  separada de la red de Ana). Un equipo con la versión anterior recibe el rechazo «versión distinta».
+- **v4 (2026-10):** vehículos en línea y rechazo con el texto de la versión.
+- **v5 (2026-11):** veredicto y confianza de la ciudad en línea (campos opcionales nuevos).
+- **v6 (2026-11, recta final):** campos opcionales `mult`/`nivel` en «ind» y `desenlace`/`claves` en «fin».
+- **2026-11-22 (sin cambiar de versión):** la bandera de vehículos entra en la huella del contenido. Un equipo con el
+  código anterior al 2026-11-22 no se empareja con uno actualizado («Mundo distinto»): **todos deben actualizar**.
+- **2026-11-22, ajustes para la Feria (sin cambiar de versión):** la Oficina do Beto y Zeca pasan a la pared lateral
+  oeste de la Rodoviária y, con `ALCALDE_PUESTOS_FIJOS`, la posición de todos los puestos fijos entra en la huella
+  del mundo (clave `puestos`). Con la semilla por defecto la huella del mundo pasa de `7cc465e2…` a `42363471…`; la
+  del contenido no cambia. Un equipo con el código anterior ve «Mundo distinto»: **todos con el mismo código**.
 - **Un solo mundo:** anfitrión y clientes construyen el MISMO mundo (Ciudad3D, 11 lugares) y el catálogo de 14 misiones.
   En línea existen 8 vehículos (el protocolo nombra 0..7; `N_VEHICULOS_MAX = 8`). El «mapa grande» (900 x 650 m, 24 lugares,
   47 misiones, 24 vehículos, viaje rápido en mototáxi y teleférico, mensajes `viaje`/`viaje_ok`/`viaje_no`) y su variable
@@ -137,9 +158,9 @@ social con sus relaciones y el ciudadano de cada rol). Si no coinciden, la sala 
 
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
-| «Tu mundo es distinto» | `ALCALDE_SEMILLA` o `ALCALDE_VEHICULOS_ONLINE` distintos | Igualarlos en todos y reiniciar |
-| «Versión del protocolo distinta» | Un equipo tiene otra versión del juego (p. ej. sin el grafo social v3) | Actualizar todos a la misma versión |
-| «Código incorrecto» | Código mal escrito | Pedirlo de nuevo; no distingue mayúsculas |
+| «Tu mundo es distinto» | `ALCALDE_SEMILLA`, `ALCALDE_PUESTOS_FIJOS` o `ALCALDE_VEHICULOS_ONLINE` distintos, o código del juego distinto | Igualarlos en todos y reiniciar |
+| «Versión del protocolo distinta» | Un equipo tiene otra versión del juego (p. ej. sin la recta final v6) | Actualizar todos a la misma versión |
+| «Código incorrecto» | Código mal escrito, o varios intentos fallidos desde ese equipo (veto de 60 s) | Pedirlo de nuevo (no distingue mayúsculas); tras varios fallos, esperar un minuto |
 | «Sala ocupada» | Límite por IP (2) o sala llena (4) | Subir `--max-por-ip` o esperar |
 | No se conecta por Tailscale/ZeroTier | Ámbito `lan` | Anfitrión con ámbito `abierto` |
 | Conexión rechazada | Cortafuegos, puerto o IP errónea | Revisar cortafuegos de macOS, `IP:puerto` y la red |

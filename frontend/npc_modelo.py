@@ -18,12 +18,14 @@ import zlib
 from ursina import camera, time
 from panda3d.core import Mat4, Vec3, CS_zup_right, getDefaultCoordinateSystem
 
+from frontend import casco_pantalla
 from frontend import modelo_calculos as mc
 from frontend import npc_calculos as nc
 from frontend import npc_nuevos_calculos as nn
 from frontend import npc_nuevos_modelo as nnm
 from frontend import npc_postura
 from frontend import rostro_calculos as rc
+from frontend import toon_duro_calculos as tdc
 from frontend.npc_color import agregar_camiseta, recolorear_actor
 from frontend.personaje import Personaje
 from frontend.personaje_modelo import PersonajeModelo, _cargar_actor
@@ -76,6 +78,15 @@ class PersonajeNPC(PersonajeModelo):
         except Exception as error:
             _avisar(f"no se pudo recolorear {self._plan['archivo']} ({error})")
         return actor
+
+    # T5: toon duro solo en los modelos nuevos (color plano + bandas horneadas); las copias de los 4 .glb, no.
+    def _toon_duro(self):
+        return bool(self._plan.get("nuevo")) and tdc.usa_toon_duro(self._plan.get("archivo"))
+
+    # T2: casco de tinta de grosor ~constante en pantalla en los modelos nuevos (los únicos con casco inflado por normal).
+    def _casco_pantalla(self):
+        if self._plan.get("nuevo") and nnm.CONTORNO:
+            casco_pantalla.aplicar_actor(self.actor, nn.GROSOR_CONTORNO)
 
     def _escala_modelo(self, rol):
         return self._plan.get("escala_base", mc.escala_para_rol(rol)) * self._plan["escala"]

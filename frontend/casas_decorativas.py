@@ -13,6 +13,7 @@
 # Pisos: una casa con `pisos` > 1 es el mismo modelo repetido hacia arriba (cada piso, el alto del
 # modelo escalado) con el tinte siguiente, como las casas que crecen por encima en una favela.
 
+from frontend import tinta_calculos as _tinta   # T1: fuente única del grosor de tinta
 import os
 import sys
 
@@ -99,7 +100,7 @@ from frontend.texturas_ladrillo import textura_relieve_ladrillo
 
 TINTA = (18, 20, 32)                 # RGB del contorno (el mismo de docs/DISENO.md §7)
 TINTA_CASCO = (0, 0, 0)             # lo que se pinta en el casco: el shader sin luz lo aclara (gamma) y sale ~TINTA
-GROSOR_CONTORNO = 0.12               # m que el casco asoma por cada lado (grosor de la línea de tinta)
+GROSOR_CONTORNO = _tinta.grosor("casa")                # m que el casco asoma por cada lado (grosor de la línea de tinta)
 SUBE_CONTORNO_PISO = 0.05            # m sobre la base de un piso de arriba a los que llega el fondo del casco (el piso de abajo no se toca)
 BAJA_CONTORNO_SUELO = 0.25           # m bajo la base de la planta baja a los que llega el fondo del casco (queda bajo tierra)
 # Pinturas vivas de las fachadas (albedo RGB 0-255): turquesa, rosa, amarillo, naranja, lima, cobalto,
@@ -414,16 +415,25 @@ def _textura_ladrillo_de_referencia():
     return _REFERENCIA_LADRILLO[0]
 
 
+# M7.3: parte (medida) del tiempo de construir_casas_favela que se va en copiar casas; el resto (aplanar el lote y el
+# casco de tinta) no avisa a la barra: un cuadro dibujado justo tras aplanar costaba 60-80 ms.
+FRACCION_COPIAS = 0.6
+
+
 # Entity con todas las `casas` fundidas (pisos con su pintura viva) colgada de `padre`; devuelve
 # (lote, contorno): `contorno` es la Entity del casco de tinta (None si contorno=False), que el llamador
 # debe colgar donde convenga (fuera del mapa de sombras). `alturas`: la y de la planta baja de cada casa.
-def construir_casas_favela(padre, casas, alturas=None, contorno=True):
+# `al_avance(fraccion)`: opcional, para la barra de la pantalla de carga (frontend/pantalla_carga.py).
+def construir_casas_favela(padre, casas, alturas=None, contorno=True, al_avance=None):
     lote = Entity(parent=padre, shader=lit_with_shadows_shader)
     raiz = NodePath("casas_favela")
     raiz_tinta = NodePath("contorno_casas") if contorno else None
     texturas = _Texturas()
     fuentes, cascos = {}, {}
-    for casa, y in zip(casas, alturas or [0.0] * len(casas)):
+    variantes = _variantes_de_luz()      # punto 4: luz horneada por cara (None con ALCALDE_LUZ_HORNEADA=0)
+    for i, (casa, y) in enumerate(zip(casas, alturas or [0.0] * len(casas))):
+        if al_avance is not None:
+            al_avance(FRACCION_COPIAS * i / max(1, len(casas)))
         m = modelo_de(casa.modelo)
         alto_piso = m.alto * casa.escala
         est = getattr(casa, "estiramiento", 1.0)
@@ -434,7 +444,10 @@ def construir_casas_favela(padre, casas, alturas=None, contorno=True):
             if clave not in fuentes:
                 fuentes[clave] = _fuente_viva(casa.modelo, *estilo, texturas, relieve)
                 fusion_materiales.hornear_colores(fuentes[clave])    # menos draw calls (ALCALDE_SIN_FUSION_MATERIALES)
-            copia = fuentes[clave].copy_to(raiz)
+            origen = fuentes[clave]
+            if variantes is not None:
+                origen = variantes.de(clave, origen, casa.rumbo, casa.escala, est, piso == 0)
+            copia = origen.copy_to(raiz)
             copia.set_pos(casa.cx, y + piso * alto_piso, casa.cz)
             copia.set_hpr(-casa.rumbo, 0, 0)
             copia.set_scale(casa.escala, casa.escala, casa.escala * est)
@@ -455,6 +468,17 @@ def construir_casas_favela(padre, casas, alturas=None, contorno=True):
         raiz_tinta.reparent_to(tinta)
         tinta.set_light_off()
     return lote, tinta
+
+
+# Punto 4 (luz horneada): caché de fuentes con la luz por cara ya horneada en sus colores de vértice (frontend/luz_horneada.py).
+# Necesita los colores de vértice que deja fusion_materiales.hornear_colores: sin esa fusión, o con ALCALDE_LUZ_HORNEADA=0,
+# devuelve None y las casas quedan exactamente como antes.
+def _variantes_de_luz():
+    from frontend import luz_horneada
+    if not luz_horneada.activa() or not fusion_materiales.activo():
+        return None
+    from frontend.cielo import DIRECCION_SOL
+    return luz_horneada.VariantesHorneadas(DIRECCION_SOL)
 
 
 # Clases de geom que NO entran en el casco de tinta (se llenan en _casco): los planos de grosor cero (láminas de

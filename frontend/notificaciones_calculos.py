@@ -17,6 +17,11 @@ MAX_VISIBLES = 3
 SEGUNDOS_TARJETA = 4.0
 SEGUNDOS_ENTRADA = 0.2           # la tarjeta entra deslizándose desde la derecha
 SEGUNDOS_SALIDA = 0.4            # y sale con fundido (los últimos 0,4 s de sus 4 s)
+
+# M3.6 (ALCALDE_UI_ANIMACIONES): regla de la UI — la tarjeta entra en 0,18 s y sale en 0,12 s (antes 0,2 / 0,4).
+from frontend import hud_contextual_calculos as _hctx  # noqa: E402
+SEGUNDOS_ENTRADA = _hctx.tiempo("TARJETA_ENTRADA")
+SEGUNDOS_SALIDA = _hctx.tiempo("TARJETA_SALIDA")
 TOPE_BANNER = 4                  # mensajes seguidos que el banner repasa como mucho (los más recientes)
 
 # tono -> (símbolo, constante de color en frontend/estilo.py). Nunca solo color: el símbolo va siempre.

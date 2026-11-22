@@ -16,6 +16,8 @@
 #   - Interfaz: hover (al entrar el ratón en un botón) y clic (clic izquierdo sobre un botón habilitado).
 #   - Ajustes: se suscribe al almacén backend.logica.ajustes y aplica volúmenes/silencio/dispositivo al instante.
 
+import math
+
 from frontend import audio as audio_modulo
 from frontend import audio_calculos as ac
 from frontend.conexion_flujo import INICIO, INTERIOR, JUEGO, MUNDO, SELECCION_ROL
@@ -61,6 +63,8 @@ class EnganchesAudio:
         self._ajustes = None
         self._reloj = None
         self._bucles_puestos = set()      # bucles de ambiente que este observador ha encendido
+        self._capas_salud = set()         # M3 (ALCALDE_AUDIO_SALUD): capas por salud que suenan ahora
+        self._t_salud = 0.0
 
     # -- Un frame --
 
@@ -85,10 +89,13 @@ class EnganchesAudio:
         self._aplicar_perfil(nombre)
         if anterior == MUNDO:
             self._soltar_movimiento()
+            self._soltar_capas_salud()
 
     # Música y bucles de ambiente de la escena `nombre`. En el MUNDO manda el perfil de la etapa si hay uno puesto
     # (fijar_perfil_mundo_etapa): así al volver de un interior suena el de la etapa y no el de siempre.
     def _aplicar_perfil(self, nombre):
+        if nombre == MUNDO and _perfil_mundo_etapa is not None:
+            self._soltar_capas_salud()         # la recta final por etapas manda: fuera las capas por salud (M3)
         musica, vol_musica, ambiente, vol_ambiente = PERFIL_ESCENA.get(nombre, (None, 0.0, None, 0.0))
         bucles = {ambiente: vol_ambiente} if ambiente is not None else {}
         if nombre == MUNDO and _perfil_mundo_etapa is not None:
@@ -105,6 +112,46 @@ class EnganchesAudio:
             elif bucle == "ambiente_favela" or bucle in self._bucles_puestos:      # los de etapa solo se paran si se pusieron
                 self.audio.parar_bucle(bucle, fundido=1.0)
                 self._bucles_puestos.discard(bucle)
+
+    # -- M3: audio por capas según la salud de la ciudad (ALCALDE_AUDIO_SALUD=0 = como antes) --
+
+    def _audio_salud(self, escena, jugador, dt):
+        if not ac.audio_salud_activo() or _perfil_mundo_etapa is not None:
+            return
+        self._t_salud -= dt
+        if self._t_salud > 0:
+            return
+        self._t_salud = ac.PERIODO_AUDIO_SALUD
+        from frontend import ambiente_vivo
+        vols = ac.volumenes_salud(ambiente_vivo.obtener().salud, ac.cercania_plaza(self._distancia_plaza(escena, jugador)),
+                                  con_ruido=ac.ambiente_ruido_activo())
+        if self.audio.musica_actual == "musica_ambiente":
+            self.audio.ajustar_bucle("musica_ambiente", volumen=vols["musica_ambiente"])
+        for capa in ac.CAPAS_SALUD:
+            volumen = vols.get(capa, 0.0)
+            if volumen > 0.005:
+                canal = audio_modulo.MUSICA if capa.startswith("musica") else audio_modulo.EFECTOS
+                if capa in self._capas_salud:
+                    self.audio.ajustar_bucle(capa, volumen=volumen)
+                elif self.audio.bucle(capa, volumen, 1.0, fundido=ac.FUNDIDO_SALUD, canal=canal):
+                    self._capas_salud.add(capa)
+            elif capa in self._capas_salud:
+                self.audio.parar_bucle(capa, fundido=ac.FUNDIDO_SALUD)
+                self._capas_salud.discard(capa)
+
+    @staticmethod
+    def _distancia_plaza(escena, jugador):
+        mundo = getattr(escena, "_mundo", None)
+        try:
+            return min(math.hypot(jugador.x - x, jugador.z - z) for x, z in (mundo.coordenada(l) for l in mundo.lugares()))
+        except Exception:
+            return None
+
+    def _soltar_capas_salud(self):
+        for capa in list(self._capas_salud):
+            if capa != self.audio.musica_actual:      # si la etapa la tomó como música, se queda
+                self.audio.parar_bucle(capa, fundido=ac.FUNDIDO_SALUD)
+        self._capas_salud.clear()
 
     def _soltar_movimiento(self):
         self.audio.parar_bucle("motor_moto", 0.3)
@@ -164,6 +211,7 @@ class EnganchesAudio:
             return
         self._mensajes(jugador)
         self._misiones(flujo)
+        self._audio_salud(escena, jugador, dt)
         controlador = getattr(escena, "controlador", None)
         if controlador is None:
             return

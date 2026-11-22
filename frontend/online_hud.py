@@ -20,6 +20,15 @@ from frontend.hud import MARGEN, AvisoGenerico, _fondo, _medidor, _seguro
 Y_AVISO = 0.5 - MARGEN - 0.115          # centro del aviso superior (bajo la pastilla de ping)
 
 
+class AvisoSuperior(AvisoGenerico):
+    """NET-010: el aviso de arriba crece HACIA ABAJO (el genérico crece hacia arriba, porque va al pie de la pantalla):
+    con dos líneas («Bot2 decidió: ... desinformación») ya no se mete bajo la pastilla de ping."""
+
+    def _aplicar_aparicion(self):
+        super()._aplicar_aparicion()
+        self.y -= self._alto - self.ALTO
+
+
 # Con los finales por etapas en línea (online_config.ETAPAS_ONLINE) el medidor «Confianza de Ciudad Nova» (y su barra de
 # desinformación) ocupa arriba al centro: la pastilla de ping y el aviso superior bajan lo que mide para no pisarlo.
 def bajada_por_medidor():
@@ -59,7 +68,7 @@ class HudOnline(Entity):
         self._nivel = None
 
         # Aviso superior (segunda instancia del AvisoGenerico de hud.py).
-        self.aviso = AvisoGenerico(parent=self)
+        self.aviso = AvisoSuperior(parent=self)
         self.aviso.y_base = Y_AVISO - bajada
         self.aviso.y = Y_AVISO - bajada
         self._texto_aviso = None

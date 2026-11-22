@@ -12,7 +12,7 @@
 from ursina import Entity, camera, time
 
 from frontend.peatones_calculos import aspecto_peaton, crear_peatones, rasgos_peaton
-from frontend import fuente_calculos
+from frontend import fuente_calculos, pantalla_carga
 from frontend import poses
 from frontend.personaje import Personaje
 from frontend.npc_modelo import crear_npc
@@ -40,6 +40,7 @@ class Peatones(Entity):
         self._rodeos = fuente_calculos.circulos_fuente(mundo)
         self._dibujados = {}
         for i, caminante in enumerate(self.caminantes):
+            pantalla_carga.avance("peatones", i / max(1, len(self.caminantes)))     # M7.3 (no-op sin pantalla)
             aspecto = aspecto_peaton(i, SEMILLA)
             if USAR_MODELOS:     # copia de uno de los 4 .glb con otra ropa; si falla, el muñeco de siempre
                 personaje = crear_npc(i, SEMILLA, aspecto, rasgos_peaton(i, SEMILLA), ROPA[i % len(ROPA)], parent=self)

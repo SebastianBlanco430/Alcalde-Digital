@@ -28,10 +28,11 @@ from ursina import Entity, time
 from frontend import estilo, geometria_mundo, modelo_calculos as mc
 from frontend.componentes import rgb
 from frontend.personaje import Personaje
-from frontend.piezas import COLOR_MARCADOR, etiqueta, limitar_etiqueta, silenciar
+from frontend.piezas import COLOR_MARCADOR, etiqueta, limitar_etiqueta, modo_etiqueta_jugador, silenciar
 from frontend import rostro_calculos as rc
 from frontend import animacion_humana as ah
 from frontend import skinning_gpu
+from frontend import toon_duro
 from frontend.rostro_modelo import colocar_rostro_animado
 from frontend import sombra_calculos as sc
 from frontend.sombra_contacto import SombraContacto, crear_aro
@@ -98,6 +99,7 @@ class PersonajeModelo(Entity):
         self._en_aire = False         # estado de salto (lo fija el controlador con fijar_estado_aire)
         self._vel_vertical = 0.0
         self._subiendo = False        # subiendo escalones (fijar_subiendo_escalera)
+        self._bajando = 0.0           # pendiente al bajar una escalera (fijar_bajando_escalera, ANI-002)
         self._gesto = None            # gesto de mano pedido ("dar" | "recibir" | None)
         self._gesto_clip = None       # clip del gesto que suena (sigue hasta que el peso vuelve a 0)
         self._gesto_peso = 0.0        # 0..1: cuánto manda el gesto sobre el reposo
@@ -124,12 +126,24 @@ class PersonajeModelo(Entity):
         self.actor.setControlEffect(mc.IDLE, 1.0)
         if ANIMACION_HUMANA:
             self._humano = ah.crear_animador(self)
-        skinning_gpu.aplicar(self.actor)    # deforma en la GPU (frontend/skinning_gpu.py); si falla, sigue por CPU
+        # T5: los NPC nuevos (sin bandas pintadas) llevan el toon duro (frontend/toon_duro.py, que también deforma en la
+        # GPU); los protagonistas y lo demás, el skinning de siempre. Si el toon duro no se aplica, el camino de siempre.
+        if not (self._toon_duro() and toon_duro.aplicar_actor(self.actor)):
+            skinning_gpu.aplicar(self.actor)    # deforma en la GPU (frontend/skinning_gpu.py); si falla, sigue por CPU
+        self._casco_pantalla()
+
+    # T2: casco de tinta de grosor ~constante en pantalla (frontend/casco_pantalla.py). Solo los NPC nuevos lo tienen.
+    def _casco_pantalla(self):
+        pass
 
     # -- Ganchos que las variantes (frontend/npc_modelo.py) sustituyen; por defecto, el comportamiento de siempre --
 
     def _crear_actor(self, rol):
         return _cargar_actor(rol)
+
+    # T5: ¿toon duro? Los 4 .glb de los roles traen bandas pintadas: nunca (frontend/toon_duro_calculos.py).
+    def _toon_duro(self):
+        return False
 
     def _escala_modelo(self, rol):
         return mc.escala_para_rol(rol)
@@ -287,6 +301,13 @@ class PersonajeModelo(Entity):
         except (TypeError, ValueError):
             self._vel_vertical = 0.0
 
+    def fijar_bajando_escalera(self, pendiente):
+        """ANI-002: pendiente (0 = no baja) de la escalera que está bajando: mezcla el clip de bajada."""
+        try:
+            self._bajando = max(0.0, float(pendiente or 0.0))
+        except (TypeError, ValueError):
+            self._bajando = 0.0
+
     def fijar_subiendo_escalera(self, subiendo):
         self._subiendo = bool(subiendo)
 
@@ -297,6 +318,7 @@ class PersonajeModelo(Entity):
         self.aro.enabled = activo
         self.etiqueta.color = COLOR_MARCADOR if activo else rgb(estilo.COLOR_TEXTO)
         self.etiqueta.y = self._y_etiqueta()
+        modo_etiqueta_jugador(self.etiqueta, activo)   # M1.1: sin el nombre propio; los demás, al 60 % y con fundido
 
     def _y_etiqueta(self):
         return (2.45 if self._activo else 2.25) + (self._elevacion or 0.0)

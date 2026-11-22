@@ -28,6 +28,20 @@ import time as _reloj_real
 from ursina import Entity, Text, color, time
 
 from backend.logica import tutorial_mision as logica
+from frontend.cinematica import LineaDeTiempo, Tramo
+
+
+def construir_linea(pasos, ejecutor, al_terminar=None):
+    """LineaDeTiempo (frontend/cinematica) con un tramo por paso. `ejecutor` implementa, por acción, un método con su nombre
+    (bocadillo(paso, i), mover(paso, i), tecla(paso, i), esperar(paso, i), error_demo(paso, i), turno_jugador(paso, i),
+    camara(paso, i)) que se llama al EMPEZAR el tramo. El turno del jugador dura «infinito»: se cierra con linea.saltar().
+    (Antes en backend/logica/tutorial_mision.py; movida aquí por ARQ-004.)"""
+    tramos = []
+    for i, paso in enumerate(pasos):
+        metodo = getattr(ejecutor, paso["accion"])
+        tramos.append(Tramo(f"{i}:{paso['accion']}", logica.duracion_paso(paso),
+                            al_empezar=lambda m=metodo, p=paso, n=i: m(p, n)))
+    return LineaDeTiempo(tramos, al_terminar=al_terminar)
 from frontend import banderas_visuales as bv
 from frontend import estilo, tipografia
 from frontend.cinematica import ease_in_out, lerp
@@ -81,7 +95,7 @@ class TutorialMision(Entity):
         try:
             self.vista = adaptador.crear_vista(self, self._vista_termino)
             self._montar_capas()
-            self.linea = logica.construir_linea(self.pasos, self, al_terminar=self._fin_de_la_linea)
+            self.linea = construir_linea(self.pasos, self, al_terminar=self._fin_de_la_linea)
             self.linea.avanzar(0.0)             # arranca el primer paso (los de duración 0 ya se ejecutan)
         except Exception:
             self._limpiar()

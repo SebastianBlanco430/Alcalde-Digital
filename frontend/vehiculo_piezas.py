@@ -11,6 +11,7 @@
 # que vehiculo_modelo.py añade con el mismo método geométrico de contorno_calculos.py. Favela: pintura con parches
 # de otro color, bici vieja de colores con cesta y caja de carga, moto de reparto / mototaxi con baúl.
 
+from frontend import tinta_calculos as _tinta   # T1: fuente única del grosor de tinta
 import math
 import os
 from dataclasses import dataclass, field
@@ -23,8 +24,8 @@ from frontend import vehiculo_calculos as vc
 LUZ_VEHICULO = (-0.35, 0.80, 0.45)
 
 TINTA = cc.TINTA
-GROSOR_CONTORNO = 0.016          # m por lado en piezas grandes; en tubos finos se usa el fino
-GROSOR_FINO = 0.009
+GROSOR_CONTORNO = _tinta.grosor("vehiculo")           # m por lado en piezas grandes; en tubos finos se usa el fino
+GROSOR_FINO = _tinta.grosor("vehiculo_fino")
 
 NEUMATICO = (30, 31, 40)
 CUBIERTA_TACOS = (74, 76, 92)

@@ -82,9 +82,21 @@ def lineas_desenlace(datos):
 
 # -- Lectura del estado según el flujo --
 
+def _escenas_de_partida():
+    """Escenas donde el chip puede verse: el mundo y las de misión (fuera de ellas, menú/rol/ajustes/red, nada)."""
+    from frontend.flujo_constantes import INTERIOR, JUEGO, MUNDO, MUNDO_DIGITAL, PARKOUR, TRABAJO
+    return {MUNDO, JUEGO, INTERIOR, TRABAJO, MUNDO_DIGITAL, PARKOUR, "minijuego"}
+
+
 def _leer(gestor):
-    """(info | None, desenlace | None, terminada). Nunca lanza."""
+    """(info | None, desenlace | None, terminada). Nunca lanza.
+
+    Fuera de una escena de partida (BUG-001: el menú tras terminar) no hay nada que pintar; la franja del desenlace
+    solo va en el mundo, donde está la pantalla final."""
     from frontend.flujo_constantes import MUNDO
+    actual = gestor.nombre_actual()
+    if actual not in _escenas_de_partida():
+        return None, None, False
     escena = gestor._escenas.get(MUNDO)
     flujo = getattr(escena, "flujo", None) if escena is not None else None
     if flujo is None:
@@ -94,14 +106,14 @@ def _leer(gestor):
     if ctrl is not None:                                       # hot-seat
         info = ctrl.info()
         leer = getattr(flujo, "desenlace_partida", None)
-        return info, (leer() if terminada and callable(leer) else None), terminada
+        return info, (leer() if terminada and callable(leer) and actual == MUNDO else None), terminada
     rf = getattr(flujo, "ultimo_rf", None)                     # en línea: lo que mandó el anfitrión
     info = None
     if rf is not None:
         nivel = int(rf.get("nivel", 0))
         info = {"en_recta": nivel > 0, "nivel": nivel, "mult": rf.get("mult", 1.0), "intensidad": nivel / 3.0,
                 "decisiones": rf.get("n", 0), "eco": {}, "evento": None, "evento_titulo": None, "evento_texto": None}
-    return info, (getattr(flujo, "desenlace_fin", None) if terminada else None), terminada
+    return info, (getattr(flujo, "desenlace_fin", None) if terminada and actual == MUNDO else None), terminada
 
 
 def _cinematica_final_en_pantalla():
@@ -152,8 +164,10 @@ def _vigia_cls():
                 if self._aviso_t <= 0:
                     self._mostrar_aviso(None)
             self._t += time.dt
-            if self._t < PERIODO:
+            escena = self.gestor.nombre_actual()
+            if self._t < PERIODO and escena == getattr(self, "_escena_vista", escena):
                 return
+            self._escena_vista = escena                 # cambio de escena: se relee ya (no queda 1 lectura encima)
             self._t = 0.0
             try:
                 self._refrescar(*_leer(self.gestor))

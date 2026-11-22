@@ -14,6 +14,8 @@
 
 import os
 
+from frontend import atmosfera_calculos as atmosfera
+
 CICLO_DIA = True
 PASOS_MEZCLA = 32                # escalones de color entre dos tramos (≈ 0,6 s reales cada uno con la semana de 30 min)
 PERIODO_CICLO = 0.5              # s reales entre dos lecturas de la hora
@@ -48,6 +50,8 @@ PALETAS = {
                      (150, 170, 220), 0.25, (226, 232, 246), (14, 22, 44), (70, 86, 130),
                      ((30, 34, 58), (18, 20, 40)), (70, 78, 110), (34, 38, 62)),
 }
+if atmosfera.activa():       # perspectiva atmosférica (frontend/atmosfera_calculos.py): horizonte, cielo bajo y cerros apagados
+    PALETAS = {nombre: atmosfera.atenuar_paleta(paleta) for nombre, paleta in PALETAS.items()}
 NOMBRES_PERIODO = {"manana": "mañana", "amanecer": "mañana", "tarde": "tarde", "noche": "noche"}
 
 
@@ -87,6 +91,40 @@ def mezcla_de_hora(hora):
                 return b, b, 0.0
             return a, b, t
     return TRAMOS[-1][1], TRAMOS[-1][1], 0.0
+
+
+# VIS-003: la LUZ del mundo sigue al cielo con las mismas paletas y los mismos escalones (mezcla_de_hora). Multiplicadores
+# (r, g, b) del sol (DirectionalLight) y del ambiente (AmbientLight) sobre los colores que ya pone la ciudad viva por salud;
+# la «tarde» es 1 (la luz de siempre). De noche se oscurece y se enfría sin perder la lectura (el jugador, los NPC, los
+# letreros y la línea del GPS, que no reciben luz, siguen claros). Los focos de las farolas (sin sombreado) brillan más.
+LUZ_PALETAS = {
+    "manana": ((1.0, 1.03, 1.08), (1.0, 1.02, 1.06)),
+    "amanecer": ((0.92, 0.82, 0.78), (0.84, 0.80, 0.88)),
+    "tarde": ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0)),
+    "noche": ((0.32, 0.36, 0.52), (0.50, 0.53, 0.70)),
+}
+FOCOS_DIA, FOCOS_NOCHE = 1.0, 1.3      # escala de color de los focos de las farolas
+
+
+def _mezclar_tripla(a, b, t):
+    return tuple(round(a[i] + (b[i] - a[i]) * t, 4) for i in range(3))
+
+
+def luz_de_hora(hora):
+    """((r, g, b) del sol, (r, g, b) del ambiente) multiplicativos para la hora (None = la tarde de siempre: 1)."""
+    a, b, t = mezcla_de_hora(hora)
+    (sol_a, amb_a), (sol_b, amb_b) = LUZ_PALETAS[a], LUZ_PALETAS[b]
+    return _mezclar_tripla(sol_a, sol_b, t), _mezclar_tripla(amb_a, amb_b, t)
+
+
+def peso_noche(hora):
+    """0 de día, 1 de noche, con los mismos escalones del cielo entre medias."""
+    a, b, t = mezcla_de_hora(hora)
+    return round((1.0 - t) * (a == "noche") + t * (b == "noche"), 4)
+
+
+def focos_de_hora(hora):
+    return round(FOCOS_DIA + (FOCOS_NOCHE - FOCOS_DIA) * peso_noche(hora), 4)
 
 
 # «mañana», «tarde» o «noche» de la hora (el amanecer cuenta como mañana). Sin hora: «tarde».

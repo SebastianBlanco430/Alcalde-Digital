@@ -117,6 +117,7 @@ class ControladorJugador(Entity):
         x0, z0 = jugador.x, jugador.z
         x, z = x0, z0
         sube_escalera = False
+        baja_pendiente = 0.0
         if dx != 0 or dz != 0:
             # Cuesta: se mide el desnivel 0.5 m adelante y se frena/acelera (corriendo también).
             # El mapa 2D no tiene `altura`; el mundo plano devuelve 0 -> factor 1.
@@ -128,6 +129,9 @@ class ControladorJugador(Entity):
                 factor = navegacion.factor_pendiente(desnivel, DISTANCIA_PENDIENTE)
                 # Escalera: subir cuesta un poco más (bajar, no). Solo si el mundo tiene perfiles de peldaños.
                 sube_escalera = self._sube_escalera(x0, z0, dx / largo, dz / largo)
+                bajada = getattr(self, "_baja_escalera", None)       # (ANI-002; ausente en dobles de prueba)
+                if not sube_escalera and callable(bajada):
+                    baja_pendiente = bajada(x0, z0, dx / largo, dz / largo)
                 if sube_escalera:
                     factor *= escaleras_calculos.factor_subida(True, True)
                 dx, dz = dx * factor, dz * factor
@@ -143,7 +147,8 @@ class ControladorJugador(Entity):
                 avatar.mirar_hacia(geometria_mundo.rumbo_de(dx, dz))
             real = ((x - x0) ** 2 + (z - z0) ** 2) ** 0.5 / dt if dt > 0 else 0.0
             self._informar_velocidad(avatar, real)
-            self._avanzar_vertical(avatar, jugador, x, z, dt, not telefono_abierto, sube_escalera and real > 0.05)
+            self._avanzar_vertical(avatar, jugador, x, z, dt, not telefono_abierto, sube_escalera and real > 0.05,
+                                   baja_pendiente if real > 0.05 else 0.0)
         self._salto_pedido = False
         return (x, z)
 
@@ -173,6 +178,28 @@ class ControladorJugador(Entity):
             return False
         return perfil.sube_hacia(x, z, x + ux * DISTANCIA_PENDIENTE, z + uz * DISTANCIA_PENDIENTE)
 
+    # ANI-002: pendiente (desnivel / avance, > 0) con la que se BAJA una escalera yendo desde (x, z) en (ux, uz); 0 si no
+    # está sobre una o no baja. Cuenta el ángulo con el eje (en diagonal se baja menos por metro).
+    def _baja_escalera(self, x, z, ux, uz):
+        perfil_en = getattr(self._mapa, "perfil_escalera_en", None)
+        if perfil_en is None or not escaleras_calculos.ESCALERAS_PELDANOS:
+            return 0.0
+        perfil = perfil_en(x, z)
+        if perfil is None or not hasattr(perfil, "altura_rampa_en_s"):
+            return 0.0
+        e = perfil.escalera
+        eje = ((e.bx - e.ax) * ux + (e.bz - e.az) * uz) / max(1e-9, perfil.largo)     # coseno con A->B
+        if abs(eje) < 0.3:
+            return 0.0                    # casi de lado: se camina por un peldaño
+        baja = (eje > 0) != perfil.baja_en_a     # baja si va hacia la punta baja
+        if not baja:
+            return 0.0
+        s = perfil.s_de(x, z)                     # pendiente LOCAL de la rampa (±0,4 m), no la media de la escalera
+        h0, h1 = perfil.altura_rampa_en_s(s - 0.4), perfil.altura_rampa_en_s(s + 0.4)
+        tramo = min(perfil.largo, s + 0.4) - max(0.0, s - 0.4)
+        local = abs(h1 - h0) / tramo if tramo > 0.1 else perfil.pendiente
+        return local * abs(eje)
+
     # Altura del suelo que pisa el jugador en (x, z): con escaleras en peldaños; si el mapa no sabe, la del
     # terreno; sin terreno (mapa 2D), None (no hay vertical que simular).
     def _suelo_en(self, x, z):
@@ -183,8 +210,14 @@ class ControladorJugador(Entity):
         return altura(x, z) if altura is not None else None
 
     # Sigue el suelo escalón a escalón y resuelve el salto; deja `avatar.y` en la altura visual.
-    def _avanzar_vertical(self, avatar, jugador, x, z, dt, puede_saltar, subiendo):
+    def _avanzar_vertical(self, avatar, jugador, x, z, dt, puede_saltar, subiendo, baja_pendiente=0.0):
         objetivo = self._suelo_en(x, z)
+        if baja_pendiente > 0.0 and objetivo is not None:
+            # ANI-002: bajando, el cuerpo sigue la rampa (recta por el centro de las huellas) y el clip de bajada pone los
+            # pies en los peldaños; al pararse o salir vuelve a la altura del peldaño con el suavizado de siempre.
+            perfil = self._mapa.perfil_escalera_en(x, z)
+            if perfil is not None:
+                objetivo = perfil.altura_rampa_en_s(perfil.s_de(x, z))
         if objetivo is None:
             return
         estado = self.estado_vertical(jugador)
@@ -209,6 +242,9 @@ class ControladorJugador(Entity):
         informar_escalera = getattr(avatar, "fijar_subiendo_escalera", None)
         if callable(informar_escalera):
             informar_escalera(bool(subiendo) and not estado.en_aire)
+        informar_bajada = getattr(avatar, "fijar_bajando_escalera", None)
+        if callable(informar_bajada):
+            informar_bajada(0.0 if estado.en_aire else baja_pendiente)
 
     # La sombra de contacto y el aro cuelgan del avatar: al saltar se bajan lo mismo que sube el
     # avatar para que se queden sobre el suelo. Guarda sus alturas originales y las restaura al aterrizar.

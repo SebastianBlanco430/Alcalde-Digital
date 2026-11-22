@@ -467,6 +467,12 @@ class ClienteRed:
     async def _handshake(self, conn):
         try:
             reto = await conn.recibir(timeout=self._t["handshake"])
+            if reto["t"] == "rechazo":
+                # NET-006: el anfitrión puede rechazar ANTES del reto (veto por IP tras códigos malos, tope de conexiones):
+                # se emite con su código y su texto en vez de tomarlo por un protocolo roto («Sala ocupada»).
+                seguro = sanear_mensaje(reto)
+                self._emitir({"t": "rechazo", "codigo": seguro["codigo"], "texto": seguro["texto"]})
+                raise _Terminal(seguro["codigo"])
             if reto["t"] != "reto":
                 raise _Terminal("protocolo_invalido:esperaba_reto")
             hola = {"t": "hola", "juego": protocolo.JUEGO, "v": protocolo.PROTOCOLO_V,

@@ -39,7 +39,13 @@ def sitio_junto_al_destino(mundo, caso_id):
     if mision is None:
         return None
     try:                                         # con edificio: fuera de la puerta y a un lado, mirando a la calle
-        return resolver_ancla(mundo, {"lugar": mision.destino, "fuera": FUERA_TERMINAL, "lateral": LATERAL_TERMINAL})
+        lateral = LATERAL_TERMINAL
+        puestos = _puestos_fijos(mundo)
+        if puestos:                              # ALCALDE_PUESTOS_FIJOS: que no caiga dentro de la pareja de la puerta
+            from frontend.comercios_calculos import lateral_terminal
+            libre = lateral_terminal(mundo, mision.destino, FUERA_TERMINAL, LATERAL_TERMINAL, puestos)
+            lateral = LATERAL_TERMINAL if libre is None else libre
+        return resolver_ancla(mundo, {"lugar": mision.destino, "fuera": FUERA_TERMINAL, "lateral": lateral})
     except (ValueError, KeyError, AttributeError):
         pass
     try:
@@ -52,6 +58,17 @@ def sitio_junto_al_destino(mundo, caso_id):
         if transitable is None or transitable(x, z):
             return (x, z, math.degrees(math.atan2(-dx, -dz)))      # la silla queda del lado del waypoint
     return None
+
+
+# [(x, z, rumbo)] de los puestos con ancla fija (ALCALDE_PUESTOS_FIJOS); [] con la bandera apagada.
+def _puestos_fijos(mundo):
+    from backend.datos.comercios_semilla import CATALOGO_COMERCIOS
+    from backend.logica.comercios import resolver_comercios
+    try:
+        return [p for c, p in resolver_comercios(mundo, CATALOGO_COMERCIOS)
+                if c.tipo != "vendedor_calle" and c.ancla.get("fijo")]
+    except (ValueError, KeyError, AttributeError):
+        return []
 
 
 def registrar(gestor, conexion, escena_mundo):

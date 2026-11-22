@@ -68,7 +68,8 @@ class ServiciosOnline:
     def crear_cliente(self):
         if self._fabrica_cliente is not None:
             return self._fabrica_cliente()
-        h_mundo, h_contenido = calcular_huellas(self.mundo, self.semilla, self.catalogo)
+        h_mundo, h_contenido = calcular_huellas(self.mundo, self.semilla, self.catalogo,
+                                                vehiculos=online_config.VEHICULOS_ONLINE)       # NET-004
         return ClienteRed(h_mundo, h_contenido, ids_misiones=[m.id for m in self.catalogo],
                           vehiculos=online_config.VEHICULOS_ONLINE)
 

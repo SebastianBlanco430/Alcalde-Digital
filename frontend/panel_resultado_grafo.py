@@ -204,6 +204,11 @@ class PanelResultadoGrafo(Entity):
         self.estado = None
         self._al_continuar = None
         self._tecla_pendiente = False
+        # VIS-010: lo dinámico (grafo, etiquetas, insignias: ~200 Entity) se rehace en cada mostrar(); oculto no sirve
+        # de nada y se quedaba vivo hasta el siguiente minijuego (también al volver al menú).
+        for hijo in list(self._dinamico.children):
+            destruir_arbol(hijo)
+        self._nodos, self._cuadros, self._aristas, self._puntos = {}, {}, [], {}
 
     # Un paso de `dt`: avanza el reloj, hace el «pop», enciende saltos y atiende una tecla pendiente.
     def avanzar(self, dt):

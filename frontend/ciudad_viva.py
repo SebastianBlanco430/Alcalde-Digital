@@ -24,8 +24,10 @@ import math
 import sys
 
 from backend.logica import ciudad_viva_calculos as cv
+from frontend import tinta_calculos as _tinta   # T1: fuente única del grosor de tinta
+from frontend import cielo_salud_calculos as cielo_salud     # M7: cielo por nivel
 from backend.logica import etapas_final
-from frontend import ambiente_vivo, estilo
+from frontend import ambiente_vivo, estilo, fuente_firma_calculos
 from frontend.contorno_calculos import realzar_color
 from frontend.azar_fijo import azar_de
 from frontend.props_mundo import Malla, caja, icosfera, prisma
@@ -40,6 +42,7 @@ ALTURA_FOCO = 4.25               # m del foco de la farola sobre el suelo (la fa
 ALTURA_GUIRNALDA = 3.75          # m a los que se cuelga la guirnalda (algo por debajo del foco)
 SALES = {"basura": 1.0, "flores": 2.0, "marchitas": 6.0, "carteles": 4.0, "apagados": 5.0, "bancos": 8.0, "corros": 9.0,
          "guirnaldas": 11.0, "grafitis": 3.0}
+CAPAS_CON_FOCO = ("basura", "flores")   # firma M4: estas capas priorizan la puerta del destino de la misión
 
 
 def _aviso(texto):
@@ -57,6 +60,10 @@ def _desplazar(x, z, dx, dz, giro):
 
 
 # -- Mallas de las piezas (se construyen UNA vez por ranura; todo mira hacia +z local y tiene el origen en el suelo) ----------
+
+
+def _byte_luz(valor):
+    return max(0, min(255, int(round(valor))))
 
 
 class Dibujo(Malla):
@@ -314,7 +321,7 @@ def mesh_capuchon(v):
 # siempre, pero metido en la MISMA malla (las caras del casco van al revés, así el recorte de caras traseras deja ver solo
 # el borde): una entidad por pieza, sin atributos de render nuevos.
 
-GROSOR_TINTA_ETAPA = 0.035       # m por lado del casco de tinta de estas piezas
+GROSOR_TINTA_ETAPA = _tinta.grosor("etapa")  # m por lado del casco de tinta de estas piezas
 SALES_ETAPA = {"fuego": 13.0, "rodadores": 14.0, "fiesta": 15.0}
 ROJO_FUEGO = realzar_color(estilo.ESTADO_ERROR)
 NARANJA_FUEGO = realzar_color((240, 130, 40))
@@ -512,12 +519,24 @@ class Grupo:
             e.ignore = True
             self.entidades.append(e)
         self.previos = set()
+        self._evitar, self._excluidos = None, frozenset()
 
-    def repartir(self, x, z, cantidad):
-        """Elige los sitios que se quieren ahora y asigna ranuras. Devuelve True si hay algo animándose."""
+    def repartir(self, x, z, cantidad, foco=None, evitar=None):
+        """Elige los sitios que se quieren ahora y asigna ranuras. Devuelve True si hay algo animándose.
+        `foco` (x, z) opcional: los sitios junto a él van primero (firma M4; ver cv.elegir_sitios).
+        `evitar` (R3d) opcional: polilíneas (aparición, camino a la puerta) junto a las que no se elige nada."""
         if self.sitios:
             candidatos = list(self.rejilla.cerca(x, z, self.radio * 1.2))
-            elegidos = cv.elegir_sitios(candidatos, x, z, self.radio, cantidad, self.previos, self.maximo)
+            if evitar:
+                if evitar is not self._evitar:          # sitios fijos: se recalcula solo al cambiar los caminos
+                    self._evitar = evitar
+                    self._excluidos = cv.indices_en_caminos([(i, s.x, s.z, s.u) for i, s in enumerate(self.sitios)], evitar)
+                if self._excluidos:
+                    candidatos = [c for c in candidatos if c[0] not in self._excluidos]
+            if foco is None:
+                elegidos = cv.elegir_sitios(candidatos, x, z, self.radio, cantidad, self.previos, self.maximo)
+            else:
+                elegidos = cv.elegir_sitios(candidatos, x, z, self.radio, cantidad, self.previos, self.maximo, foco=foco)
         else:
             elegidos = []
         self.previos = set(elegidos)
@@ -720,7 +739,7 @@ class PropagadorNiebla:
 # -- Controlador -------------------------------------------------------------------------------------------------------------
 
 
-def crear_controlador(escena, atmosfera=True, capas=True):
+def crear_controlador(escena, atmosfera=True, capas=True, color_salud=False):
     from ursina import Color, Entity, camera, scene, time
     from frontend.ciudad_3d import COLOR_LUZ_AMBIENTE, COLOR_LUZ_SOL, rgb_luz
     from frontend.cielo import COLOR_HORIZONTE
@@ -732,6 +751,8 @@ def crear_controlador(escena, atmosfera=True, capas=True):
             super().__init__(**opciones)
             self.ignore = False
             self.con_atmosfera, self.con_capas = atmosfera, capas
+            self.con_color_salud = bool(color_salud and atmosfera)     # M2 (ALCALDE_COLOR_SALUD)
+            self._escala_mundo = None
             self.sol_base, self.ambiente_base = self._colores_de_luz()
             self.fin_base = float(escena._niebla.get("fin", FIN_NIEBLA)) if getattr(escena, "_niebla", None) is not None else FIN_NIEBLA
             self._t_atm = 0.0
@@ -742,6 +763,11 @@ def crear_controlador(escena, atmosfera=True, capas=True):
             self._version_capas = None
             self._cantidades = None
             self._animando = False
+            self.con_foco = fuente_firma_calculos.activo()   # firma M4: basura y flores primero junto a la puerta del destino
+            self._foco = None
+            self.con_evitar = cv.capas_evitar_camino_activo()   # R3d: nada sobre la aparición ni el camino a la puerta
+            self._clave_camino = None
+            self._caminos = ()
             self.con_etapas = etapas_final.activo()      # capas de los finales por etapas (ALCALDE_ETAPAS_FINAL=0 las quita)
             self._grupos_etapa = []                      # [(capa, Grupo)] que se animan cada frame
             self._t_etapa = 0.0
@@ -750,6 +776,13 @@ def crear_controlador(escena, atmosfera=True, capas=True):
             self.raiz.ignore = True
             self.aplicaciones_niebla = 0
             self.propagador = PropagadorNiebla()
+            self._cielo_salud = None                 # M7 (ALCALDE_CIELO_SALUD): capa cubierta, nubes y pájaros
+            if self.con_atmosfera and cielo_salud.activo():
+                try:
+                    self._instalar_cielo_salud()
+                except Exception as error:
+                    print(f"[ciudad_viva] cielo por nivel no instalado ({type(error).__name__}: {error})", file=sys.stderr)
+                    self._cielo_salud = None
             if self.con_capas:
                 self._crear_capas()
 
@@ -773,6 +806,12 @@ def crear_controlador(escena, atmosfera=True, capas=True):
             horizonte = getattr(getattr(ciudad, "cielo", None), "horizonte", COLOR_HORIZONTE)
             p = cv.atmosfera(amb, sol=self.sol_base, ambiente=self.ambiente_base, horizonte=horizonte,
                              fin=self.fin_base, fuerza=INTENSIDAD_NIEBLA)
+            p = self._luz_de_la_hora(p, ciudad)          # VIS-003: la noche oscurece el mundo (mismos escalones que el cielo)
+            if self.con_color_salud:
+                # M2: escala de color del mundo por salud. APAGADA por defecto: Ursina pone setColorScaleOff en el modelo de
+                # cada Entity con color, así que la escala del padre casi no llega (medido: sin efecto visible). El tinte
+                # y brillo por salud se hacen en el pase final (frontend/pase_final.py, ALCALDE_SATURACION_SALUD).
+                self._aplicar_escala_mundo(cv.escala_color_mundo(amb))
             if cv.cambio_apreciable(self._params, p):
                 self._params = p
                 ciudad.luz.color = rgb_luz(p["sol"])
@@ -782,6 +821,143 @@ def crear_controlador(escena, atmosfera=True, capas=True):
                 self.raiz.color = Color(brillo, brillo, brillo * 1.0, 1.0)
                 self._niebla = None
             self._aplicar_niebla()
+            if self._cielo_salud is not None:
+                self._aplicar_cielo_salud(amb)
+
+        # VIS-003: multiplica el sol y el ambiente (ya tintados por salud) por los de la hora del ciclo de día y pone los
+        # focos de las farolas más brillantes de noche. Sin ciclo de día o sin hora, todo queda igual (la «tarde»).
+        def _luz_de_la_hora(self, p, ciudad):
+            try:
+                from frontend import ciclo_dia_calculos as ciclo
+                if not ciclo.activo():
+                    return p
+                cielo = getattr(ciudad, "cielo", None)
+                hora = type(cielo)._hora() if cielo is not None and hasattr(type(cielo), "_hora") else None
+                sol, ambiente = ciclo.luz_de_hora(hora)
+                p = dict(p, sol=tuple(_byte_luz(p["sol"][i] * sol[i]) for i in range(3)),
+                         ambiente=tuple(_byte_luz(p["ambiente"][i] * ambiente[i]) for i in range(3)))
+                focos = ciclo.focos_de_hora(hora)
+                if focos != getattr(self, "_focos", None):
+                    self._focos = focos
+                    for nodo in (ciudad._grupos.get("luces"), getattr(ciudad, "focos_decorado", None)):
+                        if nodo is not None:
+                            nodo.setColorScale(focos, focos, focos, 1.0)
+            except Exception as error:      # noqa: BLE001 — la hora nunca rompe la atmósfera
+                print(f"[ciudad_viva] luz de la hora ({type(error).__name__}: {error})", file=sys.stderr)
+            return p
+
+        # -- M7: cielo por nivel (frontend/cielo_salud_calculos.py) --
+
+        def _instalar_cielo_salud(self):
+            from panda3d.core import TransparencyAttrib
+            from ursina import Mesh
+            cielo = escena.ciudad.cielo
+            capa = Entity(parent=cielo, model="sphere", scale=1.86, double_sided=True, unlit=True,
+                          shader=None, name="cielo_cubierto", enabled=False)      # radio 0,93: dentro del domo
+            capa.setTransparency(TransparencyAttrib.MAlpha)
+            capa.setBin("background", 2)
+            capa.setDepthWrite(False)
+            capa.setLightOff(1)
+            capa.setFogOff(1)
+            pajaros = []
+            for k in range(cielo_salud.PAJAROS_MAX):
+                v = ((-0.5, 0.12, 0), (0, 0, 0), (0.5, 0.12, 0), (0, 0.06, 0))
+                pajaro = Entity(parent=self, model=Mesh(vertices=v, triangles=[(0, 1, 3), (1, 2, 3)]), billboard=True,
+                                double_sided=True, unlit=True, shader=None, color=Color(0.16, 0.15, 0.2, 1), scale=0.9,
+                                enabled=False, name=f"pajaro_{k}")
+                pajaros.append(pajaro)
+            nubes = getattr(cielo, "nubes", None)
+            self._cielo_salud = {"capa": capa, "pajaros": pajaros, "nubes": nubes, "nubes_y": nubes.y if nubes else 0.0,
+                                 "t": 0.0, "n_pajaros": 0, "params": None,
+                                 "visibles": cielo_salud.pajaros_visibles_activo(), "centro": None,
+                                 "libres": cielo_salud.pajaros_libres_activo(), "props": None, "subidas": {}}
+            if self._cielo_salud["visibles"]:          # R4: un poco más grandes y sin niebla (se ven desde la plaza)
+                for pajaro in pajaros:
+                    pajaro.scale = cielo_salud.ESCALA_PAJARO
+                    pajaro.setFogOff(1)
+
+        def _aplicar_cielo_salud(self, amb):
+            c = self._cielo_salud
+            p = cielo_salud.cielo_de_salud(amb.salud)
+            if p == c["params"]:
+                return
+            c["params"] = p
+            capa = c["capa"]
+            capa.enabled = p["capa_alfa"] > 0.01
+            if capa.enabled:
+                r, g, b = (v / 255.0 for v in p["capa_color"])
+                capa.color = Color(r, g, b, p["capa_alfa"])
+            nubes = c["nubes"]
+            if nubes is not None:
+                nubes.color = Color(*p["nubes_tono"], 1.0)
+                nubes.scale = (p["nubes_escala"], 1.0, p["nubes_escala"])
+                nubes.y = c["nubes_y"] - p["nubes_bajada"]
+            c["n_pajaros"] = p["pajaros"]
+            for k, pajaro in enumerate(c["pajaros"]):
+                pajaro.enabled = k < p["pajaros"]
+
+        def _mover_pajaros(self, dt):
+            c = self._cielo_salud
+            if c is None or not c["n_pajaros"]:
+                return
+            c["t"] += dt
+            if c["visibles"]:                           # R4: en la franja de arriba de la vista, sobre el suelo
+                try:
+                    from ursina import window
+                    cam = (camera.world_x, camera.world_y, camera.world_z)
+                    objetivo = cielo_salud.centro_pajaros(cam, camera.world_rotation_y)
+                    centro = c["centro"] = cielo_salud.seguir_centro(c["centro"], objetivo, dt)
+                    fov_v = cielo_salud.fov_vertical(camera.fov, window.aspect_ratio)
+                    altura = cielo_salud.altura_pajaros(cam[1], camera.world_rotation_x, fov_v,
+                                                        escena._mundo.altura(centro[0], centro[1]))
+                    esc = cielo_salud.ESCALA_PAJARO
+                    libres = self._pajaros_libres_datos() if c["libres"] else None
+                    for k in range(c["n_pajaros"]):
+                        pajaro = c["pajaros"][k]
+                        pos = cielo_salud.posicion_pajaro_visible(k, c["t"], centro, altura)
+                        if libres is not None:                    # cierre (punto 4): fuera de props y del personaje
+                            props, pecho = libres
+                            suelo = escena._mundo.altura(pos[0], pos[2])
+                            objetivo_k = cielo_salud.subida_total(pos, cam, props, suelo, pecho)
+                            sub = c["subidas"][k] = cielo_salud.suavizar_subida(c["subidas"].get(k), objetivo_k, dt)
+                            pos = (pos[0], pos[1] + sub, pos[2])
+                        pajaro.position = pos
+                        pajaro.scale = (esc, esc * cielo_salud.aleteo(k, c["t"]), esc)
+                    return
+                except Exception as error:      # noqa: BLE001 — sin mundo/ventana: como antes
+                    print(f"[ciudad_viva] pájaros como antes ({type(error).__name__}: {error})", file=sys.stderr)
+                    c["visibles"] = False
+            centro = (camera.world_x, camera.world_z)
+            for k in range(c["n_pajaros"]):
+                x, y, z = cielo_salud.posicion_pajaro(k, c["t"], centro)
+                c["pajaros"][k].position = (x, y, z)
+
+        def _pajaros_libres_datos(self):
+            """(props cercanos a la cámara [(x, z, r, tope)], pecho del personaje o None) para el punto 4 del cierre."""
+            c = self._cielo_salud
+            mundo = escena._mundo
+            if c["props"] is None:
+                c["props"] = cielo_salud.props_para_pajaros(mundo.obstaculos(), mundo.altura)
+            cx, cz = camera.world_x, camera.world_z
+            alcance = cielo_salud.DISTANCIA_PAJAROS + cielo_salud.RADIO_PAJAROS + cielo_salud.ALCANCE_VISUAL
+            cerca = [p for p in c["props"] if abs(p[0] - cx) < alcance and abs(p[1] - cz) < alcance]
+            pecho = None
+            try:
+                j = escena.flujo.jugador_activo()
+                jx, jz = float(j.x), float(j.z)
+                pecho = (jx, mundo.altura(jx, jz) + 1.1, jz)
+            except Exception:                   # noqa: BLE001 — sin personaje: solo props
+                pecho = None
+            return cerca, pecho
+
+        def _aplicar_escala_mundo(self, escala):
+            if self._escala_mundo is not None and max(abs(a - b) for a, b in zip(escala, self._escala_mundo)) < 0.003:
+                return
+            self._escala_mundo = escala
+            escena.setColorScale(escala[0], escala[1], escala[2], 1.0)
+            cielo = getattr(escena.ciudad, "cielo", None)
+            if cielo is not None:
+                cielo.setColorScaleOff(1)
 
         def _niebla_vigente(self):
             """¿Siguen puestos los valores de niebla de este controlador? (otro módulo pudo llamar activar_niebla)."""
@@ -942,9 +1118,48 @@ def crear_controlador(escena, atmosfera=True, capas=True):
 
         def _repartir(self, x, z):
             animando = False
+            foco = self._foco
             for cantidad, grupo in self.grupos.values():
-                animando = grupo.repartir(x, z, self._cantidades[cantidad]) or animando
+                evitar = self._caminos if cantidad in cv.CAPAS_QUE_EVITAN else None
+                if foco is not None and cantidad in CAPAS_CON_FOCO:
+                    animando = grupo.repartir(x, z, self._cantidades[cantidad], foco=foco, evitar=evitar) or animando
+                else:
+                    animando = grupo.repartir(x, z, self._cantidades[cantidad], evitar=evitar) or animando
             self._animando = animando
+
+        def _actualizar_caminos(self):
+            """R3d: (aparición, posición del jugador al cambiar de misión -> puerta del destino). Devuelve True si cambió."""
+            if not self.con_evitar:
+                return False
+            try:
+                flujo, mundo = getattr(escena, "flujo", None), getattr(escena, "_mundo", None)
+                mision = flujo.mision_actual() if flujo is not None else None
+                destino = getattr(mision, "destino", None)
+                jugador = flujo.jugador_activo() if flujo is not None else None
+                clave = (getattr(mision, "id", None), destino, id(jugador))
+                if clave == self._clave_camino:
+                    return False
+                self._clave_camino = clave
+                caminos = [[(float(p[0]), float(p[1]))] for p in getattr(mundo, "spawns", {}).values()]
+                if jugador is not None:
+                    inicio = (float(jugador.x), float(jugador.z))
+                    caminos.append([inicio])
+                    if destino is not None:
+                        from backend.logica import navegacion
+                        ruta = navegacion.ruta_gps_hasta_puerta(mundo, inicio[0], inicio[1], destino)
+                        caminos.append([inicio] + [(float(p[0]), float(p[1])) for p in ruta])
+                self._caminos = tuple(caminos)
+                return True
+            except Exception as error:      # noqa: BLE001 — sin camino: las capas siguen como antes
+                print(f"[ciudad_viva] sin caminos a evitar ({type(error).__name__}: {error})", file=sys.stderr)
+                self._caminos = ()
+                return False
+
+        def _foco_actual(self):
+            """Puerta del destino de la misión (firma M4, ALCALDE_FIRMA_FUENTE), o None."""
+            if not self.con_foco:
+                return None
+            return fuente_firma_calculos.foco_de_mision(getattr(escena, "flujo", None), getattr(escena, "_mundo", None))
 
         # -- Frame --
 
@@ -953,6 +1168,8 @@ def crear_controlador(escena, atmosfera=True, capas=True):
 
         def avanzar(self, dt, posicion=None):
             amb = ambiente_vivo.obtener()
+            if self._cielo_salud is not None:
+                self._mover_pajaros(dt)
             if self.propagador.cola:
                 self.propagador.avanzar()
             self._t_atm -= dt
@@ -967,7 +1184,11 @@ def crear_controlador(escena, atmosfera=True, capas=True):
                 x, z = posicion if posicion is not None else (camera.world_x, camera.world_z)
                 movio = self._pos_capas is None or math.hypot(x - self._pos_capas[0], z - self._pos_capas[1]) >= MOVIMIENTO_CAPAS
                 version = ambiente_vivo.version()
-                if movio or version != self._version_capas or self._animando:
+                foco = self._foco_actual()
+                cambio_foco = foco != self._foco
+                self._foco = foco
+                cambio_foco = self._actualizar_caminos() or cambio_foco
+                if movio or version != self._version_capas or self._animando or cambio_foco:
                     self._cantidades = cv.cantidades(amb, ambiente_vivo.etapa() if self.con_etapas else None)
                     self._pos_capas, self._version_capas = (x, z), version
                     self._repartir(x, z)
@@ -994,6 +1215,9 @@ def crear_controlador(escena, atmosfera=True, capas=True):
             ciudad.luz.color = rgb_luz(self.sol_base)
             ciudad.ambiente.color = rgb_luz(self.ambiente_base)
             ciudad.cielo.color = Color(1, 1, 1, 1)
+            if self._escala_mundo is not None:
+                escena.clearColorScale()
+                self._escala_mundo = None
             d = scene.fog_density
             if isinstance(d, tuple) and d[1] > 0:
                 activar_niebla(**escena._niebla)

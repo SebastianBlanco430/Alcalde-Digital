@@ -436,6 +436,11 @@ class EscenarioVN:
     def fijar_caso(self, caso_id, personajes):
         self.caso_id = caso_id
         self.personajes = personajes
+        # REN-001: crear el personaje 3D la primera vez que habla costaba ~37 ms en ese frame (a los ~32 s del mundo
+        # digital). Se crean ya, al entrar al caso (durante el fundido de entrada), ocultos hasta que hablen.
+        if not self.apagado:
+            for pid in list(personajes or {}):
+                self._actor(pid)
 
     # -- Creación de un personaje --
 

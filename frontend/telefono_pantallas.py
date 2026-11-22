@@ -20,6 +20,7 @@ from ursina import Entity, Text, color
 from frontend import estilo, tipografia
 from frontend import red_social_calculos as rsc
 from frontend import red_social_iconos as ico
+from frontend import hud_contextual_calculos as hctx
 from frontend import telefono_grande_calculos as tgc
 from frontend.componentes import BotonSecundario, a_unidades, escala_fuente, modelo_redondeado, panel_tinta, rgb
 from frontend.red_social_vista import AccionPost, Avatar, Medidor
@@ -1169,6 +1170,8 @@ class PantallaFeed(Pantalla):
 
     DURACION = 0.2
     SUBIDA = 0.08
+    if hctx.animaciones_activas():
+        DURACION = hctx.tiempo("FEED_ENTRADA")
 
     def __init__(self, **opciones):
         super().__init__(lambda n: None, **opciones)
@@ -1220,7 +1223,9 @@ class PantallaFeed(Pantalla):
         if self._anterior is not None:
             self._anterior.enabled = False
             self._anterior = None
-        self.huecos[self.actual].y = self.y_post - self.SUBIDA * (1 - tgc.ease_in_out(p))
+        # M3.6 (ALCALDE_UI_ANIMACIONES): ease-out en 0,18 s (antes ease_in_out en 0,2 s)
+        curva = hctx.ease_out if hctx.animaciones_activas() else tgc.ease_in_out
+        self.huecos[self.actual].y = self.y_post - self.SUBIDA * (1 - curva(p))
 
     def update(self):
         if self._t is None:

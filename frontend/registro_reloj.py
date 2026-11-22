@@ -233,6 +233,7 @@ def _crear_vigia(escena_mundo, conexion):
     from ursina import Entity, Text, time
 
     from frontend import diseno_adaptable, estilo, tipografia
+    from frontend import hud_esquinas_calculos as hec
     from frontend.componentes import escala_fuente, panel_tinta, rgb
     from frontend.hud import AvisoGenerico
     from frontend.panel_final_semana import PanelFinalSemana
@@ -266,6 +267,8 @@ def _crear_vigia(escena_mundo, conexion):
             apilar = 0.0 if getattr(escena, "economia", None) is None else ALTO_CHIP + 0.012     # sobre el chip de dinero
             self.chip_entidad.position = (-diseno_adaptable.aspecto() / 2 + MARGEN + ANCHO_CHIP / 2,
                                           -0.5 + MARGEN + ALTO_CHIP / 2 + apilar)
+            if hec.activo():         # mapa de esquinas (M3.1): pila de abajo a la izquierda, margen y paso comunes
+                self.chip_entidad.position = hec.centro_chip_pila(diseno_adaptable.aspecto(), 1 if apilar else 0)
             diseno_adaptable.anclar(self.chip_entidad, "izquierda")
             self.chip_entidad.enabled = False
             self.aviso_entidad = AvisoCausa(parent=escena.hud)

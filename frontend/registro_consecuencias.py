@@ -118,7 +118,8 @@ def _instalar_npcs(escena_mundo, economia, npcs, catalogo, obtener_gs):
             presentes.append((clave, vendedor.x, vendedor.z))
             continue
         try:
-            x, z, rumbo = _resolver(escena_mundo, clave.ancla)
+            from backend.logica import feria         # feria alargada: que no quede delante de los puestos del fondo
+            x, z, rumbo = _resolver(escena_mundo, feria.ancla_npc(escena_mundo._mundo, clave.id, clave.ancla))
         except (ValueError, KeyError, AttributeError) as error:
             _aviso(f"{clave.id}: sin ancla en este mundo ({error}); no aparece")
             continue

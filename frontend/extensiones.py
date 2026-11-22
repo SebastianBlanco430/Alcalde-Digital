@@ -15,6 +15,7 @@ MODULOS = (
     "frontend.registro_guardado",          # A5: autoguardado de la partida local y «Continuar» en el menú
     "frontend.registro_veredicto",         # A2d paso 3: avisos de «+R$» y del veredicto al cerrar una misión
     "frontend.registro_ambiente_npc",      # plan final 3-5: alimenta ambiente_vivo; conducta, densidad y globos de los NPC
+    "frontend.registro_textos_mundo",      # M1.3: globo de NPC > cartel de puerta > cartel de puesto (ALCALDE_TEXTOS_PRIORIDAD=0)
     "frontend.registro_manillas",          # plan final 6: manillas de Bonfim (brazalete del HUD, leyenda B y cintas en los NPC)
     "frontend.registro_reloj",             # plan final 1: chip «Día N · hh:mm», enganche de avanzar_tiempo y pantalla final de la semana
     "frontend.registro_dilemas",           # plan final 7: dilemas jugables (mensaje en el teléfono, tecla K, panel modal)
@@ -24,12 +25,17 @@ MODULOS = (
     "frontend.registro_etapas_final",      # finales por etapas: medidor, fuego/fiesta, NPC, tinte y música según el índice (-3..+3)
     "frontend.registro_tutorial",          # claridad: tutorial en viñetas al empezar una partida nueva y «Cómo se juega» en la pausa
     "frontend.registro_misiones_visuales",  # misiones visuales: efectos, vistas nuevas y «Reducir movimiento» (ALCALDE_MISIONES_VISUALES=0)
+    "frontend.registro_toon_personajes",   # punto 5 del pulido: luz del toon de los personajes según la hora (apagado; ALCALDE_TOON_PERSONAJES=1)
+    "frontend.registro_momento_nivel",     # ambiente M1: titular + stinger al cruzar de nivel (ALCALDE_MOMENTO_NIVEL=0)
+    "frontend.registro_fuente_firma",      # M4 firma: la fuente de la Praça da Sé muestra la salud (ALCALDE_FIRMA_FUENTE=0)
 )
 
 
 def aplicar(gestor, conexion, escena_mundo, modulos=MODULOS):
+    from frontend import pantalla_carga      # M7.3: barra de la pantalla de carga (no-op sin ella)
     aplicados = []
-    for ruta in modulos:
+    for i, ruta in enumerate(modulos):
+        pantalla_carga.avance("extensiones", i / max(1, len(modulos)))
         try:
             modulo = importlib.import_module(ruta)
         except ModuleNotFoundError as error:

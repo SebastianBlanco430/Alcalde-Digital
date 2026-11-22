@@ -26,6 +26,11 @@ import sys
 
 from backend.logica import ambiente_ciudad as ac
 from backend.logica import etapas_final
+from backend.logica import momento_nivel as mn
+
+# Momento de nivel (M1.1): detecta cuándo el Ambiente cruza de nivel y acelera el suavizado unos segundos para que el
+# cambio se note. ALCALDE_MOMENTO_NIVEL=0/false/no/off lo apaga (sin detector ni aceleración).
+MOMENTO_NIVEL = True
 
 _suave = ac.AmbienteSuave()
 _sesion = None              # la sesión con la que se alimentó por última vez (otra partida = se fija sin interpolar)
@@ -36,6 +41,40 @@ _etapa = 0                  # etapa de los finales por etapas (-3..+3); la fija 
 _indice = None              # último índice leído (finales por etapas)
 _t_indice = 0.0             # s que faltan para volver a leerlo
 PERIODO_INDICE = 0.5
+_detector = mn.DetectorNivel()
+_reinicio_pendiente = False # fijar() saltó el ambiente: la próxima observación solo fija la referencia
+_contador_eventos = 0
+_ultimo_evento = None
+
+
+def _bandera(nombre, constante):
+    valor = os.environ.get(nombre, "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(constante)
+
+
+def momento_activo():
+    return _bandera("ALCALDE_MOMENTO_NIVEL", MOMENTO_NIVEL)
+
+
+def ultimo_evento():
+    """(contador, EventoNivel | None): el contador sube con cada cruce anunciado; los oyentes comparan una vez por frame."""
+    return _contador_eventos, _ultimo_evento
+
+
+def _observar_nivel(dt, reinicio):
+    """Pasa el nivel actual al detector; si anuncia un cruce lo guarda y acelera el suavizado (M1.3)."""
+    global _contador_eventos, _ultimo_evento, _reinicio_pendiente
+    reinicio = reinicio or _reinicio_pendiente
+    _reinicio_pendiente = False
+    evento = _detector.observar(_suave.ambiente().nivel, dt, reinicio=reinicio)
+    if evento is not None:
+        _contador_eventos += 1
+        _ultimo_evento = evento
+        _suave.acelerar(mn.TAU_ACELERADO_S, mn.DURACION_ACELERACION_S)
 
 
 def obtener():
@@ -150,15 +189,18 @@ def alimentar(dt, escena_mundo):
             return _suave.ambiente()
         fijos = indicadores_fijos()
         sesion = getattr(escena_mundo, "_sesion", None)
-        indice = _leer_indice(max(0.0, float(dt)), _flujo, sesion is not _sesion)
+        nueva_sesion = sesion is not _sesion
+        indice = _leer_indice(max(0.0, float(dt)), _flujo, nueva_sesion)
         if fijos is not None:                     # indicadores fijos de depuración: mandan salvo que se fuerce el índice
             indicadores, confianzas = fijos, None
             indice = etapas_final.indice_forzado() if etapas_final.activo() else None
-        if sesion is not _sesion:                 # otra partida (o carga de guardado): empieza en su valor real
+        if nueva_sesion:                          # otra partida (o carga de guardado): empieza en su valor real
             _sesion = sesion
             _suave.fijar(indicadores, confianzas, indice)
         else:
             _suave.actualizar(max(0.0, float(dt)), indicadores, confianzas, indice)
+        if momento_activo():                      # momento de nivel: anunciar cruces (no en el primer frame de sesión)
+            _observar_nivel(max(0.0, float(dt)), nueva_sesion)
         _version += 1
     except Exception as error:
         if not _avisado:
@@ -169,15 +211,21 @@ def alimentar(dt, escena_mundo):
 
 def fijar(indicadores, confianzas=None):
     """Salta al ambiente de esos indicadores (pruebas, capturas y depuración)."""
-    global _version
+    global _version, _reinicio_pendiente
     _version += 1
+    _reinicio_pendiente = True              # salto de depuración: no es un cruce que anunciar
     return _suave.fijar(indicadores, confianzas)
 
 
 def reiniciar():
     """Vuelve al estado de arranque (pruebas)."""
     global _suave, _sesion, _flujo, _version, _avisado, _etapa, _indice, _t_indice
+    global _detector, _reinicio_pendiente, _contador_eventos, _ultimo_evento
     _suave = ac.AmbienteSuave()
+    _detector = mn.DetectorNivel()
+    _reinicio_pendiente = False
+    _contador_eventos = 0
+    _ultimo_evento = None
     _sesion = _flujo = None
     _version = 0
     _avisado = False

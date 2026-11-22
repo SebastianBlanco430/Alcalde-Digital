@@ -386,5 +386,29 @@
       {"t": "Conté las ventanas prendidas del morro. Perdí la cuenta."},
       {"t": "Un mate de boldo y a dormir, que mañana hay feira."}
     ]
+  },
+  "cambio": {
+    "mejora": [
+      {"t": "¿Viste? Hoy la plaza está distinta."},
+      {"t": "Por fin se respira tranquilo."},
+      {"t": "Hasta la fuente se ve mejor."}
+    ],
+    "empeora": [
+      {"t": "Algo raro pasa en el barrio."},
+      {"t": "Ya nadie se saluda."},
+      {"t": "Mejor no meterse en líos."}
+    ]
+  },
+  "reaccion": {
+    "saludo": [
+      {"t": "¡Buenas!"},
+      {"t": "¡Oi! ¿Todo bien?"},
+      {"t": "¡Qué tal, vecino!"}
+    ],
+    "seco": [
+      {"t": "Mmm."},
+      {"t": "Ahora no."},
+      {"t": "Ajá…"}
+    ]
   }
 }

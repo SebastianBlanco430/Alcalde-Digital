@@ -423,10 +423,12 @@ _ERRORES = {
                             f"La sala ya tiene {MAX_JUGADORES} jugadores. Pide al anfitrión que libere un puesto."),
     "rol_tomado": InfoError("rol_tomado", "Rol tomado", "Otro jugador ya eligió ese rol. Elige uno libre."),
     "codigo_malo": InfoError("codigo_malo", "Código incorrecto",
-                             "El código de la sala no coincide. Revísalo (sin O, I, L, 0 ni 1) y vuelve a intentarlo."),
+                             "El código de la sala no coincide. Revísalo (sin O, I, L, 0 ni 1) y vuelve a intentarlo. Tras "
+                             "varios intentos fallidos desde este equipo hay que esperar un minuto."),
     "mundo_distinto": InfoError("mundo_distinto", "Mundo distinto",
                                 "Tu mundo o tu contenido no es el mismo que el del anfitrión. Reinicia el juego con la "
-                                "misma semilla (ALCALDE_SEMILLA=…) que use el anfitrión.", False),
+                                "misma semilla (ALCALDE_SEMILLA=…) y las mismas opciones de mundo "
+                                "(ALCALDE_PUESTOS_FIJOS, ALCALDE_VEHICULOS_ONLINE) que use el anfitrión.", False),
     "nombre_invalido": InfoError("nombre_invalido", "Nombre no válido",
                                  "El anfitrión no aceptó tu alias. Usa de 1 a 16 letras, números, espacio, - _ ."),
     "expulsado": InfoError("expulsado", "Te expulsaron", "El anfitrión te sacó de la sala.", False),
@@ -460,7 +462,8 @@ def info_error(motivo):
     if clave in _ERRORES:
         return _ERRORES[clave]
     if motivo == "protocolo_invalido:esperaba_reto":
-        # El anfitrión rechaza con «lleno_de_conexiones» ANTES del reto y ClienteRed lo ve como protocolo roto.
+        # (Clientes antiguos) el anfitrión rechazaba ANTES del reto y ClienteRed lo veía como protocolo roto. Desde NET-006
+        # ClienteRed entrega ese rechazo con su código (veto por IP = «codigo_malo», tope = «lleno_de_conexiones»).
         return _ERRORES["lleno_de_conexiones"]
     if motivo.startswith("protocolo_invalido"):
         return InfoError("protocolo_invalido", "Respuesta inesperada",

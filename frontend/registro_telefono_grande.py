@@ -643,9 +643,10 @@ def _instalar_carrusel(escena):
         teclas = TeclasCarrusel(parent=tarjeta.parent)
         # Esc cierra el carrusel y no la pausa (como cualquier panel registrado)
         escena.registrar_bloqueador(tarjeta.abierta, tarjeta.ocultar)
+        posicion = (escena.menu_pausa.posicion_extra(1) if hasattr(escena.menu_pausa, "posicion_extra")  # VIS-005
+                    else (menu_pausa.ANCHO / 2 + 0.04 + 0.15, 0.12, -0.001))
         boton = BotonSecundario("Avisos de Civitas", al_clic=abrir, ancho=0.30, alto=a_unidades(50),
-                                tamano_fuente_px=20, parent=escena.menu_pausa,
-                                position=(menu_pausa.ANCHO / 2 + 0.04 + 0.15, 0.12, -0.001))
+                                tamano_fuente_px=20, parent=escena.menu_pausa, position=posicion)
         return {"tarjeta": tarjeta, "boton": boton, "teclas": teclas, "estado": estado, "abrir": abrir}
     except Exception as error:
         _aviso(f"botón «Avisos de Civitas» no instalado ({type(error).__name__}: {error})")

@@ -108,6 +108,8 @@ class ControlDilemas:
             if key == self.tecla_abrir and self.puede_abrir():
                 self.abrir()
                 return True
+            if key == self.tecla_abrir:
+                self._avisar_sin_pendientes()
             return False
         if key == "escape" or key == self.tecla_abrir:
             self.cerrar()
@@ -122,6 +124,21 @@ class ControlDilemas:
         if key in TECLAS_CONTINUAR or key in TECLAS_CLIC:
             self.cerrar()
         return True
+
+    def _avisar_sin_pendientes(self):
+        """VIS-007: K sin dilema pendiente (y con el mundo jugable) da un aviso breve en vez de no hacer nada."""
+        escena, flujo = self.escena, self._flujo()
+        try:
+            if (flujo is None or self.pendiente() is not None or not escena.enabled or escena.controles_bloqueados()
+                    or flujo.partida_terminada()):
+                return
+            temporal = getattr(getattr(escena, "economia", None), "aviso_temporal", None)   # se quita solo
+            if callable(temporal):
+                temporal(dc.SIN_PENDIENTES)
+            else:
+                escena.hud.mostrar_aviso(dc.SIN_PENDIENTES)
+        except Exception:                # noqa: BLE001 — un aviso nunca rompe la tecla
+            pass
 
     def clic(self, numero):
         if self.fase == "decidiendo":
@@ -154,6 +171,7 @@ def _crear_vigia(escena_mundo):
 
     from frontend import diseno_adaptable, estilo, tipografia
     from frontend.componentes import BotonSecundario, escala_fuente, panel_tinta, rgb
+    from frontend import hud_esquinas_calculos as hec
     from frontend.registro_reloj import ALTO_CHIP, MARGEN
 
     ANCHO, ALTO = 1.30, 0.86
@@ -251,6 +269,8 @@ def _crear_vigia(escena_mundo):
             # Sobre el chip del reloj (que va sobre el del dinero).
             self.chip_entidad.position = (-diseno_adaptable.aspecto() / 2 + MARGEN + ancho / 2,
                                           -0.5 + MARGEN + ALTO_CHIP / 2 + apilar + ALTO_CHIP + 0.012)
+            if hec.activo():         # mapa de esquinas (M3.1): pila de abajo a la izquierda
+                self.chip_entidad.position = hec.centro_chip_pila(diseno_adaptable.aspecto(), 2 if apilar else 1, ancho=ancho)
             diseno_adaptable.anclar(self.chip_entidad, "izquierda")
 
         def mostrar_dilema(self, contenido):

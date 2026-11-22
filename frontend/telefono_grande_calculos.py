@@ -36,9 +36,9 @@ def ease_in_out(p):
     return 4 * p ** 3 if p < 0.5 else 1 - (-2 * p + 2) ** 3 / 2
 
 
-def rect_transicion(desde, hasta, p):
-    """Rectángulo (x, y, ancho, alto) a mitad de camino entre `desde` y `hasta` con ease_in_out."""
-    t = ease_in_out(p)
+def rect_transicion(desde, hasta, p, curva=None):
+    """Rectángulo (x, y, ancho, alto) a mitad de camino entre `desde` y `hasta` con ease_in_out (o `curva`)."""
+    t = (curva or ease_in_out)(p)
     return tuple(a + (b - a) * t for a, b in zip(desde, hasta))
 
 

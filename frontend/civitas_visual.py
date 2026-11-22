@@ -298,6 +298,7 @@ class VistaCivitas:
             e.enabled = False
         while len(self._monedas) < n:
             moneda = Entity(parent=camera.ui, z=-0.3)
+            moneda.update = self._cancelar_fuera_del_mundo          # BUG-002 (ver abajo)
             Entity(parent=moneda, model="circle", scale=0.04, color=_rgba((150, 110, 20)))
             Entity(parent=moneda, model="circle", scale=0.033, color=_rgba(DORADO), z=-0.001)
             Text("R$", parent=moneda, origin=(0, 0), z=-0.002, scale=escala_fuente(9), font=tipografia.FUENTE_TITULO,
@@ -372,6 +373,7 @@ class VistaCivitas:
         if self.robada is None:
             from frontend import iconos
             self.robada = Entity(parent=camera.ui, z=-0.4)
+            self.robada.update = self._cancelar_fuera_del_mundo
             panel_tinta(self.robada, 0.6, 0.32, tono=(60, 30, 36), radio_px=10)
             yo = Entity(parent=self.robada, model="quad", scale=0.1, position=(-0.2, -0.03, -0.01))
             try:
@@ -392,6 +394,17 @@ class VistaCivitas:
         self._t_robada = SEGUNDOS_ROBADA
 
     # -- Guardián --
+
+    def _cancelar_fuera_del_mundo(self):
+        """BUG-002: monedas y «cuenta robada» viven en camera.ui pero las anima un vigía del HUD del mundo; si se sale
+        del mundo antes de que terminen, se cancelan (no quedan congeladas sobre el interior, el minijuego o el menú)."""
+        if getattr(self._escena, "enabled", True):
+            return
+        self._t_monedas = self._t_robada = None
+        for moneda in self._monedas:
+            moneda.enabled = False
+        if self.robada is not None:
+            self.robada.enabled = False
 
     def _vigilar(self, funcion, *args):
         if self.roto:

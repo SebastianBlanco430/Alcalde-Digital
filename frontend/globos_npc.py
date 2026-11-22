@@ -21,6 +21,11 @@ COLOR_TEXTO = (28, 30, 40)
 COLOR_FONDO = (250, 248, 238, 235)
 RELLENO = (0.045, 0.028)         # relleno del fondo, en unidades del texto
 
+# M3.4 (ALCALDE_HUD_TAMANOS): globos más grandes y con fondo OPACO (también los de llegada_visual, que leen estas).
+from frontend import hud_tamanos_calculos as _ht  # noqa: E402
+if _ht.activo():
+    ESCALA_TEXTO, COLOR_FONDO = _ht.ESCALA_GLOBO_NPC, _ht.FONDO_GLOBO_NPC
+
 
 class GlobosNPC:
 

@@ -291,3 +291,54 @@ class Rampa:
     @property
     def llegado(self):
         return abs(self.valor - self.destino) < 1e-6
+
+
+# -- M3 del plan ambiente y pulseras: audio por capas según la salud de la ciudad (ALCALDE_AUDIO_SALUD=0 = como antes) --
+# Mezcla CONTINUA (sin saltos de nivel) sobre la música del mundo: la base baja un poco con la ciudad rota, `musica_tensa`
+# entra muy baja por debajo en tenso y apagado, y `musica_fiesta` asoma en florece cerca de una plaza. Los bucles de ruido
+# `ambiente_plaza` (sube con la salud) y `ambiente_caos` (con la tensión) solo entran si el equipo vuelve a encender
+# AMBIENTE_RUIDO (los quitó el 2026-11-15 por sonar a locomotora). La recta final por etapas manda cuando está activa.
+AUDIO_SALUD = True
+FUNDIDO_SALUD = 2.0              # s de fundido de cada capa
+PERIODO_AUDIO_SALUD = 0.5        # s entre recálculos
+VOL_BASE_MUNDO = 0.45            # = PERFIL_ESCENA[MUNDO] de audio_enganches
+VOL_BASE_MIN = 0.32              # la base con salud 0
+VOL_TENSA_MAX = 0.22             # musica_tensa con salud 0 (por debajo de la base)
+VOL_FIESTA_MAX = 0.20            # musica_fiesta con salud 1 en el centro de una plaza
+VOL_RUIDO_MAX = 0.5
+PLAZA_CERCA, PLAZA_LEJOS = 12.0, 35.0     # m: a <= 12 m la capa de fiesta suena entera; a >= 35 m, nada
+CAPAS_SALUD = ("musica_tensa", "musica_fiesta", "ambiente_plaza", "ambiente_caos")
+
+
+def audio_salud_activo():
+    return _bandera("ALCALDE_AUDIO_SALUD", AUDIO_SALUD)
+
+
+def _suave(t):
+    t = max(0.0, min(1.0, t))
+    return t * t * (3.0 - 2.0 * t)
+
+
+def cercania_plaza(distancia):
+    """1 a <= PLAZA_CERCA m de una plaza, 0 a >= PLAZA_LEJOS, suave en medio. None/inf = lejos."""
+    if distancia is None:
+        return 0.0
+    return _suave((PLAZA_LEJOS - distancia) / (PLAZA_LEJOS - PLAZA_CERCA))
+
+
+def volumenes_salud(salud, cercania=0.0, con_ruido=False):
+    """{nombre: volumen} de la base del mundo y de cada capa para esa salud (0..1). Continua en la salud."""
+    s = max(0.0, min(1.0, float(salud)))
+    tension = _suave((0.5 - s) / 0.5)                  # 0 con salud >= 0,5; 1 con salud 0
+    fiesta = _suave((s - 0.75) / 0.2) * max(0.0, min(1.0, cercania))
+    vols = {
+        "musica_ambiente": round(VOL_BASE_MUNDO - (VOL_BASE_MUNDO - VOL_BASE_MIN) * tension, 4),
+        "musica_tensa": round(VOL_TENSA_MAX * tension, 4),
+        "musica_fiesta": round(VOL_FIESTA_MAX * fiesta, 4),
+        "ambiente_plaza": 0.0,
+        "ambiente_caos": 0.0,
+    }
+    if con_ruido:
+        vols["ambiente_plaza"] = round(VOL_RUIDO_MAX * s, 4)
+        vols["ambiente_caos"] = round(VOL_RUIDO_MAX * (1.0 - s), 4)
+    return vols

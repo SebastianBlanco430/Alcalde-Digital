@@ -87,9 +87,14 @@ def adaptadores():
     return todos
 
 
+def activo():
+    """¿Hay tutoriales de misión? Bandera propia (backend) + la maestra de las misiones visuales (ARQ-004)."""
+    return bv.maestra() and logica.activo()
+
+
 def hay_tutorial(id_):
     """¿Existe tutorial para `id_` (bandera encendida, guion y adaptador)? No mira si ya se vio."""
-    return logica.activo() and id_ in guiones() and id_ in adaptadores()
+    return activo() and id_ in guiones() and id_ in adaptadores()
 
 
 def toca(id_, forzar_ver=False):
@@ -131,7 +136,7 @@ def construir_seccion(s):
 
 
 def registrar(gestor=None, conexion=None, escena_mundo=None):
-    if not logica.activo():                      # bandera apagada: ni la sección de Ajustes (idéntico a hoy)
+    if not activo():                             # bandera apagada: ni la sección de Ajustes (idéntico a hoy)
         return
     from frontend.escenas import escena_ajustes
     escena_ajustes.registrar_seccion(NOMBRE_SECCION, construir_seccion)

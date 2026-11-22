@@ -22,7 +22,7 @@ def guardar_ahora(escena_mundo):
     if flujo is None or getattr(escena_mundo, "online", None) is not None:
         return False
     mapa, semilla = _mundo_id(escena_mundo._mundo)
-    return guardado.guardar(guardado.capturar(flujo, mapa, semilla))
+    return guardado.guardar(guardado.capturar(flujo, mapa, semilla), segundo_plano=True)    # sin tirón (EST-007)
 
 
 def _crear_vigia(escena_mundo):
@@ -118,9 +118,10 @@ def registrar(gestor, conexion, escena_mundo):
             try:
                 flujo = guardado.restaurar(datos, EstadoPartida(*construir_arboles()), conexion._fabrica_flujo,
                                            ESCALA_MUNDO, mapa, semilla)
-            except ValueError as error:
-                print(f"[guardado] no se pudo continuar ({error}); se empieza una partida nueva", file=sys.stderr)
-                guardado.borrar()
+            except Exception as error:               # noqa: BLE001  BUG-006/EST-003: nada de un guardado tumba el juego
+                print(f"[guardado] no se pudo continuar ({type(error).__name__}: {error}); se empieza una partida nueva",
+                      file=sys.stderr)
+                guardado.apartar(motivo=f"no se pudo restaurar: {type(error).__name__}")   # .dañado, no se borra
                 return conexion.ir_a_seleccion()
             conexion.partida_restaurada = True       # «Continuar»: el tutorial (registro_tutorial) no sale
             conexion.flujo = flujo

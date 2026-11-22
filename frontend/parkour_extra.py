@@ -290,16 +290,21 @@ class ControladorParkour:
             return None
 
     def apagar(self):
+        # EST-013: al cambiar de nivel, escena_parkour ya destruyó el mundo viejo (y con él glitch, orbe y estela):
+        # apagar un nodo vacío es NodePath.stash() sobre nada -> «Assertion failed: !is_singleton() && !is_empty()»
+        # por consola (14 = 12 de estela + glitch + orbe). Los nodos ya vacíos se saltan.
         self.roto = True
         self._t_lenta = None
         for nombre in ("glitch", "orbe", "medallas_ui", "grande"):
             e = getattr(self, nombre, None)
-            if e is not None:
+            if e is not None and not e.is_empty():
                 try:
                     e.enabled = False
                 except Exception:        # noqa: BLE001
                     pass
         for e in getattr(self, "estela", []):
+            if e.is_empty():
+                continue
             try:
                 e.enabled = False
             except Exception:            # noqa: BLE001

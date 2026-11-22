@@ -316,7 +316,7 @@ def _armar_pose(m, desp, rots, tobillo_i, tobillo_d, brazos, inclinacion_total=0
     return pose
 
 
-def _pose_ciclo(fase, v, m, ascenso=0.0, paso_escalon=False):
+def _pose_ciclo(fase, v, m, ascenso=0.0, paso_escalon=False, k_pelvis=None):
     d = _interp(APOYO, v)
     fase = fase % 1.0
     psi_d = fase
@@ -326,7 +326,10 @@ def _pose_ciclo(fase, v, m, ascenso=0.0, paso_escalon=False):
     inc = _interp(INCLINACION, v) + (10.0 if paso_escalon else 0.0)
     c2, s1 = math.cos(2 * math.pi * fase), math.sin(2 * math.pi * fase)
     sway = -_interp(BAMBOLEO, v) * s1
-    dz = -_interp(AGACHE, v) + _interp(REBOTE, v) * math.cos(4 * math.pi * (fase - d / 2)) - ascenso * (d + 0.25)
+    # la pelvis: al subir baja ascenso·(d + 0,25); con k_pelvis (bajada, ANI-002) baja k_pelvis·|ascenso| para que la
+    # pierna de apoyo llegue al peldaño de abajo sin estirarse de más
+    ajuste = -ascenso * (d + 0.25) if k_pelvis is None else -k_pelvis * abs(ascenso)
+    dz = -_interp(AGACHE, v) + _interp(REBOTE, v) * math.cos(4 * math.pi * (fase - d / 2)) + ajuste
     desp = (0.0, sway, dz)
     rots = {"pelvis": (giro_p * c2, 0.25 * inc, -caida * s1),
             "lumbar": (-0.3 * giro_h * c2, 0.55 * inc, 0.5 * caida * s1),
@@ -361,6 +364,32 @@ def _pose_ciclo(fase, v, m, ascenso=0.0, paso_escalon=False):
 # Pose de caminar/correr para la fase del ciclo (0..1) y la velocidad de diseño v.
 def pose_marcha(fase, v, m=None):
     return _pose_ciclo(fase, v, m or Medidas())
+
+
+# ANI-002 · BAJAR una escalera de pendiente `pendiente` (desnivel / avance) a la velocidad de diseño v. Es la marcha de
+# siempre (misma zancada y cadencia: los pies no patinan en horizontal) con el pie de apoyo SUBIENDO respecto a la cadera
+# lo mismo que baja el cuerpo mientras apoya (ascenso negativo = pendiente · largo de ciclo / 2): así el pie plantado no
+# se hunde con el cuerpo, como haría un IK de dos huesos. La pelvis baja K_PELVIS_BAJADA·|ascenso| para que la pierna
+# llegue al peldaño de abajo (con 0,5 no hay error de alcance entre 1,5 y 8,5 m/s).
+PENDIENTE_BAJADA = 0.22          # pendiente con la que se hornean los clips (las escaleras del mundo: 0,09-0,23)
+K_PELVIS_BAJADA = 0.25
+
+
+def ascenso_bajada(v, pendiente=PENDIENTE_BAJADA):
+    return -abs(pendiente) * largo_ciclo(v) / 2
+
+
+def pose_bajada(fase, v, m=None, pendiente=PENDIENTE_BAJADA):
+    return _pose_ciclo(fase, v, m or Medidas(), ascenso=ascenso_bajada(v, pendiente), k_pelvis=K_PELVIS_BAJADA)
+
+
+# Peso del clip de bajada frente a la marcha para una pendiente dada (0 en llano, 1 a PENDIENTE_BAJADA o más).
+def peso_bajada(pendiente):
+    try:
+        p = abs(float(pendiente))
+    except (TypeError, ValueError):
+        return 0.0
+    return 0.0 if p != p else min(1.0, p / PENDIENTE_BAJADA)
 
 
 # Subir escalón: ciclo con rodilla alta en el balanceo, la pierna de apoyo se extiende y la pelvis sube; el
@@ -402,7 +431,9 @@ def pose_salto(etapa, m=None):
         rots = {"pelvis": (0, 5.0, 0), "lumbar": (0, 8.0, 0), "pecho": (0, 10.0, 0), "cuello": (0, 6.0, 0), "cabeza": (0, 2.0, 0)}
         ti = (xc + 0.20, yc + 0.02, 0.45, -15.0, 0.0)
         td = (xc - 0.02, -yc - 0.02, 0.35, -30.0, 0.0)
-        brazos = {"i": (110.0, 35.0, 125.0, 25.0), "d": (95.0, 38.0, 110.0, 28.0)}
+        # ANI-003: antes {"i": (110, 35, 125, 25), "d": (95, 38, 110, 28)}: en todo el punto alto las manos quedaban a
+        # la altura del hombro y medio abiertas (parecía una cruz). Ahora suben por encima de la cabeza y menos abiertas.
+        brazos = {"i": (145.0, 22.0, 155.0, 15.0), "d": (135.0, 25.0, 145.0, 18.0)}
     elif etapa == "caida":
         desp = (0.0, 0.0, 0.0)
         rots = {"pelvis": (0, 3.0, 0), "lumbar": (0, 4.0, 0), "pecho": (0, 5.0, 0), "cuello": (0, 3.0, 0), "cabeza": (0, 1.0, 0)}

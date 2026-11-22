@@ -211,6 +211,10 @@ class Zona:
     ancho: float
     fondo: float
     rumbo: float = 0.0      # grados: hacia dónde mira lo que hay dentro (los rincones secretos; la cancha no lo usa)
+    # Feria (zona «mercado», backend/logica/feria.py): m que se alargó la losa por el fondo y hacia qué extremo del eje
+    # largo (-1 = coordenada menor, +1 = mayor). 0 = la losa de siempre (ALCALDE_PUESTOS_FIJOS=0).
+    reserva: float = 0.0
+    lado_reserva: int = -1
 
     def caja(self):
         return (self.cx - self.ancho / 2, self.cx + self.ancho / 2,

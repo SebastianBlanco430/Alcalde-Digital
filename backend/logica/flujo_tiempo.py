@@ -119,6 +119,13 @@ def ponderar_final(final, indicadores, peso=PESO_CIUDAD):
                 componente_critico=ciudad["componente_critico"], fuente="ponderado")
 
 
+def _etapa_guardada(valor):
+    """«etapa_vista» del guardado: un entero de etapas_final.ETAPAS o None (ausente, guardado viejo o dañado)."""
+    if isinstance(valor, int) and not isinstance(valor, bool) and valor in etapas_final.ETAPAS:
+        return valor
+    return None
+
+
 class FlujoConTiempo:
 
     # `reloj`: RelojPartida (None = uno nuevo). `efectos` / `aislamiento`: True, False o None (= la bandera de su módulo).
@@ -318,6 +325,8 @@ class FlujoConTiempo:
             datos["efectos_retardados"] = self.cola_efectos.a_dict()
         if self.aislamiento is not None:
             datos["aislamiento"] = self.aislamiento.a_dict()
+        if etapas_final.activo():
+            datos["etapa_vista"] = self._etapa_vista       # BUG-004: la histéresis del final viaja con el guardado
         return datos
 
     # Restaura lo que traiga `datos` (el dict completo del guardado). TOLERANTE: una clave ausente (guardado anterior al
@@ -338,6 +347,8 @@ class FlujoConTiempo:
                                          ambiente_ciudad.AmbienteSuave())
         self.avisos_retardados = []
         self.ultimo_aviso_retardado = None
+        self._etapa_vista = _etapa_guardada(datos.get("etapa_vista"))
+        self._indice_etapas = None
 
     @staticmethod
     def _leer(datos, clave, leer, por_defecto):

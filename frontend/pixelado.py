@@ -21,7 +21,9 @@ PIXELADO = True             # bandera reversible: False = sin pixelado
 
 # Añade al FilterManager `fm` (que ya hizo renderSceneInto con `textura_mundo`) la etapa de resolución nativa.
 # Devuelve la textura final (la que debe mostrar el cuadrado de la ventana). Lanza si no se puede crear el búfer.
-def anadir_etapa_nativa(fm, textura_mundo, divisor):
+# Con `devolver_cuadro` devuelve (textura_final, cuadro): el pase final (frontend/daltonismo.py) pone en ese cuadro la tinta
+# y el grading, por debajo de la interfaz.
+def anadir_etapa_nativa(fm, textura_mundo, divisor, devolver_cuadro=False):
     textura_mundo.setMagfilter(SamplerState.FT_nearest)
     textura_mundo.setMinfilter(SamplerState.FT_nearest)
     textura_final = Texture("pixelado-nativo")
@@ -30,13 +32,17 @@ def anadir_etapa_nativa(fm, textura_mundo, divisor):
     # renderQuadInto crea el búfer SIN profundidad si no se le da una textura de profundidad; la interfaz la necesita.
     propiedades = FrameBufferProperties()
     propiedades.setDepthBits(24)
+    from frontend import suavizado
+    if suavizado.pedidas() > 0:
+        # Con el prc de MSAA cargado, getDefault() ya trae muestras: este búfer (cuadro ampliado + UI) no las necesita.
+        propiedades.setMultisamples(0)
     cuadro = fm.renderQuadInto("pixelado-nativo", colortex=textura_final, fbprops=propiedades)
     if cuadro is None:
         raise RuntimeError("FilterManager no pudo crear el búfer nativo")
     cuadro.setTexture(textura_mundo)
     cuadro.setColor(1, 1, 1, 1)
     fijar_divisor(fm, divisor)
-    return textura_final
+    return (textura_final, cuadro) if devolver_cuadro else textura_final
 
 
 # Cambia el tamaño del búfer del mundo (etapa A). Los búferes siguen la ventana al redimensionarla (sizes).

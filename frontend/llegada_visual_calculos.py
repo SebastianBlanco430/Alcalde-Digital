@@ -98,3 +98,60 @@ def acercar_telefono(t, reducir=False):
         return 1.0 if t > 0 else 0.0
     k = max(0.0, min(1.0, t / DUR_TELEFONO))
     return k * k * (3 - 2 * k)
+
+
+# -- Cierre (punto 3, ALCALDE_GLOBOS_SIN_HUD): los globos de los vecinos son del MUNDO (billboard sobre la cabeza) y el HUD
+# se pinta encima: con el vecino arriba en pantalla, «Me llegó esto…» quedaba encimado bajo el panel de misión. Con la
+# bandera, cada cuadro se proyecta el globo a camera.ui y, si toca un bloque de arriba del HUD (misión, franja, minimapa y
+# su etiqueta), se BAJA lo justo para quedar debajo con aire; si así se saldría de la zona segura, se oculta. =0 antes.
+GLOBOS_SIN_HUD = True
+BLOQUES_ARRIBA = ("mision", "franja", "minimapa", "lugar")
+MAX_BAJADA_M = 2.5            # m: más abajo taparía al vecino entero: entonces el globo se oculta
+MARGEN_INCLINACION = 1.15     # bajar en vertical del mundo con la cámara inclinada (~22°) rinde ~cos(22°) en pantalla
+
+
+def globos_sin_hud_activo(entorno=None):
+    import os
+    valor = (os.environ if entorno is None else entorno).get("ALCALDE_GLOBOS_SIN_HUD", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(GLOBOS_SIN_HUD)
+
+
+def obstaculos_hud(ancho_px, alto_px):
+    """Rects (unidades de camera.ui) de los bloques de arriba del HUD que un globo no debe pisar."""
+    from frontend import hud_esquinas_calculos as he
+    rects = he.layout_esquinas(ancho_px, alto_px)
+    return [rects[n] for n in BLOQUES_ARRIBA if n in rects]
+
+
+def bajada_globo(rect, obstaculos, piso, holgura=None):
+    """Cuánto (unidades de camera.ui, ≥ 0) hay que bajar el globo `rect` para que no toque ningún obstáculo.
+
+    Baja por debajo de cada obstáculo que toque, repitiendo hasta que no toque ninguno. None si así su borde de abajo
+    quedaría bajo `piso` (fuera de la zona segura): entonces el globo se oculta."""
+    from frontend import hud_esquinas_calculos as he
+    holgura = he.PASO if holgura is None else holgura
+    dy = 0.0
+    for _ in range(len(obstaculos) + 1):
+        actual = he.Rect(rect.x0, rect.y0 - dy, rect.x1, rect.y1 - dy)
+        tocados = [o for o in obstaculos if actual.se_solapa(o, holgura)]
+        if not tocados:
+            return dy if actual.y0 >= piso else None
+        dy = max(dy, max(actual.y1 - o.y0 + holgura for o in tocados) + dy)
+    return None
+
+
+def metros_por_unidad_ui(profundidad, fov_vertical_grados):
+    """m del mundo (a `profundidad` m de la cámara) que ocupa una unidad de camera.ui (= el alto de la pantalla)."""
+    return 2.0 * max(profundidad, 0.0) * math.tan(math.radians(fov_vertical_grados) / 2.0)
+
+
+def rect_desde_film(puntos_film, aspecto):
+    """Rect en camera.ui que encierra puntos proyectados por la lente (coordenadas de film -1..1)."""
+    from frontend import hud_esquinas_calculos as he
+    xs = [p[0] * aspecto / 2 for p in puntos_film]
+    ys = [p[1] * 0.5 for p in puntos_film]
+    return he.Rect(min(xs), min(ys), max(xs), max(ys))

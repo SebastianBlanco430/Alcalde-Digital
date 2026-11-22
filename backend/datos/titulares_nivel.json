@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "sube": {
+    "sano": "La ciudad recupera el ritmo",
+    "florece": "La plaza respira",
+    "tenso": "Vuelve algo de calma"
+  },
+  "baja": {
+    "sano": "Se apaga un poco la fiesta",
+    "tenso": "Crece la tensión en el barrio",
+    "apagado": "La ciudad se apaga"
+  }
+}

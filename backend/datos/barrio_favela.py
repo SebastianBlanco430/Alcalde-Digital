@@ -26,6 +26,7 @@ from dataclasses import replace
 from backend.datos.conectividad import Rejilla
 from backend.datos.modelos_edificios import MODELOS, modelo_de
 from backend.grafos.mapa_ciudad import _distancia_punto_segmento
+from backend.logica import feria
 from backend.logica.mundo_ciudad import (
     RADIO_JUGADOR,
     Callejon,
@@ -409,6 +410,8 @@ def zonas_abiertas(mapa, edificios, suelo, limites):
         zonas.append(Zona("cancha", round(cancha[0], 2), round(cancha[1], 2), cancha[2], cancha[3]))
     # El mercadito queda pegado a la acera de una calle, para que el paso hacia él sea la propia calle.
     mercado = _mercado_junto_a_calle(mapa, ocupadas + [z.caja() for z in zonas], suelo, limites)
+    if mercado and feria.puestos_fijos_activo():
+        mercado = extender_feria(mercado, mapa, ocupadas + [z.caja() for z in zonas], suelo, limites)
     if mercado:
         zonas.append(mercado)
     if EASTER_EGGS:
@@ -471,6 +474,48 @@ def mesas_secretas(zonas):
 
 
 # Rectángulo de MERCADO a un lado de una calle, pegado a su acera, lo más plano posible.
+# Feria nueva (backend/logica/feria.py, ALCALDE_PUESTOS_FIJOS): la losa del mercadito se alarga feria.RESERVA_FONDO m por
+# el extremo de su eje largo más lejano a las calles (el fondo; la entrada queda del lado de la calle). Se exigen las
+# mismas reglas que al buscar el sitio (límites, plazas, calles, edificios y cancha) y que el desnivel de la losa larga
+# no pase de DESNIVEL_MAXIMO_FERIA m (luego se aplana). Si no cabe, la zona de siempre.
+DESNIVEL_MAXIMO_FERIA = 1.5
+
+
+def extender_feria(zona, mapa, ocupadas, suelo, limites, reserva=None):
+    reserva = feria.RESERVA_FONDO if reserva is None else reserva
+    xmin, xmax, zmin, zmax = limites
+    calles = [(mapa.coordenada(a), mapa.coordenada(b)) for a, b in mapa.segmentos()]
+    plazas = [mapa.coordenada(lugar) for lugar in mapa.lugares()]
+    largo_x = zona.ancho >= zona.fondo
+    largo = zona.ancho if largo_x else zona.fondo
+
+    def extremo(s):
+        a = s * largo / 2
+        return (zona.cx + a, zona.cz) if largo_x else (zona.cx, zona.cz + a)
+
+    def a_calles(p):
+        return min((_distancia_punto_segmento(p, a, b) for a, b in calles), default=1e9)
+
+    lado = -1 if a_calles(extremo(-1)) >= a_calles(extremo(1)) else 1
+    cx = zona.cx + (lado * reserva / 2 if largo_x else 0.0)
+    cz = zona.cz + (0.0 if largo_x else lado * reserva / 2)
+    ancho = zona.ancho + (reserva if largo_x else 0.0)
+    fondo = zona.fondo + (0.0 if largo_x else reserva)
+    caja = (cx - ancho / 2, cx + ancho / 2, cz - fondo / 2, cz + fondo / 2)
+    if not (xmin + 1 <= caja[0] and caja[1] <= xmax - 1 and zmin + 1 <= caja[2] and caja[3] <= zmax - 1):
+        return zona
+    if any(_distancia_punto_caja(px, pz, caja) < mapa.radio_plaza + 0.9 + 1.0 for px, pz in plazas):
+        return zona
+    if any(_distancia_segmento_caja(p, q, caja) < mapa.ancho_calle / 2 + ACERA_CALLE + 0.5 for p, q in calles):
+        return zona
+    if any(_cajas_cerca(caja, o, 1.5) for o in ocupadas):
+        return zona
+    alturas = [suelo(x, z) for x in (caja[0], cx, caja[1]) for z in (caja[2], cz, caja[3])]
+    if max(alturas) - min(alturas) > DESNIVEL_MAXIMO_FERIA:
+        return zona
+    return replace(zona, cx=round(cx, 2), cz=round(cz, 2), ancho=ancho, fondo=fondo, reserva=reserva, lado_reserva=lado)
+
+
 def _mercado_junto_a_calle(mapa, ocupadas, suelo, limites):
     xmin, xmax, zmin, zmax = limites
     calles = [(mapa.coordenada(a), mapa.coordenada(b)) for a, b in mapa.segmentos()]

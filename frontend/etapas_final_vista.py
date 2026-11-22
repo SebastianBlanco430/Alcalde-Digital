@@ -14,6 +14,7 @@
 #
 # Depuración: ALCALDE_INDICE_FORZADO=<0-100> fija el índice; con ALCALDE_DEBUG=1, F8 baja una etapa y F9 sube una.
 
+from frontend import tinta_calculos as _tinta   # T1: fuente única del grosor de tinta
 import math
 import os
 import random
@@ -21,6 +22,9 @@ import sys
 
 from backend.logica import etapas_final
 from frontend import ambiente_vivo
+from frontend import hud_esquinas_calculos as hec
+from frontend import panel_unico_calculos
+from frontend import hud_tamanos_calculos
 
 PERIODO_LECTURA = 0.5            # s entre dos lecturas del índice
 SEGUNDOS_TINTE = 2.0             # fundido del tinte al cambiar de etapa
@@ -31,7 +35,7 @@ RADIO_LOD_NPC = 60.0             # m: más lejos se recolocan en el anillo
 RADIO_GLOBO = 4.0                # m: más cerca, el NPC dice su frase
 VELOCIDAD_NPC = 1.1              # m/s
 SEMILLA_NPC = 5417
-GROSOR_TINTA_PROP = 0.018        # m por lado del casco de tinta de los props (contorno_calculos.GROSOR_CUERPO)
+GROSOR_TINTA_PROP = _tinta.grosor("etapa_prop")         # m por lado del casco de tinta de los props (contorno_calculos.GROSOR_CUERPO)
 
 ANCHO_MEDIDOR, ALTO_MEDIDOR = 0.60, 0.088
 ANCHO_BARRA, ALTO_BARRA = 0.54, 0.012
@@ -99,8 +103,17 @@ def crear_controlador(escena, conexion):
         def __init__(self, **opciones):
             super().__init__(**opciones)
             self.position = (0, Y_MEDIDOR)
-            self.fondo = panel_tinta(self, ANCHO_MEDIDOR, ALTO_MEDIDOR, tono=estilo.COLOR_FONDO, radio_px=estilo.RADIO_CHIP_PX,
-                                     borde_px=estilo.GROSOR_BORDE_DENSO_PX)
+            # Mapa de esquinas (M3.1, ALCALDE_HUD_ESQUINAS): confianza y desinformación comparten UN fondo (franja única,
+            # docs/DISENO.md §4) pegado al margen de seguridad de arriba; la fila de desinformación va dentro, sin panel.
+            self.esquinas = hec.activo()
+            alto_fondo, y_fondo = ALTO_MEDIDOR, 0.0
+            if self.esquinas:
+                alto_fondo = hec.alto_franja(barra_desinfo_activa())
+                y_fondo = -(alto_fondo - ALTO_MEDIDOR) / 2
+            # Estilo único (M3.3, ALCALDE_PANEL_UNICO): la franja es una «tarjeta» (radio 10, borde denso).
+            radio = panel_unico_calculos.estilo_de("franja").radio_px if panel_unico_calculos.activo() else estilo.RADIO_CHIP_PX
+            self.fondo = panel_tinta(self, ANCHO_MEDIDOR, alto_fondo, tono=estilo.COLOR_FONDO, radio_px=radio,
+                                     borde_px=estilo.GROSOR_BORDE_DENSO_PX, position=(0, y_fondo, 0))
             izquierda = -ANCHO_BARRA / 2
             self.titulo = Text(textos["medidor"]["titulo"], parent=self, origin=(-0.5, 0), position=(izquierda, 0.026, -0.01),
                                scale=escala_fuente(13), color=rgb(estilo.COLOR_TEXTO_TENUE))
@@ -123,6 +136,17 @@ def crear_controlador(escena, conexion):
             self._pintado = None
             self.enabled = False
             diseno_adaptable.ajustar_escala(self)
+            if self.esquinas:
+                self._al_cambiar_ventana(diseno_adaptable.aspecto(), diseno_adaptable.factor())
+                diseno_adaptable.suscribir(self._al_cambiar_ventana)
+
+        def _al_cambiar_ventana(self, aspecto, factor):
+            """El medidor se escala alrededor de su fila de confianza: se baja/sube para que la franja toque el margen."""
+            try:
+                if not self.isEmpty():
+                    self.y = hec.y_franja(aspecto)
+            except Exception:            # noqa: BLE001 - medidor ya destruido: el gestor aún lo tiene suscrito
+                pass
 
         def pintar(self, indice, etapa):
             clave = (int(round(indice)), etapa)
@@ -136,7 +160,8 @@ def crear_controlador(escena, conexion):
             nombre = etapas_final.nombre_de_etapa(etapa)
             if self.etiqueta.text != nombre:
                 self.etiqueta.text = nombre
-            self.etiqueta.color = rgb(tono)
+            # M3.4: el nombre de la etapa con un tono que llega a 4,5:1 sobre el fondo (el rojo no llegaba).
+            self.etiqueta.color = rgb(hud_tamanos_calculos.tono_texto(tono) if hud_tamanos_calculos.activo() else tono)
             ancho = self.etiqueta.width
             self.flecha.enabled, self.guion.enabled = etapa != 0, etapa == 0
             self.flecha.x = self.guion.x = self.etiqueta.x - ancho / 2 - 0.018
@@ -149,10 +174,17 @@ def crear_controlador(escena, conexion):
 
         def __init__(self, **opciones):
             super().__init__(**opciones)
-            self.position = (0, -ALTO_MEDIDOR / 2 - SEPARACION_DESINFO - ALTO_DESINFO / 2)
-            self.fondo = panel_tinta(self, ANCHO_MEDIDOR, ALTO_DESINFO, tono=estilo.COLOR_FONDO, radio_px=estilo.RADIO_CHIP_PX,
-                                     borde_px=estilo.GROSOR_BORDE_DENSO_PX)
             izquierda = -ANCHO_BARRA / 2
+            if hec.activo():
+                # Franja única: fila dentro del fondo del medidor, separada por una raya fina (sin panel propio).
+                self.position = (0, -ALTO_MEDIDOR / 2 - hec.ALTO_FILA_DESINFO / 2 + 0.002)
+                self.fondo = None
+                Entity(parent=self, model="quad", scale=(ANCHO_BARRA, 0.002), position=(0, hec.ALTO_FILA_DESINFO / 2 - 0.002, -0.008),
+                       color=rgb(estilo.COLOR_BARRA_FONDO))
+            else:
+                self.position = (0, -ALTO_MEDIDOR / 2 - SEPARACION_DESINFO - ALTO_DESINFO / 2)
+                self.fondo = panel_tinta(self, ANCHO_MEDIDOR, ALTO_DESINFO, tono=estilo.COLOR_FONDO,
+                                         radio_px=estilo.RADIO_CHIP_PX, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
             try:
                 from backend.logica import manillas as mdl
                 from frontend import registro_manillas
@@ -322,9 +354,20 @@ def crear_controlador(escena, conexion):
                     self.barra_desinfo = BarraDesinfo(parent=self.medidor)
                 except Exception as error:
                     _aviso(f"barra de desinformación no instalada ({type(error).__name__}: {error})")
+            # M3.5: en el HUD «mínimo» la franja sale 4 s cuando cambian confianza o desinformación (no-op si no aplica).
+            registrar = getattr(getattr(escena, "hud", None), "registrar_bloque", None)
+            if callable(registrar):
+                registrar("franja", self.medidor, self._firma_franja)
             self.cuerpos = {}                # tipo -> CuerpoEtapa (se crean la primera vez que hacen falta)
             self._visibles = []
             self.cambios = 0                 # cambios de etapa (pruebas)
+
+        def _firma_franja(self):
+            pintado = self.medidor._pintado
+            if pintado is None:
+                return None
+            desinfo = None if self.barra_desinfo is None else self.barra_desinfo._pintado
+            return (pintado, desinfo)
 
         # -- Lectura --
 

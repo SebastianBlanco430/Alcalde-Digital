@@ -25,7 +25,9 @@ from backend.logica.misiones import RADIO_INTERACCION as radio_misiones, Sistema
 from backend.logica.sesion import SesionJuego
 from frontend import economia_config, online_config
 from frontend import compat_macos, daltonismo, diseno_adaptable, estilo, medidor_fps, tipografia
-from frontend import gpu_dedicada, rendimiento, telemetria
+from frontend import gpu_dedicada, rendimiento, suavizado, telemetria
+from frontend import fuentes_texto      # ALCALDE_FUENTE_CACHE: el model path no crece con cada Text
+from frontend import pantalla_carga         # M7.3: barra de progreso real mientras se construye todo (ALCALDE_PANTALLA_CARGA)
 from frontend import pantalla_completa      # ajuste «Pantalla completa» y F11 por el almacén de ajustes
 from frontend import audio_enganches      # sonido: observa el juego y dispara efectos/música (frontend/audio.py)
 from backend.logica import mundo_config      # el mundo de la partida y su catálogo de misiones
@@ -145,6 +147,7 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
         flujo = recta_final.envolver(flujo)
         return flujo
 
+    pantalla_carga.avance("menus")
     transicion = Transicion(duracion_transicion, duracion_transicion)
     # Fundido de la entrada a un edificio: sale a negro, se queda en negro con el nombre del lugar, vuelve.
     transicion_lugar = Transicion(
@@ -173,12 +176,14 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
         al_comenzar=conexion.ir_a_seleccion, al_salir=application.quit, al_ajustes=al_ajustes, al_online=al_online))
     gestor.registrar(SELECCION_ROL, EscenaSeleccionRol(
         fabrica_sesion=crear_sesion, al_comenzar=conexion.comenzar_partida))
+    pantalla_carga.avance("ciudad_base")
     escena_mundo = EscenaMundo(
         al_interactuar=(lambda: destino.interactuar()) if online_config.ONLINE else conexion.interactuar,
         mundo=mundo, al_menu=(lambda: destino.volver_al_menu()) if online_config.ONLINE else conexion.volver_al_menu,
         escala_tiempo=duracion_cinematica)
     gestor.registrar(MUNDO, escena_mundo)
     conexion.cinematicas = escena_mundo          # reproduce la cinemática de entrada al pulsar E
+    pantalla_carga.avance("interior")
     escena_interior = EscenaInterior(escala_tiempo=duracion_cinematica)
     gestor.registrar(INTERIOR, escena_interior)
     gestor.registrar(JUEGO, EscenaJuego())
@@ -194,7 +199,9 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
     conexion.saltadores = [transicion_lugar.saltar, transicion.saltar, escena_mundo.saltar_cinematica,
                            escena_interior.saltar_cinematica]
     from frontend import extensiones      # escenas de las olas nuevas (mundo digital, parkour)
+    pantalla_carga.avance("extensiones")
     extensiones.aplicar(gestor, conexion, escena_mundo)
+    pantalla_carga.avance("final")
     conexion.atajos = AtajosCinematica(destino)
     if online_config.ONLINE:
         _conectar_online(gestor, mundo, conexion, activa, escena_mundo, transicion, transicion_lugar,
@@ -243,6 +250,20 @@ def leer_semilla():
     return semilla
 
 
+# EST-006: temporales que dejó un cierre a mitad de una escritura (guardado, ajustes, cachés del mundo y de animación);
+# ARQ-006: y las cachés de mundos que ya no existen.
+def _limpiar_temporales():
+    try:
+        from backend.datos import cache_mundo
+        n = ajustes_jugador.limpiar_temporales([ajustes_jugador.directorio_ajustes()])
+        n += ajustes_jugador.limpiar_temporales([cache_mundo.directorio()], recursivo=True)
+        n += cache_mundo.limpiar_retirados()          # ARQ-006: cachés de mundos que ya no existen (mapa grande)
+        if n:
+            print(f"[arranque] {n} archivo(s) temporal(es) o de cachés retiradas borrado(s)")
+    except Exception as error:      # noqa: BLE001 — la limpieza nunca impide arrancar
+        print(f"[arranque] no se pudieron limpiar los temporales: {error}")
+
+
 def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematica=DURACION_CINEMATICA):
     # Retorna (aplicacion, gestor) sin iniciar el loop: quien llama hace aplicacion.run().
     # duracion_transicion=0 quita el fundido y duracion_cinematica=0 las cinemáticas (los scripts
@@ -250,7 +271,11 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     # development_mode=False oculta el panel de desarrollo, pero en Ursina 8.3.0
     # activaría fullscreen por defecto, así que se pide ventana explícita.
     compat_macos.aplicar()
+    _limpiar_temporales()
+    fuentes_texto.instalar()         # antes del primer Text (ALCALDE_FUENTE_CACHE=0 deja el setter de Ursina)
     rendimiento.configurar_panda()   # opciones de Panda que deben ir antes de abrir la ventana
+    # MSAA de la ventana según el ajuste «Suavizado» (o ALCALDE_MSAA): tiene que ir antes de abrir la ventana.
+    suavizado.configurar_antes_de_ventana(ajustes_jugador.obtener().actual)
     # El icono por defecto ('textures/ursina.ico') es relativo y Panda no lo encuentra (un error por
     # cada cambio de propiedades de la ventana): se pasa la ruta absoluta del que trae Ursina, en
     # formato de Panda ('/c/...'); con 'C:/...' Panda tampoco la encuentra en Windows.
@@ -258,6 +283,7 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     aplicacion = Ursina(title="Alcalde Digital", icon=icono.get_fullpath(), borderless=False, fullscreen=False,
                         development_mode=False, size=TAMANO_VENTANA)
     compat_macos.reaplicar()
+    suavizado.aplicar_tras_ventana()  # AntialiasAttrib solo en el mundo (render); la UI sigue nítida
     rendimiento.preparar_raices()    # posición de la cámara para la niebla, en la raíz (frontend/rendimiento.py)
     if medidor_fps.modo() != "libre":
         limitar_fps(FPS_MAXIMOS)
@@ -275,9 +301,15 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
 
     gestor = GestorEscenas()
     semilla = leer_semilla()
-    registrar_escenas(gestor, mundo_config.construir_mundo_activo(semilla), duracion_transicion, duracion_cinematica,
-                      semilla=semilla)
-    audio_enganches.instalar(gestor)       # AUDIO = False (frontend/audio.py) o ALCALDE_SIN_AUDIO=1 lo dejan mudo
+    # Pantalla de carga (M7.3): los constructores llaman a pantalla_carga.avance(...) y la barra se ve moverse.
+    pantalla_carga.iniciar()
+    try:
+        pantalla_carga.avance("mundo")
+        mundo = mundo_config.construir_mundo_activo(semilla)
+        registrar_escenas(gestor, mundo, duracion_transicion, duracion_cinematica, semilla=semilla)
+        audio_enganches.instalar(gestor)       # AUDIO = False (frontend/audio.py) o ALCALDE_SIN_AUDIO=1 lo dejan mudo
+    finally:
+        pantalla_carga.terminar()          # sin restos en el menú (y también si algo falló al construir)
     gestor.cambiar_a(INICIO)
     rendimiento.instalar()                 # silencia en el bucle de Ursina las entidades pasivas (frontend/rendimiento.py)
     telemetria.instalar()                  # F3: FPS y uso de CPU/RAM/GPU (frontend/telemetria.py)

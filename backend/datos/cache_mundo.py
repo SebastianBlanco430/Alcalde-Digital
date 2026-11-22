@@ -16,6 +16,7 @@
 import hashlib
 import os
 import pickle
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -36,12 +37,37 @@ def directorio():
     return Path(elegido) if elegido else Path.home() / ".alcalde_digital" / "cache"
 
 
+_huella_exe = []
+
+
+def huella_ejecutable():
+    """ARQ-001/002: en el ejecutable (PyInstaller) los .py van compilados DENTRO del .exe y no están en disco: la huella
+    del código no los veía y dos versiones con los mismos .json compartían la caché. En modo congelado se usa el
+    contenido del propio ejecutable (cambia con cada versión). Fuera del ejecutable, None. Se calcula una vez."""
+    if not getattr(sys, "frozen", False):
+        return None
+    if not _huella_exe:
+        h = hashlib.sha256()
+        try:
+            with open(sys.executable, "rb") as archivo:
+                for trozo in iter(lambda: archivo.read(1 << 20), b""):
+                    h.update(trozo)
+            _huella_exe.append(h.hexdigest())
+        except OSError:
+            _huella_exe.append("sin-ejecutable")
+    return _huella_exe[0]
+
+
 def huella_del_codigo(raiz=None):
-    """Huella (hex) del contenido de los .py y .json de backend/ (ruta relativa + bytes, en orden). Se calcula una vez."""
+    """Huella (hex) del contenido de los .py y .json de backend/ (ruta relativa + bytes, en orden). Se calcula una vez.
+    En el ejecutable, además, la del propio ejecutable (ARQ-001)."""
     if raiz is None and _huella:
         return _huella[0]
     base = Path(raiz) if raiz is not None else _RAIZ_BACKEND
     h = hashlib.sha256()
+    exe = huella_ejecutable() if raiz is None else None
+    if exe is not None:
+        h.update(f"exe|{exe}\0".encode("utf-8"))
     for ruta in sorted(p for p in base.rglob("*") if p.suffix in _EXTENSIONES and "__pycache__" not in p.parts):
         h.update(ruta.relative_to(base).as_posix().encode("utf-8"))
         h.update(b"\0")
@@ -79,7 +105,8 @@ def _guardar(ruta, mundo, nombre):
             if os.path.exists(temporal):
                 os.remove(temporal)
         for viejo in ruta.parent.glob(f"mundo_{nombre}_*.pickle"):       # los de otro código u otra semilla
-            if viejo != ruta:
+            # ARQ-005: el glob de «chico» también casaba con «chico_feria_…»; solo los de ESTE nombre exacto
+            if viejo != ruta and _es_de(viejo.name, nombre):
                 try:
                     viejo.unlink()
                 except OSError:
@@ -88,6 +115,35 @@ def _guardar(ruta, mundo, nombre):
     except Exception as error:      # noqa: BLE001 — disco lleno, sin permisos, algo no serializable: se juega igual
         print(f"[cache_mundo] no se pudo guardar {ruta.name}: {type(error).__name__}: {error}", file=sys.stderr)
         return False
+
+
+def _es_de(archivo, nombre):
+    """¿`archivo` es una caché del mundo `nombre` (mundo_<nombre>_<20 hex>.pickle) y no de otro que empieza igual?"""
+    return re.fullmatch(rf"mundo_{re.escape(nombre)}_[0-9a-f]{{20}}\.pickle", archivo) is not None
+
+
+# ARQ-006: mundos que ya no existen en el juego (el mapa grande se borró el 2026-11-18): su caché (~8 MB) se quedaba
+# para siempre. Se borran al arrancar. Devuelve cuántos borró.
+MUNDOS_RETIRADOS = ("grande",)
+
+
+def limpiar_retirados(carpeta=None):
+    carpeta = Path(carpeta) if carpeta is not None else directorio()
+    borrados = 0
+    for nombre in MUNDOS_RETIRADOS:
+        try:
+            candidatos = list(carpeta.glob(f"mundo_{nombre}_*.pickle"))
+        except OSError:
+            continue
+        for viejo in candidatos:
+            if not _es_de(viejo.name, nombre):
+                continue
+            try:
+                viejo.unlink()
+                borrados += 1
+            except OSError:
+                pass
+    return borrados
 
 
 def construir_con_cache(nombre, semilla, constructor, carpeta=None, huella=None):

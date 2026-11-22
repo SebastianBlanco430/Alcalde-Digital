@@ -7,11 +7,12 @@
 from ursina import Circle, Entity, Text
 
 from frontend import diseno_adaptable, estilo, tienda_calculos as calc, tipografia
-from frontend.componentes import destruir_arbol, escala_fuente, modelo_redondeado, panel_tinta, rgb
+from frontend.componentes import BotonSecundario, destruir_arbol, escala_fuente, modelo_redondeado, panel_tinta, rgb
 
 ANCHO, ALTO = 0.84, 0.70
 ALTO_FILA = 0.062
 MAX_FILAS = 7
+TECLA_EXTRA = "t"               # = trabajo_npc_calculos.TECLA_TRABAJAR
 
 
 def _texto(padre, cadena, px, tono, pos, origen=(-0.5, 0), negrita=False, z=-0.01):
@@ -33,11 +34,14 @@ def _flecha(padre, pos, arriba=True):
 
 class PanelTienda(Entity):
 
-    def __init__(self, control=None, titulo_fn=None, **opciones):
+    # `extra_fn` (opcional): () -> (texto, al_usar) o None: una acción más del comercio abierto (ALCALDE_TRABAJO_EN_NPC:
+    # «Trabajar aquí», tecla T). Sin ella el panel es el de siempre.
+    def __init__(self, control=None, titulo_fn=None, extra_fn=None, **opciones):
         opciones.setdefault("enabled", False)
         super().__init__(**opciones)
         self.control = control
         self._titulo_fn = titulo_fn or (lambda: ("", ""))
+        self._extra_fn = extra_fn or (lambda: None)
         self._firma = None
         self.marco = panel_tinta(self, ANCHO, ALTO, z=-0.02)
         self.dinamico = Entity(parent=self, z=-0.03)
@@ -56,6 +60,11 @@ class PanelTienda(Entity):
         self.enabled = False
 
     def tecla(self, key):
+        if key == TECLA_EXTRA:
+            extra = self._extra_fn()
+            if extra is not None:
+                extra[1]()                       # cierra la tienda ella misma (economia.cerrar_modales)
+                return None
         return None if self.control is None else self.control.tecla(key)
 
     def actualizar(self):
@@ -64,7 +73,8 @@ class PanelTienda(Entity):
 
     # Redibuja solo si cambió algo visible.
     def redibujar(self):
-        firma = (self.control.firma(), self._titulo_fn())
+        extra = self._extra_fn()
+        firma = (self.control.firma(), self._titulo_fn(), None if extra is None else extra[0])
         if firma == self._firma:
             return False
         self._firma = firma
@@ -129,5 +139,11 @@ class PanelTienda(Entity):
             tono = (240, 110, 110) if c.error else estilo.ESTADO_EXITO
             m = _texto(d, c.mensaje, 14, tono, (izq, abajo + 0.066), negrita=True)
             diseno_adaptable.ajustar_texto(m, ancho, escala_min=0.6)
-        a = _texto(d, "Flechas elegir · Enter comprar · Esc cierra", 12, estilo.COLOR_TEXTO_TENUE, (izq, abajo + 0.026))
+        extra = self._extra_fn()
+        teclas = "Flechas elegir · Enter comprar · Esc cierra"
+        if extra is not None:
+            teclas = "Flechas elegir · Enter comprar · T trabajar · Esc cierra"
+            BotonSecundario(extra[0], al_clic=extra[1], ancho=0.3, alto=0.06, tamano_fuente_px=16, parent=d,
+                            position=(ANCHO / 2 - 0.03 - 0.15, abajo + 0.096, -0.02))
+        a = _texto(d, teclas, 12, estilo.COLOR_TEXTO_TENUE, (izq, abajo + 0.026))
         diseno_adaptable.ajustar_texto(a, ancho, escala_min=0.6)

@@ -3,12 +3,19 @@
 #   {"zona": "mercado", "dx": m, "dz": m}              -> centro de la primera Zona de ese tipo + desfase
 #   {"lugar": "Rodoviária", "fuera": m, "lateral": m}  -> frente a la puerta del edificio: `fuera` m hacia la
 #                                                         calle y `lateral` m a lo largo de la fachada
+#   {"zona": "mercado", "fondo": i, ...}             -> el puesto i (0 o 1) del fondo de la feria (backend/logica/feria.py);
+#                                                         si la feria no tiene fondo, el dx/dz del ancla
 # Ambas aceptan "rumbo" (grados) opcional. `mundo` solo necesita zonas() y edificio_de(lugar) (un falso en tests).
+# "fijo": True (ALCALDE_PUESTOS_FIJOS, backend/datos/comercios_semilla.py) = posición revisada a mano: el frontend no la
+# corre ni la gira (frontend/comercios_calculos.colocar_puesto); los tests garantizan que es válida.
+# El dx/dz de una zona se mide desde el centro de su parte decorativa (feria.region_decorativa): con la feria alargada
+# por el fondo, Seu Zé sigue en la entrada; con la losa de siempre es el centro de la zona, como antes.
 # Lo gráfico (toldos, NPC, panel de compra) vive en frontend/; aquí no hay ursina.
 
 import math
 from dataclasses import dataclass
 
+from backend.logica import feria
 from backend.logica.mundo_ciudad import _NORMAL_FUERA, _TANGENTE
 
 TIPOS = ("tienda", "vendedor_calle", "puesto_trabajo")
@@ -54,8 +61,16 @@ def resolver_ancla(mundo, ancla):
         zona = next((z for z in mundo.zonas() if z.tipo == ancla["zona"]), None)
         if zona is None:
             raise ValueError(f"No hay una zona {ancla['zona']!r} en el mundo.")
+        if "fondo" in ancla:
+            fondo = feria.puestos_del_fondo(zona)
+            indice = ancla["fondo"]
+            if fondo and isinstance(indice, int) and not isinstance(indice, bool) and 0 <= indice < len(fondo):
+                return tuple(float(v) for v in fondo[indice])
         rumbo = ancla["rumbo"] if "rumbo" in ancla else getattr(zona, "rumbo", 0.0)
-        return (zona.cx + _numero(ancla, "dx"), zona.cz + _numero(ancla, "dz"), float(_numero({"r": rumbo}, "r")))
+        centro_a, _largo = feria.region_decorativa(zona) if hasattr(zona, "reserva") else (0.0, 0.0)
+        largo_x = zona.ancho >= zona.fondo
+        cx, cz = (zona.cx + centro_a, zona.cz) if largo_x else (zona.cx, zona.cz + centro_a)
+        return (cx + _numero(ancla, "dx"), cz + _numero(ancla, "dz"), float(_numero({"r": rumbo}, "r")))
     edificio = mundo.edificio_de(ancla["lugar"])
     lado = edificio.lado_puerta
     px, pz = edificio.puerta()

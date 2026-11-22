@@ -106,6 +106,23 @@ class PerfilEscalera:
         i = max(0, bisect_right(self._inicios, s) - 1)
         return self.tramos[i][2]
 
+    # ANI-002: altura en RAMPA a `s` m de A: recta que une los centros de las huellas (acotada en las puntas). Al bajar
+    # la escalera el cuerpo sigue esta recta y el clip de bajada lleva los pies peldaño a peldaño.
+    def altura_rampa_en_s(self, s):
+        s = min(self.largo, max(0.0, s))
+        centros = [((a + b) / 2, h) for a, b, h in self.tramos]
+        if s <= centros[0][0]:
+            return centros[0][1]
+        for (s0, h0), (s1, h1) in zip(centros, centros[1:]):
+            if s <= s1:
+                return h0 + (h1 - h0) * (s - s0) / (s1 - s0) if s1 > s0 else h1
+        return centros[-1][1]
+
+    # Pendiente media de la escalera (desnivel / largo).
+    @property
+    def pendiente(self):
+        return (self.tope - self.base) / self.largo if self.largo > 0 else 0.0
+
     # Distancia s (m desde A) de la proyección de (x, z) sobre el eje, acotada al segmento.
     def s_de(self, x, z):
         e = self.escalera

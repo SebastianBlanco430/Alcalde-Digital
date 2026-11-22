@@ -428,15 +428,11 @@ def obstaculos_de_zonas(zonas):
         largo_x = zona.ancho >= zona.fondo
         largo, ancho = (zona.ancho, zona.fondo) if largo_x else (zona.fondo, zona.ancho)
         if zona.tipo == "mercado":
-            cuantos = max(2, int(largo // 3.2))
+            from backend.logica import feria
             ma, mf = MITAD_PUESTO_MERCADO
-            for fila in (-1, 1):
-                for k in range(cuantos):
-                    a = -largo / 2 + (k + 0.5) * largo / cuantos
-                    b = fila * (ancho / 2 - 1.3)
-                    cx, cz = (zona.cx + a, zona.cz + b) if largo_x else (zona.cx + b, zona.cz + a)
-                    lx, lz = (2 * ma, 2 * mf) if largo_x else (2 * mf, 2 * ma)
-                    salida.append(Obstaculo("puesto_mercado", cx, cz, ancho=lx, fondo=lz))
+            lx, lz = (2 * ma, 2 * mf) if largo_x else (2 * mf, 2 * ma)
+            for cx, cz, _rumbo in feria.puestos_decorativos(zona):
+                salida.append(Obstaculo("puesto_mercado", cx, cz, ancho=lx, fondo=lz))
         elif zona.tipo == "cancha":
             for lado in (-1, 1):
                 a = lado * (largo / 2 + 0.05)

@@ -7,6 +7,7 @@
 
 import math
 
+from backend.logica import feria
 from backend.logica.mundo_ciudad import Obstaculo
 
 ANCHO_PUESTO = 2.6               # m a lo largo del mostrador
@@ -67,20 +68,12 @@ def muestras_huella(x, z, rumbo, ancho=ANCHO_PUESTO, atras=ATRAS_PUESTO, adelant
 
 
 # Huellas de los puestos con toldo del mercadito decorativo (frontend/favela_detalles.mercadito): cajas (x0, x1, z0, z1).
-# Los puestos nuevos se apartan de ellos para no taparlos.
+# Los puestos nuevos se apartan de ellos para no taparlos. La colocación sale de backend/logica/feria.py (la misma que
+# dibuja favela_detalles.mercadito y la que choca en favela_calculos.obstaculos_de_zonas).
 def huellas_mercadito(zona, mitad_ancho=1.3, mitad_fondo=1.1):
     largo_x = zona.ancho >= zona.fondo
-    largo, ancho = (zona.ancho, zona.fondo) if largo_x else (zona.fondo, zona.ancho)
-    cuantos = max(2, int(largo // 3.2))
-    cajas = []
-    for fila in (-1, 1):
-        for k in range(cuantos):
-            a = -largo / 2 + (k + 0.5) * largo / cuantos
-            b = fila * (ancho / 2 - 1.3)
-            cx, cz = (zona.cx + a, zona.cz + b) if largo_x else (zona.cx + b, zona.cz + a)
-            hx, hz = (mitad_ancho, mitad_fondo) if largo_x else (mitad_fondo, mitad_ancho)
-            cajas.append((cx - hx, cx + hx, cz - hz, cz + hz))
-    return cajas
+    hx, hz = (mitad_ancho, mitad_fondo) if largo_x else (mitad_fondo, mitad_ancho)
+    return [(cx - hx, cx + hx, cz - hz, cz + hz) for cx, cz, _rumbo in feria.puestos_decorativos(zona)]
 
 
 class Ocupacion:
@@ -169,3 +162,117 @@ def elegir_puesto(ocupacion, x, z, rumbo, radio=RADIO_BUSQUEDA, paso=PASO_BUSQUE
         return (x, z, rumbo, ocupacion.violaciones(muestras_huella(x, z, rumbo)))
     px, pz, r = mejor[1]
     return (px, pz, r, mejor[0][0])
+
+
+# (x, z, rumbo, violaciones) del puesto: el ancla tal cual si es FIJA (ALCALDE_PUESTOS_FIJOS: revisada a mano; aquí solo
+# se cuenta lo que pisa, los tests exigen 0) o el mejor sitio de elegir_puesto si no lo es (como antes).
+def colocar_puesto(ocupacion, x, z, rumbo, fijo=False):
+    if fijo:
+        return (x, z, rumbo, ocupacion.violaciones(muestras_huella(x, z, rumbo)))
+    return elegir_puesto(ocupacion, x, z, rumbo)
+
+
+# -- Revisión de un puesto colocado (tests y avisos) -----------------------------------------------------------------
+# Lo que Ocupacion no mira: puertas (de los lugares y de las casas decorativas), bancos, farolas, árboles y demás props,
+# puntos de misión. Puro: los props llegan como (tipo, x, z, radio).
+DISTANCIA_PUERTA = 2.0           # m mínimos de una puerta (lugar o casa) a la huella del puesto
+DISTANCIA_PROP = 1.0             # m mínimos de un banco/farola/árbol a la huella (o su radio, si es mayor)
+DISTANCIA_MISION = 4.0           # m mínimos del dependiente a un punto de misión (sus E no se pisan)
+PASILLO_PUERTA = 2.5             # m libres entre las dos huellas de una pareja, frente a la puerta
+
+
+# Distancia de (px, pz) al rectángulo de la huella del puesto (0 si cae dentro).
+def distancia_a_huella(px, pz, x, z, rumbo, ancho=ANCHO_PUESTO, atras=ATRAS_PUESTO, adelante=ADELANTE_PUESTO):
+    s, c = math.sin(math.radians(rumbo)), math.cos(math.radians(rumbo))
+    dx, dz = px - x, pz - z
+    da = c * dx - s * dz                       # a lo largo del mostrador (inversa de punto_local)
+    df = s * dx + c * dz                       # hacia delante
+    ea = max(0.0, abs(da) - ancho / 2)
+    ef = max(0.0, -atras - df, df - adelante)
+    return math.hypot(ea, ef)
+
+
+# Puerta (x, z) de una casa decorativa: centro de su frente (+z del modelo girado `rumbo`), corrida su puerta_x.
+def puerta_de_casa(casa):
+    from backend.datos.modelos_edificios import modelo_de
+    r = math.radians(casa.rumbo)
+    fx, fz = math.sin(r), math.cos(r)
+    medio_fondo = (casa.fondo if casa.rumbo % 180 == 0 else casa.ancho) / 2
+    try:
+        corrida = modelo_de(casa.modelo).puerta_x * casa.escala
+    except Exception:                          # noqa: BLE001  modelo desconocido: el centro del frente
+        corrida = 0.0
+    return (casa.cx + fx * medio_fondo + math.cos(r) * corrida, casa.cz + fz * medio_fondo - math.sin(r) * corrida)
+
+
+def puertas_del_mundo(mundo):
+    """[(x, z)] de las puertas de los lugares y de las casas decorativas."""
+    puertas = [tuple(e.puerta()) for e in mundo.edificios()]
+    puertas += [puerta_de_casa(o) for o in mundo.obstaculos() if o.tipo == "casa" and getattr(o, "modelo", "")]
+    return puertas
+
+
+def props_del_mundo(mundo, props=()):
+    """[(tipo, x, z, radio)] de bancos, farolas, árboles... del modelo y de los props del frontend (props_mundo.Prop)."""
+    salida = [(o.tipo, o.cx, o.cz, o.radio or max(o.ancho or 0, o.fondo or 0) / 2) for o in mundo.obstaculos()
+              if o.tipo in ("banco", "farola", "arbol", "bananero", "palmera")]
+    if props:
+        from frontend.props_mundo import RADIO_PROP          # sin ursina al importar
+        salida += [(p.tipo, p.x, p.z, RADIO_PROP.get(p.tipo, 0.5)) for p in props if p.tipo != "fuente"]
+    return salida
+
+
+# [motivo] de lo que falla en el puesto (x, z, rumbo): vacío si está bien. `ocupacion`: Ocupacion del mundo (+ feria);
+# `puertas`, `props`, `puntos_mision`: listas de arriba. `puerta_propia`: la puerta de su lugar (se mira aparte, con el
+# pasillo de la pareja).
+def problemas_puesto(ocupacion, x, z, rumbo, puertas=(), props=(), puntos_mision=(), puerta_propia=None):
+    problemas = list(ocupacion.motivos(muestras_huella(x, z, rumbo)))
+    for px, pz in puertas:
+        if puerta_propia is not None and math.hypot(px - puerta_propia[0], pz - puerta_propia[1]) < 1e-6:
+            continue
+        if distancia_a_huella(px, pz, x, z, rumbo) < DISTANCIA_PUERTA:
+            problemas.append(f"puerta en ({px:.1f}, {pz:.1f})")
+    for tipo, px, pz, radio in props:
+        if distancia_a_huella(px, pz, x, z, rumbo) < max(DISTANCIA_PROP, radio):
+            problemas.append(f"{tipo} en ({px:.1f}, {pz:.1f})")
+    for px, pz in puntos_mision:
+        if math.hypot(px - x, pz - z) < DISTANCIA_MISION:
+            problemas.append(f"misión en ({px:.1f}, {pz:.1f})")
+    return problemas
+
+
+# Ancho libre entre las huellas de dos puestos con el mismo rumbo (a lo largo del mostrador).
+def pasillo_entre(a, b):
+    (xa, za, ra), (xb, zb, _rb) = a, b
+    c, s = math.cos(math.radians(ra)), math.sin(math.radians(ra))
+    da = abs(c * (xb - xa) - s * (zb - za))
+    return da - ANCHO_PUESTO
+
+
+# -- Terminal de una misión digital junto a una puerta con puestos fijos ----------------------------------------------
+# frontend/registro_mundo_digital.sitio_junto_al_destino pone el computador del caso 1,5 m fuera de la puerta del destino
+# y 1,4 m a un lado. Con ALCALDE_PUESTOS_FIJOS la pareja del Mercado ocupa justo ese sitio: se busca el primer lateral
+# (el de siempre, el otro lado y luego cada vez más lejos) donde el escritorio, la silla y el sitio desde el que se llega
+# (huella local: ±0,7 m a lo ancho, de -0,45 a +1,4 m hacia delante) quedan a >= 0,4 m de todo puesto y son transitables.
+MITAD_TERMINAL, ATRAS_TERMINAL, ADELANTE_TERMINAL, MARGEN_TERMINAL = 0.7, 0.45, 1.4, 0.4
+
+
+def lateral_terminal(mundo, lugar, fuera, lateral, puestos, paso=0.25, maximo=8.0):
+    """Lateral (m) para el terminal frente a la puerta de `lugar`: `lateral` si cabe, o el primero que cabe.
+    `puestos`: [(x, z, rumbo)] colocados. None si ninguno cabe."""
+    from backend.logica.comercios import resolver_ancla
+    candidatos = [lateral, -lateral]
+    k = abs(lateral) + paso
+    while k <= maximo + 1e-9:
+        candidatos += [math.copysign(k, lateral), -math.copysign(k, lateral)]
+        k += paso
+    transitable = getattr(mundo, "es_transitable", None)
+    for lat in candidatos:
+        x, z, rumbo = resolver_ancla(mundo, {"lugar": lugar, "fuera": fuera, "lateral": lat})
+        puntos = muestras_huella(x, z, rumbo, ancho=2 * MITAD_TERMINAL, atras=ATRAS_TERMINAL,
+                                 adelante=ADELANTE_TERMINAL, paso=0.35)
+        if transitable is not None and not all(transitable(px, pz) for px, pz in puntos):
+            continue
+        if all(distancia_a_huella(px, pz, sx, sz, sr) >= MARGEN_TERMINAL for px, pz in puntos for sx, sz, sr in puestos):
+            return lat
+    return None

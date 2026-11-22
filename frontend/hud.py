@@ -24,8 +24,10 @@ from backend.logica import ajustes as modelo_ajustes
 from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 from backend.logica.roles import ROLES
 from frontend import (
-    diseno_adaptable, diseno_adaptable_calculos, estilo, hud_calculos, iconos, minimapa_calculos as mm,
-    notificaciones_calculos)
+    diseno_adaptable, diseno_adaptable_calculos, estilo, hud_calculos, hud_contextual_calculos as hctx,
+    hud_esquinas_calculos as hec, hud_modo_calculos as hm, hud_tamanos_calculos as ht, iconos,
+    panel_unico_calculos as pu,
+    minimapa_calculos as mm, notificaciones_calculos)
 from frontend.componentes import (
     BarraIndicador, BotonAccion, BotonPrimario, a_unidades, destruir_arbol, escala_fuente,
     modelo_redondeado, panel_tinta, rgb)
@@ -72,7 +74,20 @@ def _medidor(texto):
     nodo = TextNode("medida")
     nodo.setFont(texto.font)
     factor = texto.size * texto.scale_x
-    return lambda cadena: nodo.calcWidth(cadena) * factor
+
+    def medir(cadena):
+        # Panda a veces lanza AssertionError («glyph->_page->get_num_components() == 1», dynamicTextFont.cxx) al
+        # generar glifos nuevos desde Python; en C++ solo avisa y sigue. Visto el 2026-11-21 al armar el toast (tumbaba
+        # el juego). Si pasa, se estima el ancho (~0,55 em por carácter) en vez de cerrar el juego.
+        try:
+            return nodo.calcWidth(cadena) * factor
+        except AssertionError:
+            return len(cadena) * ANCHO_EM_ESTIMADO * factor
+
+    return medir
+
+
+ANCHO_EM_ESTIMADO = 0.55
 
 
 # Text de varias líneas con origen arriba-izquierda, envuelto a `ancho`. Devuelve
@@ -89,6 +104,68 @@ def _texto_envuelto(padre, cadena, ancho, px, rgb_texto, posicion):
 def _fondo(padre, ancho, alto, tono, radio_px=8, **opciones):
     return Entity(parent=padre, model=modelo_redondeado(ancho, alto, radio_px),
                   scale=(ancho, alto), color=tono, **opciones)
+
+
+# panel_tinta con el estilo único del bloque (M3.3, panel_unico_calculos): mismo radio, borde y tono por categoría.
+def _tinta(padre, bloque, ancho, alto, **opciones):
+    e = pu.estilo_de(bloque)
+    return panel_tinta(padre, ancho, alto, tono=e.tono, radio_px=e.radio_px, borde_px=e.borde_px, **opciones)
+
+
+# Fondo de tamaño variable (FondoTinta o el _fondo de antes) y su alfa de aparición.
+def _ajustar_fondo(fondo, ancho, alto, radio_px):
+    if isinstance(fondo, FondoTinta):
+        fondo.ajustar(ancho, alto)
+    else:
+        fondo.model = modelo_redondeado(ancho, alto, radio_px)
+        fondo.scale = (ancho, alto)
+
+
+def _alfa_fondo(fondo, nivel):
+    if isinstance(fondo, FondoTinta):
+        fondo.fijar_alfa(nivel)
+    else:
+        fondo.color = color.rgba32(12, 14, 24, int(round(240 * nivel)))
+
+
+# Fondo de un bloque del HUD con el estilo único que cambia de tamaño (lo rehace solo si cambia) y se funde con
+# setAlphaScale (cara, borde y sombra a la vez). Sustituye a un `_fondo` cuando ALCALDE_PANEL_UNICO está encendida.
+class FondoTinta(Entity):
+
+    def __init__(self, padre, bloque, ancho, alto, **opciones):
+        super().__init__(parent=padre, **opciones)
+        self.bloque = bloque
+        self.panel = None
+        self._medidas = None
+        self._alfa = None
+        self.ajustar(ancho, alto)
+
+    def ajustar(self, ancho, alto):
+        medidas = (round(ancho, 4), round(alto, 4))
+        if medidas == self._medidas:
+            return
+        self._medidas = medidas
+        if self.panel is not None:
+            destruir_arbol(self.panel)
+        self.panel = _tinta(self, self.bloque, ancho, alto)
+        if getattr(self, "_fundido", None) is not None:
+            self._fundido.invalidar()
+
+    def fijar_alfa(self, alfa):
+        alfa = round(float(alfa), 3)
+        if hctx.animaciones_activas():   # M3.6: fundido REAL pieza a pieza (setAlphaScale no baja a los modelos)
+            if getattr(self, "_fundido", None) is None:
+                from frontend.fundido_ui import FundidoArbol
+                self._fundido = FundidoArbol(self)
+            self._fundido.aplicar(alfa)
+            return
+        if alfa == self._alfa:
+            return
+        if self._alfa is None:
+            from panda3d.core import TransparencyAttrib
+            self.setTransparency(TransparencyAttrib.M_alpha)
+        self._alfa = alfa
+        self.setAlphaScale(alfa)
 
 
 # -- Teléfono ------------------------------------------------------------------
@@ -115,12 +192,22 @@ class TelefonoUI(Entity):
         self._nuevos_al_abrir = 0        # no leídos justo antes de abrir (para resaltar)
         self.tiempo_notificacion = 0.0
         self.nivel_banner = 0.0          # 0 = oculto bajo la pantalla, 1 = a la vista
+        # M3.6 (ALCALDE_UI_ANIMACIONES): toast y banner con la regla de la UI (entra 180 ms, sale 120 ms, ease-out).
+        self._fundido_banner = None
+        if hctx.animaciones_activas():
+            self._fundido_banner = (hctx.Fundido() if hctx.activo() else
+                                    hctx.Fundido(hctx.TIEMPOS.BANNER_ENTRADA, hctx.TIEMPOS.BANNER_SALIDA))
+        self._arbol_toast = None
         self.vista = None
         self._firma_banner = None
         self._firma_panel = None
         # Varios mensajes seguidos con el teléfono cerrado: el banner los repasa de uno en uno (4 s cada uno) en vez de
         # pisarse (docs/PLAN_CLARIDAD_JUEGO.md §2.6). None = el banner de antes (ALCALDE_NOTIF_TELEFONO=0).
-        self._cola_banner = notificaciones_calculos.ColaBanner(self.DURACION_NOTIFICACION) \
+        # HUD contextual (M3.2, ALCALDE_HUD_CONTEXTUAL): en vez del banner largo, un toast de UNA línea junto al botón
+        # (hctx.TIEMPOS.TOAST s por mensaje) que entra y sale con fundido. False = el banner de antes.
+        self.contextual = hctx.activo()
+        self.duracion_notificacion = hctx.TIEMPOS.TOAST if self.contextual else self.DURACION_NOTIFICACION
+        self._cola_banner = notificaciones_calculos.ColaBanner(self.duracion_notificacion) \
             if notificaciones_calculos.activo() else None
 
         self.x_derecho = window.aspect_ratio / 2 - MARGEN
@@ -132,6 +219,15 @@ class TelefonoUI(Entity):
     # -- Construcción --
 
     def _construir_icono(self):
+        antes = list(self.children)
+        self._construir_piezas_icono()
+        self.grupo_icono = None
+        if hm.activo():          # M3.5: las piezas del botón en un grupo, para fundirlas juntas en el HUD «mínimo»
+            self.grupo_icono = Entity(parent=self)
+            for pieza in [c for c in self.children if c not in antes and c is not self.grupo_icono]:
+                pieza.parent = self.grupo_icono
+
+    def _construir_piezas_icono(self):
         centro_x = self.x_derecho - self.ANCHO_ICONO / 2
         centro_y = self.y_inferior + self.ALTO_ICONO / 2
         self.icono = BotonAccion("", al_clic=self.alternar, ancho=self.ANCHO_ICONO,
@@ -139,6 +235,11 @@ class TelefonoUI(Entity):
         self.icono.color = rgb((26, 29, 44))
         self.icono.highlight_color = rgb((44, 50, 78))
         self.icono.pressed_color = rgb((44, 50, 78))
+        if pu.activo():          # estilo único (M3.3): esquinas de chip, borde de tinta y sombra plana detrás del botón
+            e = pu.estilo_de("telefono")
+            self.icono.model = modelo_redondeado(self.ANCHO_ICONO, self.ALTO_ICONO, e.radio_px)
+            self.fondo_icono = _tinta(self, "telefono", self.ANCHO_ICONO, self.ALTO_ICONO,
+                                      position=(centro_x, centro_y, 0.001))
         ancho_pantalla, alto_pantalla = self.ANCHO_ICONO - 0.014, self.ALTO_ICONO - 0.026
         _fondo(self, ancho_pantalla, alto_pantalla, rgb(estilo.COLOR_BOTON), 5,
                position=(centro_x, centro_y + 0.004, -0.001))
@@ -178,6 +279,8 @@ class TelefonoUI(Entity):
             self._telefono = telefono
             self.tiempo_notificacion = 0.0
             self.nivel_banner = 0.0
+            if self._fundido_banner is not None:
+                self._fundido_banner.fijar(0.0)
             self._nuevos_al_abrir = 0
             if self._cola_banner is not None and telefono is not None:
                 self._cola_banner.reiniciar(len(telefono.mensajes()), telefono.no_leidos())
@@ -197,14 +300,19 @@ class TelefonoUI(Entity):
             self.tiempo_notificacion = self._cola_banner.tiempo
         elif telefono.estado() == hud_calculos.NOTIFICANDO:
             self.tiempo_notificacion += dt
-            if self.tiempo_notificacion >= self.DURACION_NOTIFICACION:
+            if self.tiempo_notificacion >= self.duracion_notificacion:
                 telefono.terminar_notificacion()
         else:
             self.tiempo_notificacion = 0.0
 
         objetivo = 1.0 if telefono.estado() == hud_calculos.NOTIFICANDO else 0.0
-        self.nivel_banner = hud_calculos.avanzar_hacia(
-            self.nivel_banner, objetivo, dt * self.VELOCIDAD_DESLIZ)
+        if self._fundido_banner is not None:          # M3.6: nivel_banner = alfa ya con su curva
+            self.nivel_banner = self._fundido_banner.avanzar(objetivo > 0, dt)
+        elif self.contextual:
+            self.nivel_banner = hctx.avanzar_fundido(self.nivel_banner, objetivo > 0, dt)
+        else:
+            self.nivel_banner = hud_calculos.avanzar_hacia(
+                self.nivel_banner, objetivo, dt * self.VELOCIDAD_DESLIZ)
         self.vista = hud_calculos.vista_telefono(
             telefono, self._obtener_mision(), self._nuevos_al_abrir)
         indice = None if self._cola_banner is None else self._cola_banner.indice
@@ -243,13 +351,69 @@ class TelefonoUI(Entity):
         visible = vista.modo == hud_calculos.MODO_NOTIFICACION or self.nivel_banner > 0
         self.banner.enabled = (visible and bool(vista.texto_notificacion)
                                and vista.modo != hud_calculos.MODO_ABIERTO)
+        if self.contextual:
+            self._colocar_toast()
+            return
         y_visible = self.y_inferior + self._alto_banner / 2
         y_oculto = -0.5 - self._alto_banner / 2 - MARGEN
         self.banner.position = (self.x_derecho - self.ANCHO_ICONO - 0.012 - self.ANCHO_BANNER / 2,
-                                hud_calculos.mezclar(y_oculto, y_visible,
-                                                     _ease_out_quad(self.nivel_banner)))
+                                hud_calculos.mezclar(y_oculto, y_visible, self.nivel_banner
+                                                     if self._fundido_banner is not None
+                                                     else _ease_out_quad(self.nivel_banner)))
+
+    # -- Toast (HUD contextual) --
+
+    ANCHO_TOAST = 0.44               # máximo; el toast se ajusta a su texto
+    PX_TOAST = 16
+    HUECO_TOAST = 0.02               # aire entre el toast y el botón del teléfono
+
+    # Toast de UNA línea, centrado en altura con el botón y a su izquierda; entra deslizándose y fundiéndose.
+    def _colocar_toast(self):
+        alfa = self.nivel_banner if self._fundido_banner is not None else hctx.alfa_de(self.nivel_banner)
+        x = (self.x_derecho - self.ANCHO_ICONO - self.HUECO_TOAST - self._ancho_toast / 2
+             + (1.0 - alfa) * hctx.TIEMPOS.DESLIZ_TOAST)
+        self.banner.position = (x, self.y_inferior + self.ALTO_ICONO / 2)
+        if alfa != getattr(self, "_alfa_toast", None):
+            self._alfa_toast = alfa
+            if self._fundido_banner is not None:      # M3.6: fundido REAL del toast (pieza a pieza)
+                if self._arbol_toast is None:
+                    from frontend.fundido_ui import FundidoArbol
+                    self._arbol_toast = FundidoArbol(self.banner)
+                self._arbol_toast.aplicar(alfa)
+            else:
+                self.banner.setAlphaScale(alfa)
+
+    def _armar_toast(self, texto):
+        from panda3d.core import TransparencyAttrib
+        for hijo in list(self.banner.children):
+            destruir_arbol(hijo)
+        relleno, lado_icono = (pu.relleno("toast") if pu.activo() else 0.012), a_unidades(20)
+        linea = Text("", parent=self.banner, origin=(-0.5, 0), scale=escala_fuente(self.PX_TOAST),
+                     color=rgb(estilo.COLOR_TEXTO))
+        medir = _medidor(linea)
+        maximo = self.ANCHO_TOAST - 2 * relleno - lado_icono - 0.008
+        linea.text = _seguro(hctx.linea_toast(texto, medir, maximo))
+        ancho = min(self.ANCHO_TOAST, medir(linea.text) + 2 * relleno + lado_icono + 0.008)
+        alto = a_unidades(self.PX_TOAST) * 1.5 + 2 * 0.008
+        self._ancho_toast, self._alto_banner = ancho, alto
+        if pu.activo():
+            _tinta(self.banner, "toast", ancho, alto, z=0.002)
+        else:
+            _fondo(self.banner, ancho, alto, rgb(estilo.COLOR_PANEL), 10, z=0.002)
+        izquierda = -ancho / 2 + relleno
+        _icono(self.banner, "telefono", lado_icono, (izquierda + lado_icono / 2, 0, -0.001))
+        linea.position = (izquierda + lado_icono + 0.008, 0, -0.001)
+        self.banner.setTransparency(TransparencyAttrib.M_alpha)
+        self._alfa_toast = None
+        if self._arbol_toast is not None:
+            self._arbol_toast.invalidar()
+
+    _ancho_toast = 0.3
 
     def _armar_banner(self, texto):
+        if self.contextual:
+            self._armar_toast(texto)
+            return
         for hijo in list(self.banner.children):
             destruir_arbol(hijo)
         relleno = 0.012
@@ -394,7 +558,11 @@ class Minimapa(Entity):
                          0.5 - MARGEN - self.ALTO / 2)
 
         # Capas con z cada vez más negativo = más cerca de la cámara de camera.ui.
-        self.fondo = _fondo(self, self.ANCHO, self.ALTO, COLOR_FONDO_HUD, 10)
+        self.panel_unico = pu.activo()     # estilo único (M3.3): marco «tarjeta» y chip del lugar «chip»
+        if self.panel_unico:
+            self.fondo = FondoTinta(self, "minimapa", self.ANCHO, self.ALTO)
+        else:
+            self.fondo = _fondo(self, self.ANCHO, self.ALTO, COLOR_FONDO_HUD, 10)
         self.capa_calles = Entity(parent=self, z=-0.001)
         self.capa_casas = Entity(parent=self, z=-0.0015)      # casas y escaleras (una malla cada una)
         self.capa_ruta = Entity(parent=self, z=-0.002)
@@ -428,10 +596,14 @@ class Minimapa(Entity):
         self.marcador_destino = Entity(parent=self.capa_lugares, model="circle", z=0.0005,
                                        color=rgb(COLOR_DESTINO), enabled=False)
         # Etiqueta corta del destino, bajo el minimapa (chip oscuro con el nombre en amarillo).
-        self.etiqueta_destino = Text("", parent=self, origin=(0.5, 0.5), scale=escala_fuente(16),
-                                     position=(self.ANCHO / 2 - 0.008, -self.ALTO / 2 - 0.012, -0.007),
+        self.px_etiqueta, self.hueco_etiqueta = 16, 0.012           # ver fijar_estilo_etiqueta()
+        self.etiqueta_destino = Text("", parent=self, origin=(0.5, 0.5), scale=escala_fuente(self.px_etiqueta),
+                                     position=(self.ANCHO / 2 - 0.008, -self.ALTO / 2 - self.hueco_etiqueta, -0.007),
                                      color=rgb(COLOR_DESTINO), enabled=False)
-        self.fondo_etiqueta = _fondo(self, 0.1, 0.03, COLOR_FONDO_HUD, 6, z=-0.0065, enabled=False)
+        if self.panel_unico:
+            self.fondo_etiqueta = FondoTinta(self, "lugar", 0.1, 0.03, z=-0.0065, enabled=False)
+        else:
+            self.fondo_etiqueta = _fondo(self, 0.1, 0.03, COLOR_FONDO_HUD, 6, z=-0.0065, enabled=False)
         self._iniciar_capas()
         self._gestor = None
         if modelo_ajustes.AJUSTES:
@@ -641,6 +813,12 @@ class Minimapa(Entity):
     MAX_ROTULOS = 6                  # rótulos de altura («+3 m») dibujados a la vez
     PX_ROTULO = 12
 
+    # M3.4 (ALCALDE_HUD_TAMANOS): el rótulo sube lo justo para medir >= 18 px a 1080p con la escala del minimapa.
+    def _px_rotulo(self):
+        if not ht.activo():
+            return self.PX_ROTULO
+        return ht.px_asegurado(self.PX_ROTULO, abs(self.scale_x) or 1.0)
+
     # Estado de las capas y la flecha de mirada (norte arriba). Lo llama __init__ al final.
     def _iniciar_capas(self):
         self.capa_extra = None                  # marcadores y zonas: se rehace solo si cambia el registro
@@ -738,7 +916,7 @@ class Minimapa(Entity):
             if not g.contiene(u, v):
                 continue
             if usados >= len(self.rotulos_altura):
-                self.rotulos_altura.append(Text("", parent=self, origin=(-0.5, 0), scale=escala_fuente(self.PX_ROTULO),
+                self.rotulos_altura.append(Text("", parent=self, origin=(-0.5, 0), scale=escala_fuente(self._px_rotulo()),
                                                 z=-0.0072))
             rotulo = self.rotulos_altura[usados]
             usados += 1
@@ -833,12 +1011,26 @@ class Minimapa(Entity):
         # Con la traducción corta: el chip no debe pasar del ancho del minimapa.
         self.etiqueta_destino.text = _seguro(nombre_visible(destino, corto=True))
         ancho = _medidor(self.etiqueta_destino)(self.etiqueta_destino.text)
-        relleno, alto = 0.012, a_unidades(16) * 1.5
-        self.fondo_etiqueta.model = modelo_redondeado(ancho + 2 * relleno, alto, 6)
-        self.fondo_etiqueta.scale = (ancho + 2 * relleno, alto)
+        px, hueco = self.px_etiqueta, self.hueco_etiqueta
+        relleno, alto = 0.012, a_unidades(px) * 1.5
+        if self.panel_unico:
+            relleno = pu.relleno("lugar")
+            self.fondo_etiqueta.ajustar(ancho + 2 * relleno, alto)
+        else:
+            self.fondo_etiqueta.model = modelo_redondeado(ancho + 2 * relleno, alto, 6)
+            self.fondo_etiqueta.scale = (ancho + 2 * relleno, alto)
         derecha = self.ANCHO / 2
-        self.fondo_etiqueta.position = (derecha - (ancho + 2 * relleno) / 2, -self.ALTO / 2 - 0.012 - alto / 2 + 0.002, -0.0065)
-        self.etiqueta_destino.position = (derecha - relleno, -self.ALTO / 2 - 0.012 + 0.002 - (alto - a_unidades(16)) / 2, -0.007)
+        self.fondo_etiqueta.position = (derecha - (ancho + 2 * relleno) / 2, -self.ALTO / 2 - hueco - alto / 2 + 0.002, -0.0065)
+        self.etiqueta_destino.position = (derecha - relleno, -self.ALTO / 2 - hueco + 0.002 - (alto - a_unidades(px)) / 2, -0.007)
+
+    # Letra (px locales) y hueco bajo el mapa (local) del chip del lugar; redibuja el que esté puesto. Lo usa el mapa
+    # de esquinas (hud_esquinas_calculos): el minimapa se achica al 80 % y el chip no debe quedar ilegible.
+    def fijar_estilo_etiqueta(self, px, hueco):
+        self.px_etiqueta, self.hueco_etiqueta = px, hueco
+        self.etiqueta_destino.scale = escala_fuente(px)
+        actual, self._destino_etiqueta = self._destino_etiqueta, None
+        if actual is not None:
+            self._poner_etiqueta_destino(actual)
 
     def _dibujar_ruta(self, x, z, ruta):
         firma = (tuple(ruta), round(x, 3), round(z, 3))
@@ -890,13 +1082,18 @@ class AvisoInteraccion(Entity):
         super().__init__(**opciones)
         self.y_base = -0.5 + MARGEN + 0.04
         self.position = (0, self.y_base)
-        self.fondo = _fondo(self, self.ANCHO_MIN, self.ALTO, COLOR_FONDO_HUD, 12, z=0.001)
+        if pu.activo():          # estilo único (M3.3): chip con borde de tinta; mismo relleno que el resto de chips
+            self.RELLENO = 2 * pu.relleno("aviso_e")
+            self.fondo = FondoTinta(self, "aviso_e", self.ANCHO_MIN, self.ALTO, z=0.001)
+        else:
+            self.fondo = _fondo(self, self.ANCHO_MIN, self.ALTO, COLOR_FONDO_HUD, 12, z=0.001)
         self.tecla = _icono(self, "interactuar", self.LADO_TECLA, (0, 0, -0.001))
         self.texto = Text(self.TEXTO, parent=self, origin=(-0.5, 0), position=(0, 0, -0.001),
                           scale=escala_fuente(22), color=rgb(estilo.COLOR_TEXTO))
         self._ancho = self.ANCHO_MIN
         self._ancho_texto = 0.0
         self.aparicion = 0.0          # segundos desde que apareció (0 .. DURACION_APARICION)
+        self.DURACION_APARICION = hctx.tiempo("AVISO_ENTRADA")      # M3.6: 0,12 -> 0,18 s (regla de la UI)
         self.nivel = 0.0              # avance eased 0..1 de la aparición (1 = ya a la vista)
         self.enabled = False
         self._colocar()
@@ -926,8 +1123,7 @@ class AvisoInteraccion(Entity):
             self._ancho_texto = ancho_texto
             self._ancho = max(self.ANCHO_MIN,
                               ancho_texto + self.LADO_TECLA + self.SEPARACION_TECLA + self.RELLENO)
-            self.fondo.model = modelo_redondeado(self._ancho, self.ALTO, 12)
-            self.fondo.scale = (self._ancho, self.ALTO)
+            _ajustar_fondo(self.fondo, self._ancho, self.ALTO, 12)
             self._colocar()
         visible = hud_calculos.aviso_visible(estado_mision, estado_telefono, tipo_mision)
         if visible and not self.enabled:      # acaba de aparecer: la animación empieza de cero
@@ -946,7 +1142,7 @@ class AvisoInteraccion(Entity):
         self.nivel = _ease_out_quad(self.aparicion / self.DURACION_APARICION)
         self.y = self.y_base - a_unidades(self.SUBIDA_PX) * (1 - self.nivel)
         alfa = int(round(255 * self.nivel))
-        self.fondo.color = color.rgba32(12, 14, 24, int(round(240 * self.nivel)))
+        _alfa_fondo(self.fondo, self.nivel)
         self.tecla.color = color.rgba32(255, 255, 255, alfa)
         self.texto.color = color.rgba32(*estilo.COLOR_TEXTO, alfa)
 
@@ -974,9 +1170,14 @@ class AvisoGenerico(Entity):
     def __init__(self, referencia=None, **opciones):
         super().__init__(**opciones)
         self._referencia = referencia          # AvisoInteraccion sobre el que se apila (opcional)
+        self.DURACION_APARICION = hctx.tiempo("AVISO_ENTRADA")      # M3.6: 0,12 -> 0,18 s (regla de la UI)
         self.y_base = -0.5 + MARGEN + 0.04
         self.position = (0, self.y_base)
-        self.fondo = _fondo(self, self.ANCHO_MIN, self.ALTO, COLOR_FONDO_HUD, 12, z=0.001)
+        if pu.activo():          # estilo único (M3.3)
+            self.RELLENO = 2 * pu.relleno("aviso")
+            self.fondo = FondoTinta(self, "aviso", self.ANCHO_MIN, self.ALTO, z=0.001)
+        else:
+            self.fondo = _fondo(self, self.ANCHO_MIN, self.ALTO, COLOR_FONDO_HUD, 12, z=0.001)
         self.texto = Text("", parent=self, origin=(0, 0), position=(0, 0, -0.001),
                           scale=escala_fuente(self.PX), color=rgb(estilo.COLOR_TEXTO))
         self.texto.line_height = self.LINEA
@@ -1031,8 +1232,7 @@ class AvisoGenerico(Entity):
         self._ancho = max(self.ANCHO_MIN, ancho_texto + self.RELLENO)
         self._alto = max(self.ALTO, len(self.lineas) * a_unidades(self.PX) * self.LINEA * plan["escala"]
                          + 0.03)
-        self.fondo.model = modelo_redondeado(self._ancho, self._alto, 12)
-        self.fondo.scale = (self._ancho, self._alto)
+        _ajustar_fondo(self.fondo, self._ancho, self._alto, 12)
 
     _ancho = ANCHO_MIN
     _alto = ALTO
@@ -1053,7 +1253,7 @@ class AvisoGenerico(Entity):
             apilado = ref.ALTO / 2 + self._alto / 2 + 0.012
         self.y = self.y_base + (self._alto - self.ALTO) / 2 + apilado - a_unidades(self.SUBIDA_PX) * (1 - self.nivel)
         alfa = int(round(255 * self.nivel))
-        self.fondo.color = color.rgba32(12, 14, 24, int(round(240 * self.nivel)))
+        _alfa_fondo(self.fondo, self.nivel)
         self.texto.color = color.rgba32(*estilo.COLOR_TEXTO, alfa)
 
 
@@ -1064,20 +1264,38 @@ class PanelTurno(Entity):
 
     RELLENO = 0.014
 
-    def __init__(self, **opciones):
+    # esquinas: mapa de esquinas (hud_esquinas_calculos; None = la bandera ALCALDE_HUD_ESQUINAS). Con él el panel es
+    # UNA línea «Misión: <título> · <quién juega>»; texto_turno sigue teniendo el texto del turno, pero oculto.
+    def __init__(self, esquinas=None, **opciones):
         super().__init__(**opciones)
-        self.fondo = _fondo(self, 0.1, 0.1, COLOR_FONDO_HUD, 8, z=0.001)
+        self.esquinas = hec.activo() if esquinas is None else bool(esquinas)
+        px_mision = hec.PX_MISION if self.esquinas else 17
+        if pu.activo():          # estilo único (M3.3): chip con borde de tinta y el relleno de los chips
+            self.RELLENO = pu.relleno("mision")
+            self.fondo = FondoTinta(self, "mision", 0.1, 0.1, z=0.001)
+        else:
+            self.fondo = _fondo(self, 0.1, 0.1, COLOR_FONDO_HUD, 8, z=0.001)
         self.texto_turno = Text("", parent=self, origin=(-0.5, 0.5), scale=escala_fuente(22),
-                                color=rgb(estilo.COLOR_TEXTO))
+                                color=rgb(estilo.COLOR_TEXTO), enabled=not self.esquinas)
         # «Misión:» va aparte, en el color del destino; texto_mision lleva el título.
-        self.texto_prefijo = Text("", parent=self, origin=(-0.5, 0.5), scale=escala_fuente(17),
+        self.texto_prefijo = Text("", parent=self, origin=(-0.5, 0.5), scale=escala_fuente(px_mision),
                                   color=rgb(COLOR_DESTINO))
-        self.texto_mision = Text("", parent=self, origin=(-0.5, 0.5), scale=escala_fuente(17),
+        self.texto_mision = Text("", parent=self, origin=(-0.5, 0.5), scale=escala_fuente(px_mision),
                                  color=rgb(estilo.COLOR_TEXTO_TENUE))
-        self.position = (-window.aspect_ratio / 2 + MARGEN, 0.5 - MARGEN)
+        self.jugadores = None            # jugadores de la sesión (lo pone HudMundo): con 2+ la línea dice de quién es el turno
+        self._crudo = None               # (turno, mision) tal cual llegaron a fijar()
+        if self.esquinas:
+            self.position = hec.origen_mision(window.aspect_ratio)
+        else:
+            self.position = (-window.aspect_ratio / 2 + MARGEN, 0.5 - MARGEN)
 
     # Fija los textos y ajusta el fondo al más ancho.
     def fijar(self, turno, mision):
+        self._crudo = (turno, mision)
+        if self.esquinas:
+            self.texto_turno.text = _seguro(turno)
+            self._componer_linea()
+            return
         prefijo, titulo = _separar_mision(mision)
         self.texto_turno.text = _seguro(turno)
         self.texto_prefijo.text = prefijo
@@ -1089,8 +1307,7 @@ class PanelTurno(Entity):
                     avance + _medidor(self.texto_mision)(self.texto_mision.text))
         alto_turno, alto_mision = a_unidades(22) * 1.2, a_unidades(17) * 1.2
         r = self.RELLENO
-        self.fondo.model = modelo_redondeado(ancho + 2 * r, alto_turno + alto_mision + 2 * r, 8)
-        self.fondo.scale = (ancho + 2 * r, alto_turno + alto_mision + 2 * r)
+        _ajustar_fondo(self.fondo, ancho + 2 * r, alto_turno + alto_mision + 2 * r, 8)
         self.fondo.position = ((ancho + 2 * r) / 2, -(alto_turno + alto_mision + 2 * r) / 2)
         self.texto_turno.position = (r, -r, -0.001)
         self.texto_prefijo.position = (r, -r - alto_turno, -0.001)
@@ -1106,8 +1323,47 @@ class PanelTurno(Entity):
     def ajustar_ancho(self, aspecto=None, factor=None):
         if aspecto is None:
             aspecto = diseno_adaptable.aspecto()
+        if self.esquinas:
+            self._componer_linea(aspecto)
+            return
         maximo = aspecto - 2 * MARGEN - Minimapa.ANCHO - 0.03
         escala = diseno_adaptable_calculos.factor_para_ancho(self._ancho_total, maximo, minimo=0.4)
+        self.scale = ESCALA_HUD * escala
+
+    # Mapa de esquinas: cuántos jugadores hay (con 2+ la línea nombra al del turno). Recompone si cambió.
+    def fijar_jugadores(self, n):
+        if n == self.jugadores:
+            return
+        self.jugadores = n
+        if self.esquinas and self._crudo is not None:
+            self._componer_linea()
+
+    # Mapa de esquinas: «Misión: <título> · <quién>» en UNA línea que cabe en el hueco de la esquina (de la izquierda a
+    # la franja central). Se encoge hasta hec.ESCALA_MIN_MISION y, si ni así, se recorta el título con elipsis.
+    def _componer_linea(self, aspecto=None):
+        if self._crudo is None:
+            return
+        if aspecto is None:
+            aspecto = diseno_adaptable.aspecto()
+        turno, mision = self._crudo
+        prefijo, titulo = _separar_mision(mision)
+        cabeza = prefijo + " " if prefijo else ""
+        sufijo = _seguro(hec.sufijo_mision(turno, (self.jugadores or 1) > 1))
+        medir = _medidor(self.texto_mision)            # prefijo y título van a la misma letra
+        r = self.RELLENO
+        maximo = hec.layout_esquinas(aspecto, 1.0)["mision"].ancho / ESCALA_HUD - 2 * r
+        escala, titulo = hec.plan_linea_mision(cabeza, _seguro(titulo), sufijo, medir, maximo)
+        self.texto_prefijo.text = prefijo
+        self.texto_prefijo.enabled = bool(prefijo)
+        self.texto_mision.text = titulo + sufijo
+        avance = medir(cabeza) if prefijo else 0.0
+        ancho = avance + medir(self.texto_mision.text)
+        alto = a_unidades(hec.PX_MISION) * 1.2
+        _ajustar_fondo(self.fondo, ancho + 2 * r, alto + 2 * r, 8)
+        self.fondo.position = ((ancho + 2 * r) / 2, -(alto + 2 * r) / 2)
+        self.texto_prefijo.position = (r, -r, -0.001)
+        self.texto_mision.position = (r + avance, -r, -0.001)
+        self._ancho_total = ancho + 2 * r
         self.scale = ESCALA_HUD * escala
 
 
@@ -1149,6 +1405,7 @@ class PanelFinPartida(Entity):
         self.boton_menu = BotonPrimario(
             "Volver al menú", al_clic=al_menu, ancho=0.36, alto=a_unidades(56),
             parent=self, position=(0, -self.ALTO / 2 + 0.09, -0.001))
+        self.DURACION_BARRAS = hctx.tiempo("BARRAS_FIN")              # M3.6: 0,8 -> 0,3 s (nada de UI > 300 ms)
         self.tiempo = self.DURACION_BARRAS          # animación terminada
         self.enabled = False
 
@@ -1227,15 +1484,41 @@ class HudMundo(Entity):
                 self.panel_turno, self.minimapa, self.telefono_ui,
                 self.aviso, self.aviso_generico, self.panel_fin):
             componente.scale = ESCALA_HUD
+        # Mapa de esquinas (M3.1, ALCALDE_HUD_ESQUINAS): minimapa al 80 % pegado a la esquina de arriba a la derecha y
+        # teléfono en la de abajo a la derecha, con el margen de seguridad común (hud_esquinas_calculos). Se colocan
+        # ANTES de anclar: diseno_adaptable mueve luego cada bloque con su borde conservando ese margen.
+        self.esquinas = self.panel_turno.esquinas
+        if self.esquinas:
+            aspecto = window.aspect_ratio
+            self.minimapa.scale = hec.escala_minimapa()
+            self.minimapa.position = hec.centro_minimapa(aspecto)
+            self.minimapa.fijar_estilo_etiqueta(hec.PX_ETIQUETA_LUGAR, hec.hueco_etiqueta_local())
+            self.telefono_ui.position = hec.desplazamiento_telefono(aspecto, aspecto, MARGEN)
         # Diseño adaptable: lo anclado a un borde sigue al borde cuando cambia la ventana (no-op
         # si el gestor no está instalado o UI_ADAPTABLE es False).
         diseno_adaptable.anclar(self.panel_turno, "izquierda")
         diseno_adaptable.anclar(self.minimapa, "derecha")
         diseno_adaptable.anclar(self.telefono_ui, "derecha")
         diseno_adaptable.suscribir(self.panel_turno.ajustar_ancho)
+        # Ajuste «HUD: Completo / Mínimo» (M3.5, ALCALDE_HUD_MINIMO_AJUSTE): en «mínimo» solo misión y reloj; los bloques
+        # registrados (registrar_bloque) aparecen bajo demanda con hud_modo_calculos.ControlHudModo.
+        self.modo_hud = hm.ControlHudModo() if hm.activo() else None
+        self._bloques = {}               # nombre -> [entidad, firma() | None, alfa aplicado | None]
+        self._arboles_modo = {}          # nombre -> FundidoArbol (M3.6)
+        self._gestor_modo = None
+        if self.modo_hud is not None:
+            self.registrar_bloque("minimapa", self.minimapa, lambda: self.minimapa._destino_etiqueta)
+            if self.telefono_ui.grupo_icono is not None:
+                self.registrar_bloque("telefono", self.telefono_ui.grupo_icono)
+            from frontend import hud_ajustes
+            hud_ajustes.registrar()
+            if modelo_ajustes.AJUSTES:
+                self._gestor_modo = modelo_ajustes.obtener()
+                self._gestor_modo.suscribir(self._al_cambiar_ajustes)
         # Mapa a pantalla casi completa (tecla N): solo con la foto aérea (satélite) del mundo 3D.
         self.puede_abrir_mapa = None       # callable() -> bool que pone la escena (pausa, cinemática, otros paneles)
         self.mapa_grande = None
+        self._ampliado = None              # VIS-007: minimapa ampliado con N cuando no hay mapa grande (sin foto aérea)
         # Con SATÉLITE (frontend/mapa_satelite.py) el mundo 3D tiene mapa a pantalla completa: la foto aérea de la ciudad con
         # las plazas, el destino de la misión y la ruta (la foto la pone EscenaMundo con poner_satelite()).
         from frontend import mapa_satelite
@@ -1244,6 +1527,120 @@ class HudMundo(Entity):
             self.mapa_grande = MapaGrandeVista(
                 mapa, self._puede_abrir_mapa_grande, parent=self,
                 ocultar=(self.minimapa, self.panel_turno, self.telefono_ui, self.aviso, self.aviso_generico))
+
+    # -- Ajuste «HUD: Completo / Mínimo» (M3.5) --
+
+    # Un bloque del HUD que en «mínimo» sale bajo demanda. `firma()`: su valor (si cambia, se asoma 4 s); None = sin valor.
+    # Lo llaman también etapas_final_vista (franja) y economia_mundo (dinero). No-op con la bandera apagada.
+    def registrar_bloque(self, nombre, entidad, firma=None):
+        if self.modo_hud is not None and nombre in self.modo_hud.bloques:
+            self._bloques[nombre] = [entidad, firma, None]
+
+    def _al_cambiar_ajustes(self, ajustes, cambiadas):
+        if self.modo_hud is not None and "hud_modo" in cambiadas:
+            self.modo_hud.fijar_modo(ajustes.hud_modo)
+
+    def on_destroy(self):
+        if getattr(self, "_gestor_modo", None) is not None:
+            self._gestor_modo.desuscribir(self._al_cambiar_ajustes)
+
+    def input(self, key):
+        if self.modo_hud is not None:
+            self.modo_hud.tecla(key)
+        if self.mapa_grande is None:
+            from frontend import mapa_grande_calculos
+            if key == mapa_grande_calculos.TECLA_MAPA:
+                if self._ampliado is not None:
+                    self._cerrar_minimapa_ampliado()
+                elif self._puede_abrir_mapa_grande():
+                    self._abrir_minimapa_ampliado()
+
+    # -- VIS-007: minimapa ampliado (respaldo del mapa a pantalla completa cuando la foto aérea no salió) --
+
+    ALTO_AMPLIADO = 0.74                   # alto en camera.ui del minimapa ampliado (la ventana mide 1)
+
+    def _abrir_minimapa_ampliado(self):
+        mini = self.minimapa
+        ocultos = [e for e in (self.panel_turno, self.telefono_ui, self.aviso, self.aviso_generico) if e.enabled]
+        self._ampliado = (mini.position, mini.scale, mini.z, ocultos)
+        if getattr(self, "_velo_ampliado", None) is None:
+            self._velo_ampliado = Entity(parent=self, model="quad", scale=(4, 2), color=color.rgba32(10, 11, 18, 170))
+        self._velo_ampliado.z = mini.z + 0.5
+        self._velo_ampliado.enabled = True
+        for e in ocultos:
+            e.enabled = False
+        factor = self.ALTO_AMPLIADO / Minimapa.ALTO
+        mini.scale = mini.scale * factor
+        mini.position = (0, 0, mini.z)
+
+    def _cerrar_minimapa_ampliado(self):
+        if self._ampliado is None:
+            return False
+        posicion, escala, z, ocultos = self._ampliado
+        self._ampliado = None
+        self.minimapa.scale = escala
+        self.minimapa.position = posicion
+        self.minimapa.z = z
+        self._velo_ampliado.enabled = False
+        for e in ocultos:
+            e.enabled = True
+        return True
+
+    @staticmethod
+    def _tutorial_senalando():
+        try:
+            from frontend import registro_tutorial
+            return registro_tutorial.senalando_hud()
+        except Exception:
+            return False
+
+    def _actualizar_modo(self, dt, telefono):
+        modo = self.modo_hud
+        if modo is None or (not modo.minimo and all(r[2] in (None, 1.0) for r in self._bloques.values())):
+            return
+        tutorial = self._tutorial_senalando()
+        abierto = telefono is not None and telefono.estado() == hud_calculos.ABIERTO
+        modo.mantener("telefono", tutorial or abierto or self.telefono_ui.banner_visible())
+        modo.mantener("minimapa", tutorial or self.mapa_grande_abierto())
+        modo.mantener("franja", tutorial)
+        modo.mantener("dinero", tutorial)
+        for nombre, registro in self._bloques.items():
+            firma = registro[1]
+            if firma is not None:
+                try:
+                    valor = firma()
+                except Exception:
+                    valor = None
+                modo.observar(nombre, valor)
+        alfas = modo.avanzar(dt)
+        for nombre, registro in self._bloques.items():
+            entidad = registro[0]
+            visible = alfas.get(nombre, 1.0) > 0.0
+            # Oculto = hide() de Panda, reconciliado CADA frame con el `visible` de Ursina (la economía lo usa para
+            # esconder minimapa y teléfono con sus paneles): se ve solo si los dos lo quieren. No se toca `enabled`.
+            # (Un setAlphaScale en el padre no sirve: Ursina pone setColorScaleOff en cada modelo; y ocultar con un bit
+            # de máscara no lo respeta la cámara de la UI.)
+            try:
+                oculto = not (visible and entidad.visible)
+                if entidad.node().isOverallHidden() != oculto:
+                    entidad.hide() if oculto else entidad.show()
+            except Exception:            # entidad ya destruida (otra partida): se olvida
+                continue
+            if hctx.animaciones_activas():   # M3.6: el bloque entra y sale con fundido real (solo mientras cambia)
+                arbol = self._arboles_modo.get(nombre)
+                if arbol is None:
+                    from frontend.fundido_ui import FundidoArbol
+                    arbol = self._arboles_modo[nombre] = FundidoArbol(entidad)
+                alfa = alfas.get(nombre, 1.0)
+                if alfa <= 0.0:
+                    arbol.invalidar()        # oculto: al volver se recogen sus piezas de nuevo (pudo rehacerse)
+                else:
+                    arbol.aplicar(alfa)
+            estado = 1.0 if visible else 0.0
+            if estado != registro[2] and nombre == "telefono":
+                self.telefono_ui.icono.collision = visible        # invisible = no se puede pulsar
+            registro[2] = estado
+        self._bloques = {n: r for n, r in self._bloques.items() if not r[0].isEmpty()}
 
     # Foto aérea de la ciudad (mapa_satelite.Satelite) para el minimapa y el mapa grande. None = los vectoriales de siempre.
     def poner_satelite(self, satelite):
@@ -1270,10 +1667,13 @@ class HudMundo(Entity):
         return self.puede_abrir_mapa is None or bool(self.puede_abrir_mapa())
 
     def mapa_grande_abierto(self):
-        return self.mapa_grande is not None and self.mapa_grande.abierto
+        return (self.mapa_grande is not None and self.mapa_grande.abierto) or self._ampliado is not None
 
-    # Cierra el mapa grande si estaba abierto; True si lo cerró (Escape lo usa para no abrir además la pausa).
+    # Cierra el mapa grande (o el minimapa ampliado) si estaba abierto; True si lo cerró (Escape lo usa para no abrir
+    # además la pausa).
     def cerrar_mapa_grande(self):
+        if self._cerrar_minimapa_ampliado():
+            return True
         return self.mapa_grande is not None and self.mapa_grande.cerrar()
 
     # Aviso adaptable en la parte baja de la pantalla, sobre «Presiona E...» si éste está visible.
@@ -1314,6 +1714,8 @@ class HudMundo(Entity):
         if yaw_grados is not None:
             self.minimapa.fijar_yaw(yaw_grados)
         activo = flujo.jugador_activo()
+        if self.esquinas:
+            self.panel_turno.fijar_jugadores(len(sesion.jugadores()))
         mision = flujo.mision_actual()
         destino = mision.destino if mision is not None else None
         # «Seguir misión» desmarcada: ni ruta ni destino en el minimapa (el aviso de la E sí usa el destino real).
@@ -1335,6 +1737,7 @@ class HudMundo(Entity):
         self.aviso.actualizar(flujo.estado_mision(), activo.telefono.estado(),
                               self._texto_aviso(destino), getattr(mision, "tipo", "verificar"))
         self.aviso.avanzar(dt)
+        self._actualizar_modo(dt, activo.telefono)
         return cambio
 
     # "Presiona E para entrar a <edificio>" si el mapa tiene edificios (mundo 3D); None = el de siempre.

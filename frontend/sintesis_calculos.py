@@ -18,6 +18,7 @@ SEMILLA = 20261021         # base de las semillas de todos los sonidos
 PICO_EFECTOS = 0.8         # pico tras normalizar un efecto
 PICO_BUCLES = 0.6          # pico de los bucles de ambiente/motor (van de fondo)
 PICO_MUSICA = 0.55
+PICO_STINGER = 0.38        # M1.4: aviso de cambio de nivel, por debajo de la música
 
 BPM = 90                   # música: negra = 0,667 s; compás = 2,667 s
 COMPASES_MUSICA = 12       # 12 compases = 32 s
@@ -300,6 +301,28 @@ def mision_fallo():
         saw = pasa_bajos(saw, 1400)
         mezclar(x, por(saw, envolvente(n, 0.01, 0.2)), n_muestras(0.17 * k), 0.5)
     return normalizar(fundido(x, 0.004, 0.12), 0.55)
+
+
+def nivel_sube():
+    # M1.4 (ALCALDE_MOMENTO_NIVEL): la ciudad mejora de nivel. Acorde MAYOR corto (Re-Fa#-La, la 3.ª entra un poco
+    # después: se oye «abrirse»), campana suave; 1,2 s y por debajo de la música (pico bajo).
+    x = silencio(1.2)
+    for k, midi in enumerate((62, 66, 69, 74)):
+        mezclar(x, _campana(_hz(midi), 1.0, 0.45), n_muestras(0.06 * k), 0.5)
+    return normalizar(fundido(x, 0.004, 0.25), PICO_STINGER)
+
+
+def nivel_baja():
+    # M1.4: la ciudad empeora. Intervalo disonante SUAVE (tritono Do-Fa# con una 2.ª menor muy baja), con tono que cae
+    # un poco y filtrado: incómodo pero no estridente. 1,3 s.
+    x = silencio(1.3)
+    n = n_muestras(1.25)
+    for midi, ganancia in ((60, 0.55), (66, 0.45), (61, 0.18)):
+        f = _hz(midi)
+        tono = barrido(f, f * 0.97, n)
+        mezclar(x, por(tono, envolvente(n, 0.02, 0.5)), 0, ganancia)
+    x = pasa_bajos(x, 1800)
+    return normalizar(fundido(x, 0.01, 0.3), PICO_STINGER)
 
 
 def bici_timbre():
@@ -626,6 +649,8 @@ CATALOGO = {
     "mision_exito": (mision_exito, False),
     "mision_fallo": (mision_fallo, False),
     "bici_timbre": (bici_timbre, False),
+    "nivel_sube": (nivel_sube, False),
+    "nivel_baja": (nivel_baja, False),
     "motor_moto": (motor_moto, True),
     "bici_cadena": (bici_cadena, True),
     "ambiente_favela": (ambiente_favela, True),

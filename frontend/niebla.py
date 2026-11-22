@@ -10,11 +10,13 @@
 from ursina import color as paleta
 from ursina import scene
 
+from frontend.atmosfera_calculos import parametros_niebla
 from frontend.cielo import COLOR_HORIZONTE
 
 COLOR_NIEBLA = COLOR_HORIZONTE   # RGB 0-255: el horizonte del cielo (frontend/cielo.py), para que lo lejano se funda con él
-FIN_NIEBLA = 260.0               # m a los que la niebla llega a su máximo
-INTENSIDAD_NIEBLA = 0.65         # 0-1: fracción de niebla en el máximo (alfa del color)
+# m a los que la niebla llega a su máximo y fracción de niebla en ese máximo (alfa del color). Antes 260 m y 0,65; con la
+# perspectiva atmosférica (frontend/atmosfera_calculos.py, ALCALDE_PERSPECTIVA_ATMOSFERICA=0 vuelve a esos) 150 m y 0,80.
+FIN_NIEBLA, INTENSIDAD_NIEBLA = parametros_niebla()
 
 
 # Enciende la niebla lineal de 0 a `fin` m con `color` (RGB 0-255) y fuerza `intensidad` (0-1).

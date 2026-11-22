@@ -112,17 +112,38 @@ def ruta_fantasma(nivel_id, carpeta=None):
 
 
 def cargar_fantasma(nivel_id, carpeta=None):
-    """Mejor carrera guardada del nivel ({"tiempo_s", "muestras"}) o None (sin archivo o roto: sin fantasma)."""
+    """Mejor carrera guardada del nivel ({"tiempo_s", "muestras"}) o None (sin archivo o roto: sin fantasma).
+    EST-002: un archivo roto (raíz que no es un objeto, números enormes o no finitos, JSON anidado sin fin) ya no
+    tumba el controlador de los extras del nivel; se aparta como «<nivel>.json.dañado» y se juega sin fantasma."""
+    ruta = ruta_fantasma(nivel_id, carpeta)
     try:
-        with open(ruta_fantasma(nivel_id, carpeta), encoding="utf-8") as archivo:
+        with open(ruta, encoding="utf-8") as archivo:
             datos = json.load(archivo)
-        muestras = [tuple(float(v) for v in m) for m in datos.get("muestras", []) if len(m) == 5]
+    except OSError:
+        return None
+    except (ValueError, RecursionError) as error:
+        _apartar(ruta, type(error).__name__)
+        return None
+    try:
+        if not isinstance(datos, dict) or not isinstance(datos.get("muestras", []), list):
+            raise TypeError("formato desconocido")
+        muestras = [tuple(float(v) for v in m) for m in datos.get("muestras", []) if isinstance(m, list) and len(m) == 5]
+        muestras = [m for m in muestras if all(math.isfinite(v) for v in m)]
         tiempo = float(datos["tiempo_s"])
         if not muestras or not math.isfinite(tiempo):
             return None
         return {"tiempo_s": tiempo, "muestras": muestras}
-    except (OSError, ValueError, KeyError, TypeError):
+    except (ValueError, KeyError, TypeError, AttributeError, OverflowError) as error:
+        _apartar(ruta, type(error).__name__)
         return None
+
+
+def _apartar(ruta, motivo):
+    try:
+        from backend.logica import ajustes
+        ajustes.apartar_danado(ruta, motivo)
+    except Exception:                    # noqa: BLE001
+        pass
 
 
 def guardar_fantasma(nivel_id, tiempo_s, muestras, carpeta=None):

@@ -55,6 +55,9 @@ DIAS_PUBLICAR = (1, 3, 5)
 HORA_ESTAFA = 16.0
 DIAS_ESTAFA = (1, 2, 3, 4, 5, 6)
 PLAZO_HORAS = 9.0
+# JUG-007: durante el día 1 (los primeros ~4 min de mundo) la bandeja no abre un mensaje nuevo mientras haya un dilema sin
+# responder: espera en la cola (mismo mensaje, mismo orden) y así no se juntan más de 2 avisos laterales a la vez.
+DIAS_ARRANQUE_ESPACIADO = 1
 IGNORAR = "ignorar"
 DECISIONES_ESTAFA = ("seguir", IGNORAR, "reportar")
 DECISIONES_PUBLICAR = ("publicar", "no_publicar")
@@ -340,8 +343,8 @@ class GestorHabitos:
         return dict(self._respuestas)
 
     # Avanza a `ahora`: vence la oferta abierta si pasó su plazo y abre la siguiente que ya tocó. Devuelve los cambios
-    # [("ofrecido" | "vencido", Evento)] en orden.
-    def avanzar(self, ahora):
+    # [("ofrecido" | "vencido", Evento)] en orden. `abrir=False`: solo vence (la siguiente espera en la cola).
+    def avanzar(self, ahora, abrir=True):
         ahora = _hora(ahora)
         cambios = []
         if self._oferta is not None and ahora >= self._oferta.hasta:
@@ -350,7 +353,7 @@ class GestorHabitos:
             self._oferta = None
             cambios.append(("vencido", self._por_id[vencida.id]))
         calendario = self.calendario()
-        while self._oferta is None and self._usados < len(calendario) and calendario[self._usados][0] <= ahora:
+        while abrir and self._oferta is None and self._usados < len(calendario) and calendario[self._usados][0] <= ahora:
             hora, tipo, ident = calendario[self._usados]
             self._usados += 1
             if ident in self._respuestas:
@@ -435,13 +438,23 @@ class FlujoConHabitos:
         reloj = self._flujo.reloj
         if reloj.terminado() or self._flujo.partida_terminada():
             return
-        for tipo, evento in self.habitos.avanzar(reloj.tiempo_absoluto()):
+        for tipo, evento in self.habitos.avanzar(reloj.tiempo_absoluto(), abrir=self._puede_abrir_mensaje()):
             if tipo == "ofrecido":
                 self._avisar_telefono(MENSAJE_TELEFONO.format(titulo=evento.titulo))
             elif tipo == "vencido":
                 self._aplicar_plan(evento, self._plan(evento, (), IGNORAR if evento.tipo == "estafa" else "no_publicar"))
         if tiempo_pantalla_activo():
             self._balance_del_dia(reloj.dia())
+
+    def _puede_abrir_mensaje(self):
+        """JUG-007: en el arranque (día 1) un mensaje nuevo espera a que se responda o venza el dilema abierto."""
+        if self._flujo.reloj.dia() > DIAS_ARRANQUE_ESPACIADO:
+            return True
+        dilema = getattr(self._flujo, "dilema_pendiente", None)
+        try:
+            return not (callable(dilema) and dilema() is not None)
+        except Exception:                # noqa: BLE001 — ante la duda, como siempre
+            return True
 
     def _balance_del_dia(self, dia):
         while self.habitos.dia_balance < dia:

@@ -211,6 +211,7 @@ def _crear_vigia(escena_mundo):
 
     from frontend import diseno_adaptable, estilo, tipografia
     from frontend.componentes import BotonSecundario, escala_fuente, panel_tinta, rgb
+    from frontend import hud_esquinas_calculos as hec
     from frontend.registro_reloj import ALTO_CHIP, MARGEN
 
     ANCHO, ALTO = 1.30, 0.86
@@ -325,6 +326,8 @@ def _crear_vigia(escena_mundo):
             # Sobre el chip de dilemas (que va sobre el del reloj y el del dinero).
             self.chip_entidad.position = (-diseno_adaptable.aspecto() / 2 + MARGEN + ancho / 2,
                                           -0.5 + MARGEN + ALTO_CHIP / 2 + apilar + 2 * (ALTO_CHIP + 0.012))
+            if hec.activo():         # mapa de esquinas (M3.1): pila de abajo a la izquierda
+                self.chip_entidad.position = hec.centro_chip_pila(diseno_adaptable.aspecto(), 3 if apilar else 2, ancho=ancho)
             diseno_adaptable.anclar(self.chip_entidad, "izquierda")
 
         def mostrar(self, contenido):

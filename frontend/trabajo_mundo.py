@@ -10,8 +10,12 @@
 # Un puesto que NO es tienda pero queda a menos de 4 m de la puerta de una misión se corre 3,5 m al lado libre (derecha;
 # si no es transitable, izquierda), también con cartel: así su E no pisa la de la misión (docs/PLAN_CLARIDAD_JUEGO.md
 # §2.5). TRABAJO_LADO = False (o ALCALDE_TRABAJO_LADO=0) lo apaga: los puestos quedan donde estaban.
+# ALCALDE_TRABAJO_EN_NPC (frontend/trabajo_npc_calculos.py, por defecto encendida): ni cartel ni puesto aparte; el
+# trabajo se pide hablando con el dependiente (panel de la tienda: «Trabajar aquí»; taller y entregas: su E de siempre).
+# economia.puestos_trabajo sigue teniendo un PuestoTrabajo por trabajo (sin registrar): lo usa conectar() para el menú.
 # Sin cambios en economia_mundo.py: el menú engancha bloquea_controles / escape / cerrar_paneles de la instancia.
 
+from frontend import tinta_calculos as _tinta   # T1: fuente única del grosor de tinta
 import math
 import os
 import sys
@@ -24,7 +28,7 @@ from backend.datos.trabajos_semilla import CATALOGO_TRABAJOS
 from backend.logica.comercios import RADIO_COMERCIO, ancla_de, resolver_ancla
 from backend.logica.perfil_economia import FATIGA_MAX
 from backend.logica.trabajos import MENSAJE_AGOTADO, puede_trabajar
-from frontend import economia_config as cfg, estilo, tipografia
+from frontend import economia_config as cfg, estilo, tipografia, trabajo_lado_calculos, trabajo_npc_calculos
 from frontend.componentes import BotonPrimario, BotonSecundario, escala_fuente, panel_tinta, rgb
 
 PRIORIDAD = 6
@@ -38,7 +42,7 @@ DESPLAZAMIENTO_PUERTA = 3.5        # m al lado de la puerta
 ALTO_POSTE, GROSOR_POSTE = 3.4, 0.14
 ANCHO_TABLERO, ALTO_TABLERO, FONDO_TABLERO = 2.5, 0.8, 0.08
 ALTO_LETRA = 0.5                   # m
-GROSOR_TINTA_CARTEL = 0.04         # casco de tinta (contorno de cómic)
+GROSOR_TINTA_CARTEL = _tinta.grosor("cartel")         # casco de tinta (contorno de cómic)
 SEGUNDOS_AVISO = 3.0
 MENSAJE_EN_LINEA = "Trabajar aún no está disponible en línea"
 ANCHO_MENU, ALTO_MENU = 0.78, 0.36
@@ -90,7 +94,7 @@ def puntos_de_mision(mundo, catalogo=None):
 
 # Sitio del puesto: (x, z, radio, desplazado). Una tienda deja libre su punto y el trabajo va a un lado; un puesto
 # pegado a la puerta de una misión (`puntos_mision`: lista de (x, z)) también, un poco más lejos.
-def sitio_del_puesto(mundo, comercio, x, z, rumbo, puntos_mision=()):
+def sitio_del_puesto(mundo, comercio, x, z, rumbo, puntos_mision=(), ocupados=None):
     if comercio.tipo == "tienda":
         distancia = DESPLAZAMIENTO_TIENDA
     elif trabajo_lado_activo() and any(math.hypot(x - px, z - pz) < DISTANCIA_PUERTA_MISION for px, pz in puntos_mision):
@@ -100,6 +104,12 @@ def sitio_del_puesto(mundo, comercio, x, z, rumbo, puntos_mision=()):
     r = math.radians(rumbo)
     lateral = (math.cos(r), -math.sin(r))
     transitable = getattr(mundo, "es_transitable", None)
+    if ocupados is not None:       # M1.2 (ALCALDE_TRABAJO_SEPARADO): el lado que no amontona carteles «TRABAJO»
+        candidatos = [(x + s * lateral[0] * distancia, z + s * lateral[1] * distancia) for s in (1, -1)]
+        sitio = trabajo_lado_calculos.elegir_sitio(candidatos, ocupados, transitable)
+        if sitio is None:
+            return x, z, RADIO_COMERCIO, False
+        return sitio[0], sitio[1], RADIO_DESPLAZADO, True
     for signo in (1, -1):
         px, pz = x + signo * lateral[0] * distancia, z + signo * lateral[1] * distancia
         if transitable is None or transitable(px, pz):
@@ -132,7 +142,7 @@ class PuestoTrabajo:
         self.cartel = self._crear_cartel(economia.escena) if desplazado else None
 
     def _crear_cartel(self, escena):
-        from frontend.piezas import silenciar
+        from frontend.piezas import silenciar, texto_sin_tinta
         y = escena._mundo.altura(self.x, self.z)
         from panda3d.core import CullFaceAttrib
         g = GROSOR_TINTA_CARTEL
@@ -149,8 +159,8 @@ class PuestoTrabajo:
         con_tinta(cartel, (GROSOR_POSTE, ALTO_POSTE, GROSOR_POSTE), (110, 84, 58), y=ALTO_POSTE / 2)
         rotulo = Entity(parent=cartel, y=ALTO_POSTE + ALTO_TABLERO / 2, billboard=True)      # siempre de frente
         con_tinta(rotulo, (ANCHO_TABLERO, ALTO_TABLERO, FONDO_TABLERO), estilo.COLOR_ACENTO)
-        Text("TRABAJO", parent=rotulo, origin=(0, 0), position=(0, 0, -FONDO_TABLERO / 2 - 0.02),
-             scale=ALTO_LETRA / Text.size, color=rgb(estilo.TINTA), font=tipografia.FUENTE_TITULO)
+        texto_sin_tinta(Text("TRABAJO", parent=rotulo, origin=(0, 0), position=(0, 0, -FONDO_TABLERO / 2 - 0.02),
+                             scale=ALTO_LETRA / Text.size, color=rgb(estilo.TINTA), font=tipografia.FUENTE_TITULO))
         cartel.rotulo = rotulo
         return silenciar(cartel)
 
@@ -355,11 +365,13 @@ def instalar(economia, comercios=None, trabajos=None):
     economia.menu_trabajo = menu
     economia.aviso_temporal = lambda texto, segundos=SEGUNDOS_AVISO: aviso_temporal(economia, texto, segundos)
     puestos = []
+    carteles = [] if trabajo_lado_calculos.separado_activo() else None    # None: lado de siempre (bandera en 0)
     try:
         puntos_mision = puntos_de_mision(escena._mundo) if trabajo_lado_activo() else []
     except Exception as error:      # un catálogo roto no deja la ciudad sin trabajos
         print(f"[trabajo] sin puntos de misión ({error})", file=sys.stderr)
         puntos_mision = []
+    validos = []
     for comercio in comercios:
         if comercio.tipo != "puesto_trabajo" and not comercio.trabajo_id:
             continue
@@ -372,8 +384,21 @@ def instalar(economia, comercios=None, trabajos=None):
         except ValueError as error:
             print(f"[trabajo] {comercio.id}: ancla inválida ({error})", file=sys.stderr)
             continue
-        sx, sz, radio, desplazado = sitio_del_puesto(escena._mundo, comercio, x, z, rumbo, puntos_mision)
-        puesto = PuestoTrabajo(economia, menu, Puesto(comercio, trabajo), sx, sz, radio, desplazado)
+        validos.append((comercio, trabajo, x, z, rumbo))
+    plan = trabajo_npc_calculos.plan_puestos([(v[0], v[1]) for v in validos])
+    for i, ((comercio, trabajo, x, z, rumbo), (_c, _t, registrar, puede_cartel)) in enumerate(zip(validos, plan)):
+        if not registrar:
+            # ALCALDE_TRABAJO_EN_NPC: sin cartel ni puesto aparte; el NPC del comercio pide el turno
+            # (comercios_mundo.ComercioMundo -> economia.al_trabajar(jugador, trabajo_id), que busca este Puesto).
+            puestos.append(PuestoTrabajo(economia, menu, Puesto(comercio, trabajo), x, z, RADIO_COMERCIO, False))
+            continue
+        # M1.2: cuentan los carteles ya puestos y los puestos vecinos aún sin colocar (sus anclas), para que el
+        # primero de una pareja ya se abra hacia fuera y no deje al segundo sin sitio.
+        ocupados = None if carteles is None else carteles + [(v[2], v[3]) for v in validos[i + 1:]]
+        sx, sz, radio, desplazado = sitio_del_puesto(escena._mundo, comercio, x, z, rumbo, puntos_mision, ocupados)
+        if desplazado and carteles is not None:
+            carteles.append((sx, sz))
+        puesto = PuestoTrabajo(economia, menu, Puesto(comercio, trabajo), sx, sz, radio, desplazado and puede_cartel)
         economia.registrar(puesto)
         puestos.append(puesto)
     economia.puestos_trabajo = puestos

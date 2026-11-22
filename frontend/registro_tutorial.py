@@ -28,6 +28,20 @@ RUTA_VINETAS = Path(__file__).resolve().parent.parent / "backend" / "datos" / "t
 ELEMENTOS_FOCO = ("panel_turno", "minimapa", "telefono_ui", "brazalete", "medidor", "reloj", "dinero", "aviso_e")
 MAX_CARACTERES = 220
 TEXTO_BOTON_PAUSA = "Cómo se juega"
+# «Cómo se juega» en la pausa: si hay más de una entrada sale un selector pequeño. Las viñetas de siempre y, si el
+# tutorial guiado de los dilemas está instalado (frontend/tutorial_mision_bandeja: `conexion.tutorial_dilemas`), ese
+# tutorial: ya no sale solo al abrir un dilema, solo desde aquí, y con el flujo de demo (no toca la partida).
+ENTRADA_VINETAS = "Lo básico (viñetas)"
+ENTRADA_DILEMAS = "Dilemas: no hay una única respuesta"
+TEXTO_VOLVER = "Volver"
+
+
+def entradas_como_se_juega(conexion):
+    """[(id, texto)] de lo que ofrece «Cómo se juega» en la pausa. Puro (sin Ursina)."""
+    entradas = [("vinetas", ENTRADA_VINETAS)]
+    if callable(getattr(conexion, "tutorial_dilemas", None)):
+        entradas.append(("dilemas", ENTRADA_DILEMAS))
+    return entradas
 
 _estado = {"entidad": None, "senalando": False}
 _intro = {"entidad": None}
@@ -262,15 +276,48 @@ def _instalar(conexion, escena, datos):
     escena.registrar_bloqueador(abierto, cerrar)        # congela los controles y pausa el reloj (motivo PANEL)
     escena.registrar_bloqueador(intro_abierta, saltar_intro)
 
-    def ver_de_nuevo():
+    selector = {"entidad": None}
+
+    def ver_vinetas():
+        _cerrar_selector()
         escena.alternar_pausa(False)
         abrir()
+
+    def ver_dilemas():
+        _cerrar_selector()
+        ver = getattr(conexion, "tutorial_dilemas", None)
+        if not callable(ver):
+            return
+        escena.alternar_pausa(False)
+        if not ver():
+            _aviso("el tutorial de los dilemas no se pudo abrir")
+
+    def _cerrar_selector():
+        if selector["entidad"] is not None:
+            selector["entidad"].enabled = False
+
+    def ver_de_nuevo():
+        entradas = entradas_como_se_juega(conexion)
+        if len(entradas) < 2:
+            ver_vinetas()
+            return
+        try:
+            if selector["entidad"] is None:
+                selector["entidad"] = _crear_selector(escena.menu_pausa, entradas,
+                                                      {"vinetas": ver_vinetas, "dilemas": ver_dilemas},
+                                                      _cerrar_selector)
+            selector["entidad"].enabled = True
+        except Exception as error:
+            _aviso(f"selector de «Cómo se juega» no disponible ({type(error).__name__}: {error})")
+            ver_vinetas()
 
     # Botón en la pausa, a la derecha del panel (el menú no tiene sitio dentro; solo con el ratón).
     try:
         from frontend import menu_pausa
+        posicion = (escena.menu_pausa.posicion_extra(0) if hasattr(escena.menu_pausa, "posicion_extra")  # VIS-005
+                    else (menu_pausa.ANCHO / 2 + 0.04 + 0.15, 0.19, -0.001))
         boton = BotonSecundario(TEXTO_BOTON_PAUSA, al_clic=ver_de_nuevo, ancho=0.30, alto=a_unidades(50), tamano_fuente_px=20,
-                                parent=escena.menu_pausa, position=(menu_pausa.ANCHO / 2 + 0.04 + 0.15, 0.19, -0.001))
+                                parent=escena.menu_pausa, position=posicion)
     except Exception as error:
         boton = None
         _aviso(f"botón de la pausa no instalado ({type(error).__name__}: {error})")
@@ -284,9 +331,13 @@ def _instalar(conexion, escena, datos):
             self._pendiente = False
             self.abrir, self.cerrar, self.boton = abrir, cerrar, boton
             self.abrir_intro = abrir_intro
+            self.ver_de_nuevo = ver_de_nuevo
+            self.selector = selector
             self.veces = 0
 
         def update(self):
+            if selector["entidad"] is not None and selector["entidad"].enabled and not escena.en_pausa:
+                selector["entidad"].enabled = False     # se cerró la pausa (Esc): el selector no queda para la próxima
             while basura:                       # con sus hijos: destroy() a secas dejaba la viñeta entera viva
                 destruir_arbol(basura.pop())
             flujo = escena.flujo
@@ -302,3 +353,30 @@ def _instalar(conexion, escena, datos):
 
     conexion.tutorial = VigiaTutorial(parent=escena.hud)
     return conexion.tutorial
+
+
+def _crear_selector(menu, entradas, acciones, al_volver):
+    """Selector de «Cómo se juega» sobre el menú de pausa (solo ratón, como el botón que lo abre)."""
+    from ursina import Entity, Text, color
+
+    from frontend import estilo, tipografia
+    from frontend.componentes import BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb
+    from frontend.fondo_menu import anadir_filo
+
+    ancho, paso = 0.62, 0.085
+    alto = 0.14 + paso * (len(entradas) + 1)
+    raiz = Entity(parent=menu, z=-0.04, enabled=False)
+    Entity(parent=raiz, model="quad", color=color.rgba32(*estilo.TINTA, 150), scale=(4, 4), z=0.01, collider="box")
+    panel = panel_tinta(raiz, ancho, alto, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX, position=(0, 0, -0.001))
+    anadir_filo(panel, ancho, alto, estilo.RADIO_PANEL_PX)
+    Text(TEXTO_BOTON_PAUSA, parent=raiz, origin=(0, 0), position=(0, alto / 2 - 0.055, -0.01),
+         scale=escala_fuente(28), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+    y = alto / 2 - 0.125
+    raiz.botones = []
+    for id_, texto in list(entradas) + [("volver", TEXTO_VOLVER)]:
+        accion = acciones.get(id_, al_volver)
+        b = BotonSecundario(texto, al_clic=accion, ancho=ancho - 0.08, alto=a_unidades(50), tamano_fuente_px=20,
+                            parent=raiz, position=(0, y, -0.01))
+        raiz.botones.append(b)
+        y -= paso
+    return raiz

@@ -554,14 +554,13 @@ class PantallaAjustes(Entity):
             seccion.enabled = False
         self.pestanas, self.secciones = [], {}
         nombres = _registro.nombres()
-        ancho_total = ANCHO_PANEL - 0.2
-        ancho_pestana = min(0.34, ancho_total / max(1, len(nombres)) - 0.02)
-        x0 = -(ancho_pestana + 0.02) * (len(nombres) - 1) / 2
+        from frontend import ajustes_calculos
+        anchos, xs = ajustes_calculos.anchos_pestanas(nombres, ANCHO_PANEL - 0.08, separacion=0.02, maximo=0.34)
         for i, nombre in enumerate(nombres):
             boton = BotonSecundario(
-                nombre, al_clic=lambda n=nombre: self.mostrar_seccion(n), ancho=ancho_pestana,
+                nombre, al_clic=lambda n=nombre: self.mostrar_seccion(n), ancho=anchos[i],
                 alto=a_unidades(44), tamano_fuente_px=20, parent=self.raiz,
-                position=(x0 + i * (ancho_pestana + 0.02), 0.295, -0.003))
+                position=(xs[i], 0.295, -0.003))
             self.pestanas.append(boton)
             seccion = Seccion(nombre, self.gestor, self, parent=self.raiz, enabled=False)
             try:

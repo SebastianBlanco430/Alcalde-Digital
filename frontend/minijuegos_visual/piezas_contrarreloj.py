@@ -190,10 +190,14 @@ class SelloTinta(Entity):
         self.texto = Text(texto, parent=self, origin=(0, 0), position=(0, 0, -0.002), scale=escala_fuente(px),
                           font=tipografia.FUENTE_TITULO, color=rgba(tono, 0))
 
+    ALFA_MAX = 0.6          # MIN-014: el sello deja leer la noticia frenada que tiene debajo
+    ALFA_HUECO = 0.25       # antes 0,92: el papel casi opaco del hueco tapaba el texto
+
     def fijar(self, escala, alfa):
         self.scale = escala
+        alfa = min(float(alfa), 1.0) * self.ALFA_MAX
         self.marco.color = rgba(self.tono, alfa)
-        self.hueco.color = rgba(PAPEL, 0.92 * alfa)
+        self.hueco.color = rgba(PAPEL, self.ALFA_HUECO * alfa)
         self.texto.color = rgba(self.tono, alfa)
 
 

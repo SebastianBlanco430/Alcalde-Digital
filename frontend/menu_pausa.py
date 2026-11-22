@@ -6,16 +6,17 @@
 # Tab mueven el foco, Enter activa (Escape lo gestiona EscenaMundo).
 
 from panda3d.core import ClockObject
-from ursina import Entity, Text, camera, color
+from ursina import Entity, Text, camera, color, time
 
 from frontend import estilo, tipografia, vehiculo_calculos
+from frontend import menu_inicio_calculos as mic
 from frontend.componentes import (
     BotonPrimario, BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb,
 )
 from frontend.fondo_menu import FocoTeclado, anadir_filo
 
-ANCHO, ALTO = 0.74, 0.70        # antes 0.60 de ancho: la guía de teclas creció (vehículos y «seguir misión»)
-ALTO_CON_AJUSTES = 0.80      # con el botón «Ajustes» el panel crece (4 botones en vez de 3)
+ANCHO, ALTO = 1.22, 0.70        # VIS-005/006: más ancho para 3 columnas de teclas y la fila de ayuda (antes 0.74)
+ALTO_CON_AJUSTES = 0.80      # (ya no se usan para el alto: lo calcula _medidas según botones y filas de teclas)
 Z_FRENTE = -50
 ALFA_VELO = 170
 ALFA_VELO_AJUSTES = 245     # con «Ajustes» abierto el HUD del mundo no debe asomar por detrás
@@ -32,8 +33,29 @@ if vehiculo_calculos.CABALLITOS:
 else:
     TECLAS = (("WASD", "mover"), ("Tab", "teléfono"), ("Shift", "correr / turbo"), ("M", "seguir misión"),
               ("Espacio", "saltar / frenar"), ("E", "entrar / montar"))
-FILA_TECLAS = 0.058
-X_COLUMNAS = (-0.33, 0.05)      # x de la tecla de cada columna
+# VIS-006: también las de los paneles (las mismas que el README del repo).
+TECLAS = TECLAS + (("L", "bandeja de Civitas"), ("K", "dilemas"), ("B", "pulseras"), ("N", "mapa"),
+                   ("I", "mochila"))
+FILA_TECLAS = 0.052
+X_COLUMNAS = (-0.56, -0.15, 0.26)   # x de la tecla de cada columna (VIS-006: 3 columnas para que quepan todas)
+PASO_BOTON = 0.1
+CABECERA = 0.13                 # alto del título
+FILA_EXTRA = 0.09              # fila de ayuda dentro del panel: «Cómo se juega» y «Avisos de Civitas» (VIS-005)
+X_EXTRA = (-0.17, 0.17)         # x de cada hueco de la fila de ayuda
+ANCHO_EXTRA = 0.30
+SEPARACION_TECLAS = 0.035
+PIE = 0.04
+
+
+def _medidas(n_botones, n_teclas):
+    """(alto del panel, [y de cada botón], y de la fila de ayuda, y de la primera fila de teclas); y relativas al centro."""
+    filas = -(-n_teclas // len(X_COLUMNAS))
+    alto = CABECERA + n_botones * PASO_BOTON + FILA_EXTRA + SEPARACION_TECLAS + filas * FILA_TECLAS + PIE
+    arriba = alto / 2 - CABECERA
+    ys = [arriba - PASO_BOTON * (i + 0.5) for i in range(n_botones)]
+    y_extra = arriba - n_botones * PASO_BOTON - FILA_EXTRA / 2
+    y_teclas = arriba - n_botones * PASO_BOTON - FILA_EXTRA - SEPARACION_TECLAS - FILA_TECLAS / 2
+    return alto, ys, y_extra, y_teclas
 
 
 # Tecla estilo teclado: papel con borde de tinta y base gruesa; devuelve la entidad.
@@ -56,9 +78,7 @@ class MenuPausa(Entity):
             from backend.logica.ajustes import AJUSTES
             con_ajustes = AJUSTES
         self.con_ajustes = bool(con_ajustes)
-        extra = FILA_TECLAS * max(0, (len(TECLAS) + 1) // 2 - 2)     # filas de teclas de más (sobre 2)
-        alto = (ALTO_CON_AJUSTES if self.con_ajustes else ALTO) + extra
-        dy = extra / 2
+        alto, ys_botones, self._y_extra, y0 = _medidas(4 if self.con_ajustes else 3, len(TECLAS))
         self.velo = Entity(parent=self, model="quad", color=color.rgba32(*estilo.TINTA, ALFA_VELO),
                            scale=(4, 4), z=0.01)
         self.panel = panel_tinta(self, ANCHO, alto, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
@@ -67,12 +87,8 @@ class MenuPausa(Entity):
             "Pausa", parent=self, origin=(0, 0), position=(0, alto / 2 - 0.075, -0.001),
             scale=escala_fuente(40), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
 
-        # Posiciones de los botones: 3 de siempre, o 4 (con «Ajustes» tras «Reanudar») un poco más juntos.
-        if self.con_ajustes:
-            ys = (0.19, 0.19 - 0.108, 0.19 - 0.216, 0.19 - 0.324)
-        else:
-            ys = (0.125, 0.125 - 0.115, None, 0.125 - 0.23)
-        ys = tuple(None if y is None else y + dy for y in ys)
+        # Posiciones de los botones: 3 de siempre, o 4 (con «Ajustes» tras «Reanudar»).
+        ys = tuple(ys_botones) if self.con_ajustes else (ys_botones[0], ys_botones[1], None, ys_botones[2])
         self.boton_reanudar = BotonPrimario(
             "Reanudar", al_clic=al_reanudar, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=24,
             parent=self, position=(0, ys[0], -0.001))
@@ -84,8 +100,10 @@ class MenuPausa(Entity):
         self.boton_menu = BotonSecundario(
             "Volver al menú", al_clic=al_menu, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=22,
             parent=self, position=(0, ys[2] if self.con_ajustes else ys[1], -0.001))
+        self._salir_del_juego = al_salir
+        self.confirmacion = mic.Confirmacion()          # EST-011: «Salir» pregunta («No» con el foco; Esc = No)
         self.boton_salir = BotonSecundario(
-            "Salir", al_clic=al_salir, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=22,
+            "Salir", al_clic=self._pedir_salir, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=22,
             parent=self, position=(0, ys[3], -0.001))
         self.botones = (self.boton_reanudar, self.boton_menu, self.boton_salir)
         if self.con_ajustes:
@@ -94,11 +112,10 @@ class MenuPausa(Entity):
         self._frame_cierre_ajustes = -1   # frame en que se cerró «Ajustes» (para el Escape compartido)
         self._ocultos_por_ajustes = []
 
-        # Guía de teclas: 2 columnas, con una línea fina encima.
-        y0 = (-0.255 if self.con_ajustes else -0.235) + dy
+        # Guía de teclas: 3 columnas bajo la fila de ayuda.
         self.teclas = []
         for i, (tecla, accion) in enumerate(TECLAS):
-            columna, fila = i % 2, i // 2
+            columna, fila = i % len(X_COLUMNAS), i // len(X_COLUMNAS)
             x = X_COLUMNAS[columna]
             y = y0 - fila * FILA_TECLAS
             ancho_t = a_unidades(34) + a_unidades(11) * len(tecla)
@@ -107,12 +124,80 @@ class MenuPausa(Entity):
                  scale=escala_fuente(17), color=rgb(estilo.COLOR_TEXTO_TENUE))
 
         self.foco = FocoTeclado(lambda: self.botones, parent=self)
+        self._crear_confirmacion()
+
+    # VIS-005: hueco `i` (0 o 1) de la fila de ayuda, DENTRO del panel, para los botones que añaden otros módulos
+    # («Cómo se juega», «Avisos de Civitas»). Devuelve (x, y, z) relativos al menú.
+    def posicion_extra(self, i):
+        return (X_EXTRA[min(max(int(i), 0), len(X_EXTRA) - 1)], self._y_extra, -0.001)
 
     # Al abrir, el foco vuelve al primer botón (Reanudar) y el anillo se oculta hasta usar el teclado.
     def on_enable(self):
+        if getattr(self, "confirmacion", None) is not None:
+            self._cerrar_confirmacion()
         foco = getattr(self, "foco", None)
         if foco is not None:
             foco.reiniciar()
+
+    def on_disable(self):
+        if getattr(self, "confirmacion", None) is not None:
+            self._cerrar_confirmacion()
+
+    # -- «¿Salir del juego?» (EST-011): mismo diálogo que el menú de inicio --
+
+    def _crear_confirmacion(self):
+        self.velo_confirmar = Entity(parent=self, model="quad", color=color.rgba32(*estilo.TINTA, 150),
+                                     scale=(4, 4), z=-0.02, collider="box", enabled=False)
+        self.dialogo = panel_tinta(self, 0.7, 0.26, estilo.COLOR_PANEL, position=(0, 0, -0.03), enabled=False)
+        anadir_filo(self.dialogo, 0.7, 0.26, estilo.RADIO_PANEL_PX)
+        self.texto_dialogo = Text(mic.SALIR[0], parent=self.dialogo, origin=(0, 0), position=(0, 0.05, -0.01),
+                                  scale=escala_fuente(24), color=rgb(estilo.COLOR_TEXTO))
+        self.boton_no = BotonPrimario(mic.TEXTO_NO, al_clic=lambda: self._responder(False), ancho=0.26,
+                                      alto=ALTO_BOTON, tamano_fuente_px=22, parent=self.dialogo,
+                                      position=(-0.15, -0.055, -0.01))
+        self.boton_si = BotonSecundario(mic.SALIR[1], al_clic=lambda: self._responder(True), ancho=0.26,
+                                        alto=ALTO_BOTON, tamano_fuente_px=22, parent=self.dialogo,
+                                        position=(0.15, -0.055, -0.01))
+        self._botones_menu = None
+
+    def _pedir_salir(self):
+        if self._salir_del_juego is None or self.confirmacion.abierta:
+            return
+        self.confirmacion.pedir(mic.SALIR, self._salir_del_juego)
+        self.velo_confirmar.enabled = self.dialogo.enabled = True
+        self._botones_menu, self._indice_menu = self.botones, self.foco.indice
+        self.botones = (self.boton_no, self.boton_si)
+        self.foco.indice = 0
+        self.foco.visible = True
+        self.foco._hover_previo = None
+        self.foco._aplicar()
+
+    def _responder(self, si):
+        if not self.confirmacion.abierta:
+            return
+        if si and not self.confirmacion.puede_si(por_teclado=self.foco.visible):
+            return                                  # «Sí» demasiado pronto (aporreando el mando): no pasa nada
+        accion = self.confirmacion.responder(si)
+        self._cerrar_confirmacion()
+        if accion is not None:
+            accion()
+
+    def _cerrar_confirmacion(self):
+        self.confirmacion.responder(False)
+        self.velo_confirmar.enabled = self.dialogo.enabled = False
+        if self._botones_menu is not None:
+            self.botones, self.foco.indice = self._botones_menu, self._indice_menu
+            self._botones_menu = None
+            self.foco._aplicar()
+
+    def update(self):
+        if self.confirmacion.abierta:
+            self.confirmacion.avanzar(time.dt, self.foco.enfocado() is self.boton_si)
+
+    def input(self, key):
+        if self.confirmacion.tecla(key):             # Esc / B del mando = «No»; la pausa sigue abierta
+            self._cerrar_confirmacion()
+            self._frame_cierre_ajustes = ClockObject.get_global_clock().get_frame_count()
 
     # «Ajustes»: superpone la pantalla de ajustes (se crea la primera vez) y esconde lo demás del menú.
     def abrir_ajustes(self):
@@ -131,6 +216,8 @@ class MenuPausa(Entity):
     # del mundo también recibe la misma tecla y no debe cerrar además la pausa).
     def escape_es_de_ajustes(self):
         if self.pantalla_ajustes is not None and self.pantalla_ajustes.enabled:
+            return True
+        if self.confirmacion.abierta:               # Escape responde «No» a «¿Salir del juego?» (ver input)
             return True
         return self._frame_cierre_ajustes == ClockObject.get_global_clock().get_frame_count()
 

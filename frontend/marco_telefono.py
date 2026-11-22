@@ -16,6 +16,7 @@
 from ursina import Entity, Text, camera, color, time
 
 from frontend import estilo, tipografia
+from frontend import hud_contextual_calculos as hctx
 from frontend import telefono_grande_calculos as tgc
 from frontend.componentes import BotonSecundario, a_unidades, escala_fuente, modelo_redondeado, rgb
 
@@ -90,8 +91,17 @@ class MarcoTelefono(Entity):
         return self._desde if self._desde is not None else (tgc.TELEFONO_X, -0.2, tgc.TELEFONO_ANCHO * 0.6,
                                                             tgc.TELEFONO_ALTO * 0.6)
 
+    def _curva(self):
+        """M3.6 (ALCALDE_UI_ANIMACIONES): ease-out al abrir y también al cerrar (rápido al principio); sin ease-in.
+        None = el ease_in_out de antes."""
+        if not hctx.animaciones_activas():
+            return None
+        if getattr(self, "_sentido", 0) < 0:
+            return lambda p: 1.0 - hctx.ease_out(1.0 - p)
+        return hctx.ease_out
+
     def _colocar(self, p):
-        x, y, escala = tgc.escala_de_rect(tgc.rect_transicion(self._rect_desde(), tgc.rect_telefono(), p))
+        x, y, escala = tgc.escala_de_rect(tgc.rect_transicion(self._rect_desde(), tgc.rect_telefono(), p, self._curva()))
         self.position = (x, y, self.z)
         self.scale = escala
 
@@ -128,7 +138,9 @@ class MarcoTelefono(Entity):
     def update(self):
         if self._sentido == 0:
             return
-        paso = time.dt / tgc.DURACION_TRANSICION
+        # M3.6: abre en 0,18 s y cierra en 0,12 s (antes 0,25 s los dos)
+        duracion = (hctx.tiempo("TELEFONO_GRANDE_ENTRADA") if self._sentido > 0 else hctx.tiempo("TELEFONO_GRANDE_SALIDA"))             if hctx.animaciones_activas() else tgc.DURACION_TRANSICION
+        paso = time.dt / duracion
         self._t = max(0.0, min(1.0, self._t + paso * self._sentido))
         self._colocar(self._t)
         if self._sentido == 1 and self._t >= 1.0:

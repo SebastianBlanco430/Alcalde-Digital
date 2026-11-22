@@ -3,9 +3,10 @@
 # Visual (T7): fondo de menú en capas con deriva lenta, wordmark dibujado por código y botones
 # de tinta (primario amarillo / secundario). Teclado: flechas o Tab mueven el foco, Enter activa.
 
-from ursina import Text
+from ursina import Entity, Text, color, time
 
 from frontend import diseno_adaptable, estilo
+from frontend import menu_inicio_calculos as mic
 from frontend.componentes import (
     BotonPrimario, BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb,
 )
@@ -31,6 +32,9 @@ class EscenaInicio(Escena):
 
     def __init__(self, al_comenzar, al_salir=None, al_ajustes=None, al_online=None, **opciones):
         super().__init__(**opciones)
+        self._al_comenzar = al_comenzar
+        self._salir_del_juego = al_salir
+        self.confirmacion = mic.Confirmacion()
         self.fondo = FondoMenu(parent=self)
         self.wordmark = crear_wordmark(self, position=(0, self.Y_TITULO))
         self.texto_titulo = self.wordmark.texto_principal
@@ -52,7 +56,7 @@ class EscenaInicio(Escena):
         alto_b = self.ALTO_BOTON if al_online is None else a_unidades(50)
         paso = a_unidades(80) if al_online is None else a_unidades(62)
         self.boton_comenzar = BotonPrimario(
-            "Empezar", al_clic=al_comenzar, ancho=self.ANCHO_BOTON, alto=alto_b,
+            "Empezar", al_clic=self._clic_comenzar, ancho=self.ANCHO_BOTON, alto=alto_b,
             tamano_fuente_px=26, parent=self, position=(0, self.Y_BOTON),
         )
         # Botón «Ajustes» (opcional: solo si main.py pasa `al_ajustes`): va entre Empezar y Salir y Salir baja
@@ -74,7 +78,7 @@ class EscenaInicio(Escena):
             )
             y_salir = y_salir - paso
         self.boton_salir = BotonSecundario(
-            "Salir", al_clic=al_salir, ancho=self.ANCHO_BOTON, alto=alto_b,
+            "Salir", al_clic=self._clic_salir, ancho=self.ANCHO_BOTON, alto=alto_b,
             tamano_fuente_px=24, parent=self, position=(0, y_salir),
         )
         self.botones = (self.boton_comenzar, self.boton_salir)
@@ -94,6 +98,7 @@ class EscenaInicio(Escena):
         self._botones_base = self.botones
         self._al_continuar = None
         self._resumen_guardado = None
+        self._crear_confirmacion(alto_b)
 
     X_PAREJA = a_unidades(140)          # con «Continuar» a la vista, él y «Partida nueva» van uno al lado del otro
 
@@ -126,7 +131,79 @@ class EscenaInicio(Escena):
         self.boton_comenzar.text = "Partida nueva" if hay else "Empezar"
         self.botones = ((self.boton_continuar,) + self._botones_base) if hay else self._botones_base
 
+    # -- Confirmaciones (EST-011 «Salir», BUG-005 «Partida nueva» con guardado): foco en «No», Esc/B = No --
+
+    def _crear_confirmacion(self, alto_b):
+        self.velo = Entity(parent=self, model="quad", scale=(4, 2), color=color.rgba(0, 0, 0, 0.55), z=-0.3,
+                           collider="box", enabled=False)          # tapa el menú: el ratón no llega a lo de detrás
+        self.dialogo = panel_tinta(self, 0.78, 0.3, estilo.COLOR_PANEL, position=(0, 0.02, -0.31), enabled=False)
+        self.texto_dialogo = Text("", parent=self.dialogo, origin=(0, 0), position=(0, 0.06, -0.01),
+                                  scale=escala_fuente(24), color=rgb(estilo.COLOR_TEXTO))
+        self.boton_no = BotonPrimario(mic.TEXTO_NO, al_clic=lambda: self._responder(False), ancho=a_unidades(180),
+                                      alto=alto_b, tamano_fuente_px=24, parent=self.dialogo,
+                                      position=(-0.16, -0.07, -0.01))
+        self.boton_si = BotonSecundario("Sí", al_clic=lambda: self._responder(True), ancho=a_unidades(180),
+                                        alto=alto_b, tamano_fuente_px=24, parent=self.dialogo,
+                                        position=(0.16, -0.07, -0.01))
+        self._botones_menu = None
+
+    def _pedir(self, contenido, al_si):
+        if self.confirmacion.abierta:
+            return
+        self.confirmacion.pedir(contenido, al_si)
+        self.texto_dialogo.text = self.confirmacion.pregunta
+        self.boton_si.text = self.confirmacion.texto_si
+        self.velo.enabled = self.dialogo.enabled = True
+        self._botones_menu, self._indice_menu = self.botones, self.foco.indice
+        self.botones = (self.boton_no, self.boton_si)
+        self.foco.indice = 0                    # «No» con el anillo de foco a la vista
+        self.foco.visible = True
+        self.foco._hover_previo = None
+        self.foco._aplicar()
+
+    def _responder(self, si):
+        if not self.confirmacion.abierta:
+            return
+        if si and not self.confirmacion.puede_si(por_teclado=self.foco.visible):
+            return                                  # «Sí» demasiado pronto (aporreando el mando): no pasa nada
+        accion = self.confirmacion.responder(si)
+        self._cerrar_confirmacion()
+        if accion is not None:
+            accion()
+
+    def _cerrar_confirmacion(self):
+        self.confirmacion.responder(False)
+        self.velo.enabled = self.dialogo.enabled = False
+        if self._botones_menu is not None:
+            self.botones, self.foco.indice = self._botones_menu, self._indice_menu
+            self._botones_menu = None
+            self.foco._aplicar()
+
+    def _clic_salir(self):
+        if self._salir_del_juego is not None:
+            self._pedir(mic.SALIR, self._salir_del_juego)
+
+    def _clic_comenzar(self):
+        if self._al_comenzar is None:
+            return
+        if mic.necesita_confirmar_nueva(self.boton_continuar.enabled):
+            self._pedir(mic.NUEVA, self._al_comenzar)
+        else:
+            self._al_comenzar()
+
+    def input(self, key):
+        if self.confirmacion.tecla(key):
+            self._cerrar_confirmacion()
+
+    def update(self):
+        if self.confirmacion.abierta:
+            self.confirmacion.avanzar(time.dt, self.foco.enfocado() is self.boton_si)
+
+    def al_salir(self):
+        self._cerrar_confirmacion()
+
     def al_entrar(self, **datos):
+        self._cerrar_confirmacion()
         self._refrescar_continuar()
         self.foco.reiniciar()
         self.fondo.t = 0.0

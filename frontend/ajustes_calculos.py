@@ -7,6 +7,23 @@ import os
 
 from frontend import daltonismo_calculos
 
+# VIS-008: anchos de las pestañas de Ajustes según el largo de cada rótulo (con un mínimo), repartidos en `disponible`
+# con `separacion` entre ellas y como mucho `maximo` cada una. Devuelve ([anchos], [x del centro]) centrados en 0.
+def anchos_pestanas(nombres, disponible, separacion=0.02, maximo=0.34, relleno=3, minimo_letras=5):
+    n = len(nombres)
+    if n == 0:
+        return [], []
+    pesos = [max(minimo_letras, len(str(nombre))) + relleno for nombre in nombres]
+    util = max(0.0, disponible - separacion * (n - 1))
+    anchos = [min(maximo, util * p / sum(pesos)) for p in pesos]
+    total = sum(anchos) + separacion * (n - 1)
+    xs, x = [], -total / 2
+    for ancho in anchos:
+        xs.append(x + ancho / 2)
+        x += ancho + separacion
+    return anchos, xs
+
+
 MAX_DISPOSITIVOS = 40
 LARGO_MAX_DISPOSITIVO = 120
 ETIQUETA_PREDETERMINADO = "Predeterminado del sistema"

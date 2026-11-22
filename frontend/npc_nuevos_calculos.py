@@ -9,6 +9,7 @@
 # tal cual. El nodo del esqueleto viene escalado (0,85-0,91) para dar la altura de cada uno (1,66-1,80 m): al
 # cargarlo se quita esa escala (el modelo queda en las medidas del periodista / la brasileña) y se aplica al Actor.
 
+from frontend import tinta_calculos as _tinta   # T1: fuente única del grosor de tinta
 import random
 
 from frontend import npc_calculos as nc
@@ -55,7 +56,7 @@ ZAPATOS = ((0.16, 0.15, 0.17), (0.90, 0.89, 0.86), (0.50, 0.32, 0.20), (0.75, 0.
 LUZ = (0.33, -0.52, 0.79)
 BANDAS = ((0.30, 1.0), (-0.20, 0.86), (-2.0, 0.72))     # (coseno mínimo, brillo): luz, medio tono y sombra
 
-GROSOR_CONTORNO = 0.011          # m (medidas del esqueleto): casco de tinta que se añade al cargar
+GROSOR_CONTORNO = _tinta.grosor("npc_nuevos")           # m (medidas del esqueleto): casco de tinta que se añade al cargar
 COLOR_CONTORNO = (0.07, 0.078, 0.125)     # la tinta de todo el juego (rostro_calculos.TINTA)
 
 # Mochila de los nuevos: hueso de la espalda y centro (ejes del glb crudo: x izquierda, y atrás, z arriba), como

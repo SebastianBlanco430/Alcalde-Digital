@@ -6,14 +6,15 @@
 # Como cada pieza se infla por su cuenta, el grosor es uniforme (cubos y esferas) y sigue la animación porque
 # el casco cuelga del mismo pivote.
 
+from frontend import tinta_calculos as _tinta   # T1: fuente única del grosor de tinta
 import colorsys
 import math
 
 from frontend import estilo
 
 TINTA = estilo.TINTA                       # (18, 20, 32)
-GROSOR_CUERPO = 0.018                      # m por cada lado: se lee a 8 m (≈ 2.7 px con FOV 65 y 720 px de alto)
-GROSOR_DETALLE = 0.010                     # m: piezas pequeñas (zapatos, hebilla)
+GROSOR_CUERPO = _tinta.grosor("personaje")                       # m por cada lado: se lee a 8 m (≈ 2.7 px con FOV 65 y 720 px de alto)
+GROSOR_DETALLE = _tinta.grosor("personaje_fino")                      # m: piezas pequeñas (zapatos, hebilla)
 PIEZA_MINIMA = 0.06                        # m: bajo este tamaño usa el grosor fino
 FOV_JUEGO = 65.0                           # grados (horizontal, como Ursina)
 ANCHO_PANTALLA_REF = 1280                  # px de la captura de referencia

@@ -16,7 +16,9 @@
 import json
 import math
 import os
+import sys
 import tempfile
+import time
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
@@ -41,6 +43,31 @@ PRESET_GRAFICO_POR_DEFECTO = "nitido"
 MINIMAPA_ZOOMS = (0.5, 0.75, 1.0, 1.5, 2.0, 3.0)      # escalones del zoom (el valor guardado siempre cae en uno)
 MODOS_ROTACION_MINIMAPA = ("camara", "norte")
 MINIMAPA_DENSIDAD_MIN, MINIMAPA_DENSIDAD_MAX = 1, 3
+# Suavizado de bordes (MSAA de la ventana, frontend/suavizado.py): muestras por píxel. 0 = sin suavizado. Solo se aplica
+# al abrir la ventana (el búfer no cambia de tamaño sin reabrirla), o sea, al reiniciar el juego.
+SUAVIZADOS = (0, 2, 4)
+
+
+def suavizado_por_defecto(plataforma):
+    """4× en todas partes salvo macOS («darwin»): allí 0 hasta que se pruebe que Cocoa abre la ventana con MSAA
+    (si no consigue formato multimuestra la ventana podría no abrir). ALCALDE_MSAA=4 lo fuerza igual."""
+    return 0 if str(plataforma).startswith("darwin") else 4
+
+
+SUAVIZADO_POR_DEFECTO = suavizado_por_defecto(__import__("sys").platform)
+
+# HUD del mundo (M3.5): «completo» (todo a la vista) o «minimo» (solo la misión y el reloj; el resto aparece cuando hace
+# falta). Lo aplica frontend/hud.py si ALCALDE_HUD_MINIMO_AJUSTE no lo apaga.
+HUD_MODOS = ("completo", "minimo")
+HUD_MODO_POR_DEFECTO = "completo"
+# Pulseras en el HUD (M5.3): «siempre» (las mini-pulseras junto al reloj, siempre a la vista) o «al_cambiar» (solo 30 s
+# tras un cambio de nivel). Lo aplica frontend/pulseras_visibles_vista.py si ALCALDE_PULSERAS_VISIBLES no lo apaga.
+PULSERAS_HUD_MODOS = ("siempre", "al_cambiar")
+PULSERAS_HUD_POR_DEFECTO = "siempre"
+# Tinta (T3, pase final): «contornos» = solo los contornos de casco de los modelos; «comic» = además la tinta de pantalla
+# (líneas sacadas de la profundidad). Lo aplica frontend/pase_final.py si ALCALDE_TINTA_PANTALLA no la apaga.
+TINTA_MODOS = ("contornos", "comic")
+TINTA_POR_DEFECTO = "comic"
 
 LARGO_MAX_NOMBRE = 24               # nombre en línea
 LARGO_MAX_HOST = 64                 # último anfitrión (IP/nombre:puerto)
@@ -59,7 +86,10 @@ _CARACTERES_HOST = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123
 def _acotar(valor, minimo, maximo, defecto):
     if isinstance(valor, bool) or not isinstance(valor, (int, float)):
         return defecto
-    if not math.isfinite(valor):
+    try:
+        if not math.isfinite(valor):
+            return defecto
+    except OverflowError:              # EST-001: un entero enorme (p. ej. 401 cifras) no cabe en un float
         return defecto
     return float(min(maximo, max(minimo, valor)))
 
@@ -87,6 +117,11 @@ class Ajustes:
     preset_grafico: str = PRESET_GRAFICO_POR_DEFECTO   # retro | nitido | normal | personalizado
     pixel_scale: float = 0.0                # 0 = resolución nativa (sin pase gráfico), 1 = pixelado máximo
     pantalla_completa: bool = False         # ventana sin borde del tamaño del monitor (F11 la alterna también)
+    suavizado: int = SUAVIZADO_POR_DEFECTO  # MSAA: uno de SUAVIZADOS (0 = no); se aplica al reiniciar
+    # --- Interfaz ---
+    hud_modo: str = HUD_MODO_POR_DEFECTO     # uno de HUD_MODOS
+    pulseras_hud: str = PULSERAS_HUD_POR_DEFECTO   # uno de PULSERAS_HUD_MODOS
+    tinta_pantalla: str = TINTA_POR_DEFECTO         # uno de TINTA_MODOS
     # --- Minimapa ---
     minimapa_zoom: float = 1.0              # uno de MINIMAPA_ZOOMS (1 = lo de siempre)
     minimapa_rotacion: str = "camara"       # camara = gira con la cámara (arriba = adelante) | norte = norte arriba
@@ -116,6 +151,14 @@ class Ajustes:
             self.preset_grafico = PRESET_GRAFICO_POR_DEFECTO
         self.pixel_scale = _acotar(self.pixel_scale, 0.0, 1.0, 0.0)
         self.pantalla_completa = _booleano(self.pantalla_completa, False)
+        muestras = _acotar(self.suavizado, SUAVIZADOS[0], SUAVIZADOS[-1], SUAVIZADO_POR_DEFECTO)
+        self.suavizado = min(SUAVIZADOS, key=lambda m: abs(m - muestras))
+        if not isinstance(self.hud_modo, str) or self.hud_modo not in HUD_MODOS:
+            self.hud_modo = HUD_MODO_POR_DEFECTO
+        if not isinstance(self.pulseras_hud, str) or self.pulseras_hud not in PULSERAS_HUD_MODOS:
+            self.pulseras_hud = PULSERAS_HUD_POR_DEFECTO
+        if not isinstance(self.tinta_pantalla, str) or self.tinta_pantalla not in TINTA_MODOS:
+            self.tinta_pantalla = TINTA_POR_DEFECTO
         zoom = _acotar(self.minimapa_zoom, MINIMAPA_ZOOMS[0], MINIMAPA_ZOOMS[-1], 1.0)
         self.minimapa_zoom = min(MINIMAPA_ZOOMS, key=lambda z: abs(z - zoom))
         if not isinstance(self.minimapa_rotacion, str) or self.minimapa_rotacion not in MODOS_ROTACION_MINIMAPA:
@@ -202,17 +245,71 @@ def ruta_ajustes(directorio=None):
     return (Path(directorio) if directorio is not None else directorio_ajustes()) / NOMBRE_ARCHIVO
 
 
-# Lee los ajustes; cualquier problema (falta, permisos, tamaño, JSON roto, tipo raro) -> valores por defecto.
+SUFIJO_DANADO = ".dañado"
+
+
+# Aparta un archivo propio que no se puede usar (corrupto, enorme, de otra versión): lo RENOMBRA a «<nombre>.dañado»
+# (sustituye a uno anterior con ese nombre; nunca se borra) y avisa por stderr. Devuelve la ruta nueva o None.
+def apartar_danado(ruta, motivo):
+    ruta = Path(ruta)
+    destino = ruta.with_name(ruta.name + SUFIJO_DANADO)
+    try:
+        os.replace(ruta, destino)
+    except OSError as error:
+        print(f"[archivos] {ruta.name} no se puede usar ({motivo}) ni apartar ({error}); se ignora", file=sys.stderr)
+        return None
+    print(f"[archivos] {ruta.name} no se puede usar ({motivo}): se apartó como {destino.name} y se sigue con los "
+          f"valores por defecto", file=sys.stderr)
+    return destino
+
+
+# EST-006: borra los temporales («*.tmp») que dejó una escritura atómica interrumpida (cierre a mitad de un guardado).
+# Solo los de más de `edad_min_s` segundos: otra instancia del juego (en línea en el mismo equipo) puede estar
+# escribiendo ahora mismo. Con `recursivo` recorre las subcarpetas (la caché de animación tiene una por huella).
+# Devuelve cuántos borró.
+def limpiar_temporales(carpetas, edad_min_s=120.0, recursivo=False):
+    borrados, ahora = 0, time.time()
+    for carpeta in carpetas:
+        try:
+            carpeta = Path(carpeta)
+            candidatos = list(carpeta.rglob("*.tmp") if recursivo else carpeta.glob("*.tmp"))
+        except OSError:
+            continue
+        for tmp in candidatos:
+            try:
+                if tmp.is_file() and ahora - tmp.stat().st_mtime > edad_min_s:
+                    tmp.unlink()
+                    borrados += 1
+            except OSError:
+                pass
+    return borrados
+
+
+# Lee los ajustes; cualquier problema (falta, permisos, tamaño, JSON roto, tipo raro) -> valores por defecto. Un archivo
+# corrupto (JSON roto, raíz que no es un objeto, demasiado grande) se aparta como «ajustes.json.dañado» (EST-001).
 def cargar(ruta=None):
     ruta = Path(ruta) if ruta is not None else ruta_ajustes()
     try:
-        if not ruta.is_file() or ruta.stat().st_size > TAMANO_MAX_ARCHIVO:
+        if not ruta.is_file():
+            return Ajustes()
+        if ruta.stat().st_size > TAMANO_MAX_ARCHIVO:
+            apartar_danado(ruta, "demasiado grande")
             return Ajustes()
         with open(ruta, "r", encoding="utf-8") as archivo:
             datos = json.load(archivo)
-    except (OSError, ValueError, UnicodeDecodeError, RecursionError):
+    except OSError:
         return Ajustes()
-    return Ajustes.desde_dict(datos)
+    except (ValueError, UnicodeDecodeError, RecursionError) as error:
+        apartar_danado(ruta, type(error).__name__)
+        return Ajustes()
+    if not isinstance(datos, dict):
+        apartar_danado(ruta, "no es un objeto JSON")
+        return Ajustes()
+    try:
+        return Ajustes.desde_dict(datos)
+    except Exception as error:         # noqa: BLE001 — un valor imposible nunca impide arrancar
+        apartar_danado(ruta, f"{type(error).__name__}: {error}")
+        return Ajustes()
 
 
 # Guarda de forma atómica (temporal en el mismo directorio + os.replace). Devuelve True si se guardó.

@@ -121,7 +121,9 @@ TOMAS_INTERIOR = {
         "position": (POSICION_PANTALLA[0], POSICION_PANTALLA[1],
                      POSICION_PANTALLA[2] - distancia_a_monitor(ALTO_PANTALLA, FOV_PANTALLA)),
         "target": POSICION_PANTALLA, "fov": FOV_PANTALLA},
-    "levantarse": {"position": (2.0, 1.6, 0.2), "target": (1.0, 1.0, 1.4), "fov": FOV_INTERIOR},
+    # MIN-015: antes (2.0, 1.6, 0.2), a 0,9 m de la nuca del personaje sentado (tapaba un tercio del encuadre); ahora
+    # desde atrás y a un lado, como la toma «sentarse»: se le ve entero levantarse frente al escritorio.
+    "levantarse": {"position": (2.7, 1.8, -0.6), "target": (1.1, 1.15, 1.3), "fov": FOV_INTERIOR},
 }
 
 # -- Intro: plaza de la fuente (frontend/intro_cinematica.py) ------------------------------------------------------------

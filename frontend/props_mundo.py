@@ -18,6 +18,7 @@
 # toca el random del backend. Las funciones puras (plantillas, colocación) se prueban en
 # tests/frontend_3d/test_props_mundo.py; solo `construir_props_mundo` y `cinta_con_tono` usan Mesh.
 
+from frontend import tinta_calculos as _tinta   # T1: fuente única del grosor de tinta
 import math
 from functools import lru_cache
 from typing import NamedTuple
@@ -344,12 +345,20 @@ def caneca(m, x, y, z, s, variante):
 
 
 # Fuente de tres niveles: borde de piedra hueco, agua, pedestal, taza y chorro. Su colisión: frontend/fuente_calculos.py.
-def fuente(m, x, y, z, s=1.0):
+# Con la firma «la fuente» (ALCALDE_FIRMA_FUENTE, frontend/fuente_firma_calculos.py) aquí va SOLO la piedra: el agua, el
+# chorro y las gotas los dibuja frontend/fuente_firma.py aparte, según la salud de la ciudad.
+def fuente(m, x, y, z, s=1.0, con_agua=None):
+    if con_agua is None:
+        from frontend import fuente_firma_calculos
+        con_agua = not fuente_firma_calculos.activo()
     m.agregar(prisma(14, 0.5, 0.5), (x, y, z), (4.5 * s, 0.12 * s, 4.5 * s), 0, _tono(PIEDRA_FUENTE, 0.9), (0.8, 1.0))
     m.agregar(anillo(14, 0.5, 0.42), (x, y, z), (4.0 * s, 0.66 * s, 4.0 * s), 12, PIEDRA_FUENTE, (0.85, 1.1), 0.05)
-    m.agregar(prisma(14, 0.5, 0.5), (x, y + 0.04 * s, z), (3.35 * s, 0.46 * s, 3.35 * s), 0, AGUA_FUENTE, (0.95, 1.1))
+    if con_agua:
+        m.agregar(prisma(14, 0.5, 0.5), (x, y + 0.04 * s, z), (3.35 * s, 0.46 * s, 3.35 * s), 0, AGUA_FUENTE, (0.95, 1.1))
     m.agregar(prisma(10, 0.5, 0.3), (x, y, z), (0.9 * s, 1.15 * s, 0.9 * s), 0, PIEDRA_FUENTE, (0.8, 1.1))
     m.agregar(prisma(14, 0.28, 0.5), (x, y + 1.05 * s, z), (1.9 * s, 0.34 * s, 1.9 * s), 0, PIEDRA_FUENTE, (0.8, 1.1))
+    if not con_agua:
+        return
     m.agregar(prisma(14, 0.5, 0.5), (x, y + 1.2 * s, z), (1.5 * s, 0.1 * s, 1.5 * s), 0, AGUA_FUENTE, (1.0, 1.1))
     m.agregar(prisma(6, 0.5, 0.2), (x, y + 1.2 * s, z), (0.28 * s, 1.2 * s, 0.28 * s), 0, (176, 218, 244), (0.95, 1.15))
     m.agregar(icosfera(1), (x, y + 2.45 * s, z), (0.42 * s, 0.5 * s, 0.42 * s), 0, (196, 228, 248), (1.0, 1.15))
@@ -367,6 +376,23 @@ def _distancia_a_segmento(x, z, a, b):
     largo2 = dx * dx + dz * dz
     t = 0.0 if largo2 < 1e-12 else min(1.0, max(0.0, ((x - a[0]) * dx + (z - a[1]) * dz) / largo2))
     return math.hypot(x - (a[0] + dx * t), z - (a[1] + dz * t))
+
+
+RADIO_PUESTO_FIJO = 1.9          # m alrededor del dependiente de un puesto fijo
+FRENTE_PUESTO = 6.0              # m libres delante del mostrador de un puesto fijo
+ANCHO_FRENTE_PUESTO = 1.4        # m a cada lado del eje de ese frente
+
+
+# [(x, z, rumbo)] de los puestos de comercio con ancla fija (ALCALDE_PUESTOS_FIJOS); [] con la bandera apagada o si el
+# mundo no tiene sus lugares (mundos de prueba).
+def _puestos_fijos(mundo):
+    try:
+        from backend.datos.comercios_semilla import CATALOGO_COMERCIOS
+        from backend.logica.comercios import resolver_comercios
+        return [p for c, p in resolver_comercios(mundo, CATALOGO_COMERCIOS)
+                if c.tipo != "vendedor_calle" and c.ancla.get("fijo")]
+    except Exception:                  # noqa: BLE001  mundo sin esos lugares o zonas
+        return []
 
 
 class Reserva:
@@ -391,6 +417,12 @@ class Reserva:
                 self.calles.append((pa, pb, semiancho + ACERA + 0.6))
                 self.ejes.append((pa, pb, CORREDOR_PASO))
         self.circulos_nuevos = []
+        # ALCALDE_PUESTOS_FIJOS: los puestos de comercio tienen sitio fijo; el decorado no los pisa ni se planta delante
+        # de su mostrador (pasillo de FRENTE_PUESTO m desde el dependiente hacia el cliente).
+        for x, z, rumbo in _puestos_fijos(mundo):
+            fx, fz = math.sin(math.radians(rumbo)), math.cos(math.radians(rumbo))
+            self.circulos.append((x, z, RADIO_PUESTO_FIJO))
+            self.pasos.append(((x, z), (x + fx * FRENTE_PUESTO, z + fz * FRENTE_PUESTO), ANCHO_FRENTE_PUESTO))
 
     # ¿Cabe un prop de radio r en (x, z)? Sin chocar con lo existente ni con lo ya colocado. Con
     # `en_plaza`, las calles solo reservan su eje (el asfalto no llega al interior de la plaza).
@@ -612,7 +644,7 @@ def construir_props_mundo(mundo):
 
 # -- Contorno de tinta de los props grandes (estilo cómic) --------------------------------------------
 
-GROSOR_CONTORNO_PROPS = 0.09     # m que el casco asoma por cada lado de un árbol
+GROSOR_CONTORNO_PROPS = _tinta.grosor("prop")  # m que el casco asoma por cada lado de un árbol
 CONTORNO_PROPS = ("arbol",)      # tipos de prop que llevan contorno de tinta (la fuente no: sus piezas apiladas dejan huecos negros)
 TINTA_PROPS = (0, 0, 0)          # el shader sin luz aclara el casco (gamma): en pantalla sale ~ la tinta (18, 20, 32)
 

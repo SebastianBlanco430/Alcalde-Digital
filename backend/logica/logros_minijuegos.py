@@ -64,7 +64,7 @@ def cargar(ruta=None):
     try:
         with open(ruta, encoding="utf-8") as archivo:
             return sanear(json.load(archivo))
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):      # RecursionError: JSON anidado sin fin
         return vacio()
 
 

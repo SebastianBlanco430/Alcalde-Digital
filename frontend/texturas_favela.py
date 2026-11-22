@@ -13,6 +13,21 @@ import random
 
 from PIL import Image, ImageDraw, ImageFilter
 
+from frontend import tinta_calculos
+
+# T6 (ALCALDE_TINTA_TEXTURAS): grietas con trazo de tinta y las piedras oscuras con borde entintado (cómic). Con la bandera
+# apagada, las de siempre. Valores relativos a BASE_CLARA (la textura MULTIPLICA el color del suelo).
+GRIETA_TINTA = 0.48          # antes 0.72
+BORDE_PIEDRA_TINTA = 0.55
+
+
+def _tono_grieta():
+    return GRIETA_TINTA if tinta_calculos.texturas_activa() else 0.72
+
+
+def _borde_piedra():
+    return int(BASE_CLARA * BORDE_PIEDRA_TINTA) if tinta_calculos.texturas_activa() else None
+
 TAMANO_GRANO = 256                       # px del lado de la textura del grano (repite cada METROS_GRANO m)
 METROS_GRANO = 8.0
 ANCHO_CAMINO, ALTO_CAMINO = 256, 512     # px de la textura del camino (ancho de la cinta x 8 m de largo)
@@ -76,9 +91,9 @@ def textura_grano(semilla=SEMILLA_TEXTURAS):
             if tono < 0.55:      # sombra corta a un lado: la piedra se despega del suelo
                 d.ellipse([x + dx - r + 0.8, y + dy - r * 0.8 + 1.2, x + dx + r + 0.8, y + dy + r * 0.8 + 1.2],
                           fill=int(BASE_CLARA * 0.78))
-                d.ellipse([x + dx - r, y + dy - r * 0.8, x + dx + r, y + dy + r * 0.8], fill=valor)
+                d.ellipse([x + dx - r, y + dy - r * 0.8, x + dx + r, y + dy + r * 0.8], fill=valor, outline=_borde_piedra())
         for puntos in grietas:
-            d.line([(px + dx, py + dy) for px, py in puntos], fill=int(BASE_CLARA * 0.72), width=1)
+            d.line([(px + dx, py + dy) for px, py in puntos], fill=int(BASE_CLARA * _tono_grieta()), width=1)
 
     _con_envoltura(imagen, dibujo)
     return _a_rgb(_desenfocar(imagen, 0.7))
@@ -127,9 +142,10 @@ def textura_camino(semilla=SEMILLA_TEXTURAS + 1):
                 d.ellipse([hx - 2.4, hy - 4.6, hx + 2.4, hy + 4.6], fill=int(BASE_CLARA * 0.74))
         for x, y, r, tono in piedras:
             valor = int(BASE_CLARA * (0.6 + 0.25 * tono)) if tono < 0.6 else min(255, BASE_CLARA + 14)
-            d.ellipse([x + dx - r, y + dy - r * 0.8, x + dx + r, y + dy + r * 0.8], fill=valor)
+            d.ellipse([x + dx - r, y + dy - r * 0.8, x + dx + r, y + dy + r * 0.8], fill=valor,
+                      outline=_borde_piedra() if tono < 0.6 else None)
         for puntos in grietas:
-            d.line([(px + dx, py + dy) for px, py in puntos], fill=int(BASE_CLARA * 0.7), width=1)
+            d.line([(px + dx, py + dy) for px, py in puntos], fill=int(BASE_CLARA * min(0.7, _tono_grieta())), width=1)
 
     _con_envoltura(imagen, dibujo)
     imagen = _desenfocar(imagen, 1.1)

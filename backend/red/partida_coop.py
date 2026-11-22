@@ -72,8 +72,11 @@ class PartidaCooperativa:
 
     def __init__(self, estado_partida, mapa, catalogo, grafo_social=None, reloj=time.monotonic,
                  escala_mundo=1.0, punto_interaccion=None, radio_interaccion=RADIO_INTERACCION,
-                 histeresis=0.3, gracia=GRACIA_RECONEXION, consecuencias=False):
+                 histeresis=0.3, gracia=GRACIA_RECONEXION, consecuencias=False, anfitrion_cierra=True):
         self.sesion = SesionEnLinea(estado_partida, escala_mundo=escala_mundo)
+        # NET-001: en el anfitrión con ventana, el primero en entrar ES el anfitrión (su cliente va por loopback) y si se va
+        # se cierra la sala. En el servidor dedicado (backend/red/servidor.py) es un cliente más: anfitrion_cierra=False.
+        self._anfitrion_cierra = bool(anfitrion_cierra)
         self._cartas = None            # CartasMision del catálogo (None = sin consecuencias)
         self._tabla = None             # {grupo: DeltasGrupo}
         self._gs = None                # GameState del anfitrión (confianza de la ciudad)
@@ -225,7 +228,7 @@ class PartidaCooperativa:
         jugador = self.sesion.por_id(id_jugador)
         if jugador is None:
             return False
-        if id_jugador == self._anfitrion_id:
+        if self._cierra_la_sala(id_jugador):
             self._cerrar_por_anfitrion(motivo)
             return True
         sistema = self._sistemas.pop(id_jugador, None)
@@ -254,7 +257,7 @@ class PartidaCooperativa:
         jugador = self.sesion.por_id(id_jugador)
         if jugador is None or not jugador.conectado:
             return False
-        if id_jugador == self._anfitrion_id:
+        if self._cierra_la_sala(id_jugador):
             self._cerrar_por_anfitrion("anfitrion_desconectado")
             return True
         if self._fase != FASE_JUEGO:
@@ -263,6 +266,11 @@ class PartidaCooperativa:
         self._cancelar_minijuego(id_jugador)
         self._emitir("jugador_desconectado", id=id_jugador)
         return True
+
+    # ¿Su salida o su corte cierra la sala? Solo el anfitrión con ventana y mientras no haya terminado la partida
+    # (NET-002: tras el fin, su «adiós» se procesa como el de cualquiera y deja de contar como conectado).
+    def _cierra_la_sala(self, id_jugador):
+        return id_jugador == self._anfitrion_id and self._anfitrion_cierra and not self._fin_emitido
 
     # Reconexión por token en claro (se compara contra el hash guardado). None si no procede.
     def reconectar_por_token(self, token):
@@ -575,11 +583,34 @@ class PartidaCooperativa:
         if self._fase != FASE_JUEGO:
             return
         self._repartir_libres()
+        if self._liberar_misiones_de_desconectados():
+            return                                   # salir() ya volvió a comprobar el fin
         if any(s.mision_actual() is not None for s in self._sistemas.values()):
             return
         if self.reserva.quedan_para(self.sesion.roles_en_juego()):
             return
         self._terminar("completada")
+
+    # NET-007: si lo único que falta son misiones de jugadores DESCONECTADOS (en su gracia de reconexión) y ningún
+    # conectado tiene trabajo ni quedan misiones libres, no se espera hasta 90 s: se dan por salidos (su misión se libera
+    # y se reparte, o la partida termina). True si liberó alguna.
+    def _liberar_misiones_de_desconectados(self):
+        desconectados, conectados_ocupados = [], False
+        for id_jugador, sistema in self._sistemas.items():
+            if sistema.mision_actual() is None:
+                continue
+            jugador = self.sesion.por_id(id_jugador)
+            if jugador is not None and not jugador.conectado:
+                desconectados.append(id_jugador)
+            else:
+                conectados_ocupados = True
+        if not desconectados or conectados_ocupados:
+            return False
+        if self.reserva.quedan_para(self.sesion.roles_en_juego()):
+            return False
+        for id_jugador in desconectados:
+            self.salir(id_jugador, "gracia_agotada")
+        return True
 
     def _cerrar_por_anfitrion(self, motivo):
         if self._fin_emitido:

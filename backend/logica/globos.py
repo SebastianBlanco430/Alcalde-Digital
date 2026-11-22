@@ -274,6 +274,20 @@ class PlanificadorGlobos:
         for r in self.ranuras:
             r.clave = None
 
+    def forzar(self, clave, texto):
+        """Globo inmediato de `clave` con `texto` (M8: reacción al jugador o comentario del cambio de nivel). Se salta el
+        enfriamiento global, no el del propio NPC. Devuelve la Ranura o None si no hay sitio / ya habla / está callado."""
+        if not texto or any(r.clave == clave for r in self.ranuras) or self._callados.get(clave, -1.0) > self.t:
+            return None
+        libre = next((r for r in self.ranuras if r.clave is None), None)
+        if libre is None:
+            return None
+        libre.clave, libre.texto, libre.edad, libre.duracion = clave, texto, 0.0, duracion_de(texto)
+        libre.serie += 1
+        self.dichos += 1
+        self._callados[clave] = self.t + self._enfriamiento_npc
+        return libre
+
     def avanzar(self, dt, candidatos=(), nivel=None, hora=None, dia=None):
         """Un paso de `dt` s. Devuelve la Ranura que acaba de recibir un globo nuevo, o None."""
         dt = max(0.0, dt)

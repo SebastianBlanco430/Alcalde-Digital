@@ -15,6 +15,7 @@ import sys
 from ursina import Entity, Mesh, camera, time
 from ursina.shaders import unlit_shader
 
+from frontend import atmosfera_calculos as atmosfera
 from frontend import ciclo_dia_calculos as ciclo
 from frontend.azar_fijo import azar_de
 
@@ -31,6 +32,11 @@ PARADAS_CIELO = (
     (0.75, (104, 112, 212)),             # azul violáceo
     (1.00, (70, 100, 206)),              # azul profundo del cenit
 )
+# Perspectiva atmosférica (frontend/atmosfera_calculos.py, ALCALDE_PERSPECTIVA_ATMOSFERICA=0 lo quita): horizonte y paradas
+# bajas con menos saturación; como la niebla usa este horizonte, lo lejano también se apaga.
+if atmosfera.activa():
+    PARADAS_CIELO = atmosfera.atenuar_paradas(PARADAS_CIELO)
+    COLOR_HORIZONTE = PARADAS_CIELO[0][1]
 COLOR_RESPLANDOR = (255, 232, 176)
 DIRECCION_SOL = (1.0, -1.1, 0.8)          # hacia donde apunta la luz; el resplandor sale del lado opuesto (la de siempre: ~43° de altura;
                                           # más baja aparece acné de sombra en los techos con el shadow_bias actual)

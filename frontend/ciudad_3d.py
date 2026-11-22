@@ -48,11 +48,13 @@ from frontend.banderas import crear_banderas
 from frontend.casas_decorativas import (casco_de_modelo, color_base_como_color, construir_casas,
                                         construir_casas_favela, modelo_pintado, relieve_de_edificio)
 from frontend.cielo import DIRECCION_SOL, CieloDegradado
-from frontend import estilo, rendimiento
+from frontend import estilo, pantalla_carga, rendimiento
+from frontend import pantalla_carga_calculos as carga_calculos
 from frontend.componentes import rgb
 from frontend.detalles_calculos import esquina_del_tanque, franjas_prohibidas
 from frontend.detalles_techos import construir_detalles
 from frontend.favela_detalles import LETRAS_CARTEL, construir_favela_detalles, letreros_secretos
+from frontend import fusion_materiales, luz_horneada
 from frontend.geometria_mundo import ENTIERRO_BASE, apoyo_de_caja, medidas_losa, medidas_zocalo
 from frontend.muros_contencion import construir_muros
 from frontend.piezas import MASCARA_LUZ, encender_luz, lineas_sueltas, pieza, silenciar
@@ -60,7 +62,9 @@ from frontend.props_mundo import (
     cinta_con_tono, colocar_props, construir_props_mundo, construir_props_y_contorno, obstaculos_de_props,
 )
 from frontend import suelo_calculos as sc
+from frontend import terreno_rapido_calculos as tr
 from frontend import fuente_calculos
+from frontend import tinta_calculos
 from frontend.suelo_favela import (cinta_asfalto_gastado, malla_calles_arena, malla_plaza_pintada,
                                    textura_del_camino, textura_del_grano)
 from frontend.texturas_favela import METROS_GRANO
@@ -69,6 +73,9 @@ from frontend.texturas_favela import METROS_GRANO
 # y la luz de las piezas combinadas cambia según el encuadre (plazas ora blancas, ora apagadas). Con
 # normales el sombreado es el mismo desde cualquier vista.
 COMBINAR_CON_NORMALES = True
+# Punto 4 (luz horneada, frontend/luz_horneada.py; ALCALDE_LUZ_HORNEADA=0 lo apaga): grupos combinados de cubos que reciben
+# la luz por cara y la oclusión falsa en sus colores de vértice. Suelo, calles, plazas, vegetación y mobiliario no.
+GRUPOS_LUZ_HORNEADA = ("edificios", "muros")
 SOMBRAS = True                       # horneadas: el mapa se redibuja solo si algo de la ciudad se mueve
 RESOLUCION_SOMBRAS = (4096, 4096)
 
@@ -160,6 +167,7 @@ ANCHO_PUERTA, ALTO_PUERTA = 1.6, 2.4
 ANGULO_PUERTA_ABIERTA = -100
 SEPARACION_LINEAS = 4.0
 SEPARACION_VENTANAS = 3.2
+ANCHO_TINTA_BORDILLO = 0.06   # m: T6 cinta del bordillo SIN la bandera; con ALCALDE_TINTA_BORDILLO_ANCHA manda tinta_calculos
 TRAMO_CINTA = 1.0         # m entre muestras de las cintas de calle y acera
 ALTO_PELDANO = 0.17       # m: contrahuella de las escaleras de la favela
 PENDIENTE_TIERRA = (25.0, 40.0)   # grados: de pasto a tierra en los taludes
@@ -236,6 +244,7 @@ class Ciudad3D(Entity):
         self._puertas_horneadas = None     # aperturas de las puertas en el último horneado
         self.puertas = {}              # lugar -> PuertaEdificio
         self.letreros = {}             # lugar -> Text
+        self.carteles_texto = []       # M1.4: Text de los carteles pintados y secretos (frontend/registro_textos_mundo.py)
         self.banderas = {}             # lugar -> BanderaTecho (se llena al final del __init__)
         self.apoyos_casas = []         # (bajo, alto) del suelo bajo cada casa, alineada con las casas
         self._contornos = []           # cascos de tinta (contorno de cómic): fuera del mapa de sombras
@@ -259,22 +268,41 @@ class Ciudad3D(Entity):
         self.luz.look_at(DIRECCION_SOL)
         self.ambiente = AmbientLight(parent=self, color=rgb_luz(COLOR_LUZ_AMBIENTE))
 
+        avance = pantalla_carga.avance      # M7.3: barra de la pantalla de carga (no-op sin ella)
+        avance("ciudad_suelo")
         self._construir_suelo()
+        avance("ciudad_calles")
         self._construir_calles()
+        avance("ciudad_marcas")
         self._construir_marcas()
+        avance("ciudad_plazas")
         self._construir_plazas()
+        avance("ciudad_edificios")
         self._construir_edificios()
+        avance("ciudad_obstaculos")
         self._construir_obstaculos()
+        avance("ciudad_decorado")
         self._construir_decorado()
+        avance("ciudad_escaleras")
         self._construir_escaleras()
+        avance("ciudad_muros")
         construir_muros(self._grupos["muros"], mundo.muros(), paleta=PALETA_MUROS if SUELO_FAVELA else None)
-        for grupo in self._grupos.values():
+        hornear = luz_horneada.activa() and COMBINAR_CON_NORMALES      # punto 4: luz por cara en los colores de vértice
+        avance("ciudad_combinar")
+        pesos = [carga_calculos.PESOS_COMBINAR.get(nombre, 0.1) if grupo.children else 0.0
+                 for nombre, grupo in self._grupos.items()]       # lo que tarda el combine de cada grupo (medido)
+        for i, (nombre, grupo) in enumerate(self._grupos.items()):
+            avance("ciudad_combinar", carga_calculos.fraccion_acumulada(pesos, i))
             if grupo.children:             # p. ej. "edificios" queda vacío si todos tienen modelo
+                conteos = luz_horneada.conteos_para_combine(grupo) if hornear and nombre in GRUPOS_LUZ_HORNEADA else None
                 grupo.combine(include_normals=COMBINAR_CON_NORMALES)
+                if hornear and nombre in GRUPOS_LUZ_HORNEADA:
+                    luz_horneada.hornear_malla_combinada(grupo, conteos, DIRECCION_SOL)
         self._grupos["calles"].double_sided = True      # las cintas no cuidan el sentido de sus caras
         for hijo in self.children:
             if hijo is not self.cielo:
                 silenciar(hijo)            # lo estático no necesita update() (ver piezas.silenciar)
+        avance("ciudad_sombras")
         # Las banderas se animan: se crean DESPUÉS de silenciar() y las mueve update().
         self.banderas = crear_banderas(mundo.edificios(), self)
         if sombras:
@@ -322,6 +350,7 @@ class Ciudad3D(Entity):
 
     def _construir_suelo(self):
         self._tierra = self._mapa_de_tierra() if SUELO_FAVELA else None
+        self._tierra_rapida = None       # se arma en el primer _color_de_ladera con el mapa nuevo
         if self._mundo.terreno is not None:
             # Hija directa de la ciudad (no del grupo): combine() sería lento con ~40 000 vértices.
             if SUELO_FAVELA:
@@ -348,7 +377,14 @@ class Ciudad3D(Entity):
         return sc.MapaTierra(cajas, calles, plazas, mundo.radio_plaza + 0.9)
 
     # Color (RGBA 0-1) de la ladera en un vértice: pasto, tierra junto a casas y calles y talud.
+    # ALCALDE_TERRENO_RAPIDO (frontend/terreno_rapido_calculos.py): mismos números, ~2,5 veces más deprisa.
     def _color_de_ladera(self, x, z, talud):
+        rapido = getattr(self, "_tierra_rapida", None)
+        if rapido is None:
+            rapido = self._tierra_rapida = tr.PesoTierraRapido(self._tierra) if tr.terreno_rapido_activo() else False
+        if rapido:
+            r, g, b = tr.color_ladera(x, z, rapido.peso_tierra(x, z), talud)
+            return (r, g, b, 1.0)
         r, g, b = sc.color_ladera(x, z, self._tierra.peso_tierra(x, z), talud)
         return (r, g, b, 1.0)
 
@@ -387,6 +423,12 @@ class Ciudad3D(Entity):
                                                               COLOR_ACERA_AVENIDA if SUELO_FAVELA else COLOR_ACERA,
                                                               AMPLITUD_RUIDO_ACERA, columnas=2, lados=0.20),
                           color=color.white)
+                    if tinta_calculos.texturas_activa():     # T6: línea de tinta en el borde del bordillo
+                        filo = lado * semiancho
+                        ancho_tinta = tinta_calculos.ancho_tinta_bordillo()   # cierre: 0,12 m con TINTA_BORDILLO_ANCHA
+                        pieza(parent=calles, model=_cinta(self._suelo, pa, pb, borde, largo - borde,
+                                                          filo - ancho_tinta / 2, filo + ancho_tinta / 2,
+                                                          0.205), color=rgb(estilo.TINTA))
             # Línea central discontinua.
             s = mundo.radio_plaza + 2.0
             while s + 1.0 <= largo - mundo.radio_plaza - 2.0:
@@ -478,8 +520,13 @@ class Ciudad3D(Entity):
             tono = color_del_lugar(e.lugar)
             pintado = modelo_pintado(e.modelo, tono, PUERTAS_EDIFICIOS[indice % len(PUERTAS_EDIFICIOS)], COLOR_TECHO_EDIFICIO,
                                      relieve=relieve_de_edificio(indice), escala_relieve=s)
+            hornear = luz_horneada.activa() and fusion_materiales.activo()
+            if hornear:
+                fusion_materiales.hornear_colores(pintado)       # colores planos -> de vértice (mismo color en pantalla)
             modelo = pieza(parent=self._modelos, model=pintado, position=(e.cx, e.y, e.cz),
                            rotation_y=e.rumbo_puerta() + GIRO_MODELO, scale=s, color=rgb((255, 255, 255)))
+            if hornear:
+                luz_horneada.hornear_nodo(modelo.model, self, base_y=e.y, direccion_sol=DIRECCION_SOL)
             if CONTORNO_TINTA:
                 self._contorno_de_edificio(e, s)
         else:
@@ -549,9 +596,10 @@ class Ciudad3D(Entity):
               position=(x, y + sube, -0.12), scale=(ancho, 0.8 + 2 * sube, 0.14))
         texto = Text(e.titulo, parent=puerta, origin=(0, 0), position=(x, y + (0.36 if glosa else 0), -0.22),
                      scale=escala, color=color.rgb32(240, 240, 245))
+        texto.glosa = None              # M1.3: la glosa se funde junto con el título (frontend/registro_textos_mundo.py)
         if glosa:
-            Text(f"({glosa})", parent=puerta, origin=(0, 0), position=(x, y, -0.22),
-                 scale=6.5, color=color.rgb32(255, 214, 102))
+            texto.glosa = Text(f"({glosa})", parent=puerta, origin=(0, 0), position=(x, y, -0.22),
+                               scale=6.5, color=color.rgb32(255, 214, 102))
         self.letreros[e.lugar] = texto
 
     # -- Escaleras de la favela --
@@ -613,6 +661,7 @@ class Ciudad3D(Entity):
             ux, uz = (e.bx - e.ax) / e.largo, (e.bz - e.az) / e.largo
             rumbo = math.degrees(math.atan2(ux, uz))
             par = PALETAS_ESCALERA[numero % len(PALETAS_ESCALERA)] if SUELO_FAVELA else None
+            tapa_previa = None
             for k, (s0, s1, altura) in enumerate(perfil.tramos):
                 if s1 - s0 < 1e-3:
                     continue
@@ -630,6 +679,14 @@ class Ciudad3D(Entity):
                     tono = COLOR_ESCALERA if k % 2 else tuple(c - 10 for c in COLOR_ESCALERA)
                 pieza(parent=g, model="cube", color=rgb(tono), rotation_y=rumbo,
                       position=(x, (tapa + fondo) / 2, z), scale=(e.ancho, tapa - fondo, (s1 - s0) + 0.02))
+                if tinta_calculos.texturas_activa() and k > 0:      # T6: filo de tinta en el borde del peldaño
+                    fx, fz = a[0] + ux * s0, a[1] + uz * s0
+                    # cierre: listón más grueso, en la nariz del peldaño más alto de los dos
+                    y_filo, alto_filo, fondo_filo = tinta_calculos.filo_peldano(
+                        tinta_calculos.tapa_del_filo(tapa, tapa_previa))
+                    pieza(parent=g, model="cube", color=rgb(estilo.TINTA), rotation_y=rumbo,
+                          position=(fx, y_filo, fz), scale=(e.ancho + 0.01, alto_filo, fondo_filo))
+                tapa_previa = tapa
             # Baranda: postes cada ~2 m (parados sobre el peldaño que les toca) y un pasamanos entre poste y poste.
             dx, dz = uz * (e.ancho / 2 - 0.05), -ux * (e.ancho / 2 - 0.05)
             postes = max(2, math.ceil(e.largo / 2) + 1)
@@ -671,6 +728,7 @@ class Ciudad3D(Entity):
         if luces is not None:
             focos = Entity(parent=self, model=luces, shader=None, name="focos_decorado")
             focos.hide(MASCARA_LUZ)
+            self.focos_decorado = focos           # VIS-003: ciudad_viva los hace brillar más de noche
 
     # -- Árboles, farolas y bancos (salen de los obstáculos del modelo) --
 
@@ -688,6 +746,8 @@ class Ciudad3D(Entity):
                 self._banco(o)
             elif o.tipo == "arbusto":
                 self._arbusto(o)
+        avance = pantalla_carga.avance      # M7.3: sub-pasos (fracciones medidas con ALCALDE_CARGA_TRAZA=1)
+        avance("ciudad_obstaculos", 0.01)
         if casas:
             self.apoyos_casas = [apoyo_de_caja(self._suelo, c.cx, c.cz, c.ancho, c.fondo) for c in casas]
             altos = [alto for _, alto in self.apoyos_casas]       # la planta baja se apoya en el punto más alto
@@ -695,19 +755,25 @@ class Ciudad3D(Entity):
                 # La cámara choca desde el pie de la base hasta el techo.
                 self._collider_camara(c.cx, c.cz, c.ancho, c.fondo, alto - bajo + c.alto_total, bajo)
                 self._base_de_casa(c, bajo, alto)
+            avance("ciudad_obstaculos", 0.03)
             # Bajo la raíz de los edificios: entran en el volumen de sombra.
             if CASAS_VIVAS:
-                _, tinta = construir_casas_favela(self._raiz_edificios, casas, alturas=altos, contorno=CONTORNO_TINTA)
+                _, tinta = construir_casas_favela(self._raiz_edificios, casas, alturas=altos, contorno=CONTORNO_TINTA,
+                                                  al_avance=lambda f: avance("ciudad_obstaculos", 0.03 + 0.67 * f))
                 if tinta is not None:
                     self._contornos.append(tinta)
             else:
                 construir_casas(self._raiz_edificios, casas, TINTES_FAVELA, alturas=altos)
+            avance("ciudad_obstaculos", 0.70)
             self._tanques(casas, altos)
+            avance("ciudad_obstaculos", 0.71)
             # Antenas, prendas y cuerdas de ropa; las cuerdas se suman a la malla de los cables.
             vertices_extra = construir_detalles(self._grupos["mobiliario"], casas, self.apoyos_casas,
                                                 prohibidos=franjas_prohibidas(self._mundo), suelo=self._suelo)
+        avance("ciudad_obstaculos", 0.77)
         self._cables([o for o in self._mundo.obstaculos() if o.tipo == "farola"], casas,
                      [alto for _, alto in self.apoyos_casas], vertices_extra)
+        avance("ciudad_obstaculos", 0.78)
         if FAVELA_DETALLES:
             self._construir_favela(casas, [alto for _, alto in self.apoyos_casas])
 
@@ -738,10 +804,11 @@ class Ciudad3D(Entity):
                          rotation_y=math.degrees(math.atan2(-nx, -nz)), scale=TAMANO_TEXTO_CARTEL if len(cal.texto) <= 6 else TAMANO_TEXTO_CARTEL * 0.8,
                          color=rgb(letras))
             silenciar(texto)
+            self.carteles_texto.append(texto)
         # Carteles de cartón de los rincones secretos (easter eggs): letras de tinta, sin entrar al minimapa ni al GPS.
         for cadena, posicion, giro, escala in letreros_secretos(self._mundo):
-            silenciar(Text(cadena, parent=self, origin=(0, 0), position=posicion, rotation_y=giro, scale=escala,
-                           color=rgb(estilo.TINTA)))
+            self.carteles_texto.append(silenciar(Text(cadena, parent=self, origin=(0, 0), position=posicion,
+                                                      rotation_y=giro, scale=escala, color=rgb(estilo.TINTA))))
 
     # Base que llena el hueco entre el suelo y la planta baja (que se apoya en `alto`) y TAPA el plinto
     # que el modelo trae bajo su umbral (`hondo_umbral`): zócalo macizo si el desnivel es pequeño,

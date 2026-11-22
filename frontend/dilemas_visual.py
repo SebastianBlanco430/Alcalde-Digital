@@ -72,6 +72,9 @@ class VistaDilemaVisual:
                                scale=escala_fuente(13), color=_rgba(estilo.COLOR_TEXTO))
         Text("!", parent=self.ayer, origin=(0, 0), position=(0.28, 0.0, -0.01), scale=escala_fuente(50),
              font=tipografia.FUENTE_TITULO, color=_rgba(estilo.COLOR_ACENTO))
+        # BUG-002: la tarjeta vive en camera.ui pero su reloj (_frame) lo da un vigía del HUD del mundo; si se sale del
+        # mundo antes de que caduque, ella misma se cancela (no queda congelada sobre el interior, el minijuego o el menú).
+        self.ayer.update = self._cancelar_fuera_del_mundo
 
     def __getattr__(self, nombre):
         return getattr(self._original, nombre)
@@ -179,6 +182,11 @@ class VistaDilemaVisual:
             if self._t_ayer <= 0:
                 self._t_ayer = None
                 self.ayer.enabled = False
+
+    def _cancelar_fuera_del_mundo(self):
+        if not getattr(self._escena, "enabled", True):
+            self._t_ayer = None
+            self.ayer.enabled = False
 
     # -- Al día siguiente --
 

@@ -18,6 +18,7 @@ from panda3d.core import (Geom, GeomTriangles, GeomVertexData, GeomVertexReader,
                           Material, MaterialAttrib, NodePath, RenderState)
 
 from frontend import animacion_humana as ah
+from frontend import casco_pantalla_calculos as cpc
 from frontend import npc_nuevos_calculos as nn
 from frontend import npc_postura
 from frontend import personaje_modelo as pm
@@ -67,12 +68,16 @@ def _casco_tinta(origen):
         s[1] += n[1]
         s[2] += n[2]
     escritor, color = GeomVertexRewriter(datos, "vertex"), GeomVertexWriter(datos, "color")
+    # T2 (casco_pantalla_calculos): la normal del casco pasa a ser la suavizada, por la que su shader lo empuja
+    normales = GeomVertexWriter(datos, "normal") if cpc.activa() else None
     for clave, p in puntos:
         s = suma[clave]
         largo = (s[0] ** 2 + s[1] ** 2 + s[2] ** 2) ** 0.5 or 1.0
         k = nn.GROSOR_CONTORNO / largo
         escritor.setData3(p[0] + s[0] * k, p[1] + s[1] * k, p[2] + s[2] * k)
         color.setData4(*nn.COLOR_CONTORNO, 1.0)
+        if normales is not None:
+            normales.setData3(s[0] / largo, s[1] / largo, s[2] / largo)
     triangulos = GeomTriangles(Geom.UHStatic)
     for primitiva in origen.getPrimitives():
         primitiva = primitiva.decompose()

@@ -95,6 +95,27 @@ def atmosfera(amb, sol=(255, 232, 192), ambiente=(134, 124, 150), horizonte=(252
     }
 
 
+# M2 del plan ambiente y pulseras (ALCALDE_COLOR_SALUD): el tinte y el brillo de la luz se pasan a una ESCALA DE COLOR del
+# mundo entero (setColorScale en la escena, nunca en camera.ui), así también tocan a lo que no recibe luz (personajes
+# unlit, piezas combinadas con «luz plena»). Para no multiplicar dos veces, con la bandera las luces se quedan en su color
+# base y TODO el tinte va por aquí. Límites: luminancia >= LUMA_MINIMA_ESCALA (legibilidad) y ningún canal > CANAL_MAXIMO.
+LUMA_MINIMA_ESCALA = 0.78
+CANAL_MAXIMO_ESCALA = 1.08
+
+
+def escala_color_mundo(amb):
+    """(r, g, b) multiplicativos del mundo para ese Ambiente; con salud 0,5 -> (1, 1, 1)."""
+    tinte, brillo = factores_de_luz(amb)
+    rgb = [tinte[i] * brillo for i in range(3)]
+    luma = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+    if luma < LUMA_MINIMA_ESCALA:
+        rgb = [c * LUMA_MINIMA_ESCALA / luma for c in rgb]
+    pico = max(rgb)
+    if pico > CANAL_MAXIMO_ESCALA:              # se recorta conservando el matiz (la calidez de la ciudad sana se nota)
+        rgb = [c * CANAL_MAXIMO_ESCALA / pico for c in rgb]
+    return tuple(round(c, 4) for c in rgb)
+
+
 def cambio_apreciable(a, b, tol_color=1.0, tol_fin=1.0, tol_fuerza=0.01):
     """¿Difieren dos resultados de `atmosfera` lo bastante para volver a aplicarlos? (evita recorrer entidades por nada)."""
     if a is None or b is None:
@@ -368,12 +389,25 @@ class Rejilla:
                 yield from self._celdas.get((i, j), ())
 
 
-def elegir_sitios(candidatos, x, z, radio, cantidad, estado_previo, maximo):
+RADIO_FOCO = 12.0               # m alrededor del foco (puerta del destino) cuyos sitios van primero
+REFUERZO_FOCO = 2.0             # la cantidad cerca del foco se multiplica por esto (tope 1) para elegir candidatos
+
+
+def elegir_sitios(candidatos, x, z, radio, cantidad, estado_previo, maximo, foco=None, radio_foco=RADIO_FOCO):
     """De `candidatos` = [(indice, sx, sz, u)] elige los índices que deben estar visibles: a menos de `radio` m de (x, z)
     (histéresis de 15 % para los que ya lo estaban, en `estado_previo` = conjunto de índices), con `encendido(u, cantidad)`,
-    los `maximo` más cercanos. Devuelve la lista ordenada por distancia."""
+    los `maximo` más cercanos. Devuelve la lista ordenada por distancia.
+
+    `foco` = (fx, fz) opcional (firma M4: la puerta del destino de la misión): el TOTAL no cambia (los mismos que sin foco,
+    con el mismo tope `maximo`), pero se eligen primero los sitios a menos de `radio_foco` m del foco, que además pasan con
+    la cantidad reforzada (x REFUERZO_FOCO); el resto, por distancia. Solo cuenta si el foco está dentro de `radio` de
+    (x, z) (lo simple: sus candidatos ya están en la rejilla cercana a la cámara). Sin foco, exactamente como antes."""
     r2, r2_sale = radio * radio, (radio * 1.15) ** 2
-    pasan = []
+    if foco is not None and (foco[0] - x) ** 2 + (foco[1] - z) ** 2 > r2:
+        foco = None
+    pasan, cerca_foco = [], []
+    rf2 = radio_foco * radio_foco
+    reforzada = min(1.0, cantidad * REFUERZO_FOCO)
     for i, sx, sz, u in candidatos:
         estaba = i in estado_previo
         d2 = (sx - x) ** 2 + (sz - z) ** 2
@@ -381,8 +415,17 @@ def elegir_sitios(candidatos, x, z, radio, cantidad, estado_previo, maximo):
             continue
         if encendido(u, cantidad, estaba):
             pasan.append((d2, i))
+        if foco is not None and (sx - foco[0]) ** 2 + (sz - foco[1]) ** 2 <= rf2 and encendido(u, reforzada, estaba):
+            cerca_foco.append((d2, i))
     pasan.sort()
-    return [i for _, i in pasan[:maximo]]
+    elegidos = [i for _, i in pasan[:maximo]]
+    if foco is None:
+        return elegidos
+    total = len(elegidos)
+    cerca_foco.sort()
+    primero = [i for _, i in cerca_foco][:total]
+    vistos = set(primero)
+    return primero + [i for _, i in pasan if i not in vistos][:total - len(primero)]
 
 
 class Ranuras:
@@ -442,3 +485,60 @@ class Ranuras:
 
     def ocupadas(self):
         return sum(1 for s in self.sitio if s is not None)
+
+
+# -- R3d (retoques): las capas del suelo no caen sobre el jugador ------------------------------------------------------------
+# Las jardineras (y la basura, las flores secas y los carteles) podían quedar sobre el punto de aparición o en el camino a
+# la puerta de la misión: el jugador aparecía con una jardinera en los pies. Con la bandera, los sitios a menos de
+# RADIO_EVITAR m de esos caminos (polilíneas de (x, z)) no se eligen. ALCALDE_CAPAS_EVITAR_CAMINO=0 = como antes.
+CAPAS_EVITAR_CAMINO = True
+RADIO_EVITAR = 1.6                   # m: media acera; la jardinera mide ~1 m
+CAPAS_QUE_EVITAN = ("basura", "flores", "marchitas", "carteles")
+
+
+def capas_evitar_camino_activo():
+    valor = os.environ.get("ALCALDE_CAPAS_EVITAR_CAMINO", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(CAPAS_EVITAR_CAMINO)
+
+
+def distancia_a_polilinea(x, z, puntos):
+    """Distancia de (x, z) a la polilínea `puntos` [(x, z), ...] (un solo punto = distancia al punto; vacía = inf)."""
+    if not puntos:
+        return math.inf
+    if len(puntos) == 1:
+        return math.hypot(x - puntos[0][0], z - puntos[0][1])
+    mejor = math.inf
+    for (ax, az), (bx, bz) in zip(puntos, puntos[1:]):
+        dx, dz = bx - ax, bz - az
+        largo2 = dx * dx + dz * dz
+        t = 0.0 if largo2 <= 1e-12 else max(0.0, min(1.0, ((x - ax) * dx + (z - az) * dz) / largo2))
+        mejor = min(mejor, math.hypot(x - (ax + dx * t), z - (az + dz * t)))
+    return mejor
+
+
+def fuera_de_caminos(candidatos, caminos, radio=RADIO_EVITAR):
+    """Los `candidatos` [(indice, sx, sz, u)] a más de `radio` m de todas las polilíneas de `caminos`."""
+    if not caminos:
+        return list(candidatos)
+    return [c for c in candidatos if all(distancia_a_polilinea(c[1], c[2], p) > radio for p in caminos)]
+
+
+def indices_en_caminos(candidatos, caminos, radio=RADIO_EVITAR):
+    """frozenset de los índices de `candidatos` [(indice, sx, sz, u)] a `radio` m o menos de alguna polilínea de `caminos`.
+    Descarta primero por la caja de cada polilínea (los sitios son muchos y los caminos pocos)."""
+    cajas = []
+    for p in caminos:
+        if p:
+            xs, zs = [q[0] for q in p], [q[1] for q in p]
+            cajas.append((min(xs) - radio, max(xs) + radio, min(zs) - radio, max(zs) + radio, p))
+    fuera = set()
+    for i, sx, sz, _u in candidatos:
+        for x0, x1, z0, z1, p in cajas:
+            if x0 <= sx <= x1 and z0 <= sz <= z1 and distancia_a_polilinea(sx, sz, p) <= radio:
+                fuera.add(i)
+                break
+    return frozenset(fuera)

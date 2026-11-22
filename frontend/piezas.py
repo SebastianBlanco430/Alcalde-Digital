@@ -81,6 +81,22 @@ def etiqueta(texto, **opciones):
     opciones.setdefault("color", rgb(estilo.COLOR_TEXTO))
     texto_3d = Text(texto, billboard=True, origin=(0, 0), **opciones)
     texto_3d.create_background(padding=(0.03, 0.015), radius=0.3, color=color.rgba32(10, 12, 20, 170))
+    return texto_sin_tinta(texto_3d)
+
+
+# R3a (retoques): la tinta de pantalla (Sobel sobre la profundidad) veía las letras de los textos del mundo como bordes
+# y las erosionaba («Beto» se leía «Belo»). Con la tinta encendida, los textos del mundo no escriben profundidad (siguen
+# ocultándose tras lo que tienen delante): el Sobel no los ve. ALCALDE_TINTA_PANTALLA=0 lo deja como antes. Nunca lanza.
+def texto_sin_tinta(texto_3d):
+    try:
+        from frontend import pase_final_calculos
+        if pase_final_calculos.tinta_activa():
+            texto_3d.setDepthWrite(False)
+            fondo = getattr(texto_3d, "background_entity", None)
+            if fondo is not None:
+                fondo.setDepthWrite(False)
+    except Exception:
+        pass
     return texto_3d
 
 
@@ -92,14 +108,40 @@ def limitar_etiqueta(texto_3d):
         if not texto_3d.enabled:
             return
         from ursina import camera
-        from frontend.etiqueta_calculos import escala_limitada
+        from frontend.etiqueta_calculos import ESCALA_OTROS, alfa_por_distancia, escala_limitada
         base = getattr(texto_3d, "escala_base", None)
         if base is None:
             base = texto_3d.escala_base = texto_3d.scale_x
         distancia = (camera.world_position - texto_3d.world_position).length()
-        nueva = escala_limitada(base, distancia)
+        atenuar = getattr(texto_3d, "atenuar_otro", False)     # M1.1: solo lo pone modo_etiqueta_jugador()
+        if atenuar and texto_3d.isHidden():
+            return
+        nueva = escala_limitada(base * ESCALA_OTROS if atenuar else base, distancia)
         if abs(nueva - texto_3d.scale_x) > 1e-3:
             texto_3d.scale = nueva
+        if atenuar:
+            alfa, previo = alfa_por_distancia(distancia), getattr(texto_3d, "_alfa_etiqueta", 1.0)
+            if alfa != previo and (abs(alfa - previo) > 1e-2 or alfa in (0.0, 1.0)):
+                texto_3d._alfa_etiqueta = alfa
+                texto_3d.setAlphaScale(alfa)       # afecta también al fondo (hijo); sin crear nada nuevo
+    except Exception:
+        pass
+
+
+# M1.1 (D6): decide si la etiqueta de un avatar de jugador se ve (la del propio jugador no) y marca las de los demás
+# para que limitar_etiqueta() las deje al 60 % y desvanecidas con la distancia. Lo llama resaltar() (no cada frame).
+# Usa `visible` (hide/show), independiente del `enabled` que tocan cinemáticas e interiores. Con
+# ALCALDE_ETIQUETA_JUGADOR=0 no hace nada: todo queda como antes.
+def modo_etiqueta_jugador(texto_3d, es_activo):
+    try:
+        from frontend.etiqueta_calculos import etiqueta_jugador_activa, mostrar_etiqueta
+        if not etiqueta_jugador_activa():
+            return
+        texto_3d.visible = mostrar_etiqueta(es_activo)
+        texto_3d.atenuar_otro = not es_activo
+        if not hasattr(texto_3d, "_alfa_etiqueta"):
+            texto_3d._alfa_etiqueta = 1.0
+            texto_3d.setTransparency(1)            # TransparencyAttrib.M_alpha, para setAlphaScale
     except Exception:
         pass
 
