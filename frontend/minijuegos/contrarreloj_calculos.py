@@ -72,14 +72,55 @@ class PartidaContrarreloj:
     def resultado(self):
         total = float(len(self.cartas))
         aciertos = float(sum(1 for i in range(len(self.cartas)) if self.acierta(i)))
-        frenadas_mal = sum(1 for c in self.cartas if c["estado"] == FRENADA and c["veraz"])
-        propagadas = sum(1 for c in self.cartas if c["estado"] == PROPAGADA)
-        if aciertos == total:
-            detalle = "Frenaste lo falso y dejaste pasar lo cierto."
-        elif propagadas:
-            detalle = "Algunas noticias se propagaron antes de que las juzgaras."
-        elif frenadas_mal:
-            detalle = "Frenaste una noticia que era cierta."
-        else:
-            detalle = "Dejaste pasar una noticia falsa."
+        detalle = detalle_resultado(self.cartas, [self.acierta(i) for i in range(len(self.cartas))])
         return ResultadoMinijuego(CONTRARRELOJ, aciertos, total, self.terminada, detalle, umbral=UMBRAL_CONTRARRELOJ)
+
+
+# -- Lo que se enseña al terminar (puro): la etiqueta de cada papel y la frase del resultado salen de la MISMA fuente de
+# verdad (`veraz` de cada carta; la del rumor es mision.es_verdadera) y no se contradicen (retoques 2026-11-22, M3). --
+
+def etiqueta_final(carta, acierto):
+    """«BIEN: era cierta», «MAL: era falsa»... de un papel al terminar."""
+    return ("BIEN" if acierto else "MAL") + (": era cierta" if carta["veraz"] else ": era falsa")
+
+
+def _noticias(n, singular, plural):
+    return singular if n == 1 else plural.format(n=n)
+
+
+def detalle_resultado(cartas, aciertos):
+    """Frase del resultado. Si el rumor de la misión salió mal, habla de él; si salió bien y el fallo está en OTRAS
+    noticias, lo dice («Con el rumor acertaste, pero…»): así no parece que la frase hable del rumor."""
+    if all(aciertos):
+        return "Frenaste lo falso y dejaste pasar lo cierto."
+    i_mision = next((i for i, c in enumerate(cartas) if c.get("es_mision")), None)
+    if i_mision is not None and not aciertos[i_mision]:
+        c = cartas[i_mision]
+        if c["estado"] == PROPAGADA:
+            return "El rumor se difundió antes de que lo juzgaras."
+        if c["estado"] == FRENADA:
+            return "Frenaste el rumor y era cierto."
+        return "Dejaste pasar el rumor y era falso."
+    fallos = [c for i, c in enumerate(cartas) if not aciertos[i] and i != i_mision]
+    propagadas = sum(1 for c in fallos if c["estado"] == PROPAGADA)
+    frenadas = sum(1 for c in fallos if c["estado"] == FRENADA)
+    liberadas = len(fallos) - propagadas - frenadas
+    if propagadas:
+        parte = _noticias(propagadas, "otra noticia se difundió antes de que la juzgaras",
+                          "{n} noticias se difundieron antes de que las juzgaras")
+    elif frenadas:
+        parte = _noticias(frenadas, "frenaste otra noticia que era cierta", "frenaste {n} noticias que eran ciertas")
+    else:
+        parte = _noticias(liberadas, "dejaste pasar otra noticia falsa", "dejaste pasar {n} noticias falsas")
+    if i_mision is None:
+        parte = parte.replace("otra noticia", "una noticia")
+        return parte[0].upper() + parte[1:] + "."
+    return "Con el rumor acertaste, pero " + parte + "."
+
+
+def sello_con_rumor(partida, texto):
+    """El sello del veredicto (`texto`) solo si el papel del rumor de la misión quedó bien; si no, None."""
+    if partida is None:
+        return texto
+    i = next((k for k, c in enumerate(partida.cartas) if c.get("es_mision")), None)
+    return None if i is not None and not partida.acierta(i) else texto

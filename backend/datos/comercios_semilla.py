@@ -58,9 +58,10 @@ CATALOGO_COMERCIOS = (
 #   - Rodoviária (2026-11-22, ajustes para la Feria): Oficina do Beto y Zeca juntos (0,3 m entre huellas), de espaldas a
 #     la pared LATERAL OESTE del edificio (la cara que se ve a la derecha de la fachada desde la plaza; caja x 19,6..28,4,
 #     z -52..-40), a 0,4 m de ella y mirando al oeste (rumbo -90), con un pasillo libre de >= 2 m delante del mostrador.
-#     No van centrados en esa cara (z -46): en las semillas 7 y 11 una casa del barrio ocupa z <= -48 delante del tramo
-#     sur, así que la pareja se corre 1,25 m hacia la esquina de la fachada (centro z -44,75); más al norte, Beto queda a
-#     < 4 m del punto de misión de la puerta. La calle diagonal no llega a esa pared (pasa al norte de z -40).
+#     Centrados en esa cara (centro de la pareja z -46; retoques 2026-11-22) con cualquier semilla: la colocación de
+#     casas del barrio reserva antes el sitio de los puestos fijos y su pasillo (comercios.cajas_reservadas_puestos), así
+#     que la casa que en las semillas 7 y 11 caía delante del tramo sur se aparta. La calle diagonal no llega a esa pared
+#     (pasa al norte de z -40).
 #     Coordenadas: puerta (21,216; -40), tangente (1, 0) y normal (0, 1) del lado «n» => lateral = x - 21,216,
 #     fuera = z + 40.
 #   - Lanchonete: al lado norte de la fachada del Parque do Povo, fuera del letrero (centrado en la fachada) y lejos de
@@ -72,8 +73,8 @@ ANCLAS_FIJAS = {
     "lanchonete": {"lugar": "Parque do Povo", "fuera": 2.5, "lateral": 8.5, "rumbo": -90.0, "fijo": True},
     "bar": {"lugar": "Praça da Sé", "fuera": 3.0, "lateral": 2.7, "rumbo": -180.0, "fijo": True},
     "lan_house": {"lugar": "Praça da Sé", "fuera": 3.0, "lateral": -2.7, "rumbo": -180.0, "fijo": True},
-    "taller": {"lugar": "Rodoviária", "fuera": -3.3, "lateral": -2.97, "rumbo": -90.0, "fijo": True},
-    "entregas": {"lugar": "Rodoviária", "fuera": -6.2, "lateral": -2.97, "rumbo": -90.0, "fijo": True},
+    "taller": {"lugar": "Rodoviária", "fuera": -4.55, "lateral": -2.97, "rumbo": -90.0, "fijo": True},
+    "entregas": {"lugar": "Rodoviária", "fuera": -7.45, "lateral": -2.97, "rumbo": -90.0, "fijo": True},
     "feirante": {"zona": "mercado", "fondo": 0, "dx": -5.0, "dz": 2.0, "fijo": True},
     "tienda_general": {"zona": "mercado", "fondo": 1, "dx": -1.0, "dz": 3.0, "fijo": True},
 }

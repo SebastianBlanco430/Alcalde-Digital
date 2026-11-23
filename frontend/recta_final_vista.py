@@ -1,6 +1,8 @@
 # Vista de la recta final (backend/logica/recta_final.py): que el jugador SIENTA que el final de la partida pesa más.
-#   - Chip de tensión arriba a la derecha: «RECTA FINAL · decisiones ×1,4» con una barra de tensión (solo en la recta).
-#   - Aviso de entrada: cartel de unos segundos con el evento de entrada («Rumores acumulados»...) y un sonido.
+#   - Chip de tensión arriba a la izquierda: «RECTA FINAL · decisiones ×1,4» con una barra de tensión (solo en la recta y
+#     solo en el mundo: escenas_del_chip(); en las escenas de misión tapaba su encabezado).
+#   - Aviso de entrada: cartel de unos segundos con el evento de entrada («Rumores acumulados»...) y un sonido (si la
+#     recta empieza durante una misión, espera a que se vuelva al mundo).
 #   - Pulso en cada decisión de la recta: el chip y las barras de indicadores de la escena de misión laten (más cuanto
 #     mayor el multiplicador) y suena un clic más grave.
 #   - Desenlace: al terminar la partida, una franja con «Ciudad unida / dividida / tomada» y las decisiones clave.
@@ -83,9 +85,23 @@ def lineas_desenlace(datos):
 # -- Lectura del estado según el flujo --
 
 def _escenas_de_partida():
-    """Escenas donde el chip puede verse: el mundo y las de misión (fuera de ellas, menú/rol/ajustes/red, nada)."""
+    """Escenas donde se LEE el estado de la recta final: el mundo y las de misión (fuera de ellas, menú/rol/ajustes/red,
+    nada). Leer no es pintar: el pulso, el sonido y el latido de las barras de la escena de juego siguen aquí; lo que
+    se pinta (chip y aviso de entrada) lo decide escenas_del_chip()."""
     from frontend.flujo_constantes import INTERIOR, JUEGO, MUNDO, MUNDO_DIGITAL, PARKOUR, TRABAJO
     return {MUNDO, JUEGO, INTERIOR, TRABAJO, MUNDO_DIGITAL, PARKOUR, "minijuego"}
+
+
+def escenas_del_chip():
+    """Escenas donde se PINTAN el chip «RECTA FINAL» y el aviso de entrada: solo el mundo. En minijuegos, escena de
+    juego, trabajo, parkour, mundo digital e interior tapaban el encabezado de la escena (retoques 2026-11-22, M1)."""
+    from frontend.flujo_constantes import MUNDO
+    return frozenset({MUNDO})
+
+
+def chip_visible(escena, texto):
+    """¿Se pinta el chip con `texto` en la escena `escena`? (puro)."""
+    return bool(texto) and escena in escenas_del_chip()
 
 
 def _leer(gestor):
@@ -183,16 +199,19 @@ def _vigia_cls():
                 self._entrada_vista = bool(info and info.get("en_recta"))
                 self._desenlace_visto = None
             texto = "" if terminada else texto_chip(info)
-            if texto != self._chip_txt:
-                self._chip_txt = texto
+            pintar = chip_visible(self.gestor.nombre_actual(), texto)
+            if (texto, pintar) != self._chip_txt:
+                self._chip_txt = (texto, pintar)
                 self.chip_texto.text = texto
                 for e in (self.chip, self.chip_texto, self.barra):
-                    e.enabled = bool(texto)
+                    e.enabled = pintar
+            if not pintar and self.aviso.enabled:          # se salió del mundo con el aviso puesto
+                self._mostrar_aviso(None)
             if texto:
                 nivel = max(1, min(3, int(info.get("nivel", 1))))
                 self.barra.scale_x = 0.42 * max(0.05, float(info.get("intensidad", 0.0)))
                 self.barra.color = color.rgb(*COLOR_TENSION[nivel - 1])
-                if not self._entrada_vista:
+                if not self._entrada_vista and pintar:      # el aviso de entrada espera a volver al mundo
                     self._entrada_vista = True
                     titulo = info.get("evento_titulo") or "Recta final"
                     cuerpo = info.get("evento_texto") or "Desde ahora cada decisión pesa más."

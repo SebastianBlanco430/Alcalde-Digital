@@ -110,15 +110,58 @@ def particula(t, vx, vy, dur=DUR_PARTICULA, gravedad=GRAVEDAD_PARTICULA):
     return x, y, alfa
 
 
-def caida_sello(t, dur=DUR_SELLO, reducir=False):
-    """(escala, opacidad, golpeó) de un sello que cae desde grande hasta su sitio. `golpeó` se vuelve True al llegar."""
+def caida_sello(t, dur=DUR_SELLO, reducir=False, inicial=ESCALA_SELLO_INICIAL):
+    """(escala, opacidad, golpeó) de un sello que cae desde grande (`inicial`) hasta su sitio. `golpeó` se vuelve True al
+    llegar. `inicial` lo baja ajustar_sello solo cuando el sello no cabría entero en su panel durante la caída."""
     if t < 0:
-        return (1.0 if reducir else ESCALA_SELLO_INICIAL), 0.0, False
+        return (1.0 if reducir else inicial), 0.0, False
     p = _progreso(t, dur)
     if reducir:
         return 1.0, p, p >= 1.0
-    escala = ESCALA_SELLO_INICIAL + (1.0 - ESCALA_SELLO_INICIAL) * (p * p)      # acelera al caer
+    escala = inicial + (1.0 - inicial) * (p * p)      # acelera al caer
     return escala, min(1.0, p * 2.2), p >= 1.0
+
+
+GIRO_SELLO = -9.0           # grados (rotation_z del sello)
+MARGEN_SELLO = 0.012        # unidades del panel que quedan libres entre el sello y su borde
+
+
+def medio_sello(ancho, alto, escala, giro=GIRO_SELLO):
+    """(medio ancho, medio alto) de la caja alineada que ocupa el sello girado `giro` grados a escala `escala`."""
+    c, s = abs(math.cos(math.radians(giro))), abs(math.sin(math.radians(giro)))
+    return (ancho * c + alto * s) / 2 * escala, (ancho * s + alto * c) / 2 * escala
+
+
+def _meter(valor, medio, minimo, maximo):
+    """`valor` movido lo justo para que [valor - medio, valor + medio] quede dentro de [minimo, maximo]."""
+    if 2 * medio >= maximo - minimo:
+        return (minimo + maximo) / 2
+    return min(max(valor, minimo + medio), maximo - medio)
+
+
+def ajustar_sello(posicion, ancho, alto, escala, limites, inicial=ESCALA_SELLO_INICIAL, giro=GIRO_SELLO,
+                  margen=MARGEN_SELLO):
+    """(final, inicio, escala_inicial) para que el sello quede ENTERO dentro de `limites` (xmin, xmax, ymin, ymax, en las
+    coordenadas del padre del sello) al final y durante TODA la caída. `final` es `posicion` metida dentro del panel si
+    hacía falta. La caída sigue empezando a `inicial` (2,6 veces): si a esa escala no cabe sobre `final` (un sello junto al
+    borde), arranca desde `inicio`, un punto más adentro, y se desliza a su sitio mientras encoge. Solo si el panel entero
+    es más pequeño que el sello a esa escala, se reduce la escala de partida. Sin límites: lo de siempre."""
+    x, y = float(posicion[0]), float(posicion[1])
+    if limites is None:
+        return (x, y), (x, y), inicial
+    xmin, xmax, ymin, ymax = (limites[0] + margen, limites[1] - margen, limites[2] + margen, limites[3] - margen)
+    hx, hy = medio_sello(ancho, alto, escala, giro)
+    final = (_meter(x, hx, xmin, xmax), _meter(y, hy, ymin, ymax))
+    cabe = min((xmax - xmin) / (2 * hx) if hx > 0 else inicial, (ymax - ymin) / (2 * hy) if hy > 0 else inicial)
+    k = max(1.0, min(float(inicial), cabe))
+    inicio = (_meter(final[0], hx * k, xmin, xmax), _meter(final[1], hy * k, ymin, ymax))
+    return final, inicio, k
+
+
+def posicion_caida(inicio, final, escala, inicial):
+    """Punto del sello cuando su escala va por `escala` (de `inicial` a 1): mismo avance que la escala."""
+    f = 1.0 if inicial <= 1.0 else max(0.0, min(1.0, (inicial - escala) / (inicial - 1.0)))
+    return inicio[0] + (final[0] - inicio[0]) * f, inicio[1] + (final[1] - inicio[1]) * f
 
 
 def tono_racha(racha):
@@ -187,3 +230,9 @@ def texto_sello(es_verdadera):
     if es_verdadera is None:
         return None
     return "VERIFICADO" if es_verdadera else "BULO"
+
+
+def texto_sello_resultado(es_verdadera, bien):
+    """Sello del final de un minijuego: el veredicto del rumor SOLO si se verificó bien. Con «Se te escapó algo» no se
+    estampa nada (un «VERIFICADO» ahí contradice el resultado; retoques 2026-11-22, M3)."""
+    return texto_sello(es_verdadera) if bien else None

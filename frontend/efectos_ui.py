@@ -281,9 +281,10 @@ class EfectosUI(Entity):
 
     # -- Sello, estrellas y medalla --
 
-    def sello(self, texto, posicion=(0.45, 0.385), tono=None, al_golpe=None, retardo=0.0, escala=1.0):
+    def sello(self, texto, posicion=(0.45, 0.385), tono=None, al_golpe=None, retardo=0.0, escala=1.0, limites=None):
         """Sello que cae sobre `posicion` y golpea (sonido + temblor del sello). Uno por pantalla. `escala` (por defecto 1)
-        reduce el sello entero (caja y texto) sin cambiar su caída."""
+        reduce el sello entero (caja y texto) sin cambiar su caída. `limites` (xmin, xmax, ymin, ymax en coordenadas de
+        este efecto): el panel donde debe quedar ENTERO, también mientras cae (calc.ajustar_sello)."""
         if self.roto or not texto:
             return
         tono = tono or (VERDE if texto == "VERIFICADO" else ROJO)
@@ -301,6 +302,11 @@ class EfectosUI(Entity):
         self._escala_sello = max(0.2, float(escala))
         if self._escala_sello != 1.0:           # sello reducido a petición: la caja se ajusta al texto (nunca lo desborda)
             self._ajustar_caja_sello()
+        ancho = getattr(self, "_ancho_sello", 0.34) if self._escala_sello != 1.0 else 0.34
+        self._final_sello, self._inicio_sello, self._inicial_sello = calc.ajustar_sello(
+            posicion, ancho, 0.092, self._escala_sello, limites)
+        x, y = self._inicio_sello if not self.reducir else self._final_sello
+        self.sello_e.position = (x, y, -0.05)
         self._al_golpe = al_golpe
         self._t_sello = -retardo
         self._pintar_sello(0.0)
@@ -392,8 +398,14 @@ class EfectosUI(Entity):
                 self._t_racha = None
         if self._t_sello is not None:
             self._t_sello += dt
-            escala, alfa, golpe = calc.caida_sello(self._t_sello, reducir=self.reducir)
+            escala, alfa, golpe = calc.caida_sello(self._t_sello, reducir=self.reducir,
+                                                   inicial=getattr(self, "_inicial_sello", calc.ESCALA_SELLO_INICIAL))
             self.sello_e.scale = escala * getattr(self, "_escala_sello", 1.0)
+            final = getattr(self, "_final_sello", None)
+            if final is not None:
+                x, y = calc.posicion_caida(self._inicio_sello, final, escala,
+                                           getattr(self, "_inicial_sello", calc.ESCALA_SELLO_INICIAL))
+                self.sello_e.position = (x, y, -0.05)
             self._pintar_sello(alfa)
             if golpe:
                 self._t_sello = None

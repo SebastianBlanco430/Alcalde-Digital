@@ -45,6 +45,7 @@ void main() {
 # PASE FINAL ÚNICO (T3 + M6, frontend/pase_final_calculos.py): el mismo shader hace, según sus interruptores (float 0/1):
 #   usar_tinta    tinta de pantalla: Sobel sobre la profundidad LINEAL con umbral relativo (|Δz|/z), 1 texel a 720p, solo
 #                 en el lado cercano del borde, nunca en el cielo; el color va hacia el de la niebla y se apaga a lo lejos.
+#                 Solo donde hay SALTO (2.ª diferencia de 1/z): un plano rasante no se entinta (retoques M4).
 #   usar_grading  saturación alrededor de la luma y tinte multiplicativo (salud de la ciudad).
 #   usar_matriz   la matriz de color del daltonismo (sRGB -> lineal -> M·c + d -> sRGB).
 # Con los tres apagados salvo la matriz el resultado es idéntico al del filtro de siempre.
@@ -69,6 +70,7 @@ uniform float saturacion;
 uniform vec3 tinte;
 uniform vec4 extra;           // R5: pliegues (0/1), umbral bajo y alto del pliegue, fuerza del violeta lejano
 uniform float mezcla_post;    // cierre: 0..1, fundido de tinta+grading al cerrar la pausa (1 = como siempre)
+uniform vec2 rasante;         // retoques M4: umbral bajo y alto del salto (2.ª diferencia de 1/z) de la tinta de silueta
 
 vec3 a_lineal(vec3 c) {
     vec3 bajo = c / 12.92;
@@ -110,9 +112,17 @@ vec3 con_tinta(vec3 c) {
     float zmax = max(max(max(z00, z01), max(z02, z10)), max(max(z12, z20), max(z21, z22)));
     float zmin = min(min(min(z00, z01), min(z02, z10)), min(min(z12, z20), min(z21, z22)));
     float cercano = step(zc - min(zmin, zc), max(zmax, zc) - zc);
-    float fuerza = smoothstep(tinta.a, rango.y, borde) * cercano;
+    // Retoques M4: en un plano 1/z es afín en pantalla, así que su 2.ª diferencia es ~0 aunque el plano esté muy rasante
+    // (gradiente de z enorme: rampas y bordes inclinados a media distancia se llenaban de tinta). Un borde de verdad (salto
+    // de profundidad) o un pliegue la tienen grande: la tinta de silueta solo se pinta donde hay salto.
+    float wc = 1.0 / max(zc, 1e-4);
+    float sx = abs(1.0 / max(z10, 1e-4) + 1.0 / max(z12, 1e-4) - 2.0 * wc);
+    float sy = abs(1.0 / max(z01, 1e-4) + 1.0 / max(z21, 1e-4) - 2.0 * wc);
+    float sd = abs(1.0 / max(z00, 1e-4) + 1.0 / max(z22, 1e-4) - 2.0 * wc);
+    float se = abs(1.0 / max(z02, 1e-4) + 1.0 / max(z20, 1e-4) - 2.0 * wc);
+    float salto = smoothstep(rasante.x, rasante.y, max(max(sx, sy), max(sd, se)) / wc);
+    float fuerza = smoothstep(tinta.a, rango.y, borde) * salto * cercano;
     if (extra.x > 0.5) {
-        float wc = 1.0 / max(zc, 1e-4);
         float lap = 1.0 / max(z01, 1e-4) + 1.0 / max(z10, 1e-4) + 1.0 / max(z12, 1e-4) + 1.0 / max(z21, 1e-4) - 4.0 * wc;
         fuerza = max(fuerza, 0.8 * smoothstep(extra.y, extra.z, abs(lap) / wc) * cercano);
     }
@@ -521,6 +531,7 @@ _UNIFORMES_NEUTROS = {
     "rango": (pase_calc.FIN_SIN_NIEBLA, pase_calc.UMBRAL_ALTO, pase_calc.DESVANECE_INICIO, pase_calc.DESVANECE_FIN),
     "saturacion": 1.0, "tinte": (1.0, 1.0, 1.0),
     "extra": (0.0, pase_calc.PLIEGUE_BAJO, pase_calc.PLIEGUE_ALTO, 0.0),
+    "rasante": (pase_calc.SALTO_BAJO, pase_calc.SALTO_ALTO),
     "mezcla_post": 1.0,
 }
 

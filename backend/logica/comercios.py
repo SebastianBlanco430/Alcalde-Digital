@@ -82,6 +82,67 @@ def resolver_ancla(mundo, ancla):
     return (px + nx * fuera + tx * lateral, pz + nz * fuera + tz * lateral, float(_numero({"r": rumbo}, "r")))
 
 
+# -- Espacio reservado de los puestos fijos (antes de colocar las casas del barrio) --
+# Huella de un puesto (m: a lo largo del mostrador, detrás y delante del dependiente): la misma que
+# frontend/comercios_calculos (ANCHO_PUESTO, ATRAS_PUESTO, ADELANTE_PUESTO; un test comprueba que coinciden). Delante se
+# reserva el pasillo libre del mostrador. Así una casa decorativa nunca cae donde va un puesto fijo anclado a un edificio
+# (la misma idea que la losa de la feria, que reserva su sitio antes que las casas): es la casa la que se aparta.
+# Además, alrededor de la huella sola, DISTANCIA_PUERTA_CASA m (la regla de frontend/comercios_calculos.DISTANCIA_PUERTA):
+# la puerta de una casa está en el borde de su caja, así ninguna queda a menos de 2 m del puesto.
+HUELLA_PUESTO = (2.6, 0.95, 1.4)
+PASILLO_RESERVADO = 2.0
+MARGEN_RESERVA = 0.3
+DISTANCIA_PUERTA_CASA = 2.0
+
+
+class _SoloEdificios:
+    """Lo mínimo de un mundo para resolver un ancla de lugar (durante la construcción todavía no hay MundoCiudad)."""
+
+    def __init__(self, edificios):
+        self._por_lugar = {e.lugar: e for e in edificios}
+
+    def edificio_de(self, lugar):
+        if lugar not in self._por_lugar:
+            raise ValueError(f"No hay edificio para {lugar!r}.")
+        return self._por_lugar[lugar]
+
+    def zonas(self):
+        return []
+
+
+def caja_reservada(x, z, rumbo, huella=HUELLA_PUESTO, pasillo=PASILLO_RESERVADO, margen=MARGEN_RESERVA):
+    """(xmin, xmax, zmin, zmax) que contiene la huella del puesto en (x, z, rumbo) y el pasillo delante, con margen."""
+    ancho, atras, adelante = huella
+    s, c = math.sin(math.radians(rumbo)), math.cos(math.radians(rumbo))
+    xs, zs = [], []
+    for da in (-ancho / 2 - margen, ancho / 2 + margen):
+        for df in (-atras - margen, adelante + pasillo + margen):
+            xs.append(x + c * da + s * df)
+            zs.append(z - s * da + c * df)
+    return (min(xs), max(xs), min(zs), max(zs))
+
+
+def cajas_reservadas_puestos(edificios, comercios):
+    """Cajas reservadas de los puestos fijos anclados a un edificio, dos por puesto: huella + pasillo delante, y huella +
+    DISTANCIA_PUERTA_CASA alrededor (sin ALCALDE_PUESTOS_FIJOS, ninguna: el barrio de siempre). `comercios` = catálogo
+    con anclas fijas (comercios_semilla.con_puestos_fijos)."""
+    if not feria.puestos_fijos_activo():
+        return []
+    mundo = _SoloEdificios(edificios)
+    cajas = []
+    for comercio in comercios:
+        ancla = comercio.ancla
+        if comercio.tipo == "vendedor_calle" or not ancla.get("fijo") or "lugar" not in ancla:
+            continue
+        try:
+            x, z, rumbo = resolver_ancla(mundo, ancla)
+        except ValueError:
+            continue
+        cajas.append(tuple(round(v, 3) for v in caja_reservada(x, z, rumbo)))
+        cajas.append(tuple(round(v, 3) for v in caja_reservada(x, z, rumbo, pasillo=0.0, margen=DISTANCIA_PUERTA_CASA)))
+    return cajas
+
+
 # Ancla del comercio EN ESTE mundo: la `ancla` del catálogo.
 def ancla_de(mundo, comercio):
     return comercio.ancla

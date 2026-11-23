@@ -9,7 +9,7 @@
 #
 # M1.4 (D9, letreros ilegibles): cada cartel (no los globos) cuyo tamaño de letra en pantalla (em de la fuente x escala,
 # a la profundidad de su centro, penalizado si se ve de lado) baja de ALTO_OCULTAR_PX se funde igual y vuelve por encima
-# de ALTO_MOSTRAR_PX (histéresis). Carteles: de puerta (+ glosa), de puesto, pintados de la favela y secretos.
+# de ALTO_MOSTRAR_PX (histéresis); entre ALTO_OCULTAR_PX y ALTO_PLENO_PX su opacidad sigue al tamaño (M5, retoques). Carteles: de puerta (+ glosa), de puesto, pintados de la favela y secretos.
 # Hay ~280 carteles (los pintados de la favela son la mayoría): se repasan por tandas, VUELTA_FRAMES frames por vuelta
 # completa (~0.1 s), así ningún frame paga la lista entera. La misma tanda apunta qué carteles están cerca (`_v_cerca`):
 # los solapes (cada PERIODO_SOLAPES s) solo miran globos + carteles cercanos y legibles. Solo se funden las letras: el
@@ -48,6 +48,7 @@ class PrioridadTextos(Entity):
         self._t = tm.PERIODO_SOLAPES
         self._cursor = 0
         self._legible = {}              # clave -> ¿legible? (con histéresis)
+        self._alfa_tamano = {}          # clave -> opacidad por tamaño en pantalla (M5: 0 a ALTO_OCULTAR_PX, 1 desde ALTO_PLENO_PX)
         self._v_centros, self._v_altos, self._v_legibles, self._v_cerca = [], [], [], []   # paralelos a _carteles
         self._v_normales, self._v_altos_px = [], []
         self._normales = {}             # clave -> normal unitaria del cartel en el mundo
@@ -104,7 +105,8 @@ class PrioridadTextos(Entity):
 
     # Objetivo del cartel: 0 si lo tapa un texto de más prioridad o si es ilegible; si cambia, empieza a fundirse.
     def _fijar(self, clave):
-        objetivo = 0.0 if (clave in self._ocultos_solape or not self._legible.get(clave, True)) else 1.0
+        objetivo = 0.0 if (clave in self._ocultos_solape or not self._legible.get(clave, True)) \
+            else self._alfa_tamano.get(clave, 1.0)
         if objetivo == self._objetivo.get(clave, 1.0):
             return
         self._objetivo[clave] = objetivo
@@ -151,6 +153,16 @@ class PrioridadTextos(Entity):
             clave = self._carteles[k][0]
             self._legible[clave] = self._v_legibles[k]
             self._fijar(clave)
+        if self.minimo:                 # M5: opacidad por tamaño entre ALTO_OCULTAR_PX y ALTO_PLENO_PX
+            for k in range(self._cursor, fin):
+                px = self._v_altos_px[k]
+                if px is None:
+                    continue
+                clave = self._carteles[k][0]
+                alfa = tm.alfa_por_tamano(px)
+                if abs(alfa - self._alfa_tamano.get(clave, 1.0)) > 0.02 or (alfa == 1.0) != (self._alfa_tamano.get(clave, 1.0) == 1.0):
+                    self._alfa_tamano[clave] = alfa
+                    self._fijar(clave)
         self._cursor = 0 if fin >= n else fin
 
     # Normal (unitaria) del plano del cartel en el mundo, una vez: para penalizar los carteles vistos de lado.

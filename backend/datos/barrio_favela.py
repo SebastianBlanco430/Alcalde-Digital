@@ -155,8 +155,9 @@ def _punto_mas_cercano(p, a, b):
 class _Barrio:
     """Estado de la generación: reglas de despeje y rejilla de vecinos para no solaparse."""
 
-    def __init__(self, mapa, edificios, despeje, previos, terreno, zonas, limites):
+    def __init__(self, mapa, edificios, despeje, previos, terreno, zonas, limites, reservas=()):
         self.mapa = mapa
+        self.cajas_reservadas = list(reservas)     # puestos fijos con su pasillo (comercios.cajas_reservadas_puestos)
         self.terreno = terreno
         self.despeje = despeje
         self.calles = [(mapa.coordenada(a), mapa.coordenada(b)) for a, b in mapa.segmentos()]
@@ -201,6 +202,8 @@ class _Barrio:
         if any(_cajas_cerca(caja, otra, DESPEJE_EDIFICIO) for otra in self.cajas_edificios):
             return False
         if any(_cajas_cerca(caja, otra, DESPEJE_ZONA) for otra in self.cajas_zonas):
+            return False
+        if any(_cajas_cerca(caja, otra, 0.0) for otra in self.cajas_reservadas):
             return False
         if not self.despeje.permite(casa):
             return False
@@ -274,12 +277,16 @@ def _proponer(azar, barrio, x_izq, z_fila, prof, reduccion):
 
 
 # Casas del barrio: filas de izquierda a derecha, con los filtros de la clase _Barrio. `cantidad`
-# es el tope. `limites` es el rectángulo (xmin, xmax, zmin, zmax) donde puede haber casas. `fabrica_barrio` construye
+# es el tope. `limites` es el rectángulo (xmin, xmax, zmin, zmax) donde puede haber casas. `reservas` son cajas donde no
+# puede caer ninguna casa (los puestos fijos con su pasillo: el puesto no se mueve, la casa se aparta). `fabrica_barrio` construye
 # el estado de la generación (por defecto _Barrio; barrio_indexado._BarrioIndexado da el mismo resultado con índices).
 def generar_casas(mapa, edificios, despeje, previos, terreno, zonas, limites, semilla, cantidad=CANTIDAD_BARRIO,
-                   fabrica_barrio=_Barrio):
+                   fabrica_barrio=_Barrio, reservas=()):
     azar = random.Random(semilla + SEMILLA_BARRIO)
-    barrio = fabrica_barrio(mapa, edificios, despeje, previos, terreno, zonas, limites)
+    if reservas:
+        barrio = fabrica_barrio(mapa, edificios, despeje, previos, terreno, zonas, limites, reservas=reservas)
+    else:
+        barrio = fabrica_barrio(mapa, edificios, despeje, previos, terreno, zonas, limites)
     x0, x1, z0, z1 = limites
     casas = []
     z_fila = z0

@@ -6,7 +6,8 @@ from frontend import estilo
 from frontend.componentes import a_unidades
 from frontend.minijuegos import ui
 from frontend.minijuegos.base import ANCHO_UTIL, Minijuego, Y_CONTENIDO_ARRIBA
-from frontend.minijuegos.contrarreloj_calculos import FRENADA, LIBERADA, PENDIENTE, PROPAGADA, PartidaContrarreloj
+from frontend.minijuegos.contrarreloj_calculos import (FRENADA, LIBERADA, PENDIENTE, PROPAGADA, PartidaContrarreloj,
+                                                        etiqueta_final)
 
 ANCHO_LISTA = 1.2
 ANCHO_TEXTO = 0.72
@@ -162,8 +163,7 @@ class MinijuegoContrarreloj(Minijuego):
             self.filas[i].enabled = self.barras[i].enabled = self.rotulos[i].enabled = True
             self.filas[i].fijar_foco(False)
             ok = p.acierta(i)
-            self.filas[i].fijar_estado("correcta" if ok else "incorrecta",
-                                       ("BIEN" if ok else "MAL") + (": era cierta" if c["veraz"] else ": era falsa"))
+            self.filas[i].fijar_estado("correcta" if ok else "incorrecta", etiqueta_final(c, ok))
             self.rotulos[i].text = ""
         self.boton_frenar.fijar_habilitado(False)
         self.boton_pasar.fijar_habilitado(False)

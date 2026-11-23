@@ -114,4 +114,5 @@ def _lentos():
         "saturacion": sat,
         "tinte": tinte,
         "extra": calc.uniformes_r5(calc.pliegues_activos(), calc.sombra_lejos_activa()),
+        "rasante": (calc.SALTO_BAJO, calc.SALTO_ALTO),
     }

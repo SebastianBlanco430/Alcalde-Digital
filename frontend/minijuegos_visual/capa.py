@@ -17,6 +17,11 @@ from frontend import banderas_visuales as bv
 from frontend import efectos_ui_calculos as calc
 
 
+# Panel visible de la escena de minijuego en coordenadas del minijuego: la mesa (marco_mesa: ASPECTO + 0,06 de ancho) y el
+# fondo sin marco (ASPECTO x 1) quedan, dentro del monitor, a unos ±0,88 x ±0,49; el sello no sale de ese rectángulo.
+LIMITES_SELLO = (-0.875, 0.875, -0.49, 0.49)
+
+
 class CapaVisual:
 
     _fx = None
@@ -99,7 +104,8 @@ class CapaVisual:
             self._fx.foco(pieza, False)
         retardo = self.repasar_revision()
         texto = self.texto_sello_final(resultado)
-        self._fx.sello(texto, posicion=self.posicion_sello(), retardo=retardo + 0.15, escala=self.escala_sello())
+        self._fx.sello(texto, posicion=self.posicion_sello(), retardo=retardo + 0.15, escala=self.escala_sello(),
+                       limites=self.limites_sello())
         cantidad = calc.estrellas(resultado.fraccion, resultado.bien, resultado.completado)
         self._fx.estrellas(cantidad, posicion=self.posicion_estrellas(), retardo=retardo + 0.55)
         if getattr(self, "es_tutorial", False):      # tutorial de la primera vez: se ve el sello y las estrellas, pero NO se anota nada
@@ -124,8 +130,14 @@ class CapaVisual:
         return len(tarjetas) * paso
 
     def texto_sello_final(self, resultado):
-        """Texto del sello final (None = sin sello). Por defecto, el veredicto real del rumor; las vistas pueden afinarlo."""
-        return calc.texto_sello(getattr(self.mision, "es_verdadera", None))
+        """Texto del sello final (None = sin sello): el veredicto real del rumor, solo si se verificó bien (con «Se te escapó
+        algo» un «VERIFICADO» contradice el resultado). Las vistas pueden afinarlo."""
+        return calc.texto_sello_resultado(getattr(self.mision, "es_verdadera", None), getattr(resultado, "bien", False))
+
+    def limites_sello(self):
+        """Panel donde el sello debe quedar entero (también mientras cae), en coordenadas del minijuego: la mesa de papel
+        (o el fondo de la escena sin marco), que escala con la escena en cualquier aspecto de ventana."""
+        return LIMITES_SELLO
 
     def escala_sello(self):
         """Tamaño del sello (1 = el de siempre). Con el marco de papel es menor, para que entre entero en la franja de arriba

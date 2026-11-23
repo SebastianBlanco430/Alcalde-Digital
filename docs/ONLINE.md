@@ -146,6 +146,10 @@ Versión actual del protocolo: **v6** (`backend/red/protocolo.PROTOCOLO_V`). His
   oeste de la Rodoviária y, con `ALCALDE_PUESTOS_FIJOS`, la posición de todos los puestos fijos entra en la huella
   del mundo (clave `puestos`). Con la semilla por defecto la huella del mundo pasa de `7cc465e2…` a `42363471…`; la
   del contenido no cambia. Un equipo con el código anterior ve «Mundo distinto»: **todos con el mismo código**.
+- **2026-11-22, retoques de la recta final (sin cambiar de versión):** Beto y Zeca quedan centrados en esa pared con
+  cualquier semilla (las casas y la vegetación del barrio reservan antes el sitio de los puestos fijos y su pasillo).
+  Con la semilla por defecto la huella del mundo pasa de `42363471…` a `4b3d197c…`; la del contenido no cambia
+  (`bb48a187…`). Otra vez: **todos con el mismo código**.
 - **Un solo mundo:** anfitrión y clientes construyen el MISMO mundo (Ciudad3D, 11 lugares) y el catálogo de 14 misiones.
   En línea existen 8 vehículos (el protocolo nombra 0..7; `N_VEHICULOS_MAX = 8`). El «mapa grande» (900 x 650 m, 24 lugares,
   47 misiones, 24 vehículos, viaje rápido en mototáxi y teleférico, mensajes `viaje`/`viaje_ok`/`viaje_no`) y su variable

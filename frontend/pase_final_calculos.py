@@ -25,6 +25,14 @@ FRACCION_CIELO = 0.6             # z >= 0,6 · far = cielo (la cúpula está a 0
 FIN_SIN_NIEBLA = 120.0           # m: rango del desvanecido cuando no hay niebla (interiores)
 DESVANECE_INICIO = 0.30          # fracción del fin de niebla donde la tinta empieza a perder opacidad...
 DESVANECE_FIN = 0.85             # ...y donde ya no se dibuja (lo lejano no se ensucia)
+# Retoques M4 (rampas negras): la tinta de silueta solo se pinta donde hay SALTO de profundidad. En un plano 1/z es afín en
+# pantalla: su segunda diferencia (relativa a 1/z del centro) es ~0 aunque el plano esté casi rasante, cuando |Sobel(z)|/z
+# supera el umbral en cada píxel (con el trazo grueso, 3 px a 1080p) y una rampa que baja alejándose de la cámara se
+# llenaba de negro. En un salto que ya pasaba el umbral del Sobel (|Δz|/z >= 0,0625) la segunda diferencia es >= 0,059,
+# muy por encima de SALTO_ALTO: los contornos de siempre (personajes, casas, bordillos) quedan igual. Con 0,01-0,03 se perdía
+# parte del contorno suave del borde de la plaza; con 0,0025-0,01 aparecían rayas de más (medido en el arnés).
+SALTO_BAJO = 0.005
+SALTO_ALTO = 0.02
 
 # --- Grading de salud --------------------------------------------------------------------------------------------------
 SATURACION_MIN = 0.72            # salud 0
@@ -151,11 +159,22 @@ def lado_cercano(vecinos):
     return 1.0 if max(otros) - centro >= centro - min(otros) else 0.0
 
 
+def salto_relativo(vecinos):
+    """Mayor |2.ª diferencia de 1/z| / (1/z) del centro en las 4 direcciones del 3x3: ~0 en cualquier plano (también uno
+    rasante), grande en un salto de profundidad o un pliegue."""
+    (a, b, c), (d, e, f), (g, h, i) = vecinos
+    w = lambda z: 1.0 / max(z, 1e-6)
+    wc = w(e)
+    s = max(abs(w(d) + w(f) - 2 * wc), abs(w(b) + w(h) - 2 * wc), abs(w(a) + w(i) - 2 * wc), abs(w(c) + w(g) - 2 * wc))
+    return s / wc
+
+
 def fuerza_tinta(vecinos, lejos):
-    """Opacidad de la línea (0..1) antes del desvanecido por distancia."""
+    """Opacidad de la línea (0..1) antes del desvanecido por distancia. Solo donde hay salto (no en planos rasantes)."""
     if es_cielo(vecinos[1][1], lejos):
         return 0.0
-    return _suave(UMBRAL_BAJO, UMBRAL_ALTO, borde_relativo(vecinos)) * lado_cercano(vecinos)
+    salto = _suave(SALTO_BAJO, SALTO_ALTO, salto_relativo(vecinos))
+    return _suave(UMBRAL_BAJO, UMBRAL_ALTO, borde_relativo(vecinos)) * salto * lado_cercano(vecinos)
 
 
 def niebla_de(fog_color, fog_density):

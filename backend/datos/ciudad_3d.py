@@ -500,7 +500,7 @@ TIPOS_VEGETACION_BARRIO = (("palmera", 0.30, 0.45), ("bananero", 0.28, 0.5), ("a
 
 
 def _vegetacion_barrio(mapa, despeje, ocupados, terreno, cantidad=CANTIDAD_VEGETACION_BARRIO, semilla=SEMILLA_CASAS + 1,
-                       zonas=()):
+                       zonas=(), reservas=()):
     azar = random.Random(semilla)
     calles = [(mapa.coordenada(a), mapa.coordenada(b)) for a, b in mapa.segmentos()]
     plazas = [mapa.coordenada(lugar) for lugar in mapa.lugares()]
@@ -528,11 +528,21 @@ def _vegetacion_barrio(mapa, despeje, ocupados, terreno, cantidad=CANTIDAD_VEGET
             continue
         if any(_distancia_punto_caja(x, z, zona.caja()) < planta.radio + 1.0 for zona in zonas):
             continue                       # nada de plantas sobre la cancha ni el mercadito
+        if any(_distancia_punto_caja(x, z, caja) < planta.radio for caja in reservas):
+            continue                       # ni en el sitio (y el pasillo) de un puesto fijo
         # 1,6 m de cualquier otra cosa: en un callejón de 1,5-3 m no queda hueco para una planta
         if any(_separacion(planta, o) < 1.6 for o in ocupados + plantas):
             continue
         plantas.append(planta)
     return plantas
+
+
+# Sitio de los puestos fijos anclados a un edificio (con su pasillo): ni las casas ni la vegetación del barrio caen ahí.
+def _reservas_puestos(edificios):
+    from backend.datos import comercios_semilla
+    from backend.logica.comercios import cajas_reservadas_puestos
+    catalogo = comercios_semilla.con_puestos_fijos(comercios_semilla.CATALOGO_COMERCIOS_BASE)
+    return cajas_reservadas_puestos(edificios, catalogo)
 
 
 # -- Fábrica ------------------------------------------------------------------------------------------
@@ -573,8 +583,9 @@ def construir_mundo_3d(ladera=True, casas=None, semilla=SEMILLA_CASAS, denso=Tru
         region = (x0 + barrio_favela.BORDE_BARRIO, x1 - barrio_favela.BORDE_BARRIO,
                   z0 + barrio_favela.BORDE_BARRIO, z1 - barrio_favela.BORDE_BARRIO)
         tope = barrio_favela.CANTIDAD_BARRIO if casas is None else casas
+        reservas = _reservas_puestos(edificios)
         nuevas = barrio_favela.generar_casas(mapa, edificios, despeje, obstaculos, terreno, zonas, region,
-                                             semilla, cantidad=tope)
+                                             semilla, cantidad=tope, reservas=reservas)
         # Rincones secretos (easter eggs): se orientan hacia su lado abierto, ya con las casas, y su mesa choca.
         zonas = barrio_favela.orientar_secretos(zonas, [_caja(c) for c in nuevas], mapa)
         obstaculos = obstaculos + barrio_favela.mesas_secretas(zonas)
@@ -585,7 +596,8 @@ def construir_mundo_3d(ladera=True, casas=None, semilla=SEMILLA_CASAS, denso=Tru
         obstaculos = obstaculos + nuevas
         callejones = barrio_favela.callejones_entre(nuevas)
         escaleras = escaleras + _escaleras_de_callejones(callejones, escaleras, terreno)
-        obstaculos = obstaculos + _vegetacion_barrio(mapa, despeje, obstaculos, terreno, semilla=semilla + 1, zonas=zonas)
+        obstaculos = obstaculos + _vegetacion_barrio(mapa, despeje, obstaculos, terreno, semilla=semilla + 1, zonas=zonas,
+                                                     reservas=reservas)
     else:
         obstaculos = obstaculos + _casas_favela(mapa, despeje, obstaculos, terreno,
                                                 cantidad=CANTIDAD_CASAS if casas is None else casas, semilla=semilla)

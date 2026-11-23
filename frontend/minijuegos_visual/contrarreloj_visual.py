@@ -232,12 +232,19 @@ class ContrarrelojVisual(CapaVisual, MinijuegoContrarreloj):
             self._vigilar(self._fx.pulso, self.filas[i])
 
     def posicion_sello(self):
-        # El rumor de esta vista llega casi hasta el borde derecho: el sello del veredicto va más a la derecha y arriba.
-        x, y = super().posicion_sello()
-        return (x + 0.04, y + 0.015)
+        # El rumor de esta vista llega casi hasta el borde derecho: el sello del veredicto va a su derecha, sobre las
+        # estrellas. Antes iba a (0,77; 0,46), pegado al borde de la mesa: al caer (2,6 veces) se salía del panel y de la
+        # ventana. capa.limites_sello lo deja entero dentro de la mesa, también mientras cae.
+        return (0.775, 0.44)
 
     def escala_sello(self):
         return min(super().escala_sello(), 0.5)
+
+    def texto_sello_final(self, resultado):
+        # El veredicto del rumor no se estampa si el papel del rumor quedó «MAL» (p. ej. se frenó un rumor cierto y se
+        # acertó todo lo demás: la nota llega al umbral, pero un «VERIFICADO» contradiría su papel).
+        from frontend.minijuegos.contrarreloj_calculos import sello_con_rumor
+        return sello_con_rumor(getattr(self, "partida", None), super().texto_sello_final(resultado))
 
     # -- Bucle visual --
 

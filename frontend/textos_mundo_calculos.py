@@ -132,8 +132,22 @@ LETREROS_MINIMO = True           # constante por defecto de la bandera
 # 22 m y de lado (6.7); se leen = «Padaria Estrela» y «Supermercado do Bairro» a 14 m (10.7 / 10.9), «Mercado
 # Municipal» a 18 m (15.4), «Prefeitura» a 11 m (21.4). Banda de histéresis estrecha (0.5 px, ~5 % de distancia):
 # más ancha volvía a esconder los puestos a 14 m al llegar desde lejos.
-ALTO_OCULTAR_PX = 10.0           # por debajo, ilegible: se oculta
-ALTO_MOSTRAR_PX = 10.5           # por encima, legible: vuelve
+# Retoques 2026-11-22 (M5): con 10 px los carteles se iban demasiado pronto (Sam vio vacío el de la Rodoviária desde la
+# plaza: a 1920x1080 desaparecía a 34 m de frente, 26 m a 45 grados y 12 m a 65). Ahora el texto empieza a verse a
+# ALTO_OCULTAR_PX y se funde por TAMAÑO hasta ALTO_PLENO_PX (alfa_por_tamano): aparece poco a poco al acercarse, no de
+# golpe, y sigue limitado por el tamaño en pantalla (no se muestran todos sin límite).
+ALTO_OCULTAR_PX = 6.0            # por debajo, ilegible: se oculta
+ALTO_MOSTRAR_PX = 6.3            # por encima, vuelve (histéresis)
+ALTO_PLENO_PX = 8.5              # desde aquí, opacidad plena
+
+
+def alfa_por_tamano(alto_px, desde=ALTO_OCULTAR_PX, hasta=ALTO_PLENO_PX):
+    """Opacidad de un cartel legible según el alto de sus letras en pantalla: 0 en `desde`, 1 desde `hasta` (suave).
+    Sin medida (None), 1."""
+    if alto_px is None or alto_px != alto_px:
+        return 1.0
+    t = min(1.0, max(0.0, (alto_px - desde) / (hasta - desde)))
+    return t * t * (3.0 - 2.0 * t)
 
 
 def letreros_minimo_activa():
