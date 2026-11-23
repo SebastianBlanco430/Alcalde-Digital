@@ -151,6 +151,19 @@ def _sello(parent, texto, pos, tono, giro=-8, escala=(0.17, 0.06)):
     return raiz
 
 
+PX_TITULO = 14                          # cabecera amarilla de la nota candidata
+MARGEN_TITULO = 0.016
+
+
+def titulo_nota(numero, opcion, ancho):
+    """«número   quién  ·  hora» en UNA línea de `ancho` unidades, medida con la fuente y el tamaño con que se dibuja
+    (ui.medir, negrita, PX_TITULO px). Si no cabe, se recorta el nombre con «…»; la hora nunca. (Antes el nombre se
+    recortaba a 26 caracteres sin medir ni contar la hora y la cabecera se salía de la nota.)"""
+    from frontend.minijuegos_3d import corcho_calculos
+    return corcho_calculos.cabecera_nota(numero, opcion.get("de", ""), opcion.get("hora") or "",
+                                         lambda c: ui.medir(c, PX_TITULO, True) <= ancho)
+
+
 def _es_reenvio(opcion):
     return "reenviado" in str(opcion.get("texto", "")).lower()
 
@@ -184,10 +197,8 @@ class NotaCandidata(Entity):
         Entity(parent=self, model="quad", position=(0, y_cab, -0.001), scale=(w, alto_cab), color=_rgba(AMARILLO))
         Entity(parent=self, model="quad", position=(0, y_cab - alto_cab / 2, -0.0015), scale=(w, BORDE),
                color=_rgba(TINTA))
-        quien = calc.recortar(str(opcion.get("de", "")), 26)
-        hora = opcion.get("hora") or ""
-        self.titulo = _txt(self, f"{numero}   {quien}" + (f"  ·  {hora}" if hora else ""), 14,
-                           pos=(-w / 2 + 0.016, y_cab), origen=(-0.5, 0))
+        self.titulo = _txt(self, titulo_nota(numero, opcion, w - 2 * MARGEN_TITULO), PX_TITULO,
+                           pos=(-w / 2 + MARGEN_TITULO, y_cab), origen=(-0.5, 0))
         # Cuerpo: 16 px, máximo 3 líneas.
         if len(lineas) > 3:
             lineas = lineas[:3]

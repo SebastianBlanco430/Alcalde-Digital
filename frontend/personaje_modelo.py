@@ -31,6 +31,8 @@ from frontend.personaje import Personaje
 from frontend.piezas import COLOR_MARCADOR, etiqueta, limitar_etiqueta, modo_etiqueta_jugador, silenciar
 from frontend import rostro_calculos as rc
 from frontend import animacion_humana as ah
+from frontend import pesos_cabeza
+from frontend import rostro_skinning
 from frontend import skinning_gpu
 from frontend import toon_duro
 from frontend.rostro_modelo import colocar_rostro_animado
@@ -64,6 +66,7 @@ def _cargar_actor(rol):
         modelo = gltf.load_model(str(ruta), gltf_settings=gltf.GltfSettings())
         if ANIMACION_HUMANA:      # añade al nodo los clips de marcha/escalón/salto antes de crear el Actor
             ah.hornear_clips(NodePath(modelo), rol)
+        pesos_cabeza.unificar(NodePath(modelo), rol)   # bug-pelo: coronilla rígida con la cabeza al mezclar clips
         base = Actor(NodePath(modelo))
         faltan = [c for c in (mc.IDLE, mc.CAMINAR, mc.CORRER, mc.HABLAR) if c not in base.getAnimNames()]
         if faltan:
@@ -130,6 +133,8 @@ class PersonajeModelo(Entity):
         # GPU); los protagonistas y lo demás, el skinning de siempre. Si el toon duro no se aplica, el camino de siempre.
         if not (self._toon_duro() and toon_duro.aplicar_actor(self.actor)):
             skinning_gpu.aplicar(self.actor)    # deforma en la GPU (frontend/skinning_gpu.py); si falla, sigue por CPU
+            if not skinning_gpu.toon_activo():  # bug-pelo (giros): el pelo en la MISMA llamada de dibujo que el cráneo
+                rostro_skinning.fusionar_con_piel(self.actor, rol)
         self._casco_pantalla()
 
     # T2: casco de tinta de grosor ~constante en pantalla (frontend/casco_pantalla.py). Solo los NPC nuevos lo tienen.

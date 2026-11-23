@@ -38,8 +38,8 @@ MOVIMIENTO_CAPAS = 1.5           # m que debe moverse la cámara para repartir d
 TINTE_OBJETOS = 0.88             # los objetos de las capas no tienen sombreado: se bajan un poco para casar con la ciudad
 ALTURA_ACERA = 0.19              # m sobre el terreno de las aceras (ciudad_3d: ALTO_ACERA 0.20)
 ALTURA_PLAZA = 0.16
-ALTURA_FOCO = 4.25               # m del foco de la farola sobre el suelo (la farola: suelo - 0.1 + 4.35)
-ALTURA_GUIRNALDA = 3.75          # m a los que se cuelga la guirnalda (algo por debajo del foco)
+ALTURA_FOCO = 4.75               # m del foco de la farola sobre el suelo (la farola: suelo - 0.1 + 4.85, ciudad_3d.ALTURA_FOCO_FAROLA)
+ALTURA_GUIRNALDA = 4.25          # m a los que se cuelga la guirnalda (algo por debajo del foco y del cable)
 SALES = {"basura": 1.0, "flores": 2.0, "marchitas": 6.0, "carteles": 4.0, "apagados": 5.0, "bancos": 8.0, "corros": 9.0,
          "guirnaldas": 11.0, "grafitis": 3.0}
 CAPAS_CON_FOCO = ("basura", "flores")   # firma M4: estas capas priorizan la puerta del destino de la misión
@@ -64,6 +64,30 @@ def _desplazar(x, z, dx, dz, giro):
 
 def _byte_luz(valor):
     return max(0, min(255, int(round(valor))))
+
+
+# Luz-noche (23-nov): sombra de la hora. Cada pieza del mundo trae su propio `shadow_color` (Ursina lo copia del
+# default_input del shader al crearla, con prioridad 0); uno puesto en la raíz de la escena del mundo con prioridad mayor
+# manda sobre todos ellos sin recorrer entidades. Solo afecta a lo que cuelga de esa escena (no al UI, interiores ni
+# minijuegos). Con la sombra de siempre (de día) se quita: el mundo queda exactamente como antes.
+PRIORIDAD_SOMBRA = 10
+
+
+def _sombra_base():
+    """El `shadow_color` de siempre (r, g, b, a): el default del shader que fija frontend/piezas.py."""
+    from ursina.shaders import lit_with_shadows_shader
+    c = lit_with_shadows_shader.default_input["shadow_color"]
+    return (float(c[0]), float(c[1]), float(c[2]), float(c[3]))
+
+
+def _fijar_sombra(raiz, sombra, base):
+    # Entity.set_shader_input de Ursina no acepta prioridad: se llama al de NodePath (Entity es un NodePath).
+    from panda3d.core import LVecBase4f, NodePath
+    tipo = NodePath if isinstance(raiz, NodePath) else type(raiz)
+    if tuple(sombra) == tuple(base):
+        tipo.clear_shader_input(raiz, "shadow_color")
+        return
+    tipo.set_shader_input(raiz, "shadow_color", LVecBase4f(*sombra), PRIORIDAD_SOMBRA)
 
 
 class Dibujo(Malla):
@@ -607,6 +631,19 @@ def _libre(mundo, x, z):
         return True
 
 
+def guirnalda_cruza_casa(a, b, cajas, muestras=40):
+    """True si la guirnalda de `a` a `b` ((x, y, z) de sus dos ataduras) pasa por DENTRO de una casa. `cajas`:
+    [(cx, cz, ancho, fondo, y del techo)]. Se mira la cuerda sin comba (la comba solo la baja más). Verificación del
+    23-nov (D4): dos guirnaldas atravesaban una casa de lado a lado; es la misma regla que ciudad_3d.cable_cruza_casa."""
+    for j in range(1, muestras):
+        t = j / muestras
+        x, y, z = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t
+        for cx, cz, ancho, fondo, techo in cajas:
+            if abs(x - cx) < ancho / 2 and abs(z - cz) < fondo / 2 and y < techo:
+                return True
+    return False
+
+
 def sitios_de_la_ciudad(mundo):
     """Todos los sitios fijos de las capas, a partir del mundo. Devuelve un dict nombre -> [Punto] / datos.
     Determinista: el mismo mundo da siempre los mismos sitios (nada de random)."""
@@ -646,11 +683,15 @@ def sitios_de_la_ciudad(mundo):
 
     # Farolas: las del mundo; capuchones y guirnaldas.
     farolas = [(o.cx, o.cz) for o in obst if o.tipo == "farola"]
+    cajas_casas = [(o.cx, o.cz, o.ancho, o.fondo, piso(o.cx, o.cz, o.ancho, o.fondo) + o.alto_total)
+                   for o in obst if o.tipo == "casa" and o.es_caja]
     for x, z in farolas:
         out["apagados"].append(_punto(x, z, cv.azar_sitio(x, z, SALES["apagados"]), suelo(x, z) - 0.1 + ALTURA_FOCO + 0.1, 0.0, 0))
     for i, j in cv.pares_de_farolas(farolas, 6.0, 24.0, 2):
         (ax, az), (bx, bz) = farolas[i], farolas[j]
         ya, yb = suelo(ax, az) - 0.1 + ALTURA_GUIRNALDA, suelo(bx, bz) - 0.1 + ALTURA_GUIRNALDA
+        if guirnalda_cruza_casa((ax, ya, az), (bx, yb, bz), cajas_casas):     # no se cuelga a través de una casa
+            continue
         dx, dz, dy = bx - ax, bz - az, yb - ya
         horiz = math.hypot(dx, dz)
         largo = math.hypot(horiz, dy)
@@ -834,6 +875,7 @@ def crear_controlador(escena, atmosfera=True, capas=True, color_salud=False):
                 cielo = getattr(ciudad, "cielo", None)
                 hora = type(cielo)._hora() if cielo is not None and hasattr(type(cielo), "_hora") else None
                 sol, ambiente = ciclo.luz_de_hora(hora)
+                p_salud = p["sol"]
                 p = dict(p, sol=tuple(_byte_luz(p["sol"][i] * sol[i]) for i in range(3)),
                          ambiente=tuple(_byte_luz(p["ambiente"][i] * ambiente[i]) for i in range(3)))
                 focos = ciclo.focos_de_hora(hora)
@@ -842,6 +884,15 @@ def crear_controlador(escena, atmosfera=True, capas=True, color_salud=False):
                     for nodo in (ciudad._grupos.get("luces"), getattr(ciudad, "focos_decorado", None)):
                         if nodo is not None:
                             nodo.setColorScale(focos, focos, focos, 1.0)
+                # Luz-noche (23-nov): la resta fija de la sombra del shader escala con el sol de la hora; si no, de noche
+                # todo lo que está a la sombra (fachadas al norte y al este, lo que cae en su sombra) sale negro.
+                # Segunda pasada (D2): de noche también sigue a la salud (el sol de `p` antes de la hora / el sol base).
+                base = _sombra_base()
+                salud = tuple(p_salud[i] / max(1, self.sol_base[i]) for i in range(3))
+                sombra = ciclo.sombra_de_hora(hora, base, salud)
+                if sombra != getattr(self, "_sombra", None):
+                    self._sombra = sombra
+                    _fijar_sombra(escena, sombra, base)
             except Exception as error:      # noqa: BLE001 — la hora nunca rompe la atmósfera
                 print(f"[ciudad_viva] luz de la hora ({type(error).__name__}: {error})", file=sys.stderr)
             return p
@@ -1222,5 +1273,7 @@ def crear_controlador(escena, atmosfera=True, capas=True, color_salud=False):
             if isinstance(d, tuple) and d[1] > 0:
                 activar_niebla(**escena._niebla)
             self._niebla = None
+            _fijar_sombra(escena, _sombra_base(), _sombra_base())
+            self._sombra = None
 
     return ControladorCiudadViva(parent=escena)

@@ -60,6 +60,14 @@ def barra_desinfo_activa():
     return bool(BARRA_DESINFO)
 
 
+def rasgos_para_prop(rasgos, prop, tono):
+    """Rasgos de la cara de un NPC de etapa según su prop: con «capucha», la capucha es una pieza más del rostro (del
+    color de su ropa), sin gorra. Puro: no toca `rasgos`."""
+    if prop != "capucha":
+        return rasgos
+    return dict(rasgos, capucha=tuple(int(c) for c in tono), gorra=None)
+
+
 def texto_desinfo(valor):
     """«Desinformación 34 · más baja = mejor» (puro)."""
     return f"Desinformación {int(round(max(0.0, min(100.0, float(valor)))))} · {SUFIJO_DESINFO}"
@@ -230,8 +238,10 @@ def crear_controlador(escena, conexion):
     def poner_prop(cuerpo, prop, tono, y_cabeza=1.75):
         """`y_cabeza`: altura de la coronilla de ese modelo (npc_postura.y_ancla_cabeza), para capucha y gorro."""
         if prop == "capucha":
-            pieza(cuerpo, "sphere", (0, y_cabeza - 0.13, -0.05), (0.38, 0.36, 0.38), tono)
-            pieza(cuerpo, "cube", (0, y_cabeza - 0.33, -0.11), (0.42, 0.14, 0.20), tono)
+            # la capucha va en la cabeza (rasgos_para_prop -> rostro_calculos.capucha: sigue al hueso, deja ver la cara y
+            # cae sobre la nuca). Antes eran una esfera de 38 cm y un bloque de 42 cm colgados del CUERPO a una altura
+            # genérica: tapaban la cabeza entera, un disco oscuro sin cara con un bloque al lado (retoques 23-nov)
+            return
         elif prop == "canasta":
             pieza(cuerpo, "cube", (0.34, 0.88, 0.14), (0.34, 0.20, 0.26), (150, 104, 62))
             for k, flor in enumerate(((222, 64, 64), (248, 206, 56), tono)):
@@ -274,7 +284,8 @@ def crear_controlador(escena, conexion):
             self.hablando = False
             i = int(datos.get("modelo", orden))
             tono = tuple(datos.get("color", ROPA[i % len(ROPA)]))
-            npc = crear_npc(i, SEMILLA_NPC, aspecto_peaton(i, SEMILLA_NPC), rasgos_peaton(i, SEMILLA_NPC), tono, parent=escena,
+            npc = crear_npc(i, SEMILLA_NPC, aspecto_peaton(i, SEMILLA_NPC),
+                            rasgos_para_prop(rasgos_peaton(i, SEMILLA_NPC), datos.get("prop"), tono), tono, parent=escena,
                             nombre=self.nombre)
             npc.aro.enabled = False
             npc.nombre = self.nombre
@@ -299,6 +310,7 @@ def crear_controlador(escena, conexion):
             self._relleno = RELLENO
             self.globo.enabled = False
             silenciar(self.globo)
+            self.frase_actual = None         # retoques 23-nov (globos): la dibuja la CapaGlobos (globos_npc.py)
             self.npc = npc
             self.activo = True
             npc.enabled = False
@@ -316,16 +328,12 @@ def crear_controlador(escena, conexion):
             self.hablando = True
             frase = self.frases[self._frase % len(self.frases)]
             self._frase += 1
-            self.globo.text = frase
-            self.globo.wordwrap = self._ajuste
-            fondo = self.globo.background_entity
-            if fondo is not None:
-                fondo.scale = (self.globo.width + self._relleno[0], self.globo.height + self._relleno[1])
-            self.globo.enabled = True
+            self.frase_actual = frase        # el globo del mundo ya no se enciende: va a la CapaGlobos
             self.npc.etiqueta.enabled = False
 
         def callar(self):
             self.hablando = False
+            self.frase_actual = None
             self.globo.enabled = False
             self.npc.etiqueta.enabled = True
 
@@ -593,12 +601,24 @@ def crear_controlador(escena, conexion):
                 self._leer()
             self._avanzar_tinte(dt)
             self._avanzar_npc(dt)
+            self._pedir_globos()
             visible = self._medidor_visible()
             if visible:
                 self.medidor.pintar(self.indice, self.etapa)
                 self._pintar_desinfo()
             if self.medidor.enabled != visible:
                 self.medidor.enabled = visible
+
+        # Retoques 23-nov (globos): las frases de los NPC de etapa, en la CapaGlobos (un globo por NPC, en pantalla).
+        def _pedir_globos(self):
+            try:
+                from frontend.globos_npc import PRIORIDAD_LLEGADA, capa_de
+                from frontend.globos_npc_calculos import pedidos_etapa
+                pedidos = pedidos_etapa(self._visibles, PRIORIDAD_LLEGADA)
+                if pedidos or getattr(escena, "_capa_globos", None) is not None:
+                    capa_de(escena).fijar("etapas", pedidos)
+            except Exception as error:
+                _aviso(f"globos de etapa sin pintar ({type(error).__name__}: {error})")
 
         def estadisticas(self):
             return {"etapa": self.etapa, "indice": self.indice, "cambios": self.cambios,

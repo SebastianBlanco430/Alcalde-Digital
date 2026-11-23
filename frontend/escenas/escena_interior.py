@@ -343,6 +343,9 @@ class EscenaInterior(Escena):
     # jugador: Jugador (nombre, rol). lugar: nombre del lugar. modo: 'sentarse' | 'levantarse'.
     # al_terminar: se llama sin argumentos al acabar la cinemática (ConexionFlujo sigue la cadena).
     def al_entrar(self, jugador=None, lugar=None, modo="sentarse", al_terminar=None, **datos):
+        # Rework 3D (aditivo): `sin_destello=True` lo pasa ConexionFlujo SOLO si el minijuego va en 3D de la familia PC: la
+        # cámara llega al monitor sin el destello blanco (el minijuego aparece en ese mismo monitor). Sin él, como siempre.
+        self._sin_destello = bool(datos.get("sin_destello", False))
         self._luces(True)
         self._guardar_camara()
         self.jugador, self.modo, self._al_terminar = jugador, modo, al_terminar
@@ -377,7 +380,11 @@ class EscenaInterior(Escena):
 
     def _terminar(self):
         callback, self._al_terminar = self._al_terminar, None
-        if self.modo == "sentarse":
+        if self.modo == "sentarse" and getattr(self, "_sin_destello", False):
+            self.destello.poner(0)
+            if callback is not None:
+                callback()
+        elif self.modo == "sentarse":
             self.destello.poner(1)            # cubre la pantalla; el juego aparece y el destello se desvanece
             if callback is not None:
                 try:
@@ -482,7 +489,8 @@ class EscenaInterior(Escena):
             camera.fov = lerp(tomas["teclear"]["fov"], tomas["acercar_fin"]["fov"], k)
 
         def destello(t):
-            self.destello.poner(t)
+            if not getattr(self, "_sin_destello", False):
+                self.destello.poner(t)
 
         return {"caminar": caminar, "sentarse": sentarse, "teclear": teclear, "acercar": acercar,
                 "destello": destello}

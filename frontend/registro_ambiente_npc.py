@@ -212,7 +212,7 @@ def _crear_controlador(escena):
                 catalogo, _ = gl.cargar_frases()
                 azar = random.Random(SEMILLA_GLOBOS)
                 plan = gl.PlanificadorGlobos(gl.SelectorFrases(catalogo, azar), azar)
-                self.globos = GlobosNPC(self, plan)
+                self.globos = GlobosNPC(self, plan, escena)            # globos en pantalla (CapaGlobos de la escena)
                 cuerpos = []                                        # las anclas de cabeza se crean ya (no al hablar)
                 if self._peatones is not None:
                     cuerpos += list(self._peatones.personajes)
@@ -317,6 +317,11 @@ def _crear_controlador(escena):
 def registrar(gestor, conexion, escena_mundo):
     try:
         conexion.ambiente_npc = _crear_controlador(escena_mundo)
+        try:
+            from frontend import globos_npc
+            globos_npc.registrar_conexion(escena_mundo, conexion)   # globos: avisos K/L y paneles que los esconden
+        except Exception as error:
+            _aviso(f"globos sin conexión ({type(error).__name__}: {error})")
         return conexion.ambiente_npc
     except Exception as error:
         _aviso(f"no instalado ({type(error).__name__}: {error}); la ciudad sigue como antes")

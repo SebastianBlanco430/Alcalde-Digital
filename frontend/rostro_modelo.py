@@ -18,6 +18,7 @@ from panda3d.core import (CS_zup_right, CullFaceAttrib, Geom, GeomNode, GeomTria
 from frontend import rostro_animacion_calculos as ra
 from frontend import malla_calculos as ml
 from frontend import rostro_calculos as rc
+from frontend import rostro_skinning
 
 SEGMENTOS = 10                   # meridianos de cada esfera (low-poly, como el modelo)
 ANILLOS = 6                      # paralelos de cada esfera
@@ -192,6 +193,8 @@ def construir_rostro(actor, rol):
     raiz.setMat(_matriz_cabeza(rol))
     _armar(raiz, rc.rostro_del_modelo(rol))
     raiz.wrtReparentTo(hueso)                     # conserva la posición actual (bind pose) y desde ahora sigue al hueso
+    # bug-pelo: el pelo y las piezas fijas se deforman con el mismo hueso que el cráneo (frontend/rostro_skinning.py)
+    rostro_skinning.skinear(actor, raiz, rol, rc.hueso_cabeza(rol), _matriz_cabeza(rol))
     return raiz
 
 
@@ -402,6 +405,7 @@ def colocar_rostro_animado_piezas(actor, rol, piezas, semilla=0):
         raiz.setMat(_matriz_cabeza(rol))
         _armar(raiz, piezas)
         raiz.wrtReparentTo(hueso)
+        rostro_skinning.skinear(actor, raiz, rol, rc.hueso_cabeza(rol), _matriz_cabeza(rol))   # bug-pelo (nunca lanza)
     except Exception as error:
         _avisar(rol, error)
         return None

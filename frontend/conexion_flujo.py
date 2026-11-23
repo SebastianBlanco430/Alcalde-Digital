@@ -72,6 +72,7 @@ class ConexionFlujo:
         if flujo is None or self._transicion_en_curso() or not flujo.puede_interactuar():
             return
         contexto = flujo.iniciar_minijuego()
+        self._salida_3d()               # rework 3D: una marca vieja (misión revertida a mitad) no decide esta salida
         if self._con_interior:
             self._entrar_al_edificio(flujo, contexto)
             return
@@ -312,14 +313,18 @@ class ConexionFlujo:
 
         def abrir_interior():
             try:
+                extra = {"sin_destello": True} if self._entrada_pc_3d(contexto) else {}
                 self._gestor.cambiar_a(INTERIOR, jugador=jugador, lugar=lugar, modo="sentarse",
-                                       al_terminar=abrir_juego)
+                                       al_terminar=abrir_juego, **extra)
             except BaseException:
                 self._revertir_al_mundo(flujo)
                 raise
 
         def tras_la_entrada():
-            self._con_transicion_lugar(abrir_interior, texto=titulo)
+            if self._sentarse_al_pc(contexto):
+                self._con_transicion_lugar(abrir_interior, texto=titulo)
+            else:   # minijuego 3D de corcho o mesa: el personaje entra y camina hasta ellos dentro del minijuego
+                self._con_transicion_lugar(abrir_juego, texto=titulo)
 
         if self.cinematicas is None:
             tras_la_entrada()
@@ -332,9 +337,61 @@ class ConexionFlujo:
                 self._revertir_al_mundo(flujo)
                 raise
 
+    # Rework 3D (aditivo, frontend/minijuegos_3d): ¿se hace la cinemática de sentarse al PC del interior? Solo NO cuando la
+    # misión va a la escena de minijuegos Y su minijuego se juega en 3D en el corcho o la mesa. Con ALCALDE_MINIJUEGOS_3D=0,
+    # sin selector, sin implementación 3D o ante cualquier fallo: True (el camino de hoy).
+    def _sentarse_al_pc(self, contexto):
+        try:
+            from frontend.minijuegos_3d import banderas as banderas_3d
+            if not banderas_3d.maestra():
+                return True
+            selector = getattr(self, "selector_escena", None)
+            nombre = selector(contexto) if selector is not None else None
+            if not nombre or nombre == JUEGO:
+                return True
+            from frontend.minijuegos_3d import selector as selector_3d
+            return selector_3d.sentarse_al_pc(contexto["mision"])
+        except Exception:            # noqa: BLE001
+            return True
+
+    # Rework 3D (aditivo): ¿el minijuego de esta misión va en 3D de la familia PC con la entrada sin destello? Entonces la
+    # cinemática de sentarse se pasa a EscenaInterior con `sin_destello` y se avisa a la presentación 3D (estado) para que
+    # no ponga su propio velo. Con la maestra apagada, sin escena de minijuego, otra familia o cualquier fallo: False.
+    def _entrada_pc_3d(self, contexto):
+        try:
+            from frontend.minijuegos_3d import banderas as banderas_3d
+            if not banderas_3d.entrada_sin_destello():
+                return False
+            selector = getattr(self, "selector_escena", None)
+            nombre = selector(contexto) if selector is not None else None
+            if not nombre or nombre == JUEGO:
+                return False
+            from backend.datos import minijuegos_asignacion as asignacion
+            from frontend.minijuegos_3d import estado as estado_3d
+            from frontend.minijuegos_3d import selector as selector_3d
+            if selector_3d.familia_efectiva(asignacion.asignar(contexto["mision"])) != "pc":
+                return False
+            estado_3d.entrada_sin_destello(True)
+            return True
+        except Exception:            # noqa: BLE001
+            return False
+
+    # Rework 3D (aditivo): ¿el minijuego de esta misión TERMINÓ en 3D? Lee y borra la marca de frontend/minijuegos_3d/estado
+    # (la pone la presentación 3D al terminar; la borra la escena si cae al 2D). Con ALCALDE_MINIJUEGOS_3D=0 o ante
+    # cualquier fallo: False (el camino de hoy).
+    def _salida_3d(self):
+        try:
+            from frontend.minijuegos_3d import banderas as banderas_3d
+            from frontend.minijuegos_3d import estado as estado_3d
+            familia = estado_3d.consumir_salida()
+            return bool(familia) and banderas_3d.maestra()
+        except Exception:            # noqa: BLE001
+            return False
+
     def _salir_del_edificio(self, resultado):
         flujo = self.flujo
         saliente, lugar = flujo.jugador_activo(), flujo.mision_actual().destino
+        salida_3d = self._salida_3d()           # leer (y borrar) la marca ANTES de nada: nunca queda para la siguiente
         flujo.completar_mision(resultado)       # el modelo avanza en el acto: pasa el turno
         if self._sin_edificio(lugar):           # al aire libre: no hay interior ni puerta; fundido y de vuelta al mundo
             self._con_transicion(self._volver_al_mundo)
@@ -344,6 +401,12 @@ class ConexionFlujo:
             def abrir_mundo():
                 self._gestor.cambiar_a(MUNDO, flujo=flujo, salida={"jugador": saliente, "lugar": lugar})
             self._con_transicion(abrir_mundo)
+
+        if salida_3d:
+            # Minijuego terminado en 3D (rework 3D): el personaje ya se levantó/apartó dentro del 3D (o nunca se sentó,
+            # en corcho y mesa): sin la escena «levantarse» de la silla del PC; fundido y sale por la puerta en el mundo.
+            salir_al_mundo()
+            return
 
         def volver_al_interior():
             try:

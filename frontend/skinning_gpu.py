@@ -352,6 +352,21 @@ def _atributo():
     return _cache[0][0]
 
 
+# Shader de skinning SIN luz (el unlit de Ursina + huesos), aunque los personajes lleven el toon: lo usan las piezas del
+# rostro que pasan a geometría animada (frontend/rostro_skinning.py) para verse igual que cuando las pintaba el unlit.
+# Esas piezas pesan en UN solo hueso (la cabeza, índice 0 de su tabla), así que el shader declara p3d_TransformTable[1]:
+# Panda sube por dibujo tantas matrices como declara el array (128 x 64 B con el de siempre). Mismo texto en lo demás.
+_cache_unlit = []
+
+
+def atributo_unlit():
+    if not _cache_unlit:
+        vertex, fragment = (_VERTEX_120, _FRAGMENT_120) if sys.platform == "darwin" else (_VERTEX, _FRAGMENT)
+        vertex = vertex.replace(f"p3d_TransformTable[{MAX_HUESOS}]", "p3d_TransformTable[1]")
+        _cache_unlit.append(ShaderAttrib.make(_hacer(vertex, fragment)).set_flag(ShaderAttrib.F_hardware_skinning, True))
+    return _cache_unlit[0]
+
+
 def _tiene_animacion(geom_node):
     for i in range(geom_node.get_num_geoms()):
         formato = geom_node.get_geom(i).get_vertex_data().get_format()

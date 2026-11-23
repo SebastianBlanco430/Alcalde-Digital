@@ -148,7 +148,7 @@ def aleteo(k, t, frecuencia=8.0):
 # ALCALDE_PAJAROS_LIBRES=0 = como antes (R4).
 PAJAROS_LIBRES = True
 ALTO_PROP_PAJARO = {"banco": 1.0, "jardinera": 1.0, "caneca": 1.0, "valla": 1.1, "arbusto": 1.4, "cartel": 2.4,
-                    "farola": 4.4, "arbol": 5.2, "fuente": 2.6}
+                    "farola": 4.9, "arbol": 5.2, "fuente": 2.6}       # farola: 4,4 + 0,5 (2026-11-23, postes más altos)
 RADIO_EXTRA_PROP = {"arbol": 1.6, "arbusto": 0.5, "farola": 0.2}   # copa/brazo más ancho que el cuerpo de colisión
 MARGEN_DENTRO_XZ = 0.8
 MARGEN_DENTRO_Y = 1.0

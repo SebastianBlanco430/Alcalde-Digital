@@ -39,6 +39,28 @@ ALTO_BANNER = 0.17
 # Mismo ancho que el contenido de los minijuegos (base.ANCHO_UTIL): el banner queda alineado con las tarjetas de arriba.
 ANCHO_BANNER = 1.62
 
+# Presentación 3D: la oficina del lugar es una copia PROPIA de EscenaInterior (no la del gestor), creada la primera vez que
+# un minijuego 3D la pide y reutilizada después. El paquete frontend/minijuegos_3d no importa escenas (capa MVC): se la pasa
+# esta fábrica.
+_interior_3d = {"escena": None}
+
+
+def _fabrica_interior():
+    escena = _interior_3d["escena"]
+    if escena is None or escena.is_empty():
+        from frontend.escenas.escena_interior import EscenaInterior
+        escena = EscenaInterior(escala_tiempo=0)
+        _interior_3d["escena"] = escena
+    return escena
+
+
+def _olvidar_salida_3d():
+    try:
+        from frontend.minijuegos_3d import estado
+        estado.olvidar()
+    except Exception:                            # noqa: BLE001
+        pass
+
 
 class EscenaMinijuego(Escena):
 
@@ -54,6 +76,8 @@ class EscenaMinijuego(Escena):
         self.banner = None
         self.panel_resultado = PanelResultadoGrafo(parent=self, z=-0.3)
         self.usados = {}                 # ids de casos ya jugados por minijuego (para no repetir en la partida)
+        self.vista3d = None              # presentación 3D (frontend/minijuegos_3d) mientras se juega; None = 2D de hoy
+        self._lugar, self._marco_activo = "", False
         self._reiniciar()
 
     # -- Estado de una entrada --
@@ -75,10 +99,12 @@ class EscenaMinijuego(Escena):
         self.t_panel = None
         self.t_previa = None
         self._clase = None
+        self._clase3d = None
         self._caso = None
         self._azar = None
 
     def _limpiar_vista(self):
+        self._cerrar_3d()
         if getattr(self, "tutorial", None) is not None:
             try:
                 destruir_arbol(self.tutorial)
@@ -148,6 +174,7 @@ class EscenaMinijuego(Escena):
         self.jugador = jugador or {}
         self.estado, self.mision, self.grafo_social = estado, mision, grafo_social
         self._al_terminar, self._al_respaldo = al_terminar, al_respaldo
+        self._lugar, self._marco_activo = lugar, bool(marco)
         self._poner_marco(marco, lugar)
         try:
             self._preparar_minijuego()
@@ -185,12 +212,121 @@ class EscenaMinijuego(Escena):
             self._clase = clase_visual(self.minijuego_id, self._clase)
         except Exception:                        # noqa: BLE001  sin capa visual: la vista de siempre
             pass
+        self._clase3d = self._elegir_3d()
 
     def _arrancar_minijuego(self):
-        self.contenido = Entity(parent=self)
+        if self.contenido is None or self.contenido.is_empty():     # con la previa en el monitor ya existe: se reutiliza
+            self.contenido = Entity(parent=self)
         self.minijuego = self._clase(parent=self.contenido)
         self.minijuego.empezar({"caso": self._caso, "mision": self.mision, "azar": self._azar,
                                 "al_terminar": self._minijuego_terminado})
+        if self.vista3d is not None:             # la previa ya estaba en el monitor 3D: el minijuego ocupa su sitio
+            minijuego = self.minijuego
+            self._en_3d(lambda v: v.usar_minijuego(minijuego))
+        else:
+            self._montar_3d()
+
+    def _previa_en_monitor(self):
+        """¿La pantalla previa va dentro del monitor 3D? Solo con presentación 3D de la familia PC y la bandera
+        ALCALDE_3D_PREVIA_MONITOR encendida (por defecto). Nunca lanza."""
+        clase = self._clase3d
+        if clase is None or getattr(clase, "FAMILIA", None) != "pc":
+            return False
+        try:
+            from frontend.minijuegos_3d import banderas
+            return banderas.previa_en_monitor()
+        except Exception:                        # noqa: BLE001
+            return False
+
+    # -- Presentación 3D (frontend/minijuegos_3d; banderas ALCALDE_MINIJUEGOS_3D y ALCALDE_3D_<ID>) --
+    # La vista 2D de arriba se crea y se empieza IGUAL que siempre (misma lógica, mismo ResultadoMinijuego); la presentación
+    # 3D solo la cuelga de una textura y monta el set. Cualquier fallo del 3D (al abrir o en update/input) cae al 2D de hoy
+    # con la MISMA vista 2D (mismo estado de la partida en curso): _caer_a_2d. Un fallo de la vista 2D sigue yendo a
+    # _respaldo (la escena de juego), como hoy.
+
+    def _elegir_3d(self):
+        try:
+            from frontend.minijuegos_3d import selector
+            return selector.clase_3d(self.minijuego_id)
+        except Exception:                        # noqa: BLE001  sin selector: 2D
+            return None
+
+    def _montar_3d(self, con_previa=False):
+        _olvidar_salida_3d()
+        clase = self._clase3d
+        if clase is None or self.contenido is None or (self.minijuego is None and not con_previa):
+            return
+        try:
+            from frontend.minijuegos_3d.base import Contexto3D
+            ctx = Contexto3D(self.minijuego_id, self.minijuego, self.contenido, jugador=self._jugador_3d(),
+                             mision=self.mision, lugar=getattr(self.mision, "destino", "") or "",
+                             fabrica_interior=_fabrica_interior, escena=self)
+            self.vista3d = clase(ctx)
+            self._mostrar_2d(False)
+            self.vista3d.abrir()
+        except Exception as error:               # noqa: BLE001  el 3D nunca deja la misión atascada
+            self._caer_a_2d(error)
+
+    def _jugador_3d(self):
+        from types import SimpleNamespace
+        j = self.jugador
+        if isinstance(j, dict):
+            return SimpleNamespace(nombre=j.get("nombre") or "Jugador", rol=j.get("rol") or "ciudadano")
+        return j
+
+    def _mostrar_2d(self, visible):
+        """Fondo y marco del PC de la escena 2D: escondidos mientras se ve el 3D, de vuelta en el 2D."""
+        self.fondo.enabled = bool(visible)
+        if visible and self._marco_activo:
+            self.marco.mostrar(self._rol_visible(), self._lugar)
+        elif not visible:
+            self.marco.ocultar()
+
+    def _en_3d(self, accion):
+        """Ejecuta una llamada a la presentación 3D; si lanza, cae al 2D (nunca al respaldo de la misión)."""
+        if self.vista3d is None:
+            return
+        try:
+            accion(self.vista3d)
+        except Exception as error:               # noqa: BLE001
+            self._caer_a_2d(error)
+
+    def _caer_a_2d(self, error):
+        vista, self.vista3d = self.vista3d, None
+        self._clase3d = None                     # en este minijuego no se vuelve a intentar el 3D
+        _olvidar_salida_3d()                     # cayó al 2D: la salida del edificio es la de hoy
+        _registro.warning("Minijuego %r: la presentación 3D falló (%r); se sigue en 2D con la misma partida.",
+                          self.minijuego_id, error, exc_info=(type(error), error, getattr(error, "__traceback__", None)))
+        try:
+            from frontend import banderas_visuales as bv
+            bv.avisar_una_vez(f"3d_{self.minijuego_id}", error)
+        except Exception:                        # noqa: BLE001
+            pass
+        if vista is not None:
+            try:
+                vista.cerrar()
+            except Exception:                    # noqa: BLE001  limpieza de mejor esfuerzo
+                pass
+        try:
+            if self.contenido is not None:
+                self.contenido.parent = self
+                self.contenido.position = (0, 0, 0)
+                self.contenido.scale = 1
+            self._mostrar_2d(not (self.cerrado and self.t_panel is not None))
+        except Exception as fallo:               # noqa: BLE001  ni el 2D se puede enseñar: el respaldo de siempre
+            self._respaldo(fallo)
+
+    def _cerrar_3d(self):
+        vista, self.vista3d = getattr(self, "vista3d", None), None
+        if vista is not None:
+            try:
+                vista.cerrar()
+            except Exception:                    # noqa: BLE001
+                pass
+            try:
+                self._mostrar_2d(True)
+            except Exception:                    # noqa: BLE001
+                pass
 
     # -- Pantalla previa («Antes de empezar») --
 
@@ -205,10 +341,21 @@ class EscenaMinijuego(Escena):
                 corta, ver = True, self._ver_tutorial
         except Exception:                        # noqa: BLE001
             pass
+        # Minijuego 3D de la familia PC: la previa va DENTRO del monitor 3D (la presentación se monta ya, con la previa como
+        # contenido; al empezar, la vista 2D del minijuego ocupa su sitio en el mismo monitor). Si el 3D falla, la previa
+        # vuelve a pantalla completa como hoy (_caer_a_2d devuelve `contenido` a la escena).
+        en_monitor = self._previa_en_monitor()
+        padre = self
+        if en_monitor:
+            if self.contenido is None or self.contenido.is_empty():
+                self.contenido = Entity(parent=self)
+            padre = self.contenido
         self.previa = PantallaPrevia(self._clase.TITULO, rumor, textos, ui.ayuda_legible(self._clase.AYUDA),
                                      self._empezar_desde_previa, corta=corta, al_ver_tutorial=ver, minijuego_id=self.minijuego_id,
-                                     parent=self)
+                                     parent=padre)
         self.t_previa = 0.0
+        if en_monitor and self.vista3d is None:
+            self._montar_3d(con_previa=True)
 
     # -- Tutorial de la primera vez (frontend/registro_tutorial_mision.py): no cambia reglas, resultados ni pagos --
 
@@ -248,6 +395,11 @@ class EscenaMinijuego(Escena):
         destruir_arbol(self.previa)
         self.previa = None
         self.t_previa = None
+        if self.vista3d is not None:             # previa en el monitor 3D: el tutorial es el de hoy (2D, pantalla completa)
+            self._cerrar_3d()
+            if self.contenido is not None:
+                destruir_arbol(self.contenido)
+                self.contenido = None
         if not self._abrir_tutorial(textos, forzar_ver=True):
             self._mostrar_previa(textos)
 
@@ -269,6 +421,7 @@ class EscenaMinijuego(Escena):
         self.resultado = resultado
         self.t_banner = 0.0
         self._pintar_banner(resultado)
+        self._en_3d(lambda v: v.resultado(resultado))
 
     def _pintar_banner(self, resultado):
         self.banner = Entity(parent=self, z=-0.1)
@@ -387,6 +540,7 @@ class EscenaMinijuego(Escena):
 
     def _mostrar_grafo(self):
         intento = self._intento
+        self._cerrar_3d()                        # el panel del grafo es el de siempre, sobre el fondo de siempre
         if self.banner is not None:
             self.banner.enabled = False
         self.minijuego.enabled = False
@@ -411,6 +565,7 @@ class EscenaMinijuego(Escena):
             _registro.error("Minijuego %r falló (%s) con el lote ya aplicado; no se abre el respaldo.", self.minijuego_id, error)
             return
         _registro.warning("Minijuego %r falló (%s): se usa el minijuego de siempre.", self.minijuego_id, error)
+        _olvidar_salida_3d()                     # la misión sigue en la escena de juego de siempre: salida de hoy
         self.en_respaldo = True
         callback, self._al_respaldo = self._al_respaldo, None
         if callback is None:
@@ -435,11 +590,14 @@ class EscenaMinijuego(Escena):
                 self.minijuego.tecla(key)
         except Exception as error:               # noqa: BLE001
             self._respaldo(error)
+            return
+        self._en_3d(lambda v: v.tecla(key))     # imitación 3D DESPUÉS de la tecla de siempre (nunca la decide)
 
     def update(self):
         if self.en_respaldo:
             return
         dt = time.dt
+        self._en_3d(lambda v: v.avanzar(dt))
         try:
             if self.t_previa is not None:
                 self.t_previa += dt

@@ -279,12 +279,17 @@ def arbusto(m, x, y, z, s, variante, flores=False):
                       0.2 * s, 0, flor, (0.9, 1.1))
 
 
+# 2026-11-23: el poste mide SUBIDA_FAROLA m más (absolutos, no escalados por `s`); farol, sombrerete y luz suben con él.
+SUBIDA_FAROLA = 0.5
+
+
 def farola(m, luz, x, y, z, s, variante):
+    sube = SUBIDA_FAROLA
     m.agregar(prisma(8, 0.5, 0.4), (x, y - 0.05, z), (0.36 * s, 0.35 * s, 0.36 * s), 0, HIERRO, (0.8, 1.1))
-    m.agregar(prisma(8, 0.5, 0.36), (x, y + 0.3 * s, z), (0.13 * s, 3.1 * s, 0.13 * s), 0, HIERRO, (0.8, 1.1))
-    m.agregar(caja(), (x, y + 3.55 * s, z), (0.34 * s, 0.46 * s, 0.34 * s), 0, (236, 220, 170), (0.8, 1.0))
-    m.agregar(prisma(8, 0.65, 0.0), (x, y + 3.78 * s, z), (0.5 * s, 0.32 * s, 0.5 * s), 0, HIERRO, (0.8, 1.1))
-    luz.agregar(icosfera(0), (x, y + 3.55 * s, z), 0.42 * s, 0, LUZ_FAROLA, (1.0, 1.0))
+    m.agregar(prisma(8, 0.5, 0.36), (x, y + 0.3 * s, z), (0.13 * s, 3.1 * s + sube, 0.13 * s), 0, HIERRO, (0.8, 1.1))
+    m.agregar(caja(), (x, y + 3.55 * s + sube, z), (0.34 * s, 0.46 * s, 0.34 * s), 0, (236, 220, 170), (0.8, 1.0))
+    m.agregar(prisma(8, 0.65, 0.0), (x, y + 3.78 * s + sube, z), (0.5 * s, 0.32 * s, 0.5 * s), 0, HIERRO, (0.8, 1.1))
+    luz.agregar(icosfera(0), (x, y + 3.55 * s + sube, z), 0.42 * s, 0, LUZ_FAROLA, (1.0, 1.0))
 
 
 def banco(m, x, y, z, giro, s, variante):

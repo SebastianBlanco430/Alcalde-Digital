@@ -181,7 +181,12 @@ TINTES_FAVELA = ((255, 178, 190), (255, 232, 140), (160, 205, 255), (180, 238, 1
 COLOR_TANQUE = (40, 96, 190)
 COLOR_CABLE = (22, 22, 26)
 PROPORCION_TANQUES = 0.45         # casas con tanque de agua en el techo
-ALTURA_CABLE = 4.0                # m sobre el suelo donde los cables se atan a las farolas
+# 2026-11-23: los postes de luz (farolas) y lo que cuelga de ellos van 0,5 m más altos (poste 4,2 -> 4,7; foco 4,35 ->
+# 4,85; cable 4,0 -> 4,5). De estas tres alturas dependen ciudad_viva (ALTURA_FOCO, ALTURA_GUIRNALDA) y
+# cielo_salud_calculos (ALTO_PROP_PAJARO['farola']); tests/test_farolas_mas_altas.py las mantiene casadas.
+ALTO_POSTE_FAROLA = 4.7           # m del poste de la farola del mundo, desde su base (suelo - 0.1)
+ALTURA_FOCO_FAROLA = 4.85         # m del centro del foco sobre la base de la farola
+ALTURA_CABLE = 4.5                # m sobre el suelo donde los cables se atan a las farolas
 DISTANCIA_CABLE = 20.0            # m máximos entre dos farolas unidas por un cable
 DISTANCIA_CABLE_CASA = 15.0       # m máximos de una farola a la casa a la que le tira un cable
 ALTURA_CABLE_CASA_MAX = 9.0       # m sobre la planta baja a los que se ata un cable en una casa alta (no sube a la azotea)
@@ -194,6 +199,19 @@ LADO_PILOTE = 0.3                 # m: sección cuadrada de cada pilote
 RETRANQUEO_PILOTE = 0.2           # m que el centro del pilote queda hacia adentro de la esquina
 # (ENTIERRO_BASE, SOBRESALE_ZOCALO, HOLGURA_ZOCALO, GROSOR_LOSA y MARGEN_BASE: frontend/geometria_mundo.py)
 PILOTE_MINIMO = 0.1               # m: un pilote más corto que esto queda tapado por el suelo y no se dibuja
+
+
+# True si el cable recto de `p` a `q` (puntas de dos farolas, (x, y, z)) pasa por DENTRO de alguna casa: por encima de
+# su huella y por debajo de su techo (`altos[i]` = y de la planta baja de `casas[i]`). Se mira la cuerda sin comba (la
+# comba solo lo baja más). 2026-11-23: había un tramo farola-farola que atravesaba una casa de lado a lado.
+def cable_cruza_casa(p, q, casas, altos, muestras=40):
+    for j in range(1, muestras):
+        t = j / muestras
+        x, y, z = p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t
+        for c, base in zip(casas, altos):
+            if abs(x - c.cx) < c.ancho / 2 and abs(z - c.cz) < c.fondo / 2 and y < base + c.alto_total:
+                return True
+    return False
 
 
 # Una puerta con bisagra: la hoja gira sobre `bisagra`. abrir(t) con t en [0, 1].
@@ -882,7 +900,9 @@ class Ciudad3D(Entity):
         tramos = []
         for f, g in zip(farolas, farolas[1:]):
             if math.dist((f.cx, f.cz), (g.cx, g.cz)) <= DISTANCIA_CABLE:
-                tramos.append((self._punta_farola(f), self._punta_farola(g)))
+                p, q = self._punta_farola(f), self._punta_farola(g)
+                if not cable_cruza_casa(p, q, casas, altos):      # un cable no pasa por dentro de una casa
+                    tramos.append((p, q))
         for f in farolas:
             cerca = [(c, y) for c, y in zip(casas, altos)
                      if math.dist((f.cx, f.cz), (c.cx, c.cz)) <= DISTANCIA_CABLE_CASA]
@@ -913,9 +933,9 @@ class Ciudad3D(Entity):
     def _farola(self, o):
         y = self._suelo(o.cx, o.cz) - 0.1
         pieza(parent=self._grupos["mobiliario"], model="cube", color=rgb((70, 72, 82)),
-              position=(o.cx, y + 2.1, o.cz), scale=(0.14, 4.2, 0.14))
+              position=(o.cx, y + ALTO_POSTE_FAROLA / 2, o.cz), scale=(0.14, ALTO_POSTE_FAROLA, 0.14))
         pieza(parent=self._grupos["luces"], model="sphere", color=rgb((255, 238, 170)),
-              position=(o.cx, y + 4.35, o.cz), scale=0.5, shader=None)
+              position=(o.cx, y + ALTURA_FOCO_FAROLA, o.cz), scale=0.5, shader=None)
 
     def _banco(self, o):
         g = self._grupos["mobiliario"]

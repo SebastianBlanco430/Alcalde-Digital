@@ -11,7 +11,7 @@
 
 import math
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from frontend.azar_fijo import azar_de
 
@@ -150,13 +150,15 @@ class Calcomania:
     alto: float
     semilla: float
     texto: str = ""
+    extra: float = 0.0      # m más despegada de la pared (solo si se solapa con otra: separar_calcomanias_solapadas)
 
     def centro(self):
-        """(x, z) del centro de la calcomanía, despegada SEPARACION_PARED de la pared."""
+        """(x, z) del centro de la calcomanía, despegada SEPARACION_PARED (+ extra) de la pared."""
         nx, nz = NORMAL[self.lado]
+        fuera = SEPARACION_PARED + self.extra
         if self.lado in ("e", "o"):
-            return (self.plano + nx * SEPARACION_PARED, self.t)
-        return (self.t, self.plano + nz * SEPARACION_PARED)
+            return (self.plano + nx * fuera, self.t)
+        return (self.t, self.plano + nz * fuera)
 
     @property
     def rumbo(self):
@@ -222,6 +224,75 @@ def calcomanias(casas, caras):
                                         round(posicion(_u(s0, 26.3), ANCHO_BALCON, 0.5), 2),
                                         round(altura * (0.38 + 0.2 * _u(s0, 27.1)), 2), ANCHO_BALCON, VOLADO_BALCON,
                                         _u(s0, 28.5)))
+    if capas_calcomanias_activas():
+        resultado = separar_calcomanias_solapadas(resultado)
+    return resultado
+
+
+# -- Capas de las calcomanías que se solapan (rework 3D, bug-textura) --------------------------------------------
+# Todas las calcomanías planas de una pared se despegan lo mismo (SEPARACION_PARED) y cada una apila sus capas a
+# 0, CAPA, 2·CAPA… (favela_detalles.CAPA). Si dos de la MISMA cara se solapan (p. ej. un remiendo bajo un cartel, o
+# una grieta que cruza un mural), sus capas quedan en el mismo plano y pelean en el z-buffer: rayas finas de un color
+# sobre el otro. Aquí, a cada calcomanía que se solapa con otra anterior en ORDEN_CAPAS (de la pared hacia afuera:
+# manchas, remiendos, grietas, murales, carteles) se le suma `extra` = lo que ocupan las capas de debajo: queda
+# delante, sin compartir plano. Las que no se solapan con nada siguen en su sitio de siempre (extra 0). Es decorado
+# puro (sin colisión): no cambia la huella del mundo en línea.
+# CAPAS_CALCOMANIAS = False o ALCALDE_CAPAS_CALCOMANIAS=0: todas a la misma distancia, como antes.
+CAPAS_CALCOMANIAS = True
+CAPA_CALCOMANIA = 0.006         # m: la CAPA de favela_detalles (lo que se adelanta cada capa de un dibujo)
+MURALES = ("sol", "bandera", "estrella", "corazon", "ola", "ojo")
+ORDEN_CAPAS = {"mancha": 0, "remiendo": 1, "grieta": 2, **{t: 3 for t in MURALES}, "cartel": 4}
+# Capas que ocupa cada tipo (en CAPA, contando la de base y una de holgura): mancha 0-1, remiendo/cartel/grieta 0-2,
+# murales 0-5.
+GROSOR_CAPAS = {"mancha": 3, "remiendo": 3, "grieta": 3, "cartel": 3, **{t: 6 for t in MURALES}}
+
+
+def capas_calcomanias_activas():
+    valor = os.environ.get("ALCALDE_CAPAS_CALCOMANIAS", "").strip().lower()
+    if valor in ("0", "false", "no", "off"):
+        return False
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    return bool(CAPAS_CALCOMANIAS)
+
+
+# Rectángulo (t0, t1, y0, y1) que ocupa una calcomanía en su pared, holgado: marco de tinta, giro del remiendo
+# (hasta 6°) y quiebros de la grieta.
+def rectangulo_en_pared(cal):
+    w, h = cal.ancho, cal.alto
+    if cal.tipo == "remiendo":
+        r = math.hypot(w + 0.08, h + 0.08) / 2
+        return (cal.t - r, cal.t + r, cal.y + h / 2 - r, cal.y + h / 2 + r)
+    if cal.tipo == "grieta":                     # 7 tramos de <= 0,25 m de desvío y una rama
+        return (cal.t - 1.0, cal.t + 1.0, cal.y - 0.05, cal.y + 2.4)
+    margen = 0.08                                # marco de tinta (0,07 m por lado en los murales)
+    return (cal.t - w / 2 - margen, cal.t + w / 2 + margen, cal.y - margen, cal.y + h + margen)
+
+
+def _solapan(a, b):
+    return a[0] < b[1] and b[0] < a[1] and a[2] < b[3] and b[2] < a[3]
+
+
+# Las mismas calcomanías (mismo orden) con `extra` puesto a las que se solapan con otras de su cara.
+def separar_calcomanias_solapadas(cals, capa=CAPA_CALCOMANIA):
+    resultado = list(cals)
+    por_cara = {}
+    for i, cal in enumerate(cals):
+        if cal.tipo in ORDEN_CAPAS:
+            por_cara.setdefault((cal.casa, cal.lado), []).append(i)
+    for indices in por_cara.values():
+        if len(indices) < 2:
+            continue
+        indices.sort(key=lambda i: (ORDEN_CAPAS[cals[i].tipo], i))
+        colocadas = []                           # (rectángulo, extra, grosor)
+        for i in indices:
+            cal = cals[i]
+            rect = rectangulo_en_pared(cal)
+            extra = max((e + g for r, e, g in colocadas if _solapan(rect, r)), default=0.0)
+            grosor = GROSOR_CAPAS[cal.tipo] * capa
+            colocadas.append((rect, extra, grosor))
+            if extra:
+                resultado[i] = replace(cal, extra=round(extra, 4))
     return resultado
 
 

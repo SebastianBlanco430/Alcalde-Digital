@@ -282,6 +282,24 @@ def gorra(color, color_visera, tinta=TINTA):
     ]
 
 
+def capucha(color, color_borde, tinta=TINTA):
+    # Capucha que ENMARCA la cara (NPC de etapa «malos»: jíbaro, extorsionador, raponero). Cubre coronilla, nuca, orejas
+    # y sienes, y su frente queda DETRÁS de la cara (y > -0.12 en x = 0; la cara está en y ≈ -0.157): ojos, cejas, nariz
+    # y boca se ven de frente y de perfil. Antes era una esfera de 38 cm colgada del cuerpo que tapaba toda la cabeza
+    # (un disco oscuro sin cara; retoques 23-nov). Cuelga del hueso de la cabeza como el resto del rostro.
+    c = GROSOR_CONTORNO
+    return [
+        _pieza("capucha_casco", "esfera", CENTRO_CAPUCHA, SEMIEJES_CAPUCHA, color, contorno=c, detalle=(16, 10)),
+        _pieza("capucha_pico", "esfera", (0.0, 0.150, 0.262), (0.060, 0.085, 0.060), color, giro=(-35, 0, 0),
+               contorno=c),
+        _pieza("capucha_caida", "esfera", (0.0, 0.105, 0.010), (0.125, 0.085, 0.095), color_borde, contorno=c),
+    ]
+
+
+CENTRO_CAPUCHA = (0.0, 0.035, 0.170)
+SEMIEJES_CAPUCHA = (0.150, 0.155, 0.150)
+
+
 def lapiz():
     # Lápiz amarillo detrás de la oreja (periodista).
     c = GROSOR_CONTORNO_FINO
@@ -362,7 +380,8 @@ def piezas_rostro(d, procedural=False):
                     inclinacion_cejas=d.get("inclinacion_cejas", 7.0), ojeras=d.get("ojeras", False),
                     procedural=procedural)
     if d.get("peinado"):
-        pelo = peinado(d["peinado"], d["pelo"]) if not d.get("gorra") else peinado("calvo", d["pelo"])
+        tapado = d.get("gorra") or d.get("capucha")
+        pelo = peinado(d["peinado"], d["pelo"]) if not tapado else peinado("calvo", d["pelo"])
         piezas += pelo
     if d.get("canas"):      # mechas canosas sobre las sienes, pegadas al pelo
         piezas += [_pieza(f"pelo_cana_{lado}_{k}", "esfera", (0.1078 * lado, -0.06 - 0.03 * k, 0.188 - 0.004 * k),
@@ -371,6 +390,10 @@ def piezas_rostro(d, procedural=False):
     if d.get("gorra"):
         piezas += gorra(*d["gorra"])
         piezas += [_pieza("pelo_flequillo", "esfera", (0.0, -0.1, 0.2), (0.07, 0.03, 0.02), d["pelo"])]
+    elif d.get("capucha"):
+        piezas += capucha(*d["capucha"])
+        if d.get("peinado"):
+            piezas += [_pieza("pelo_flequillo", "esfera", (0.0, -0.1, 0.2), (0.07, 0.03, 0.02), d["pelo"])]
     if d.get("gafas"):
         piezas += gafas(d["gafas"])
     if d.get("gafas_sol"):
@@ -400,6 +423,9 @@ def descriptor_peaton(rasgos_peaton, piel, pelo):
              inclinacion_cejas=rasgos_peaton["inclinacion"])
     if rasgos_peaton.get("gorra"):
         d["gorra"] = (tuple(c / 255 for c in rasgos_peaton["gorra"]), tono(tuple(c / 255 for c in rasgos_peaton["gorra"]), 0.8))
+    if rasgos_peaton.get("capucha"):
+        capucha_rgb = tuple(c / 255 for c in rasgos_peaton["capucha"])
+        d["capucha"] = (capucha_rgb, tono(capucha_rgb, 0.8))
     if rasgos_peaton.get("gafas"):
         d["gafas"] = TINTA
     if rasgos_peaton.get("bigote"):

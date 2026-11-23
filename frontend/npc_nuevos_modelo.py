@@ -22,6 +22,7 @@ from frontend import casco_pantalla_calculos as cpc
 from frontend import npc_nuevos_calculos as nn
 from frontend import npc_postura
 from frontend import personaje_modelo as pm
+from frontend import pesos_cabeza
 
 CONTORNO = True                  # casco de tinta en los modelos nuevos (False = sin contorno, ~mitad de triángulos)
 POSTURAS = True                  # hornear las variantes de postura (False = los nuevos solo tienen la postura neutra)
@@ -116,6 +117,7 @@ def _preparar(modelo_np, archivo, clave):
         ah.hornear_clips(modelo_np, clave)
         if POSTURAS:
             npc_postura.hornear_posturas(modelo_np, clave)
+    pesos_cabeza.unificar(modelo_np, clave)           # bug-pelo: coronilla rígida con la cabeza al mezclar clips
     return zonas
 
 

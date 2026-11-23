@@ -21,6 +21,11 @@
 #       el frontend (cerca de la cámara y a la vista). Envejece los globos, libera los vencidos, apaga con un fundido los
 #       de NPC que dejaron de ser candidatos y, si toca (enfriamiento global y por NPC), da un globo nuevo.
 #   ranuras[k] -> Ranura(clave, texto, edad, duracion, serie) | clave None = libre.  alfa(k) -> 0..1 (fundido).
+#   UNA ranura por NPC (retoques 23-nov, globos): forzar() sobre un NPC que ya habla deja la frase PENDIENTE en su
+#       misma ranura; la actual se apaga en FUNDIDO_CAMBIO s desde el alfa que tenga y solo después entra la nueva
+#       (serie + 1, edad 0 = alfa 0: nunca hereda el alfa de la anterior). Nunca hay dos textos del mismo NPC.
+#   avanzar(..., retenidas=claves): una ranura que aún no se vio entera (en pantalla la tapaba otro globo) vuelve a
+#       alfa 0 y espera sin envejecer, hasta ESPERA_MAXIMA s.
 #
 # Todo el azar es inyectado (`azar`: objeto con random(), uniform(a, b) y shuffle(lista); p. ej. random.Random(semilla)).
 
@@ -45,6 +50,8 @@ ENFRIAMIENTO_GLOBAL = (3.0, 7.0)        # s entre dos globos nuevos
 ENFRIAMIENTO_NPC = 30.0         # s sin que el mismo NPC vuelva a hablar
 DURACION = (3.0, 5.0)           # s en pantalla (según el largo del texto)
 FUNDIDO = 0.35                  # s de entrada y de salida
+FUNDIDO_CAMBIO = 0.15           # s de salida cuando la frase se cambia por otra del mismo NPC (≤ 0,15 s)
+ESPERA_MAXIMA = 4.0             # s que una frase puede esperar a tener sitio en pantalla antes de descartarse
 CARACTERES_POR_SEGUNDO = 22.0   # para alargar la duración de las frases largas
 MAXIMO_ENFRIAMIENTOS = 96       # entradas del registro por NPC antes de podar
 
@@ -227,10 +234,18 @@ class SelectorFrases:
 
 
 class Ranura:
-    __slots__ = ("clave", "texto", "edad", "duracion", "serie")
+    __slots__ = ("clave", "texto", "edad", "duracion", "serie", "pendiente", "salida", "espera")
 
     def __init__(self):
         self.clave, self.texto, self.edad, self.duracion, self.serie = None, "", 0.0, 0.0, 0
+        self.pendiente = None            # frase que entra cuando la actual termine de apagarse
+        self.salida = FUNDIDO            # s del fundido de salida de la frase actual
+        self.espera = 0.0                # s que lleva retenida sin verse
+
+    def empezar(self, clave, texto):
+        self.clave, self.texto, self.edad, self.duracion = clave, texto, 0.0, duracion_de(texto)
+        self.pendiente, self.salida, self.espera = None, FUNDIDO, 0.0
+        self.serie += 1
 
 
 def duracion_de(texto):
@@ -238,13 +253,15 @@ def duracion_de(texto):
     return max(DURACION[0], min(DURACION[1], 1.5 + len(texto) / CARACTERES_POR_SEGUNDO))
 
 
-def alfa_de(edad, duracion, fundido=FUNDIDO):
-    """Opacidad 0..1 de un globo de `edad` s que dura `duracion` s: entra y sale con un fundido de `fundido` s."""
+def alfa_de(edad, duracion, fundido=FUNDIDO, salida=None):
+    """Opacidad 0..1 de un globo de `edad` s que dura `duracion` s: entra con un fundido de `fundido` s y sale con
+    uno de `salida` s (None = el mismo `fundido`)."""
+    salida = fundido if salida is None else salida
     if edad <= 0.0 or edad >= duracion:
         return 0.0
-    if fundido <= 0.0:
-        return 1.0
-    return max(0.0, min(1.0, edad / fundido, (duracion - edad) / fundido))
+    entrada = 1.0 if fundido <= 0.0 else edad / fundido
+    final = 1.0 if salida <= 0.0 else (duracion - edad) / salida
+    return max(0.0, min(1.0, entrada, final))
 
 
 class PlanificadorGlobos:
@@ -265,7 +282,20 @@ class PlanificadorGlobos:
 
     def alfa(self, k):
         r = self.ranuras[k]
-        return 0.0 if r.clave is None else alfa_de(r.edad, r.duracion)
+        return 0.0 if r.clave is None else alfa_de(r.edad, r.duracion, FUNDIDO, r.salida)
+
+    def ranura_de(self, clave):
+        return next((r for r in self.ranuras if r.clave == clave), None)
+
+    def _cambiar(self, r, texto):
+        """Deja `texto` pendiente en la ranura `r` (del mismo NPC) y apaga la frase actual en FUNDIDO_CAMBIO s,
+        siguiendo desde el alfa que tiene ahora (sin saltos). Si ya se estaba cambiando, gana la última."""
+        r.pendiente = texto
+        alfa = alfa_de(r.edad, r.duracion, FUNDIDO, r.salida)
+        fin = r.edad + FUNDIDO_CAMBIO * alfa
+        if fin < r.duracion:
+            r.duracion, r.salida = fin, FUNDIDO_CAMBIO
+        return r
 
     def activos(self):
         return sum(1 for r in self.ranuras if r.clave is not None)
@@ -276,20 +306,30 @@ class PlanificadorGlobos:
 
     def forzar(self, clave, texto):
         """Globo inmediato de `clave` con `texto` (M8: reacción al jugador o comentario del cambio de nivel). Se salta el
-        enfriamiento global, no el del propio NPC. Devuelve la Ranura o None si no hay sitio / ya habla / está callado."""
-        if not texto or any(r.clave == clave for r in self.ranuras) or self._callados.get(clave, -1.0) > self.t:
+        enfriamiento global, no el del propio NPC. Si el NPC ya habla, la frase nueva va a SU ranura: la actual se
+        apaga en FUNDIDO_CAMBIO s y después entra esta (nunca dos textos a la vez). Devuelve la Ranura, o None si no
+        hay sitio / está callado / ya está diciendo (o va a decir) justo ese texto."""
+        if not texto:
+            return None
+        propia = self.ranura_de(clave)
+        if propia is not None:
+            if texto == (propia.texto if propia.pendiente is None else propia.pendiente):
+                return None
+            self._callados[clave] = self.t + self._enfriamiento_npc
+            return self._cambiar(propia, texto)
+        if self._callados.get(clave, -1.0) > self.t:
             return None
         libre = next((r for r in self.ranuras if r.clave is None), None)
         if libre is None:
             return None
-        libre.clave, libre.texto, libre.edad, libre.duracion = clave, texto, 0.0, duracion_de(texto)
-        libre.serie += 1
+        libre.empezar(clave, texto)
         self.dichos += 1
         self._callados[clave] = self.t + self._enfriamiento_npc
         return libre
 
-    def avanzar(self, dt, candidatos=(), nivel=None, hora=None, dia=None):
-        """Un paso de `dt` s. Devuelve la Ranura que acaba de recibir un globo nuevo, o None."""
+    def avanzar(self, dt, candidatos=(), nivel=None, hora=None, dia=None, retenidas=()):
+        """Un paso de `dt` s. Devuelve la Ranura que acaba de recibir un globo nuevo, o None. `retenidas`: claves de
+        NPC cuyo globo no se pudo poner en pantalla (lo tapaba otro): si aún no se vio, espera sin envejecer."""
         dt = max(0.0, dt)
         self.t += dt
         presentes = {c[0] for c in candidatos}
@@ -298,14 +338,29 @@ class PlanificadorGlobos:
         for r in self.ranuras:
             if r.clave is None:
                 continue
+            if (r.clave in retenidas and r.clave in presentes and r.pendiente is None and r.edad <= FUNDIDO
+                    and r.espera < ESPERA_MAXIMA):
+                r.espera += dt                                # espera su turno en pantalla (vuelve a alfa 0)
+                r.edad = 0.0
+                hablando.add(r.clave)
+                vivos += 1
+                continue
             r.edad += dt
             if r.edad >= r.duracion:
-                r.clave = None
+                if r.pendiente is not None and r.clave in presentes:
+                    r.empezar(r.clave, r.pendiente)            # la anterior ya se apagó: entra la nueva desde alfa 0
+                    self.dichos += 1
+                    hablando.add(r.clave)
+                    vivos += 1
+                    continue
+                r.clave, r.pendiente = None, None
                 continue
-            if r.clave not in presentes and r.duracion - r.edad > FUNDIDO:
-                r.duracion = r.edad + FUNDIDO                 # se alejó o salió de la vista: se apaga ya (con fundido)
+            if r.clave not in presentes:
+                r.pendiente = None
+                if r.duracion - r.edad > FUNDIDO:
+                    r.duracion = r.edad + FUNDIDO             # se alejó o salió de la vista: se apaga ya (con fundido)
             hablando.add(r.clave)
-            if r.duracion - r.edad > FUNDIDO:
+            if r.duracion - r.edad > FUNDIDO or r.pendiente is not None:
                 vivos += 1
         if self.t < self._siguiente or vivos >= self._maximo or not candidatos:
             return None
@@ -328,8 +383,7 @@ class PlanificadorGlobos:
         texto = self._selector.elegir(elegido[1], nivel, hora, dia)
         if texto is None:
             return None
-        libre.clave, libre.texto, libre.edad, libre.duracion = elegido[0], texto, 0.0, duracion_de(texto)
-        libre.serie += 1
+        libre.empezar(elegido[0], texto)
         self.dichos += 1
         callados[elegido[0]] = self.t + self._enfriamiento_npc
         if len(callados) > MAXIMO_ENFRIAMIENTOS:

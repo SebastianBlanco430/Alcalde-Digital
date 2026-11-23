@@ -25,6 +25,7 @@ from frontend import animacion_humana_calculos as ac
 from frontend import modelo_calculos as mc
 from frontend import npc_postura_calculos as pc
 from frontend import personaje_modelo as pm
+from frontend import pesos_cabeza
 
 FOTOGRAMAS_REPOSO = 48           # fotogramas del ciclo de respiración (1,6 s a 30 fps)
 # Clips que tienen variante por postura: el reposo y la marcha hasta 3 m/s (los NPC caminan a 1-1,6 m/s). Más deprisa
@@ -113,6 +114,7 @@ def cargar_actor_de_siempre(rol):
             ruta = pm.CARPETA_MODELOS / mc.MODELOS_POR_ROL[rol]
             modelo = NodePath(gltf.load_model(str(ruta), gltf_settings=gltf.GltfSettings()))
             if ah.hornear_clips(modelo, rol) and hornear_posturas(modelo, rol):
+                pesos_cabeza.unificar(modelo, rol)    # bug-pelo: coronilla rígida con la cabeza al mezclar clips
                 base = Actor(modelo)
                 faltan = [c for c in (mc.IDLE, mc.CAMINAR, mc.CORRER, mc.HABLAR) if c not in base.getAnimNames()]
                 if faltan:

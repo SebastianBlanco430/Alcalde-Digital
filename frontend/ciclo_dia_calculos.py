@@ -127,6 +127,45 @@ def focos_de_hora(hora):
     return round(FOCOS_DIA + (FOCOS_NOCHE - FOCOS_DIA) * peso_noche(hora), 4)
 
 
+# Luz-noche (retoques 23-nov): la SOMBRA PROYECTADA sigue a la luz del sol de la hora. El shader lit_with_shadows de Ursina
+# le RESTA a todo lo que está a la sombra una cantidad fija, (1 - rgb) * alfa del `shadow_color` (frontend/piezas.py), que
+# no depende del color de la luz: de día (sol x1) es la sombra de siempre, pero de noche el sol baja a x0,32-0,52 y esa
+# resta fija pasa a ser mayor que el color mismo -> las fachadas a la sombra (y lo que cae en su sombra) salen NEGRAS.
+# Aquí la resta se escala por canal con el multiplicador del sol de la hora (acotado a 1: de día queda idéntica), así lo
+# que está a la sombra de noche es lo mismo que de día por la luz de la noche: sol * (color - resta), nunca recortado a 0.
+# Segunda pasada (D2 del verificador): de noche la resta sigue al sol FINAL (hora x salud), porque en crisis la salud baja
+# el sol (x0,72/0,78/0,95) y con solo la hora las fachadas oscuras volvían a recortarse a negro. La parte de salud se pondera
+# con peso_noche (0 de día, 1 de noche, por los mismos escalones del cielo): continuo al anochecer y al amanecer, y de día
+# (peso 0) la sombra es EXACTAMENTE la de siempre en todos los niveles (la crisis de día oscurecida se queda como está).
+PASO_SALUD_SOMBRA = 0.01          # se redondea el factor de salud: la sombra no cambia por variaciones de una milésima
+
+
+def salud_de_noche(hora, salud):
+    """Factor RGB de la salud sobre el sol (sol tras la salud / sol base) ponderado por cuánta noche hay:
+    1 + peso_noche * (salud - 1), redondeado a PASO_SALUD_SOMBRA. De día (peso 0): (1, 1, 1)."""
+    w = peso_noche(hora)
+    if w <= 0.0 or salud is None:
+        return (1.0, 1.0, 1.0)
+    salida = []
+    for c in tuple(salud)[:3]:
+        f = 1.0 + w * (max(0.0, float(c)) - 1.0)
+        salida.append(round(round(f / PASO_SALUD_SOMBRA) * PASO_SALUD_SOMBRA, 4))
+    return tuple(salida)
+
+
+def sombra_de_hora(hora, sombra, salud=None):
+    """`shadow_color` (r, g, b, a) para la hora a partir del de siempre (`sombra`): misma alfa y la resta (1 - c) * a
+    escalada por k = min(1, sol de luz_de_hora x salud_de_noche(hora, salud)). `salud`: (r, g, b) sol tras la salud / sol
+    base (None = 1). Sin hora, de día o con k >= 1: `sombra` tal cual."""
+    sol, _ = luz_de_hora(hora)
+    f = salud_de_noche(hora, salud)
+    k = tuple(min(1.0, max(0.0, float(sol[i]) * f[i])) for i in range(3))
+    base = tuple(float(c) for c in sombra[:4])
+    if k == (1.0, 1.0, 1.0):
+        return base
+    return tuple(round(1.0 - (1.0 - base[i]) * k[i], 4) for i in range(3)) + (base[3],)
+
+
 # «mañana», «tarde» o «noche» de la hora (el amanecer cuenta como mañana). Sin hora: «tarde».
 def periodo_de_hora(hora):
     a, b, t = mezcla_de_hora(hora)

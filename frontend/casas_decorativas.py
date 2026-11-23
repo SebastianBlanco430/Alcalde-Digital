@@ -93,7 +93,7 @@ def color_base_como_color(nodo):
 # dibuja las caras traseras y por eso asoma como línea oscura alrededor de la silueta.
 # ==================================================================================================
 
-from panda3d.core import CullFaceAttrib, Geom, GeomVertexReader, GeomVertexWriter, Texture, TextureAttrib
+from panda3d.core import CullFaceAttrib, Geom, GeomVertexReader, GeomVertexWriter, LMatrix4f, Texture, TextureAttrib
 from PIL import Image, ImageStat
 
 from frontend.texturas_ladrillo import textura_relieve_ladrillo
@@ -350,12 +350,124 @@ def pintar_modelo(fuente, pared, puerta, techo, ladrillo, texturas, relieve=Fals
     return fuente
 
 
-# Fuente tinteada de un modelo para las casas del barrio (según el estilo de un piso).
-def _fuente_viva(nombre, pintura, ladrillo, techo, texturas, relieve=False):
+# Fuente tinteada de un modelo para las casas del barrio (según el estilo de un piso). `arriba`: fuente de un piso de
+# arriba, con el plinto retranqueado (retranquear_plinto) ANTES de pintar (los UV del relieve salen de las posiciones
+# ya movidas).
+def _fuente_viva(nombre, pintura, ladrillo, techo, texturas, relieve=False, arriba=False):
     fuente = load_model(modelo_de(nombre).archivo).copy_to(
-        NodePath(f"{nombre}_{pintura}_{int(ladrillo)}_{techo}" + ("_relieve" if relieve else "")))
+        NodePath(f"{nombre}_{pintura}_{int(ladrillo)}_{techo}" + ("_relieve" if relieve else "")
+                 + ("_arriba" if arriba else "")))
+    if arriba:
+        retranquear_plinto(fuente)
     return pintar_modelo(fuente, rgb(PINTURAS[pintura]), rgb(PUERTAS[(pintura * 3 + 1) % len(PUERTAS)]),
                          rgb(TECHOS[techo][0]), ladrillo, texturas, relieve)
+
+
+# ==================================================================================================
+# PLINTO RETRANQUEADO EN LOS PISOS DE ARRIBA (rework 3D, bug «rayas azules estiradas» en las fachadas).
+#
+# Los .glb traen bajo el umbral (altura < 0 del modelo) un plinto de `hondo` cuyas caras laterales están en el MISMO
+# plano que las paredes de encima (sonda: rework-3d/arnes/bug-textura/sonda_plinto.py). En la planta baja queda bajo
+# tierra o tapado por el zócalo, pero un piso de arriba se apila a `alto_piso` sobre el de abajo: su plinto (hondo ·
+# escala m, 0,4 a 1,3 m) cae sobre la franja alta de las paredes del piso de abajo, coplanar con ellas, y las dos
+# pinturas pelean en el z-buffer (z-fighting): rayas finas y estiradas de un color sobre el otro (p. ej. la planta baja
+# cobalto bajo el plinto claro del piso de arriba). Arreglo: en las fuentes de los pisos de arriba los vértices del
+# plinto (altura <= 0) se meten RETRANQUEO_PLINTO hacia dentro, perpendicular a sus caras (en las esquinas, por la suma
+# de las normales de las caras que se juntan ahí, así las caras siguen unidas): donde hay pared del piso de abajo, esa
+# pared queda delante y gana sin pelea; donde no la hay (azoteas), el plinto se ve como siempre. Las paredes que
+# cruzan el umbral se inclinan ~0,3 % (invisible). Solo cambia la malla dibujada de los pisos de arriba: colisiones,
+# cajas, posiciones y semilla son las mismas (la huella en línea no cambia).
+# PLINTO_RETRANQUEADO = False o ALCALDE_PLINTO_RETRANQUEADO=0 vuelven a la fuente de siempre (con el parpadeo).
+# ==================================================================================================
+PLINTO_RETRANQUEADO = True
+RETRANQUEO_PLINTO = 0.012            # unidades del modelo (x escala 1,7-2,7 => 2-3 cm): sobra para el z-buffer a 150 m
+EPS_PLINTO = 1e-4                    # unidades del modelo: tolerancia del plano del umbral
+_MIN_HORIZONTAL = 0.5                # normales con menos componente horizontal (suelos, techos) no empujan
+
+
+def plinto_retranqueado_activo():
+    valor = os.environ.get("ALCALDE_PLINTO_RETRANQUEADO", "").strip().lower()
+    if valor in ("0", "false", "no", "off"):
+        return False
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    return bool(PLINTO_RETRANQUEADO)
+
+
+# Retranquea el plinto de `fuente` (NodePath de un modelo cargado; umbral en la altura 0 de su marco). La altura es la
+# del eje «arriba» del sistema de coordenadas activo (LVector3f.up(): y con Ursina, que usa y-up-left; z en Panda
+# pelado), igual que lo carga el cargador de .glb de Ursina. Modifica copias propias de los geoms (modify_geom: el modelo
+# que cachea Ursina no se toca); no quita ni añade triángulos. Devuelve cuántos vértices movió. Ante cualquier error
+# avisa una vez y deja la fuente como estaba en lo que falte (nunca lanza).
+def retranquear_plinto(fuente, retranqueo=RETRANQUEO_PLINTO, eps=EPS_PLINTO):
+    from panda3d.core import LVector3f
+    arriba = LVector3f.up()
+    try:
+        geoms = []                               # (nodo, i, matriz, inversa)
+        empujes = {}                             # posición (redondeada, marco de la fuente) -> {dirección horizontal}
+        for camino in fuente.find_all_matches("**/+GeomNode"):
+            nodo = camino.node()
+            matriz = camino.get_mat(fuente)      # geom -> marco de la fuente
+            inversa = LMatrix4f(matriz)
+            if not inversa.invert_in_place():
+                continue
+            for i in range(nodo.get_num_geoms()):
+                datos = nodo.get_geom(i).get_vertex_data()
+                if not datos.has_column("normal"):
+                    continue
+                geoms.append((nodo, i, matriz, inversa))
+                pos, nor = GeomVertexReader(datos, "vertex"), GeomVertexReader(datos, "normal")
+                while not pos.is_at_end():
+                    p = matriz.xform_point(pos.get_data3())
+                    n = matriz.xform_vec(nor.get_data3())
+                    if p.dot(arriba) > eps:
+                        continue
+                    h = n - arriba * n.dot(arriba)
+                    if h.length() < _MIN_HORIZONTAL * max(n.length(), 1e-9):
+                        continue
+                    h.normalize()
+                    empujes.setdefault(_clave(p), set()).add((round(h.x, 3), round(h.y, 3), round(h.z, 3)))
+        movidos = 0
+        for nodo, i, matriz, inversa in geoms:
+            movidos += _mover_plinto(nodo, i, matriz, inversa, empujes, retranqueo, arriba, eps)
+        return movidos
+    except Exception as error:      # noqa: BLE001 — la fuente queda (en lo que falte) con su plinto, como antes
+        if not _AVISO_PLINTO:
+            _AVISO_PLINTO.append(True)
+            print(f"[plinto] retranqueo omitido ({type(error).__name__}: {error}).", file=sys.stderr)
+        return 0
+
+
+_AVISO_PLINTO = []
+
+
+def _clave(p):
+    return (round(p.x, 4), round(p.y, 4), round(p.z, 4))
+
+
+def _mover_plinto(nodo, i, matriz, inversa, empujes, retranqueo, arriba, eps):
+    from panda3d.core import LVector3f
+    lector = GeomVertexReader(nodo.get_geom(i).get_vertex_data(), "vertex")
+    nuevos = {}
+    fila = 0
+    while not lector.is_at_end():
+        p = matriz.xform_point(lector.get_data3())
+        if p.dot(arriba) <= eps:
+            dirs = empujes.get(_clave(p))
+            if dirs:
+                suma = LVector3f(0, 0, 0)
+                for d in dirs:
+                    suma += LVector3f(*d)
+                nuevos[fila] = inversa.xform_point(p - suma * retranqueo)
+        fila += 1
+    if not nuevos:
+        return 0
+    datos = nodo.modify_geom(i).modify_vertex_data()
+    escritor = GeomVertexWriter(datos, "vertex")
+    for fila, q in nuevos.items():
+        escritor.set_row(fila)
+        escritor.set_data3(q)
+    return len(nuevos)
 
 
 _TEXTURAS_COMPARTIDAS = []
@@ -431,6 +543,7 @@ def construir_casas_favela(padre, casas, alturas=None, contorno=True, al_avance=
     texturas = _Texturas()
     fuentes, cascos = {}, {}
     variantes = _variantes_de_luz()      # punto 4: luz horneada por cara (None con ALCALDE_LUZ_HORNEADA=0)
+    retranqueo = plinto_retranqueado_activo()    # pisos de arriba con el plinto metido (sin z-fighting)
     for i, (casa, y) in enumerate(zip(casas, alturas or [0.0] * len(casas))):
         if al_avance is not None:
             al_avance(FRACCION_COPIAS * i / max(1, len(casas)))
@@ -440,9 +553,10 @@ def construir_casas_favela(padre, casas, alturas=None, contorno=True, al_avance=
         for piso in range(getattr(casa, "pisos", 1)):
             estilo = estilo_del_piso(casa, piso)
             relieve = relieve_del_piso(casa, piso, estilo[1])
-            clave = (casa.modelo,) + estilo + (relieve,)
+            arriba = retranqueo and piso > 0
+            clave = (casa.modelo,) + estilo + (relieve,) + (("plinto_retranqueado",) if arriba else ())
             if clave not in fuentes:
-                fuentes[clave] = _fuente_viva(casa.modelo, *estilo, texturas, relieve)
+                fuentes[clave] = _fuente_viva(casa.modelo, *estilo, texturas, relieve, arriba)
                 fusion_materiales.hornear_colores(fuentes[clave])    # menos draw calls (ALCALDE_SIN_FUSION_MATERIALES)
             origen = fuentes[clave]
             if variantes is not None:
