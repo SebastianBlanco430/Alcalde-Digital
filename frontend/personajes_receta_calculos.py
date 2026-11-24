@@ -84,9 +84,12 @@ def rasgos(receta):
     if receta.auriculares:
         aur = {"color": _u(receta.auriculares["color"]), "almohadilla": _u(receta.auriculares["almohadilla"]),
                "al_cuello": bool(receta.auriculares.get("al_cuello"))}
-    return {"peinado": receta.peinado or "corto", "iris": tuple(receta.iris), "cejas": CEJAS,
-            "inclinacion": INCLINACION, "gorra": None, "gafas": receta.gafas, "bigote": receta.bigote,
-            "barba": receta.barba, "arrugas": receta.arrugas, "canas": receta.canas, "auriculares": aur}
+    r = {"peinado": receta.peinado or "corto", "iris": tuple(receta.iris), "cejas": CEJAS,
+         "inclinacion": INCLINACION, "gorra": None, "gafas": receta.gafas, "bigote": receta.bigote,
+         "barba": receta.barba, "arrugas": receta.arrugas, "canas": receta.canas, "auriculares": aur}
+    if receta.gafas and getattr(receta, "gafas_forma", "redondas") != "redondas":
+        r["gafas_forma"] = receta.gafas_forma          # sesión H: solo si no son las redondas de siempre
+    return r
 
 
 def rasgos_v2(receta):

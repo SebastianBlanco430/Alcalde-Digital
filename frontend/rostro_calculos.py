@@ -241,6 +241,31 @@ def gafas(color_montura, grosor=0.0045):
     return piezas
 
 
+def gafas_rectas(color_montura, grosor=0.0042):
+    # Gafas rectas (sesión H): dos marcos rectangulares con las esquinas apenas redondeadas (una bolita del grosor de la
+    # montura en cada esquina), el mismo puente y patillas, del mismo grosor y tinta que las redondas y a su misma altura.
+    mx, mz, cz = 0.0315, 0.0235, 0.133            # medio ancho y medio alto del marco; altura de su centro (la de los aros)
+    y = -0.1725
+    piezas = [_pieza("gafas_puente", "caja", (0.0, y, 0.139), (0.0125, grosor, grosor), color_montura)]
+    for lado in (-1, 1):
+        cx = 0.046 * lado
+        piezas += [
+            _pieza(f"gafas_marco_{lado}_arriba", "caja", (cx, y, cz + mz), (mx - grosor, grosor, grosor), color_montura,
+                   bandas=False),
+            _pieza(f"gafas_marco_{lado}_abajo", "caja", (cx, y, cz - mz), (mx - grosor, grosor, grosor), color_montura,
+                   bandas=False),
+            _pieza(f"gafas_marco_{lado}_fuera", "caja", (cx + mx * lado, y, cz), (grosor, grosor, mz - grosor),
+                   color_montura, bandas=False),
+            _pieza(f"gafas_marco_{lado}_dentro", "caja", (cx - mx * lado, y, cz), (grosor, grosor, mz - grosor),
+                   color_montura, bandas=False)]
+        piezas += [_pieza(f"gafas_esquina_{lado}_{i}", "esfera", (cx + ex * (mx - grosor * 0.4), y, cz + ez * (mz - grosor * 0.4)),
+                          (grosor * 1.15, grosor, grosor * 1.15), color_montura, bandas=False)
+                   for i, (ex, ez) in enumerate(((-1, -1), (-1, 1), (1, -1), (1, 1)))]
+        piezas.append(_pieza(f"gafas_patilla_{lado}", "caja", (0.0905 * lado, -0.1275, 0.1385),
+                             (0.0036, 0.0475, 0.0036), color_montura, bandas=False))
+    return piezas
+
+
 def gafas_de_sol_en_la_frente(color_lente, color_montura):
     # Gafas de sol subidas a la frente (influencer): dos lentes oscuras inclinadas con montura de color.
     piezas = [_pieza("gafas_puente", "caja", (0.0, -0.1385, 0.2215), (0.013, 0.0045, 0.0055), color_montura)]
@@ -418,7 +443,7 @@ def piezas_rostro(d, procedural=False):
         if d.get("peinado"):
             piezas += [_pieza("pelo_flequillo", "esfera", (0.0, -0.1, 0.2), (0.07, 0.03, 0.02), d["pelo"])]
     if d.get("gafas"):
-        piezas += gafas(d["gafas"])
+        piezas += gafas_rectas(d["gafas"]) if d.get("gafas_forma") == "rectas" else gafas(d["gafas"])
     if d.get("gafas_sol"):
         piezas += gafas_de_sol_en_la_frente(*d["gafas_sol"])
     if d.get("auriculares"):
@@ -453,6 +478,8 @@ def descriptor_peaton(rasgos_peaton, piel, pelo):
         d["capucha"] = (capucha_rgb, tono(capucha_rgb, 0.8))
     if rasgos_peaton.get("gafas"):
         d["gafas"] = TINTA
+        if rasgos_peaton.get("gafas") == "rectas" or rasgos_peaton.get("gafas_forma") == "rectas":
+            d["gafas_forma"] = "rectas"
     if rasgos_peaton.get("bigote"):
         d["bigote"] = tono(tuple(c / 255 for c in pelo), 0.7)
     if rasgos_peaton.get("barba"):

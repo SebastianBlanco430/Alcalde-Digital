@@ -25,13 +25,13 @@
     "livia": {
       "nombre": "Lívia Sampaio", "rol": "Diseñadora independiente", "modelo": "npc_mujer_01.glb", "personaje": "livia",
       "retrato": {"piel": [228, 184, 150], "pelo": [168, 80, 46], "pelo_estilo": "largo",
-                  "ropa": [214, 120, 90], "accesorio": "gafas",
+                  "ropa": [214, 120, 90], "accesorio": "gafas", "gafas": "rectas",
                   "expresiones": ["neutral", "nervioso", "triste", "sorprendido"]}
     },
     "eurico": {
       "nombre": "Profesor Eurico Matos", "rol": "Director del instituto de encuestas", "modelo": "npc_hombre_01.glb", "personaje": "eurico",
       "retrato": {"piel": [170, 120, 90], "pelo": [210, 210, 214], "pelo_estilo": "calvo",
-                  "ropa": [110, 84, 60], "accesorio": "gafas",
+                  "ropa": [110, 84, 60], "accesorio": "gafas", "gafas": "rectas",
                   "expresiones": ["serio", "enojado", "sorprendido", "neutral"]}
     },
     "baltazar": {

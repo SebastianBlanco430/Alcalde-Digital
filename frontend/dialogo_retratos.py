@@ -93,7 +93,20 @@ def _pelo_delante(estilo_pelo, pelo):
     return base
 
 
-def _accesorios(accesorio, pelo, ropa):
+def _puntos_rect(cx, cy, mx, my, r=4.0, n=3):
+    """Polilínea cerrada de un rectángulo de medio ancho `mx` y medio alto `my` con las esquinas redondeadas `r` px."""
+    puntos = []
+    for ex, ey, desde in ((1, 1, 0), (-1, 1, 90), (-1, -1, 180), (1, -1, 270)):
+        puntos += iconos._puntos_ovalo(cx + ex * (mx - r), cy + ey * (my - r), r, r, n, desde, desde + 90)
+    return puntos + [puntos[0]]
+
+
+def _accesorios(accesorio, pelo, ropa, gafas_forma="redondas"):
+    if accesorio == "gafas" and gafas_forma == "rectas":       # sesión H: marcos rectangulares (Lívia, Eurico)
+        gafas = (24, 26, 40)
+        return [_linea(_puntos_rect(104, 131, 22, 16), gafas, 7, borde=False),
+                _linea(_puntos_rect(152, 131, 22, 16), gafas, 7, borde=False),
+                _linea([(126, 128), (130, 128)], gafas, 6, borde=False)]
     if accesorio == "gafas":
         gafas = (24, 26, 40)
         return [_linea(_puntos_ovalo(104, 131, 23, 21, 20), gafas, 7, borde=False),
@@ -127,7 +140,8 @@ def formas_retrato_caso(retrato, expresion):
         + _ojos_comic(_IRIS, mirada=expr["mirada"])
         + _cejas_comic(_TINTA, izq=(ceja_ext, ceja_int), der=(ceja_ext, ceja_int), grosor=12)
         + _nariz_comic(piel, trazos=False) + _boca(expr["boca"]) + _accesorios(
-        "gafas" if accesorio == "gafas" else "ninguno", pelo, ropa) + _extra(expr["extra"]))
+        "gafas" if accesorio == "gafas" else "ninguno", pelo, ropa,
+        "rectas" if retrato.get("gafas") == "rectas" else "redondas") + _extra(expr["extra"]))
 
 
 def dibujar_retrato_caso(retrato, expresion, lado=LADO_RETRATO_CASO):

@@ -24,6 +24,8 @@ PEINADOS = ("corto", "atras", "pompadour", "afro", "mono", "calvo")     # rostro
 BARBAS = ("incipiente", "chivo", "completa")
 PELO_ESTILOS = ("corto", "largo", "calvo")                              # contrato de casos §6
 ACCESORIOS = ("ninguno", "gafas", "barba", "corbata")
+# rostro.gafas: true (= "redondas", compatibilidad), false o la forma de la montura (sesión H: "rectas").
+FORMAS_GAFAS = ("redondas", "rectas")
 ESCALA_MIN, ESCALA_MAX = 0.90, 1.06
 CLAVES_ROSTRO_V2 = ("peinado", "gafas", "bigote", "barba", "arrugas", "canas", "auriculares", "ajuste")
 CLAVES_HOY = ("piel", "pelo", "camiseta", "pantalon", "zapatos", "corbata", "escala")
@@ -61,6 +63,7 @@ class Receta:
     rostro_v2: dict | None = None     # solo las claves que cambian con la malla v2 (None = ninguna)
     hoy: dict | None = None           # valores de la receta de siempre: piel, pelo, camiseta, pantalon, zapatos, corbata, escala
     solo_v2: bool = False
+    gafas_forma: str = "redondas"    # "redondas" (true de siempre) o "rectas" (sesión H)
 
     @property
     def mujer(self):
@@ -70,6 +73,8 @@ class Receta:
         """Retrato 2D (dialogo_retratos / contrato de casos) con los colores de la receta; `expresiones` si se pasan."""
         r = {"piel": list(self.piel), "pelo": list(self.pelo), "pelo_estilo": self.pelo_estilo,
              "ropa": list(self.camiseta), "accesorio": self.accesorio}
+        if self.gafas and self.gafas_forma != "redondas":     # sesión H: solo se escribe si no son las de siempre
+            r["gafas"] = self.gafas_forma
         if expresiones is not None:
             r["expresiones"] = list(expresiones)
         return r
@@ -193,9 +198,10 @@ def _receta(pid, d):
         raise PersonajesError(f"{donde}.rostro.barba: null o uno de {BARBAS}.")
     if mujer and (barba is not None or r.get("bigote")):
         raise PersonajesError(f"{donde}.rostro: sin bigote ni barba en un cuerpo de mujer.")
-    for clave in ("gafas", "bigote", "arrugas", "canas"):
+    for clave in ("bigote", "arrugas", "canas"):
         if not isinstance(r.get(clave, False), bool):
             raise PersonajesError(f"{donde}.rostro.{clave}: true o false.")
+    gafas_forma = forma_gafas(r.get("gafas", False), f"{donde}.rostro.gafas")
     aur = r.get("auriculares")
     if aur is not None:
         if not isinstance(aur, dict):
@@ -221,7 +227,7 @@ def _receta(pid, d):
     receta = Receta(pid, _texto(d.get("nombre"), f"{donde}.nombre"), _texto(d.get("oficio"), f"{donde}.oficio"),
                     cuerpo, float(escala), _rgb(d.get("piel"), f"{donde}.piel"), _rgb(d.get("pelo"), f"{donde}.pelo"),
                     _rgb(ropa.get("camiseta"), f"{donde}.ropa.camiseta"), _rgb(ropa.get("pantalon"), f"{donde}.ropa.pantalon"),
-                    _rgb(ropa.get("zapatos"), f"{donde}.ropa.zapatos"), peinado, bool(r.get("gafas", False)),
+                    _rgb(ropa.get("zapatos"), f"{donde}.ropa.zapatos"), peinado, gafas_forma is not None,
                     bool(r.get("bigote", False)), barba, bool(r.get("arrugas", False)), bool(r.get("canas", False)), aur,
                     tuple(float(c) for c in iris), corbata, ret["pelo_estilo"], ret["accesorio"])
     hoy = _hoy(d.get("hoy"), {"piel": receta.piel, "pelo": receta.pelo, "camiseta": receta.camiseta,
@@ -233,9 +239,21 @@ def _receta(pid, d):
     if not isinstance(solo_v2, bool):
         raise PersonajesError(f"{donde}.solo_v2: true o false.")
     receta = replace(receta, glb_v2=_glb_v2(pid, d.get("glb_v2"), donde),
-                     rostro_v2=_rostro_v2(d.get("rostro_v2"), mujer, donde), hoy=hoy, solo_v2=solo_v2)
+                     rostro_v2=_rostro_v2(d.get("rostro_v2"), mujer, donde), hoy=hoy, solo_v2=solo_v2,
+                     gafas_forma=gafas_forma or "redondas")
     _coherencia(receta, donde)
     return receta
+
+
+def forma_gafas(valor, donde="rostro.gafas"):
+    """Forma de la montura de `rostro.gafas`: None (sin gafas), "redondas" (true, compatibilidad) o "rectas"."""
+    if valor is False or valor is None:
+        return None
+    if valor is True:
+        return "redondas"
+    if valor in FORMAS_GAFAS:
+        return valor
+    raise PersonajesError(f"{donde}: true, false o una de {FORMAS_GAFAS}.")
 
 
 def _coherencia(p, donde):

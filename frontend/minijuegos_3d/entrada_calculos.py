@@ -42,14 +42,23 @@ SILLAS_MESA = {
                  "manos": {"d": (-0.27, 0.17), "i": (-0.65, 0.17)}},
     # Señales: las manos se apoyan FUERA de la captura (x ±0,35 en la banda del fondo) y de la nota «PISTA» (x >= 0,45):
     # la derecha (lado -x) a la izquierda de la captura y la izquierda entre la captura y la nota.
+    # Sesión H: con el atril (ATRIL_SENALES) la derecha termina en el canto de la mesa, delante del pie del atril (el
+    # plumón la lleva enseguida); la izquierda apoyada a la izquierda del atril (que no pasa de x 0,15), al alcance
+    # también de la influencer
     "senales": {"posicion": (0.0, 1.40), "rumbo": 180.0, "lado": "d",
-                "manos": {"d": (-0.45, 1.03), "i": (0.40, 1.03)}},
+                "manos": {"d": (-0.20, 1.08), "i": (0.28, 1.08)}},
 }
-# Minijuegos de mesa que se juegan SENTADOS con la entrada nueva. Señales NO: sentado, la mano del plumón no llega a las
-# zonas de la captura (le faltan 0,14-0,32 m con los 4 roles: el plumón quedaba suelto junto al trazo; medido en
-# animaciones/logs/m3_alcance_sen.log) y sentado no se inclina ni da pasos. Señales sigue con la entrada y el juego de
-# hoy (de pie) aunque la bandera esté encendida. La geometría de su silla se conserva para cuando se pueda.
-MESA_SENTADO = ("comparar",)
+# Minijuegos de mesa que se juegan SENTADOS con la entrada nueva. Señales sentado estuvo apagado hasta la sesión H: con
+# la captura plana sobre la mesa a la mano del plumón le faltaban 0,26 m (0,40 m la influencer). Se cambió el SET, no el
+# personaje: sentado, la captura va en un ATRIL inclinado hacia el jugador, delante de su hombro derecho y más pequeña
+# (ATRIL_SENALES); así llega a todas las zonas con los 4 protagonistas (falta_alcance_senales(..., atril=...)).
+MESA_SENTADO = ("comparar", "senales")
+# Atril de Señales sentado (mundo del cuarto_mesa). La captura (senales_3d.CAPTURA, en m de hoja) se monta escalada
+# `escala` sobre una tabla inclinada `inclinacion` grados sobre la mesa, con la cara hacia el jugador (rumbo 180, +z):
+# su canto de abajo (el del jugador) en z = `borde_z`, `base` m sobre el tablero (el reborde que la sostiene), centrada
+# en x = `x` (delante del hombro derecho del sentado: x = -HOMBRO_LADO). Búsqueda en sesiones-24nov/detalles-h: con
+# 60° y escala 0,65 a los 4 les sobran >= 2 cm; más grande o menos inclinado, la influencer (brazo 0,43 m) no llega.
+ATRIL_SENALES = {"x": -0.18, "borde_z": 1.06, "base": 0.02, "inclinacion": 60.0, "escala": 0.65}
 # Manos al terminar de sentarse (sobre el tablero, 12 cm dentro del canto cercano, ±0,16 m del centro del asiento)
 MANOS_DENTRO = 0.12
 MANOS_LADO = 0.16
@@ -278,10 +287,41 @@ MANO_SOBRE_PUNTA = 0.11             # como Senales3D._mano_para: la mano 11 cm e
 MANO_HACIA_EL_CUERPO = 0.08         # ...y 8 cm hacia el cuerpo
 
 
-def falta_alcance_senales(alcance, alto_hombro, captura, silla_id="senales"):
+def atril_normal(atril=None):
+    """Normal (mundo) de la cara del atril: hacia arriba y hacia el jugador (+z)."""
+    t = math.radians((atril or ATRIL_SENALES)["inclinacion"])
+    return (0.0, math.cos(t), math.sin(t))
+
+
+def atril_arriba(atril=None):
+    """Dirección (mundo) «hacia arriba» de la hoja en el atril: sube y se aleja del jugador (-z)."""
+    t = math.radians((atril or ATRIL_SENALES)["inclinacion"])
+    return (0.0, math.sin(t), -math.cos(t))
+
+
+def atril_centro(captura, atril=None):
+    """Centro (mundo) de la captura montada en el atril."""
+    return atril_punto(0.0, 0.0, captura, atril)
+
+
+def atril_punto(u, v, captura, atril=None):
+    """Punto (u, v) de la captura (m de hoja; u = x de la hoja, v = y de la hoja, centro = 0) -> mundo, en el atril. La
+    hoja mira al jugador: su +x va hacia -x de mundo (se lee desde detrás del jugador) y su +y sube por la tabla."""
+    a = atril or ATRIL_SENALES
+    t = math.radians(a["inclinacion"])
+    k = a["escala"]
+    d = k * (v + captura["alto"] / 2)                   # m por la tabla desde el canto de abajo
+    return (a["x"] - k * u, CUARTO_MESA["altura"] + a["base"] + d * math.sin(t), a["borde_z"] - d * math.cos(t))
+
+
+def falta_alcance_senales(alcance, alto_hombro, captura, silla_id="senales", atril=None, puntos=None):
     """Cuánto le falta (m, 0 = llega) a la mano derecha, sentada en la silla de Señales, para llevar la punta del plumón
     a las 4 esquinas y al centro de `captura` ({"centro": (x, y) del tablero, "ancho", "alto"}; y = hacia el fondo, +z
-    de mundo, como el ancla «mesa» del cuarto_mesa; «_i» = x menor). Sin inclinar el torso (Senales3D no lo inclina)."""
+    de mundo, como el ancla «mesa» del cuarto_mesa; «_i» = x menor). Sin inclinar el torso (Senales3D no lo inclina).
+    Con `atril` (p. ej. ATRIL_SENALES) la captura va montada en el atril (atril_punto) y la mano se separa por su normal;
+    `puntos` = {nombre: (u, v)} extra en m de hoja (p. ej. el punto más lejano de cada zona)."""
+    if atril is not None:
+        return _falta_en_atril(alcance, alto_hombro, captura, silla_id, atril, puntos)
     datos = SILLAS_MESA[silla_id]
     sx, sz = datos["posicion"]
     ax, az = _adelante(datos["rumbo"])
@@ -296,5 +336,28 @@ def falta_alcance_senales(alcance, alto_hombro, captura, silla_id="senales"):
     for nombre, (px, py) in puntos.items():
         punta = (px, CUARTO_MESA["altura"], mesa_z + py)
         mano = (punta[0] - ax * MANO_HACIA_EL_CUERPO, punta[1] + MANO_SOBRE_PUNTA, punta[2] - az * MANO_HACIA_EL_CUERPO)
+        faltas[nombre] = round(max(0.0, math.dist(hombro, mano) - alcance), 3)
+    return faltas
+
+
+def _hombro_derecho_sentado(alto_hombro, silla_id):
+    datos = SILLAS_MESA[silla_id]
+    sx, sz = datos["posicion"]
+    ax, az = _adelante(datos["rumbo"])
+    return (sx + az * HOMBRO_LADO, ALTURA_ASIENTO + alto_hombro - ALTO_CADERA_DE_PIE, sz - ax * HOMBRO_LADO), (ax, az)
+
+
+def _falta_en_atril(alcance, alto_hombro, captura, silla_id, atril, puntos):
+    hombro, (ax, az) = _hombro_derecho_sentado(alto_hombro, silla_id)
+    n = atril_normal(atril)
+    w, h = captura["ancho"] / 2, captura["alto"] / 2
+    # «_i» = x de MUNDO menor, como en la captura plana (la hoja del atril tiene su +x hacia -x de mundo)
+    todos = {"centro": (0.0, 0.0), "lejos_i": (w, h), "lejos_d": (-w, h), "cerca_i": (w, -h), "cerca_d": (-w, -h)}
+    todos.update(puntos or {})
+    faltas = {}
+    for nombre, (u, v) in todos.items():
+        p = atril_punto(u, v, captura, atril)
+        mano = (p[0] + n[0] * MANO_SOBRE_PUNTA - ax * MANO_HACIA_EL_CUERPO, p[1] + n[1] * MANO_SOBRE_PUNTA,
+                p[2] + n[2] * MANO_SOBRE_PUNTA - az * MANO_HACIA_EL_CUERPO)
         faltas[nombre] = round(max(0.0, math.dist(hombro, mano) - alcance), 3)
     return faltas

@@ -56,6 +56,15 @@ VERDE = estilo.ESTADO_EXITO
 GRIS = (130, 132, 140)
 ALTURA_ESPERA = 0.07                      # m sobre el papel: el plumón espera encima de la zona con el foco
 MANO_LIBRE = "i"                          # la que no lleva el plumón: cuelga junto al costado (poses.mano_reposo)
+# Sentado (sesión H): la captura va en un ATRIL inclinado hacia el jugador (entrada_calculos.ATRIL_SENALES: así la mano
+# del plumón llega a todas las zonas con los 4 protagonistas) y la cámara mira por encima de su hombro derecho. La hoja
+# es la misma (mismas medidas y letra, escalada en el atril); la nota «PISTA» va en la misma tabla, a la derecha.
+TOMA_ATRIL = {"rumbo": 150.0, "inclinacion": 48.0, "distancia": 1.05, "fov": 55.0, "corrimiento": -0.07}
+NOTA_ATRIL_HUECO = 0.04                   # m de hoja entre la captura y la nota en el atril
+NOTA_ATRIL_ANCHO = 0.26                   # m de hoja: más angosta que en la mesa (la tabla acaba antes de la lámpara, x -0,66)
+ATRIL_MARGEN = 0.03                       # m de tabla alrededor de la captura
+ATRIL_IZQUIERDA = 0.16                    # m de tabla a la izquierda de la captura (las etiquetas del cierre)
+ESPERA_ATRIL = 0.045                      # m de hoja bajo la captura donde espera el plumón en reposo (lejos del título)
 
 
 class Plumon(Entity):
@@ -103,13 +112,100 @@ class Senales3D(Minijuego3D):
         return dict(self.TOMA_ESTABLECIMIENTO)
 
     def toma_juego(self):
+        if self._en_atril():
+            from frontend.minijuegos_3d import entrada_calculos as ec
+            c = ec.atril_centro(CAPTURA)
+            objetivo = (c[0] + TOMA_ATRIL["corrimiento"], c[1], c[2])
+            return mc.toma_mesa(objetivo, TOMA_ATRIL["inclinacion"], TOMA_ATRIL["rumbo"], TOMA_ATRIL["distancia"],
+                                TOMA_ATRIL["fov"], techo=self.set.techo)
         objetivo = self.set.anclas["mesa"].mundo(TOMA["objetivo"][0], TOMA["objetivo"][1], 0)
         return mc.toma_mesa(objetivo, TOMA["inclinacion"], TOMA["rumbo"], TOMA["distancia"], TOMA["fov"],
                             techo=self.set.techo)
 
+    # -- Atril (Señales sentado, sesión H) --
+
+    def _en_atril(self):
+        return getattr(self, "atril", None) is not None and getattr(self.set, "silla", None) is not None
+
+    def _quiere_atril(self):
+        from frontend.minijuegos_3d import entrada_calculos as ec
+        from frontend.minijuegos_3d import interiores
+        mid = getattr(self.ctx, "minijuego_id", None)
+        return (mid in ec.MESA_SENTADO and ec.silla_mesa(mid) is not None
+                and getattr(self.set, "nombre", None) == interiores.CUARTO_MESA and self._modulo_silla() is not None)
+
+    def _entrada_nueva(self):
+        """Sentado (entrada animada): la captura pasa al atril ANTES de calcular la toma de juego; si la entrada no
+        arranca, vuelve a la mesa como hoy."""
+        montado = False
+        try:
+            if self._quiere_atril():
+                self._montar_atril()
+                montado = True
+        except Exception as error:               # noqa: BLE001  sin atril: la captura de hoy (de pie)
+            self._avisar("atril", error)
+            self._desmontar_atril()
+        ok = super()._entrada_nueva()
+        if montado and not (ok and self.entrada_animada and getattr(self.set, "silla", None) is not None):
+            self._desmontar_atril()
+        return ok
+
+    def _montar_atril(self):
+        from panda3d.core import Point3, Vec3
+        from ursina.shaders import lit_with_shadows_shader
+        from frontend.minijuegos_3d import entrada_calculos as ec
+        from frontend.minijuegos_3d import sets
+        a = ec.ATRIL_SENALES
+        w, h = CAPTURA["ancho"], CAPTURA["alto"]
+        centro = ec.atril_centro(CAPTURA)
+        n = ec.atril_normal()
+        self.atril = Entity(parent=self.set.raiz, position=centro, scale=a["escala"])
+        self.atril.lookAt(Point3(*(centro[i] - n[i] for i in range(3))), Vec3(0, 1, 0))  # la cara (-z local) mira +n
+        # tabla (detrás del papel: +z local), reborde abajo y pata de apoyo hasta la mesa
+        izq, der = -w / 2 - ATRIL_IZQUIERDA, w / 2 + NOTA_ATRIL_HUECO + NOTA_ATRIL_ANCHO + ATRIL_MARGEN
+        Entity(parent=self.atril, model="cube", color=rgb(sets.MADERA), shader=lit_with_shadows_shader,
+               position=((izq + der) / 2, 0, 0.012), scale=(der - izq, h + 2 * ATRIL_MARGEN, 0.02))
+        Entity(parent=self.atril, model="cube", color=rgb(sets.MADERA_OSCURA), shader=lit_with_shadows_shader,
+               position=((izq + der) / 2, -h / 2 - ATRIL_MARGEN, -0.012), scale=(der - izq, 0.014, 0.03))
+        arriba = ec.atril_punto(0.0, h / 2 + ATRIL_MARGEN, CAPTURA)
+        mesa_y = ec.CUARTO_MESA["altura"]
+        self._pata = Entity(parent=self.set.raiz, model="cube", color=rgb(sets.MADERA_OSCURA),
+                            shader=lit_with_shadows_shader,
+                            position=(a["x"] - a["escala"] * (izq + der) / 2, (mesa_y + arriba[1]) / 2, arriba[2] - 0.02),
+                            scale=(a["escala"] * (der - izq) * 0.8, arriba[1] - mesa_y, 0.018))
+        self.hoja.parent = self.atril
+        self.hoja.position = (0, 0, papel_3d.Z_PAPEL)
+        self.hoja.rotation = (0, 0, 0)
+        self.normal = n
+        if self.nota is not None:
+            destruir_arbol(self.nota)
+            self.nota = None
+        self._nota_textos = None
+        self._pintar_nota()
+
+    def _desmontar_atril(self):
+        atril = getattr(self, "atril", None)
+        if atril is None:
+            return
+        self.hoja.parent = self.mesa.entidad
+        self.hoja.position = (CAPTURA["centro"][0], CAPTURA["centro"][1], papel_3d.Z_PAPEL)
+        self.hoja.rotation = (0, 0, -1.2)
+        self.normal = self.mesa.datos_toma()["normal"]
+        if self.nota is not None:
+            destruir_arbol(self.nota)
+            self.nota = None
+        self.atril = None
+        for e in (atril, getattr(self, "_pata", None)):
+            if e is not None:
+                destruir_arbol(e)
+        self._pata = None
+        self._nota_textos = None
+        self._pintar_nota()
+
     # -- Construcción --
 
     def construir(self):
+        self.atril = self._pata = None
         mj = self.minijuego
         mesa = self.mesa = self.set.anclas["mesa"]
         self.set.luz_techo(True)                 # lámpara y luz normal: sin oscuridad
@@ -198,7 +294,7 @@ class Senales3D(Minijuego3D):
         if self.nota is not None:
             destruir_arbol(self.nota)
         titulo, cuerpo, revision, marcas = textos
-        ancho = NOTA["ancho"]
+        ancho = NOTA_ATRIL_ANCHO if getattr(self, "atril", None) is not None else NOTA["ancho"]
         ancho_txt = ancho - 0.04
         bloques = [(titulo, ALTO_TITULO, True)]
         if revision:
@@ -208,8 +304,13 @@ class Senales3D(Minijuego3D):
         if marcas:
             bloques.append((marcas, ALTO_NOTA, True))
         alto = 0.03 + sum(mp.n_lineas(t, a, ancho_txt, n) * a * mc.LINEA + 0.01 for t, a, n in bloques)
-        self.nota = papel_3d.papel(self.mesa.entidad, ancho, alto, posicion=(NOTA["x"], NOTA["arriba"] - alto / 2), giro=1.5,
-                                   tono=NOTA_TONO, capa=1)
+        if getattr(self, "atril", None) is not None:          # sentado: en la tabla del atril, a la derecha de la captura
+            w, h = CAPTURA["ancho"], CAPTURA["alto"]
+            self.nota = papel_3d.papel(self.atril, ancho, alto, giro=1.0, tono=NOTA_TONO,
+                                       posicion=(w / 2 + NOTA_ATRIL_HUECO + ancho / 2, h / 2 - alto / 2))
+        else:
+            self.nota = papel_3d.papel(self.mesa.entidad, ancho, alto, posicion=(NOTA["x"], NOTA["arriba"] - alto / 2),
+                                       giro=1.5, tono=NOTA_TONO, capa=1)
         y = alto / 2 - 0.015
         for t, a, negrita in bloques:
             texto = papel_3d.texto_en_papel(self.nota, t, alto_linea=a, ancho=ancho_txt, negrita=negrita,
@@ -318,7 +419,9 @@ class Senales3D(Minijuego3D):
             return
         sentado = self.entrada_animada and self.poses.sentado        # sesión B: juega sentado a la mesa
         if not sentado:
-            self._mano_libre_en_reposo()             # sentado, la mano libre se queda apoyada donde la dejó la entrada
+            self._mano_libre_en_reposo()
+        elif self.atril is not None:
+            self._mano_libre_en_mesa()               # sentado: apoyada en la mesa donde la dejó la entrada (no en el aire)
         n = self.normal
         # sentado no hay «colgando junto al costado» (caería sobre la silla): el plumón espera en el borde de la captura
         reposo = None if (self._trazando or sentado) else self.poses.mano_reposo("d")
@@ -337,10 +440,12 @@ class Senales3D(Minijuego3D):
             # en reposo el plumón espera FUERA de la captura, en el borde de su lado, a la altura (x) de la zona con foco:
             # la mano y el brazo no tapan la captura hasta que traza
             b = self.burbujas[f]
-            p = self._mundo_hoja(b.x, CAPTURA["alto"] / 2 + 0.05, -0.004)
+            yb = -CAPTURA["alto"] / 2 - ESPERA_ATRIL if self.atril is not None else CAPTURA["alto"] / 2 + 0.05
+            p = self._mundo_hoja(b.x, yb, -0.004)
             punta = tuple(p[i] + n[i] * ALTURA_ESPERA for i in range(3))
         else:
-            punta = self._mundo_hoja(-0.1, CAPTURA["alto"] / 2 + 0.04, -0.004)      # junto al borde de su lado
+            yb = -CAPTURA["alto"] / 2 - ESPERA_ATRIL if self.atril is not None else CAPTURA["alto"] / 2 + 0.04
+            punta = self._mundo_hoja(-0.1, yb, -0.004)      # junto al borde de su lado (en el atril: el de abajo)
             punta = tuple(punta[i] + n[i] * ALTURA_ESPERA for i in range(3))
         mano = self._mano_para(punta)
         if not mc.finito(mano):
@@ -364,6 +469,11 @@ class Senales3D(Minijuego3D):
         punto = self.poses.mano_reposo(MANO_LIBRE)
         if punto is not None and mc.finito(punto):
             self.poses.mano_a(punto, MANO_LIBRE)
+
+    def _mano_libre_en_mesa(self):
+        from frontend.minijuegos_3d import entrada_calculos as ec
+        x, z = ec.SILLAS_MESA["senales"]["manos"][MANO_LIBRE]
+        self.poses.mano_a((x, ec.CUARTO_MESA["altura"] + ec.MANOS_ALTO, z), MANO_LIBRE)
 
     def _mundo_hoja(self, x, y, z):
         from ursina import scene
@@ -436,6 +546,10 @@ class Senales3D(Minijuego3D):
 
     def destruir(self):
         raton.desvincular()
+        pata = getattr(self, "_pata", None)
+        if pata is not None:
+            destruir_arbol(pata)
+            self._pata = None
 
 
 CLASE_3D = Senales3D
