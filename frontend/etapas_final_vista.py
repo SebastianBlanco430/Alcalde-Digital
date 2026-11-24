@@ -368,6 +368,13 @@ def crear_controlador(escena, conexion):
                 registrar("franja", self.medidor, self._firma_franja)
             self.cuerpos = {}                # tipo -> CuerpoEtapa (se crean la primera vez que hacen falta)
             self._visibles = []
+            # carga (elenco v2): el .glb del NPC con capucha se prepara aquí, con la carga del mundo, y no en el primer
+            # frame en que aparece un Raponero (~0,14 s). Sin la bandera o sin el .glb no hace nada.
+            try:
+                from frontend.npc_modelo import precargar_etapa_capucha
+                precargar_etapa_capucha()
+            except Exception as error:
+                _aviso(f"capucha v2 no precargada ({type(error).__name__}: {error})")
             self.cambios = 0                 # cambios de etapa (pruebas)
 
         def _firma_franja(self):

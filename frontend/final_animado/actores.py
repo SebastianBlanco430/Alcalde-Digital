@@ -129,6 +129,9 @@ def _crear_arenas(raiz):
     from frontend import npc_nuevos_modelo as nnm
     from frontend.npc_modelo import PersonajeNPC, crear_npc
     from frontend.peatones_calculos import rasgos_peaton
+    v2 = _arenas_v2(raiz)         # elenco v2 (sesión F): su malla propia; sin ella (o sin la bandera), como siempre
+    if v2 is not None:
+        return v2
     aspecto = {"pantalon": (34, 38, 56), "piel": (226, 180, 140), "pelo": (206, 206, 210)}
     rasgos = dict(rasgos_peaton(3, P.SEMILLA_ARENAS), peinado="atras", gafas=True, bigote=True, barba=None, gorra=None,
                   arrugas=True)
@@ -144,6 +147,18 @@ def _crear_arenas(raiz):
     except Exception as error:
         _aviso(f"Arenas con el NPC de siempre ({type(error).__name__}: {error})")
         return crear_npc(3, P.SEMILLA_ARENAS, aspecto, rasgos, (34, 40, 70), parent=raiz, nombre="Tomás Arenas")
+
+
+def _arenas_v2(raiz):
+    """Arenas con v2/arenas.glb (personajes_fiscalia.json, id «arenas») si ALCALDE_ELENCO_V2 está activa; None si no."""
+    try:
+        from backend.datos import personajes_loader as pl
+        from frontend.npc_modelo import crear_v2
+        receta = pl.por_id("arenas")
+        return crear_v2(receta, parent=raiz) if receta is not None else None
+    except Exception as error:      # noqa: BLE001
+        _aviso(f"Arenas v2 no disponible ({type(error).__name__}: {error})")
+        return None
 
 
 def _crear_npc_etapa(raiz, tipo):
@@ -328,7 +343,7 @@ def vestir_fijo(id_pool, cuerpo, base):
     if id_pool == P.OCTAVIO:
         pieza(base, "cube", (0, 1.24, 0.0), (0.5, 0.09, 0.3), (44, 138, 214), (0, 0, 38))
         pieza(base, "sphere", (0.13, 1.37, 0.15), (0.1, 0.1, 0.04), estilo.ACENTO_PRIMARIO)
-    elif id_pool == P.ARENAS:
+    elif id_pool == P.ARENAS and not getattr(cuerpo, "_plan", {}).get("v2"):    # v2: la corbata va en la malla
         pieza(base, "cube", (0, 1.22, 0.15), (0.075, 0.34, 0.03), (150, 28, 40), (6, 0, 0))
         pieza(base, "cube", (0, 1.4, 0.15), (0.09, 0.06, 0.035), (150, 28, 40))
         pieza(base, "cube", (0, 1.41, 0.135), (0.22, 0.07, 0.02), (240, 240, 236))

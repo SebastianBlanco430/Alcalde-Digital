@@ -18,13 +18,13 @@
   "personajes": {
     "fiscal": {
       "nombre": "Fiscal Rojas", "rol": "Fiscalía de Ciudad Nova", "modelo": "npc_hombre_03.glb", "personaje": "fiscal",
-      "retrato": {"piel": [214, 170, 130], "pelo": [92, 92, 104], "pelo_estilo": "corto",
+      "retrato": {"piel": [214, 170, 130], "pelo": [138, 138, 150], "pelo_estilo": "corto",
                   "ropa": [58, 68, 112], "accesorio": "gafas",
                   "expresiones": ["neutral", "serio", "satisfecho"]}
     },
     "livia": {
       "nombre": "Lívia Sampaio", "rol": "Diseñadora independiente", "modelo": "npc_mujer_01.glb", "personaje": "livia",
-      "retrato": {"piel": [228, 184, 150], "pelo": [150, 70, 50], "pelo_estilo": "largo",
+      "retrato": {"piel": [228, 184, 150], "pelo": [168, 80, 46], "pelo_estilo": "largo",
                   "ropa": [214, 120, 90], "accesorio": "gafas",
                   "expresiones": ["neutral", "nervioso", "triste", "sorprendido"]}
     },
@@ -37,7 +37,7 @@
     "baltazar": {
       "nombre": "Baltazar Quirino", "rol": "Consultor de imagen", "modelo": "npc_hombre_03.glb", "personaje": "baltazar",
       "retrato": {"piel": [200, 150, 112], "pelo": [50, 44, 40], "pelo_estilo": "corto",
-                  "ropa": [40, 40, 48], "accesorio": "corbata",
+                  "ropa": [40, 40, 58], "accesorio": "corbata",
                   "expresiones": ["neutral", "satisfecho", "enojado", "nervioso"]}
     }
   },

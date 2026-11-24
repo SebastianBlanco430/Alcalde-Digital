@@ -4,12 +4,12 @@
     {
       "id": "seu_ze", "personaje": "seu_ze", "nombre": "Seu Zé", "grupo": "ciudadanos", "rol": "Vendedor de la calle",
       "origen": "vendedor",
-      "retrato": {"piel": [196, 146, 104], "pelo": [120, 120, 126], "pelo_estilo": "calvo", "ropa": [236, 196, 64], "accesorio": "barba"}
+      "retrato": {"piel": [196, 146, 104], "pelo": [122, 122, 128], "pelo_estilo": "calvo", "ropa": [150, 110, 70], "accesorio": "barba"}
     },
     {
       "id": "fiscal", "personaje": "fiscal", "nombre": "Fiscal Rojas", "grupo": "instituciones", "rol": "Fiscalía de Ciudad Nova",
       "origen": "ancla", "modelo": 101, "ancla": {"zona": "mercado", "dx": 0.5, "dz": -5.0, "rumbo": 180},
-      "retrato": {"piel": [214, 170, 130], "pelo": [92, 92, 104], "pelo_estilo": "corto", "ropa": [58, 68, 112], "accesorio": "gafas"}
+      "retrato": {"piel": [214, 170, 130], "pelo": [138, 138, 150], "pelo_estilo": "corto", "ropa": [58, 68, 112], "accesorio": "gafas"}
     },
     {
       "id": "ines", "personaje": "ines", "nombre": "Inés Duarte", "grupo": "ciudadanos", "rol": "Moderadora de Civitas",
@@ -24,7 +24,7 @@
     {
       "id": "vecina", "personaje": "vecina", "nombre": "Doña Neide", "grupo": "ciudadanos", "rol": "Vecina del mercado",
       "origen": "ancla", "modelo": 104, "ancla": {"zona": "mercado", "dx": 4.0, "dz": 4.0, "rumbo": 270},
-      "retrato": {"piel": [226, 178, 138], "pelo": [150, 150, 156], "pelo_estilo": "largo", "ropa": [150, 90, 130], "accesorio": "ninguno"}
+      "retrato": {"piel": [200, 148, 110], "pelo": [224, 224, 228], "pelo_estilo": "largo", "ropa": [140, 120, 180], "accesorio": "ninguno"}
     }
   ]
 }

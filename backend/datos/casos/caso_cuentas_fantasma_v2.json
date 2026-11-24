@@ -18,7 +18,7 @@
   "personajes": {
     "fiscal": {
       "nombre": "Fiscal Rojas", "rol": "Fiscalía de Ciudad Nova", "modelo": "npc_hombre_03.glb", "personaje": "fiscal",
-      "retrato": {"piel": [214, 170, 130], "pelo": [92, 92, 104], "pelo_estilo": "corto",
+      "retrato": {"piel": [214, 170, 130], "pelo": [138, 138, 150], "pelo_estilo": "corto",
                   "ropa": [58, 68, 112], "accesorio": "gafas",
                   "expresiones": ["neutral", "serio", "satisfecho"]}
     },

@@ -25,7 +25,9 @@ from direct.actor.Actor import Actor
 from panda3d.core import NodePath
 from ursina import Entity, time
 
+from backend.logica import modelos_v2
 from frontend import estilo, geometria_mundo, modelo_calculos as mc
+from frontend import protagonistas_v2_calculos as pv2
 from frontend.componentes import rgb
 from frontend.personaje import Personaje
 from frontend.piezas import COLOR_MARCADOR, etiqueta, limitar_etiqueta, modo_etiqueta_jugador, silenciar
@@ -35,7 +37,7 @@ from frontend import pesos_cabeza
 from frontend import rostro_skinning
 from frontend import skinning_gpu
 from frontend import toon_duro
-from frontend.rostro_modelo import colocar_rostro_animado
+from frontend.rostro_modelo import colocar_rostro_animado, colocar_rostro_animado_piezas
 from frontend import sombra_calculos as sc
 from frontend.sombra_contacto import SombraContacto, crear_aro
 
@@ -48,7 +50,8 @@ TIEMPO_GESTO_MANO = 0.35         # s que tarda el gesto en entrar y salir
 
 ANIMACION_HUMANA = True          # clips horneados con cinemática humana (frontend/animacion_humana.py); False = clips del .glb
 
-_bases = {}                      # rol -> Actor ya cargado (se copia por jugador)
+_bases = {}                      # rol -> Actor ya cargado (se copia por jugador; con v2, el del protagonista)
+_por_ruta = {}                   # ruta del .glb -> Actor base (el de hoy y el v2 de un rol pueden convivir)
 _avisados = set()
 
 
@@ -58,10 +61,9 @@ def _avisar(rol, motivo):
         print(f"[assets] {rol}: {motivo}. Se usa el modelo procedural.", file=sys.stderr)
 
 
-def _cargar_actor(rol):
-    base = _bases.get(rol)
+def _cargar_base(ruta, rol):
+    base = _por_ruta.get(str(ruta))
     if base is None:
-        ruta = CARPETA_MODELOS / mc.MODELOS_POR_ROL[rol]
         # Actor(ruta) carga el glb con la altura en Z (tumbado); gltf.load_model la deja en Y.
         modelo = gltf.load_model(str(ruta), gltf_settings=gltf.GltfSettings())
         if ANIMACION_HUMANA:      # añade al nodo los clips de marcha/escalón/salto antes de crear el Actor
@@ -72,8 +74,35 @@ def _cargar_actor(rol):
         if faltan:
             raise ValueError(f"faltan clips {faltan}")
         base.hide()
+        _por_ruta[str(ruta)] = base
+    return base
+
+
+# Copia del Actor del rol. `protagonista` (el jugador, PersonajeModelo): con ALCALDE_PROTAGONISTAS_V2 usa el .glb v2
+# (modelos_v2.PROTAGONISTAS_V2); si falta o no carga, el de hoy con un aviso. Las copias para NPC (npc_modelo) siempre
+# el de hoy. Con la bandera en 0, igual que siempre. La copia lleva `_alcalde_v2` (True si es el v2).
+def _cargar_actor(rol, protagonista=False):
+    archivo_hoy = mc.MODELOS_POR_ROL[rol]
+    archivo, es_v2 = pv2.archivo_modelo(archivo_hoy, protagonista and modelos_v2.protagonistas_activo(),
+                                        modelos_v2.PROTAGONISTAS_V2)
+    base = None
+    if es_v2:
+        ruta = CARPETA_MODELOS / archivo
+        try:
+            if not ruta.is_file():
+                raise FileNotFoundError(f"no existe {archivo}")
+            base = _cargar_base(ruta, rol)
+        except Exception as error:
+            modelos_v2.avisar_una_vez(("protagonista", rol), f"{rol}: no se pudo cargar {archivo} ({error}); "
+                                                            f"se usa {archivo_hoy}")
+            es_v2 = False
+    if base is None:
+        base = _cargar_base(CARPETA_MODELOS / archivo_hoy, rol)
+    if protagonista or rol not in _bases:          # piloto_glb lee aquí la base del protagonista
         _bases[rol] = base
-    return Actor(base)
+    actor = Actor(base)
+    actor._alcalde_v2 = es_v2
+    return actor
 
 
 class PersonajeModelo(Entity):
@@ -144,7 +173,7 @@ class PersonajeModelo(Entity):
     # -- Ganchos que las variantes (frontend/npc_modelo.py) sustituyen; por defecto, el comportamiento de siempre --
 
     def _crear_actor(self, rol):
-        return _cargar_actor(rol)
+        return _cargar_actor(rol, protagonista=True)
 
     # T5: ¿toon duro? Los 4 .glb de los roles traen bandas pintadas: nunca (frontend/toon_duro_calculos.py).
     def _toon_duro(self):
@@ -154,7 +183,11 @@ class PersonajeModelo(Entity):
         return mc.escala_para_rol(rol)
 
     def _poner_rostro(self, rol, nombre):
-        return colocar_rostro_animado(self.actor, rol, zlib.crc32(nombre.encode()))
+        semilla = zlib.crc32(nombre.encode())
+        if pv2.quitar_pelo(rol, getattr(self.actor, "_alcalde_v2", False)):   # el .glb v2 ya trae el pelo modelado
+            return colocar_rostro_animado_piezas(self.actor, rol, pv2.piezas_sin_pelo(rc.rostro_del_modelo(rol)),
+                                                 semilla)
+        return colocar_rostro_animado(self.actor, rol, semilla)
 
     # ¿Se anima la cara este frame? Siempre; los NPC la apagan cuando están lejos (rendimiento).
     def _animar_rostro(self):

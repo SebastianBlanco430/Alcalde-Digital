@@ -4,9 +4,13 @@
 #
 # Reglas que se validan al cargar: cuerpo de los 5 modelos de NPC (nunca el de un protagonista), colores [r, g, b] de 0 a
 # 255, cara con valores conocidos, retrato con los estilos del contrato de casos, y ninguna firma visual repetida.
+#
+# Elenco v2 (sesión F): cada receta trae además su `glb_v2` (malla propia, "v2/<id>.glb", única y nunca la de un
+# protagonista), su `rostro_v2` (las claves de la cara por código que cambian con esa malla), `hoy` (los valores de antes
+# que difieren de la tabla de diseños: la receta de siempre los usa y queda idéntica) y `solo_v2`.
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 RUTA = Path(__file__).resolve().parent / "personajes_fiscalia.json"
@@ -20,7 +24,10 @@ PEINADOS = ("corto", "atras", "pompadour", "afro", "mono", "calvo")     # rostro
 BARBAS = ("incipiente", "chivo", "completa")
 PELO_ESTILOS = ("corto", "largo", "calvo")                              # contrato de casos §6
 ACCESORIOS = ("ninguno", "gafas", "barba", "corbata")
-ESCALA_MIN, ESCALA_MAX = 0.93, 1.06
+ESCALA_MIN, ESCALA_MAX = 0.90, 1.06
+CLAVES_ROSTRO_V2 = ("peinado", "gafas", "bigote", "barba", "arrugas", "canas", "auriculares", "ajuste")
+CLAVES_HOY = ("piel", "pelo", "camiseta", "pantalon", "zapatos", "corbata", "escala")
+GLB_PROTAGONISTAS_V2 = ("v2/ciudadano.glb", "v2/periodista.glb", "v2/smoking.glb", "v2/brasilena.glb")
 
 
 class PersonajesError(ValueError):
@@ -50,6 +57,10 @@ class Receta:
     corbata: tuple | None
     pelo_estilo: str
     accesorio: str
+    glb_v2: str | None = None
+    rostro_v2: dict | None = None     # solo las claves que cambian con la malla v2 (None = ninguna)
+    hoy: dict | None = None           # valores de la receta de siempre: piel, pelo, camiseta, pantalon, zapatos, corbata, escala
+    solo_v2: bool = False
 
     @property
     def mujer(self):
@@ -82,6 +93,79 @@ def _texto(valor, donde):
     return valor.strip()
 
 
+def _escala(valor, donde):
+    if isinstance(valor, bool) or not isinstance(valor, (int, float)) or not ESCALA_MIN <= valor <= ESCALA_MAX:
+        raise PersonajesError(f"{donde}: número entre {ESCALA_MIN} y {ESCALA_MAX}.")
+    return float(valor)
+
+
+def _glb_v2(pid, valor, donde):
+    if valor is None:
+        return None
+    if not isinstance(valor, str) or not valor.startswith("v2/") or not valor.endswith(".glb") or "\\" in valor:
+        raise PersonajesError(f"{donde}.glb_v2: ruta \"v2/<id>.glb\".")
+    if valor in GLB_PROTAGONISTAS_V2:
+        raise PersonajesError(f"{donde}.glb_v2: {valor} es el .glb de un protagonista.")
+    return valor
+
+
+def _rostro_v2(valor, mujer, donde):
+    """Claves de la cara por código que cambian con la malla v2 (mismos valores que 'rostro'; 'ajuste' = [factor, dy,
+    dz] para encajar la cara en la cabeza nueva)."""
+    donde = f"{donde}.rostro_v2"
+    if valor is None:
+        return None
+    if not isinstance(valor, dict):
+        raise PersonajesError(f"{donde}: objeto.")
+    salida = {}
+    for clave, v in valor.items():
+        if clave not in CLAVES_ROSTRO_V2:
+            raise PersonajesError(f"{donde}.{clave}: clave desconocida (una de {CLAVES_ROSTRO_V2}).")
+        if clave == "peinado":
+            if v is not None and (mujer or v not in PEINADOS):
+                raise PersonajesError(f"{donde}.peinado: null o uno de {PEINADOS} (solo hombres).")
+        elif clave == "barba":
+            if v is not None and (mujer or v not in BARBAS):
+                raise PersonajesError(f"{donde}.barba: null o uno de {BARBAS} (solo hombres).")
+        elif clave == "auriculares":
+            if v is not None:
+                raise PersonajesError(f"{donde}.auriculares: null (los audífonos v2 van en la malla).")
+        elif clave == "ajuste":
+            if not (isinstance(v, list) and len(v) == 3 and all(isinstance(x, (int, float)) and not isinstance(x, bool)
+                                                                 for x in v) and 0.8 <= v[0] <= 1.2
+                    and all(abs(x) <= 0.1 for x in v[1:])):
+                raise PersonajesError(f"{donde}.ajuste: [factor 0,8-1,2, dy, dz] con |dy|, |dz| <= 0,1 m.")
+            v = tuple(float(x) for x in v)
+        elif not isinstance(v, bool):
+            raise PersonajesError(f"{donde}.{clave}: true o false.")
+        if clave == "bigote" and v and mujer:
+            raise PersonajesError(f"{donde}.bigote: sin bigote en un cuerpo de mujer.")
+        salida[clave] = v
+    return salida
+
+
+def _hoy(valor, receta, donde):
+    """Valores completos de la receta de siempre: los de la tabla salvo los que 'hoy' sobrescribe."""
+    donde = f"{donde}.hoy"
+    base = {"piel": receta["piel"], "pelo": receta["pelo"], "camiseta": receta["camiseta"],
+            "pantalon": receta["pantalon"], "zapatos": receta["zapatos"], "corbata": receta["corbata"],
+            "escala": receta["escala"]}
+    if valor is None:
+        return base
+    if not isinstance(valor, dict):
+        raise PersonajesError(f"{donde}: objeto.")
+    for clave, v in valor.items():
+        if clave not in CLAVES_HOY:
+            raise PersonajesError(f"{donde}.{clave}: clave desconocida (una de {CLAVES_HOY}).")
+        if clave == "escala":
+            base[clave] = _escala(v, f"{donde}.escala")
+        elif clave == "corbata":
+            base[clave] = None if v is None else _rgb(v, f"{donde}.corbata")
+        else:
+            base[clave] = _rgb(v, f"{donde}.{clave}")
+    return base
+
+
 def _receta(pid, d):
     donde = f"personajes.{pid}"
     if not isinstance(d, dict):
@@ -91,9 +175,7 @@ def _receta(pid, d):
         raise PersonajesError(f"{donde}.cuerpo: {cuerpo} es el cuerpo de un protagonista.")
     if cuerpo not in CUERPOS:
         raise PersonajesError(f"{donde}.cuerpo: uno de {CUERPOS}.")
-    escala = d.get("escala", 1.0)
-    if isinstance(escala, bool) or not isinstance(escala, (int, float)) or not ESCALA_MIN <= escala <= ESCALA_MAX:
-        raise PersonajesError(f"{donde}.escala: número entre {ESCALA_MIN} y {ESCALA_MAX}.")
+    escala = _escala(d.get("escala", 1.0), f"{donde}.escala")
     ropa = d.get("ropa")
     if not isinstance(ropa, dict):
         raise PersonajesError(f"{donde}.ropa: objeto con camiseta, pantalon y zapatos.")
@@ -142,6 +224,16 @@ def _receta(pid, d):
                     _rgb(ropa.get("zapatos"), f"{donde}.ropa.zapatos"), peinado, bool(r.get("gafas", False)),
                     bool(r.get("bigote", False)), barba, bool(r.get("arrugas", False)), bool(r.get("canas", False)), aur,
                     tuple(float(c) for c in iris), corbata, ret["pelo_estilo"], ret["accesorio"])
+    hoy = _hoy(d.get("hoy"), {"piel": receta.piel, "pelo": receta.pelo, "camiseta": receta.camiseta,
+                              "pantalon": receta.pantalon, "zapatos": receta.zapatos, "corbata": receta.corbata,
+                              "escala": receta.escala}, donde)
+    if hoy["corbata"] is not None and mujer:
+        raise PersonajesError(f"{donde}.hoy.corbata: solo en cuerpos de hombre.")
+    solo_v2 = d.get("solo_v2", False)
+    if not isinstance(solo_v2, bool):
+        raise PersonajesError(f"{donde}.solo_v2: true o false.")
+    receta = replace(receta, glb_v2=_glb_v2(pid, d.get("glb_v2"), donde),
+                     rostro_v2=_rostro_v2(d.get("rostro_v2"), mujer, donde), hoy=hoy, solo_v2=solo_v2)
     _coherencia(receta, donde)
     return receta
 
@@ -183,6 +275,13 @@ def cargar(ruta=None):
         otro = nombres.setdefault(p.nombre, p.id)
         if otro != p.id:
             raise PersonajesError(f"personajes.{p.id}: nombre repetido con {otro!r}.")
+    glbs = {}
+    for p in recetas.values():
+        if p.glb_v2 is None:
+            continue
+        otro = glbs.setdefault(p.glb_v2, p.id)
+        if otro != p.id:
+            raise PersonajesError(f"personajes.{p.id}.glb_v2: {p.glb_v2} repetido con {otro!r}.")
     return recetas
 
 

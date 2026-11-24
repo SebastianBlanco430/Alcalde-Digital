@@ -1,15 +1,17 @@
 {
-  "_nota": "Fuente única del aspecto de los personajes con nombre (los de los casos de la Fiscalía y los NPC clave del mundo). La leen la Fiscalía (frontend/fiscalia/personajes.py), el mundo (frontend/npc_modelo.crear_npc, por id o nombre) y los retratos 2D. Cargador puro y validación: backend/datos/personajes_loader.py. Cada personaje es una RECETA de la fábrica de NPC: un cuerpo de los 5 modelos de NPC (nunca el de un protagonista), sus colores (piel, pelo, camiseta, pantalón, zapatos), su escala, su cara por código (peinado, gafas, bigote, barba, arrugas, canas, auriculares) y su corbata. El retrato 2D sale de la misma receta (piel, pelo, ropa = camiseta; pelo_estilo y accesorio aquí). Los JSON de casos repiten 'modelo' y 'retrato' por el contrato; tests/test_personajes_fiscalia.py exige que coincidan con esta fuente.",
+  "_nota": "Fuente única del aspecto de los personajes con nombre (los de los casos de la Fiscalía y los NPC clave del mundo). La leen la Fiscalía (frontend/fiscalia/personajes.py), el mundo (frontend/npc_modelo.crear_npc, por id o nombre) y los retratos 2D. Cargador puro y validación: backend/datos/personajes_loader.py. Cada personaje es una RECETA de la fábrica de NPC: un cuerpo de los 5 modelos de NPC (nunca el de un protagonista), sus colores (piel, pelo, camiseta, pantalón, zapatos), su escala, su cara por código (peinado, gafas, bigote, barba, arrugas, canas, auriculares) y su corbata. El retrato 2D sale de la misma receta (piel, pelo, ropa = camiseta; pelo_estilo y accesorio aquí). Los JSON de casos repiten 'modelo' y 'retrato' por el contrato; tests/test_personajes_fiscalia.py exige que coincidan con esta fuente. Elenco v2 (fase Blender, sesión F): los colores son los de la tabla de diseños aprobada (prompt-blender-1.md); 'glb_v2' = su malla propia (assets/modelos/personajes/v2/<id>.glb), que se carga en el mundo y en la Fiscalía con ALCALDE_ELENCO_V2 activa; 'rostro_v2' = solo las claves de la cara por código que cambian con esa malla (el pelo, los audífonos y la barba completa van en la malla); 'hoy' = los valores de antes que difieren de la tabla, que usa la receta de siempre (bandera a 0 o .glb v2 que falta): así el plan de hoy queda idéntico; 'solo_v2' = el personaje solo sale de aquí con el elenco v2 (Arenas: sin la bandera lo arma frontend/final_animado/actores.py como siempre).",
   "personajes": {
     "fiscal": {
       "nombre": "Fiscal Rojas", "oficio": "Fiscalía de Ciudad Nova",
       "cuerpo": "npc_hombre_03.glb", "escala": 1.02,
-      "piel": [214, 170, 130], "pelo": [92, 92, 104],
+      "piel": [214, 170, 130], "pelo": [138, 138, 150],
       "ropa": {"camiseta": [58, 68, 112], "pantalon": [42, 48, 78], "zapatos": [32, 30, 34]},
       "rostro": {"peinado": "corto", "gafas": true, "bigote": false, "barba": null, "arrugas": true, "canas": false, "auriculares": null,
                  "iris": [0.20, 0.13, 0.07]},
       "corbata": [150, 34, 44],
-      "retrato": {"pelo_estilo": "corto", "accesorio": "gafas"}
+      "retrato": {"pelo_estilo": "corto", "accesorio": "gafas"},
+      "glb_v2": "v2/fiscal.glb", "rostro_v2": {"peinado": null},
+      "hoy": {"pelo": [92, 92, 104]}
     },
     "ines": {
       "nombre": "Inés Duarte", "oficio": "Moderadora de Civitas",
@@ -19,27 +21,32 @@
       "rostro": {"peinado": null, "gafas": false, "bigote": false, "barba": null, "arrugas": false, "canas": false, "auriculares": null,
                  "iris": [0.30, 0.20, 0.10]},
       "corbata": null,
-      "retrato": {"pelo_estilo": "largo", "accesorio": "ninguno"}
+      "retrato": {"pelo_estilo": "largo", "accesorio": "ninguno"},
+      "glb_v2": "v2/ines.glb", "rostro_v2": {}
     },
     "marcos": {
       "nombre": "Marcos Vela", "oficio": "Asesor de la campaña rival",
       "cuerpo": "npc_hombre_02.glb", "escala": 1.04,
       "piel": [176, 124, 92], "pelo": [30, 26, 34],
-      "ropa": {"camiseta": [120, 44, 64], "pantalon": [38, 36, 42], "zapatos": [80, 48, 30]},
+      "ropa": {"camiseta": [120, 44, 64], "pantalon": [58, 54, 64], "zapatos": [80, 48, 30]},
       "rostro": {"peinado": "pompadour", "gafas": false, "bigote": true, "barba": "incipiente", "arrugas": false, "canas": false, "auriculares": null,
                  "iris": [0.12, 0.08, 0.05]},
       "corbata": null,
-      "retrato": {"pelo_estilo": "corto", "accesorio": "barba"}
+      "retrato": {"pelo_estilo": "corto", "accesorio": "barba"},
+      "glb_v2": "v2/marcos.glb", "rostro_v2": {"peinado": null},
+      "hoy": {"pantalon": [38, 36, 42]}
     },
     "livia": {
       "nombre": "Lívia Sampaio", "oficio": "Diseñadora independiente",
       "cuerpo": "npc_mujer_01.glb", "escala": 0.99,
-      "piel": [228, 184, 150], "pelo": [150, 70, 50],
-      "ropa": {"camiseta": [214, 120, 90], "pantalon": [58, 56, 92], "zapatos": [212, 168, 56]},
+      "piel": [228, 184, 150], "pelo": [168, 80, 46],
+      "ropa": {"camiseta": [214, 120, 90], "pantalon": [58, 58, 72], "zapatos": [212, 168, 56]},
       "rostro": {"peinado": null, "gafas": true, "bigote": false, "barba": null, "arrugas": false, "canas": false, "auriculares": null,
                  "iris": [0.22, 0.36, 0.22]},
       "corbata": null,
-      "retrato": {"pelo_estilo": "largo", "accesorio": "gafas"}
+      "retrato": {"pelo_estilo": "largo", "accesorio": "gafas"},
+      "glb_v2": "v2/livia.glb", "rostro_v2": {},
+      "hoy": {"pelo": [150, 70, 50], "pantalon": [58, 56, 92]}
     },
     "eurico": {
       "nombre": "Profesor Eurico Matos", "oficio": "Director del instituto de encuestas",
@@ -48,70 +55,96 @@
       "ropa": {"camiseta": [110, 84, 60], "pantalon": [176, 160, 128], "zapatos": [72, 46, 30]},
       "rostro": {"peinado": "calvo", "gafas": true, "bigote": false, "barba": null, "arrugas": true, "canas": false, "auriculares": null,
                  "iris": [0.16, 0.12, 0.08]},
-      "corbata": [70, 96, 60],
-      "retrato": {"pelo_estilo": "calvo", "accesorio": "gafas"}
+      "corbata": null,
+      "retrato": {"pelo_estilo": "calvo", "accesorio": "gafas"},
+      "glb_v2": "v2/eurico.glb", "rostro_v2": {"peinado": null, "bigote": true},
+      "hoy": {"corbata": [70, 96, 60]}
     },
     "baltazar": {
       "nombre": "Baltazar Quirino", "oficio": "Consultor de imagen",
-      "cuerpo": "npc_hombre_03.glb", "escala": 1.0,
+      "cuerpo": "npc_hombre_03.glb", "escala": 1.05,
       "piel": [200, 150, 112], "pelo": [50, 44, 40],
-      "ropa": {"camiseta": [40, 40, 48], "pantalon": [40, 40, 48], "zapatos": [140, 70, 40]},
+      "ropa": {"camiseta": [40, 40, 58], "pantalon": [40, 40, 58], "zapatos": [140, 70, 40]},
       "rostro": {"peinado": "mono", "gafas": false, "bigote": false, "barba": "incipiente", "arrugas": false, "canas": false, "auriculares": null,
                  "iris": [0.10, 0.30, 0.42]},
-      "corbata": [214, 172, 40],
-      "retrato": {"pelo_estilo": "corto", "accesorio": "corbata"}
+      "corbata": [201, 162, 39],
+      "retrato": {"pelo_estilo": "corto", "accesorio": "corbata"},
+      "glb_v2": "v2/baltazar.glb", "rostro_v2": {"peinado": null, "barba": null},
+      "hoy": {"escala": 1.0, "camiseta": [40, 40, 48], "pantalon": [40, 40, 48], "corbata": [214, 172, 40]}
     },
     "jandira": {
       "nombre": "Jandira Lopes", "oficio": "Operadora de la Rádio Comunitária",
       "cuerpo": "npc_mujer_02.glb", "escala": 0.97,
       "piel": [150, 100, 74], "pelo": [24, 20, 22],
-      "ropa": {"camiseta": [90, 140, 190], "pantalon": [52, 52, 58], "zapatos": [184, 62, 52]},
+      "ropa": {"camiseta": [90, 140, 190], "pantalon": [51, 56, 74], "zapatos": [184, 62, 52]},
       "rostro": {"peinado": null, "gafas": false, "bigote": false, "barba": null, "arrugas": false, "canas": false,
                  "auriculares": {"color": [44, 46, 54], "almohadilla": [220, 90, 60], "al_cuello": true},
                  "iris": [0.14, 0.09, 0.05]},
       "corbata": null,
-      "retrato": {"pelo_estilo": "largo", "accesorio": "ninguno"}
+      "retrato": {"pelo_estilo": "largo", "accesorio": "ninguno"},
+      "glb_v2": "v2/jandira.glb", "rostro_v2": {"auriculares": null},
+      "hoy": {"pantalon": [52, 52, 58]}
     },
     "nico": {
       "nombre": "Nico Barreto", "oficio": "Administrador de un grupo de chat",
       "cuerpo": "npc_hombre_01.glb", "escala": 0.95,
       "piel": [222, 178, 140], "pelo": [120, 80, 40],
-      "ropa": {"camiseta": [60, 150, 90], "pantalon": [60, 84, 130], "zapatos": [236, 234, 228]},
+      "ropa": {"camiseta": [60, 150, 90], "pantalon": [74, 90, 120], "zapatos": [236, 234, 228]},
       "rostro": {"peinado": "corto", "gafas": false, "bigote": false, "barba": null, "arrugas": false, "canas": false,
                  "auriculares": {"color": [236, 236, 240], "almohadilla": [60, 150, 90], "al_cuello": false},
                  "iris": [0.25, 0.18, 0.08]},
       "corbata": null,
-      "retrato": {"pelo_estilo": "corto", "accesorio": "ninguno"}
+      "retrato": {"pelo_estilo": "corto", "accesorio": "ninguno"},
+      "glb_v2": "v2/nico.glb", "rostro_v2": {"peinado": null, "auriculares": null},
+      "hoy": {"pantalon": [60, 84, 130]}
     },
     "ramiro": {
       "nombre": "Ramiro Pestana", "oficio": "Dueño de un estudio de jingles",
       "cuerpo": "npc_hombre_02.glb", "escala": 1.0,
-      "piel": [196, 140, 100], "pelo": [70, 50, 36],
+      "piel": [196, 140, 100], "pelo": [70, 50, 30],
       "ropa": {"camiseta": [170, 60, 60], "pantalon": [200, 190, 170], "zapatos": [40, 40, 44]},
       "rostro": {"peinado": "afro", "gafas": false, "bigote": true, "barba": null, "arrugas": false, "canas": false, "auriculares": null,
                  "iris": [0.18, 0.11, 0.06]},
       "corbata": null,
-      "retrato": {"pelo_estilo": "corto", "accesorio": "barba"}
+      "retrato": {"pelo_estilo": "corto", "accesorio": "barba"},
+      "glb_v2": "v2/ramiro.glb", "rostro_v2": {"peinado": null, "barba": null},
+      "hoy": {"pelo": [70, 50, 36]}
     },
     "seu_ze": {
       "nombre": "Seu Zé", "oficio": "Vendedor de la calle",
       "cuerpo": "npc_hombre_02.glb", "escala": 0.96,
-      "piel": [196, 146, 104], "pelo": [120, 120, 126],
-      "ropa": {"camiseta": [236, 196, 64], "pantalon": [70, 76, 96], "zapatos": [96, 70, 44]},
+      "piel": [196, 146, 104], "pelo": [122, 122, 128],
+      "ropa": {"camiseta": [150, 110, 70], "pantalon": [70, 76, 96], "zapatos": [96, 70, 44]},
       "rostro": {"peinado": "calvo", "gafas": false, "bigote": true, "barba": "chivo", "arrugas": true, "canas": false, "auriculares": null,
                  "iris": [0.20, 0.13, 0.07]},
       "corbata": null,
-      "retrato": {"pelo_estilo": "calvo", "accesorio": "barba"}
+      "retrato": {"pelo_estilo": "calvo", "accesorio": "barba"},
+      "glb_v2": "v2/seu_ze.glb", "rostro_v2": {"peinado": null, "barba": null},
+      "hoy": {"pelo": [120, 120, 126], "camiseta": [236, 196, 64]}
     },
     "vecina": {
       "nombre": "Doña Neide", "oficio": "Vecina del mercado",
-      "cuerpo": "npc_mujer_02.glb", "escala": 0.95,
-      "piel": [226, 178, 138], "pelo": [150, 150, 156],
-      "ropa": {"camiseta": [150, 90, 130], "pantalon": [96, 84, 72], "zapatos": [120, 90, 70]},
+      "cuerpo": "npc_mujer_02.glb", "escala": 0.92,
+      "piel": [200, 148, 110], "pelo": [224, 224, 228],
+      "ropa": {"camiseta": [140, 120, 180], "pantalon": [96, 84, 72], "zapatos": [120, 90, 70]},
       "rostro": {"peinado": null, "gafas": false, "bigote": false, "barba": null, "arrugas": true, "canas": false, "auriculares": null,
                  "iris": [0.20, 0.13, 0.07]},
       "corbata": null,
-      "retrato": {"pelo_estilo": "largo", "accesorio": "ninguno"}
+      "retrato": {"pelo_estilo": "largo", "accesorio": "ninguno"},
+      "glb_v2": "v2/vecina.glb", "rostro_v2": {"gafas": true},
+      "hoy": {"escala": 0.95, "piel": [226, 178, 138], "pelo": [150, 150, 156], "camiseta": [150, 90, 130]}
+    },
+    "arenas": {
+      "nombre": "Tomás Arenas", "oficio": "Alcalde de siempre",
+      "cuerpo": "npc_hombre_03.glb", "escala": 1.0,
+      "piel": [210, 160, 126], "pelo": [200, 200, 204],
+      "ropa": {"camiseta": [90, 94, 102], "pantalon": [90, 94, 102], "zapatos": [32, 30, 34]},
+      "rostro": {"peinado": "pompadour", "gafas": false, "bigote": true, "barba": null, "arrugas": true, "canas": false, "auriculares": null,
+                 "iris": [0.16, 0.12, 0.08]},
+      "corbata": [46, 90, 140],
+      "retrato": {"pelo_estilo": "corto", "accesorio": "corbata"},
+      "glb_v2": "v2/arenas.glb", "rostro_v2": {"peinado": null},
+      "solo_v2": true
     }
   }
 }

@@ -153,3 +153,10 @@ Fecha: [...]
 
 - Apache 2.0 permite redistribuir la fuente dentro del juego; hay que conservar el archivo de licencia junto a ella.
 - Si se cambia el fondo por la versión ampliada con IA, anotar aquí la herramienta usada y sus condiciones.
+
+## 10. Modelos 3D v2 de la fase Blender (sesión F, 24-nov)
+
+- **Archivos:** `assets/modelos/personajes/v2/` — elenco (`fiscal, ines, marcos, livia, eurico, baltazar, jandira, nico, ramiro, arenas, seu_ze, vecina, etapa_capucha`) y protagonistas arreglados (`ciudadano, periodista, smoking, brasilena`). Los `.glb` de antes no se tocaron.
+- **Elenco (13):** autor «equipo Alcalde Digital»; cuerpos generados con **MPFB2 (MakeHuman para Blender)**, cuya salida es **CC0** (el addon es GPLv3, lo que genera no); cabezas copiadas de `npc_hombre_*`/`npc_mujer_*` (ver §5: su autoría sigue por confirmar); piezas (pelo, ropa, accesorios) hechas por script en `D:\Proyectos\JuegoEstructura2\blender\kit\` (fuera del repo). Licencia declarada en el archivo: CC0-1.0, en `asset.extras.alcalde` (`autor`, `base`, `licencia`, `generador`, `fecha`, `referencia`). **Ojo:** la cabeza y el esqueleto vienen de los NPC de §5; mientras su autoría no se confirme, la licencia CC0 aplica a lo nuevo (cuerpo MPFB2 y piezas), no a esa parte.
+- **Protagonistas v2 (4):** el modelo original del dueño (ver `MODELOS_3D.md`, «Personajes con modelo»), con arreglos por script (`blender\protagonistas\arreglar_protagonista.py`): jerarquía de huesos, pelo modelado a partir del pelo por código, Idle, materiales unidos. Licencia: la del original (del dueño); en `asset.extras.alcalde` consta «equipo Alcalde Digital (modelo original de Sam; arreglos por script)».
+- No se usó generación de modelos con IA ni modelos de terceros nuevos.

@@ -9,13 +9,16 @@
 #     el mismo nombre que usan los otros .glb: la multitud lo reconoce y lo quita en sus figuras lejanas).
 # Cada NPC recolorea su copia por zonas (piel, camiseta, pantalón, pelo, zapatos); el .glb no se toca.
 # Si algo falla, `disponible()` avisa UNA vez por modelo y quien crea el NPC usa otro modelo (npc_modelo.crear_npc).
+# Elenco v2 (sesión F): los .glb v2 (plan["v2"]) entran por aquí igual; su plan trae la ruta y los grupos que se
+# recolorean (ninguno, o la piel del NPC de etapa con capucha), y sus zonas se registran desde el propio .glb.
 
 import sys
+from pathlib import Path
 
 import gltf
 from direct.actor.Actor import Actor
-from panda3d.core import (Geom, GeomTriangles, GeomVertexData, GeomVertexReader, GeomVertexRewriter, GeomVertexWriter,
-                          Material, MaterialAttrib, NodePath, RenderState)
+from panda3d.core import (AnimBundle, AnimBundleNode, AnimChannelMatrixXfmTable, AnimGroup, CharacterJoint, Geom, GeomTriangles, GeomVertexData, GeomVertexReader,
+                          GeomVertexRewriter, GeomVertexWriter, Material, MaterialAttrib, NodePath, RenderState)
 
 from frontend import animacion_humana as ah
 from frontend import casco_pantalla_calculos as cpc
@@ -29,6 +32,9 @@ POSTURAS = True                  # hornear las variantes de postura (False = los
 
 _zonas = {}                      # clave -> {(nodo, geom): [(grupo, brillo, color original)] por fila de vértices}
 _fallidos = {}                   # clave -> motivo (no se reintenta en cada NPC)
+_clips = {}                      # clave -> (AnimBundles horneados, medidas de animacion_humana, {hueso: padre})
+_reordenados = {}                # (clave de la referencia, orden de huesos del v2) -> AnimBundles en ese orden
+REUSAR_CLIPS_V2 = True           # carga (sesión F): un .glb v2 usa los clips ya horneados de su referencia
 
 
 def _avisar(clave, motivo):
@@ -38,10 +44,15 @@ def _avisar(clave, motivo):
 # Grupo, brillo de la banda de luz y color original de cada fila de vértices de un Geom.
 def _leer_zonas(datos, archivo):
     filas = []
+    grupos = {}                  # carga: el grupo depende solo del color, y hay pocos colores distintos (uno por zona)
     color, normal = GeomVertexReader(datos, "color"), GeomVertexReader(datos, "normal")
     while not color.isAtEnd():
         c, n = color.getData4(), normal.getData3()
-        filas.append((nn.grupo_de_color(archivo, c), nn.banda_luz(n), (c[0], c[1], c[2])))
+        rgb = (c[0], c[1], c[2])
+        grupo = grupos.get(rgb, grupos)
+        if grupo is grupos:
+            grupo = grupos[rgb] = nn.grupo_de_color(archivo, c)
+        filas.append((grupo, nn.banda_luz(n), rgb))
     return filas
 
 
@@ -79,20 +90,91 @@ def _casco_tinta(origen):
         color.setData4(*nn.COLOR_CONTORNO, 1.0)
         if normales is not None:
             normales.setData3(s[0] / largo, s[1] / largo, s[2] / largo)
-    triangulos = GeomTriangles(Geom.UHStatic)
-    for primitiva in origen.getPrimitives():
-        primitiva = primitiva.decompose()
-        vertices = [primitiva.getVertex(i) for i in range(primitiva.getNumVertices())]
-        for t in range(0, len(vertices) - 2, 3):
-            triangulos.addVertices(vertices[t], vertices[t + 2], vertices[t + 1])
-    triangulos.closePrimitive()
+    # triángulos al revés: GeomPrimitive.reverse() (en C++) da los mismos triángulos con el orden invertido, igual que
+    # el bucle de antes (v0, v2, v1) salvo por la rotación del primer vértice (carga, sesión F: ~10x más rápido)
     casco = Geom(datos)
-    casco.addPrimitive(triangulos)
+    for primitiva in origen.getPrimitives():
+        casco.addPrimitive(primitiva.decompose().reverse())
     return casco
 
 
+# {hueso: padre} del esqueleto de un Character (para ver si dos modelos comparten esqueleto).
+def _arbol(personaje):
+    arbol = {}
+
+    def rec(grupo, padre):
+        for i in range(grupo.getNumChildren()):
+            hijo = grupo.getChild(i)
+            if isinstance(hijo, CharacterJoint):
+                arbol[hijo.getName()] = padre
+                rec(hijo, hijo.getName())
+            else:
+                rec(hijo, padre)
+    rec(personaje.node().getBundle(0), None)
+    return arbol
+
+
+# Carga (sesión F): los .glb v2 copian el esqueleto de su referencia (npc_hombre_0X / npc_mujer_0X: mismos huesos,
+# mismos padres, reposo igual a < 1e-4), así que sus clips horneados (básicos, humanos y de postura) son los de la
+# referencia: se enlazan los mismos AnimBundles en vez de hornearlos otra vez (~85 % del coste de preparar un modelo).
+# Medido: diferencia máxima entre hornear el v2 y reusar la referencia < 0,05 grados y < 0,002 mm en los 40 clips
+# (sesiones-24nov/blender-1/elenco-en-juego/carga/comparar_clips.py). None si no se puede (se hornea como siempre).
+def _clips_de_referencia(plan, personaje):
+    if not (REUSAR_CLIPS_V2 and plan.get("v2")):
+        return None
+    try:
+        referencia = nn.datos_de(plan["archivo"]).get("referencia")
+        if referencia not in nn.DATOS:
+            return None
+        clave_ref = referencia[:-4]
+        _base({"archivo": referencia, "rol": clave_ref})    # ya preparada casi siempre (los peatones la usan)
+        bancos, medidas, arbol = _clips[clave_ref]
+        propio = _arbol(personaje)
+        if propio != arbol:                              # mismos huesos y mismos padres (el orden puede variar)
+            return None
+        orden = tuple(propio.items())
+        if orden != tuple(arbol.items()):
+            # Panda enlaza clip y esqueleto recorriendo los dos árboles en paralelo: con los hijos en otro orden el
+            # enlace sale cruzado (huesos estirados a kilómetros). Se rearman los clips en el orden del v2, con las
+            # mismas tablas (una vez por referencia y orden; los v2 de un mismo kit comparten orden).
+            clave = (clave_ref, orden)
+            if clave not in _reordenados:
+                _reordenados[clave] = [_reordenar(banco, orden) for banco in bancos]
+            bancos = _reordenados[clave]
+        return bancos, medidas
+    except Exception:      # noqa: BLE001 — sin referencia utilizable: se hornea
+        return None
+
+
+# AnimBundle con las mismas tablas que `banco` pero con los canales en el orden `orden` ((hueso, padre) en recorrido en
+# profundidad del esqueleto destino). Lanza si a `banco` le falta algún hueso.
+def _reordenar(banco, orden):
+    tablas = {}
+
+    def rec(grupo):
+        for i in range(grupo.getNumChildren()):
+            canal = grupo.getChild(i)
+            if isinstance(canal, AnimChannelMatrixXfmTable):
+                tablas[canal.getName()] = canal
+            rec(canal)
+    rec(banco)
+    nuevo = AnimBundle(banco.getName(), banco.getBaseFrameRate(), banco.getNumFrames())
+    raiz = AnimGroup(nuevo, "<skeleton>")
+    canales = {}
+    for nombre, padre in orden:
+        origen = tablas[nombre]
+        canal = AnimChannelMatrixXfmTable(raiz if padre is None else canales[padre], nombre)
+        for k in "hprxyzijkabc":
+            tabla = origen.getTable(k.encode())
+            if len(tabla):
+                canal.setTable(k.encode(), tabla)
+        canales[nombre] = canal
+    return nuevo
+
+
 # Deja el modelo recién cargado listo para ser la base de las copias (ver la cabecera). Lanza si no se puede.
-def _preparar(modelo_np, archivo, clave):
+# `plan`: si es un v2 con referencia utilizable, sus clips salen de ella (_clips_de_referencia).
+def _preparar(modelo_np, archivo, clave, plan=None):
     personaje = modelo_np.find("**/+Character")
     if personaje.isEmpty():
         raise ValueError("el modelo no tiene esqueleto")
@@ -112,11 +194,21 @@ def _preparar(modelo_np, archivo, clave):
             _pintar(datos, filas, {})                # la base ya lleva las bandas de luz con sus colores de origen
     if not zonas:
         raise ValueError("el modelo no tiene color de vértice")
-    npc_postura.hornear_clips_basicos(modelo_np)
-    if pm.ANIMACION_HUMANA:
-        ah.hornear_clips(modelo_np, clave)
-        if POSTURAS:
-            npc_postura.hornear_posturas(modelo_np, clave)
+    reuso = _clips_de_referencia(plan or {}, personaje)
+    if reuso is not None:
+        bancos, medidas = reuso
+        for banco in bancos:
+            personaje.attachNewNode(AnimBundleNode("rig", banco))
+        if medidas is not None:
+            ah._cache_medidas[clave] = medidas
+    else:
+        npc_postura.hornear_clips_basicos(modelo_np)
+        if pm.ANIMACION_HUMANA:
+            ah.hornear_clips(modelo_np, clave)
+            if POSTURAS:
+                npc_postura.hornear_posturas(modelo_np, clave)
+    _clips[clave] = ([n.node().getBundle() for n in personaje.findAllMatches("**/+AnimBundleNode")],
+                     ah._cache_medidas.get(clave), _arbol(personaje))
     pesos_cabeza.unificar(modelo_np, clave)           # bug-pelo: coronilla rígida con la cabeza al mezclar clips
     return zonas
 
@@ -130,11 +222,13 @@ def _base(plan):
     if clave in _fallidos:
         raise RuntimeError(_fallidos[clave])
     try:
-        ruta = pm.CARPETA_MODELOS / plan["archivo"]
+        ruta = Path(plan["ruta"]) if plan.get("ruta") else pm.CARPETA_MODELOS / plan["archivo"]
         if not ruta.is_file():
             raise FileNotFoundError(f"no existe {ruta.name}")
+        if plan.get("v2"):       # elenco v2: zonas, esqueleto y escala salen del propio .glb (asset.extras.alcalde)
+            nn.registrar_v2(plan["archivo"], nn.datos_v2(nn.leer_gltf(ruta)))
         modelo = NodePath(gltf.load_model(str(ruta), gltf_settings=gltf.GltfSettings()))
-        zonas = _preparar(modelo, plan["archivo"], clave)
+        zonas = _preparar(modelo, plan["archivo"], clave, plan)
         base = Actor(modelo)
         base.hide()
     except Exception as error:

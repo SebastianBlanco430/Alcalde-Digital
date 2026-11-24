@@ -8,9 +8,16 @@
 # el de la brasileña ("Hips/Spine/Head", 37 huesos), así que la animación humana y la cara por código les sirven
 # tal cual. El nodo del esqueleto viene escalado (0,85-0,91) para dar la altura de cada uno (1,66-1,80 m): al
 # cargarlo se quita esa escala (el modelo queda en las medidas del periodista / la brasileña) y se aplica al Actor.
+#
+# Elenco v2 (sesión F): los .glb v2 (assets/modelos/personajes/v2/<id>.glb, uno por personaje con nombre, y el de los
+# NPC de etapa con capucha) entran por esta misma ruta. Sus datos (zonas de color, esqueleto, escala del nodo del
+# esqueleto) no están en DATOS: salen del propio .glb (`datos_v2`, de asset.extras.alcalde y del nodo raíz) y se
+# registran al cargarlo (`registrar_v2`). Un plan v2 lleva "recolor": los grupos que se repintan (ninguno, o la piel).
 
 from frontend import tinta_calculos as _tinta   # T1: fuente única del grosor de tinta
+import json
 import random
+import struct
 
 from frontend import npc_calculos as nc
 
@@ -72,6 +79,74 @@ def es_nuevo(archivo):
     return archivo in ARCHIVOS_NUEVOS
 
 
+# -- .glb v2 (elenco con malla propia) --------------------------------------------------------------------------------
+
+ROSTRO_POR_ESQUELETO = {"hombre": "periodista", "mujer": "influencer"}    # cabeza de qué modelo conocido
+ESPALDA_POR_ESQUELETO = {"hombre": ESPALDA_POR_ARCHIVO["npc_hombre_02.glb"], "mujer": ESPALDA_POR_ARCHIVO["npc_mujer_01.glb"]}
+DATOS_V2 = {}                    # archivo v2 -> datos (como DATOS), registrados al cargar cada .glb v2
+
+
+def leer_gltf(ruta):
+    """JSON (dict) de un .glb, sin Panda: cabecera de 12 bytes y el primer chunk (JSON)."""
+    with open(ruta, "rb") as f:
+        cabecera = f.read(20)
+        if len(cabecera) < 20:
+            raise ValueError("archivo truncado")
+        magic, version, _, largo, tipo = struct.unpack("<IIIII", cabecera)
+        if magic != 0x46546C67 or version != 2 or tipo != 0x4E4F534A:
+            raise ValueError("no es un .glb 2.0 con chunk JSON")
+        return json.loads(f.read(largo).decode("utf-8"))
+
+
+def datos_v2(gltf):
+    """Datos de un .glb v2 (mismas claves que DATOS + "esqueleto" e "id") desde su JSON: zonas de
+    asset.extras.alcalde (color tal como lo lee Panda, 0-1), esqueleto "hombre"/"mujer" y la escala del nodo raíz (el
+    del esqueleto, que al cargar se pasa al Actor). Lanza ValueError si faltan."""
+    alcalde = ((gltf.get("asset") or {}).get("extras") or {}).get("alcalde")
+    if not isinstance(alcalde, dict):
+        raise ValueError("sin asset.extras.alcalde")
+    esqueleto = alcalde.get("esqueleto")
+    if esqueleto not in ROSTRO_POR_ESQUELETO:
+        raise ValueError(f"esqueleto {esqueleto!r}: se espera uno de {tuple(ROSTRO_POR_ESQUELETO)}")
+    zonas = []
+    for entrada in alcalde.get("zonas") or ():
+        color, grupo = entrada[0], entrada[1]
+        if len(color) < 3 or not all(0.0 <= float(c) <= 1.0 for c in color[:3]):
+            raise ValueError(f"zona {grupo!r}: color fuera de 0-1")
+        zonas.append((tuple(float(c) for c in color[:3]), str(grupo)))
+    escenas = gltf.get("scenes") or [{}]
+    raices = escenas[gltf.get("scene", 0)].get("nodes") or []
+    nodos = gltf.get("nodes") or []
+    escala = 1.0
+    for i in raices:
+        e = nodos[i].get("scale")
+        if e:
+            escala = float(e[0])
+            break
+    return {"id": alcalde.get("id"), "esqueleto": esqueleto, "referencia": alcalde.get("referencia"),
+            "rol_rostro": ROSTRO_POR_ESQUELETO[esqueleto],
+            "escala": escala, "mujer": esqueleto == "mujer", "zonas": tuple(zonas)}
+
+
+def registrar_v2(archivo, datos):
+    DATOS_V2[archivo] = datos
+
+
+def datos_de(archivo):
+    """Datos de un modelo nuevo: los de DATOS o los registrados de su .glb v2."""
+    datos = DATOS.get(archivo)
+    return datos if datos is not None else DATOS_V2[archivo]
+
+
+def plan_v2(archivo, datos, ruta, fase, colores, escala, recolor=()):
+    """Plan de un .glb v2 (mismas claves que plan_nuevo + "v2", "ruta", "recolor"). Sin mochila, sin camisa ni corbata
+    pintadas por código: lo que lleva el personaje viene en su malla."""
+    return {"archivo": archivo, "rol": archivo, "nuevo": True, "v2": True, "ruta": str(ruta),
+            "rol_rostro": datos["rol_rostro"], "camiseta_nueva": None, "escala_base": datos["escala"],
+            "escala": escala, "colores": dict(colores), "recolor": tuple(recolor), "mochila": None, "corbata": None,
+            "fase": fase}
+
+
 # Archivo y clave del NPC `indice` con el reparto nuevo: de cada bloque de 7 sale uno de cada (5 nuevos + ciudadano +
 # brasileña), en orden barajado por (semilla, bloque). Generador propio: no toca el de nc.modelo_npc.
 def modelo_variado(indice, semilla):
@@ -84,7 +159,7 @@ def modelo_variado(indice, semilla):
 # Grupo ("piel", "camiseta"...) al que pertenece un color de vértice del modelo, o None si no es de ninguna zona.
 def grupo_de_color(archivo, color):
     mejor, distancia = None, TOLERANCIA_COLOR
-    for referencia, grupo in DATOS[archivo]["zonas"]:
+    for referencia, grupo in datos_de(archivo)["zonas"]:
         d = max(abs(color[i] - referencia[i]) for i in range(3))
         if d <= distancia:
             mejor, distancia = grupo, d
@@ -127,18 +202,22 @@ def plan_nuevo(indice, semilla, aspecto, modelo):
 
 # Colores por grupo que se pintan en un modelo nuevo: los del plan para los grupos recoloreables.
 def objetivos_nuevo(plan):
-    return {grupo: plan["colores"][grupo] for grupo in GRUPOS_RECOLOR if plan["colores"].get(grupo) is not None}
+    grupos = plan.get("recolor", GRUPOS_RECOLOR)      # v2: solo los que dice el plan (ninguno, o la piel)
+    return {grupo: plan["colores"][grupo] for grupo in grupos if plan["colores"].get(grupo) is not None}
 
 
 # Hueso de la espalda y centro de la mochila de un plan nuevo.
 def espalda(plan):
-    return ESPALDA_POR_ARCHIVO[plan["archivo"]]
+    archivo = plan["archivo"]
+    if archivo in ESPALDA_POR_ARCHIVO:
+        return ESPALDA_POR_ARCHIVO[archivo]
+    return ESPALDA_POR_ESQUELETO["mujer" if datos_de(archivo)["mujer"] else "hombre"]
 
 
 # Rasgos de la cara para un modelo nuevo: las mujeres traen el cabello en el modelo (sin peinado ni gorra por código)
 # y no reciben bigote ni barba; los hombres traen el pelo pintado al ras, así que el peinado por código va encima.
 def rasgos_nuevo(archivo, rasgos):
     rasgos = dict(rasgos)
-    if DATOS[archivo]["mujer"]:
+    if datos_de(archivo)["mujer"]:
         rasgos.update(peinado=None, gorra=None, bigote=False, barba=None)
     return rasgos

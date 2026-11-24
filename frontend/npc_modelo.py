@@ -81,9 +81,11 @@ class PersonajeNPC(PersonajeModelo):
             _avisar(f"no se pudo recolorear {self._plan['archivo']} ({error})")
         return actor
 
-    # T5: toon duro solo en los modelos nuevos (color plano + bandas horneadas); las copias de los 4 .glb, no.
+    # T5: toon duro solo en los modelos nuevos (color plano + bandas horneadas); las copias de los 4 .glb, no. Los .glb v2
+    # del elenco entran por la misma ruta (color plano + bandas horneadas al cargar).
     def _toon_duro(self):
-        return bool(self._plan.get("nuevo")) and tdc.usa_toon_duro(self._plan.get("archivo"))
+        return bool(self._plan.get("nuevo")) and (bool(self._plan.get("v2"))
+                                                  or tdc.usa_toon_duro(self._plan.get("archivo")))
 
     # T2: casco de tinta de grosor ~constante en pantalla en los modelos nuevos (los únicos con casco inflado por normal).
     def _casco_pantalla(self):
@@ -100,6 +102,8 @@ class PersonajeNPC(PersonajeModelo):
         piezas = rc.piezas_rostro(descriptor)
         if rol in rc.AJUSTE_ROSTRO_POR_ROL:
             piezas = rc.ajustar_piezas(piezas, *rc.AJUSTE_ROSTRO_POR_ROL[rol])
+        if self._plan.get("ajuste_rostro"):          # elenco v2: encaje fino de la cara en una cabeza nueva (rostro_v2.ajuste)
+            piezas = rc.ajustar_piezas(piezas, *self._plan["ajuste_rostro"])
         return colocar_rostro_animado_piezas(self.actor, rol, piezas, zlib.crc32(nombre.encode()))
 
     # Cada NPC arranca su ciclo en un punto distinto para no ir todos al compás.
@@ -264,9 +268,14 @@ def _triangulos(geom):
 # `nombre` (opcional): nombre visible del NPC; con NOMBRES_POR_GENERO su modelo pasa a ser de su género
 # (frontend/npc_genero_calculos.py). None = como siempre.
 def crear_npc(indice, semilla, aspecto, rasgos, color_ropa, nombre=None, personaje=None, **opciones):
+    if rasgos and rasgos.get("capucha"):     # NPC de etapa con capucha: con el elenco v2, v2/etapa_capucha.glb
+        npc = _crear_etapa_capucha(indice, semilla, aspecto, rasgos, nombre, **opciones)
+        if npc is not None:
+            return npc
     receta = _receta(personaje, nombre)
     if receta is not None:          # personaje con nombre: el mismo que en la Fiscalía (backend/datos/personajes_fiscalia.json)
-        npc = crear_desde_receta(receta, **opciones)
+        # solo_v2 (Arenas): sin su malla v2 sale como siempre (la fábrica de siempre, más abajo)
+        npc = crear_v2(receta, **opciones) if receta.solo_v2 else crear_desde_receta(receta, **opciones)
         if npc is not None:
             return npc
     try:
@@ -295,10 +304,60 @@ def _receta(personaje, nombre):
         return None
 
 
-# PersonajeNPC de un personaje con nombre hecho con su receta (fuente única). Si su cuerpo no carga prueba los otros de su
-# género y, como último recurso, el cuerpo de emergencia (visible, con aviso por stderr). None si nada carga.
+# Elenco v2 (sesión F): PersonajeNPC con la malla propia del personaje (v2/<id>.glb), si ALCALDE_ELENCO_V2 está activa
+# y el .glb existe y carga; si no, None (con un aviso UNA vez por stderr) y quien llama usa la receta de hoy.
+def crear_v2(receta, **opciones):
+    from backend.logica import modelos_v2 as mv2
+    from frontend import personajes_receta_calculos as prc
+    plan = prc.elegir_v2(receta)
+    if plan is None:
+        return None
+    if not nnm.disponible(plan):
+        mv2.avisar_una_vez(f"elenco:{receta.id}", f"{receta.nombre}: {receta.glb_v2} no carga; se usa su receta de hoy.")
+        return None
+    try:
+        return PersonajeNPC(receta.nombre, plan, prc.aspecto_v2(receta), prc.rasgos_v2(receta), **opciones)
+    except Exception as error:      # noqa: BLE001
+        mv2.avisar_una_vez(f"elenco:{receta.id}", f"{receta.nombre}: no se pudo crear con {receta.glb_v2} ({error}); "
+                                                  "se usa su receta de hoy.")
+        return None
+
+
+# NPC de etapa con capucha (Raponero, Jíbaro, Extorsionador) con v2/etapa_capucha.glb: la capucha va en la malla (sin los
+# elipsoides de rostro_calculos.capucha) y solo su piel se recolorea. None = sin elenco v2 o sin el .glb (aviso UNA vez):
+# sale de la fábrica de siempre con la capucha por código.
+def _crear_etapa_capucha(indice, semilla, aspecto, rasgos, nombre, **opciones):
+    from backend.logica import modelos_v2 as mv2
+    from frontend import personajes_receta_calculos as prc
+    try:
+        plan = prc.plan_etapa_capucha(indice, semilla, aspecto)
+        if plan is None:
+            return None
+        if not nnm.disponible(plan):
+            mv2.avisar_una_vez("elenco:etapa_capucha", f"{prc.ETAPA_CAPUCHA} no carga; se usa la capucha por código.")
+            return None
+        return PersonajeNPC(nombre or "", plan, aspecto, prc.rasgos_etapa_capucha(rasgos), **opciones)
+    except Exception as error:      # noqa: BLE001
+        mv2.avisar_una_vez("elenco:etapa_capucha", f"NPC de etapa con capucha: {error}; se usa la capucha por código.")
+        return None
+
+
+# Carga (elenco v2): prepara una vez la base de v2/etapa_capucha.glb (la comparten los 3 NPC de etapa con capucha) para que
+# no se prepare en un frame de juego. True si quedó lista; False sin elenco v2, sin el .glb o si no carga (avisa una vez).
+def precargar_etapa_capucha():
+    from frontend import personajes_receta_calculos as prc
+    plan = prc.plan_etapa_capucha(0, 0, {"piel": (180, 130, 100), "pelo": (40, 30, 30), "pantalon": (40, 40, 50)})
+    return plan is not None and nnm.disponible(plan)
+
+
+# PersonajeNPC de un personaje con nombre hecho con su receta (fuente única). Con el elenco v2, su malla propia (crear_v2).
+# Si no, o si no carga, su receta de hoy: si su cuerpo no carga prueba los otros de su género y, como último recurso, el
+# cuerpo de emergencia (visible, con aviso por stderr). None si nada carga.
 def crear_desde_receta(receta, **opciones):
     from frontend import personajes_receta_calculos as prc
+    npc = crear_v2(receta, **opciones)
+    if npc is not None:
+        return npc
     rasgos = prc.rasgos(receta)
     aspecto = prc.aspecto(receta)
     cuerpos = [receta.cuerpo] + prc.respaldos(receta)
@@ -316,8 +375,9 @@ def crear_desde_receta(receta, **opciones):
         archivo, rol = prc.CUERPO_EMERGENCIA
         s = prc.semilla(receta)
         plan = nc.plan_npc(s, s, aspecto, modelo=(archivo, rol))
-        plan["colores"]["camiseta"] = tuple(c / 255 for c in receta.camiseta)
-        plan["colores"]["pantalon"] = tuple(c / 255 for c in receta.pantalon)
+        hoy = prc.colores_hoy(receta)
+        plan["colores"]["camiseta"] = tuple(c / 255 for c in hoy["camiseta"])
+        plan["colores"]["pantalon"] = tuple(c / 255 for c in hoy["pantalon"])
         plan["mochila"] = None
         plan["escala"] = 1.0
         _avisar(f"{receta.nombre}: ningún cuerpo de NPC carga; se usa el de emergencia ({archivo})")
