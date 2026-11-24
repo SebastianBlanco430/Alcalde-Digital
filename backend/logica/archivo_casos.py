@@ -18,6 +18,7 @@ import textwrap
 from dataclasses import dataclass, field
 
 from backend.logica import casos as modulo_casos
+from backend.logica import evidencia
 from backend.logica.game_state import GRUPOS
 
 CATEGORIAS = ("evidencia", "decision", "prueba", "hallazgo", "acusacion", "resultado")
@@ -246,20 +247,60 @@ def _rellenar(plantilla, **valores):
     return string.Formatter().vformat(plantilla, (), _Seguro(valores))
 
 
+# Catálogo v2 por defecto (Fiscalía v2): solo con ALCALDE_FISCALIA_V2 encendida; si no carga, ninguno.
+def _catalogo_v2_por_defecto():
+    from backend.logica import fiscalia_bandera
+    if not fiscalia_bandera.activa():
+        return {}
+    try:
+        from backend.datos import casos_loader
+        return casos_loader.cargar_catalogo_v2()
+    except (ValueError, OSError):
+        return {}
+
+
 # Resuelve nombres legibles. `textos`: el JSON de archivo_casos_textos.json. `casos`: {id: Caso} (opcional).
 # `nombre_nivel`: callable(id_nivel) -> nombre del nivel de parkour (opcional).
+# Fiscalía v2 (sesión A): `casos_v2` = {id: CasoV2}; None = el catálogo v2 real si la bandera está encendida (se carga
+# solo si hace falta). Se consulta DESPUÉS de `casos`, únicamente cuando allí no está lo pedido (un final que el v1 no
+# tiene, como «final_cargos»): con la bandera apagada todo se ve como hoy. Las pruebas v2 llegan como
+# «<id_caso>.<id_prueba>» (evidencia.id_de_caso) y se muestran por su nombre.
 class Contexto:
 
-    def __init__(self, textos, casos=None, nombre_nivel=None):
+    def __init__(self, textos, casos=None, nombre_nivel=None, casos_v2=None):
         self.textos = textos
         self.casos = casos or {}
         self.nombre_nivel = nombre_nivel
+        self._casos_v2 = casos_v2
+
+    def _v2(self):
+        if self._casos_v2 is None:
+            self._casos_v2 = _catalogo_v2_por_defecto()
+        return self._casos_v2
+
+    # Los casos con ese id: primero el del catálogo dado y, detrás, el v2.
+    def _candidatos(self, caso_id):
+        primero = self.casos.get(caso_id)
+        salida = [primero] if primero is not None else []
+        if caso_id is not None:
+            segundo = self._v2().get(caso_id)
+            if segundo is not None:
+                salida.append(segundo)
+        return salida
+
+    def _con_nodo(self, caso_id, nodo_id):
+        return next((c for c in self._candidatos(caso_id) if nodo_id in c.nodos), None)
 
     def nombre_caso(self, caso_id):
-        caso = self.casos.get(caso_id)
+        caso = next(iter(self._candidatos(caso_id)), None)
         return caso.titulo if caso is not None else (caso_id or "?")
 
     def nombre_evidencia(self, evidencia_id, caso_id=None):
+        if isinstance(evidencia_id, str) and evidencia.SEPARADOR_CASO in evidencia_id:
+            prefijo, _, corta = evidencia_id.partition(evidencia.SEPARADOR_CASO)
+            for caso in self._candidatos(caso_id or prefijo):
+                if corta in caso.evidencias:
+                    return caso.nombre_evidencia(corta)
         candidatos = [self.casos[caso_id]] if caso_id in self.casos else list(self.casos.values())
         for caso in candidatos:
             if evidencia_id in caso.evidencias:
@@ -267,42 +308,44 @@ class Contexto:
         return evidencia_id or "?"
 
     def texto_opcion(self, caso_id, nodo_id, opcion_id):
-        caso = self.casos.get(caso_id)
-        if caso is not None and nodo_id in caso.nodos:
-            for opcion in modulo_casos.opciones_de(caso.nodos[nodo_id]):
+        caso = self._con_nodo(caso_id, nodo_id)
+        if caso is not None:
+            nodo = caso.nodos[nodo_id]
+            opciones = modulo_casos.opciones_de(nodo) or nodo.get("opciones") or []
+            for opcion in opciones:
                 if opcion.get("id") == opcion_id:
-                    return opcion.get("texto", opcion_id)
+                    return opcion.get("texto") or opcion.get("etiqueta") or opcion_id
         return opcion_id or "?"
 
     def titulo_final(self, caso_id, nodo_id):
-        caso = self.casos.get(caso_id)
-        if caso is not None and nodo_id in caso.nodos:
+        caso = self._con_nodo(caso_id, nodo_id)
+        if caso is not None:
             return caso.nodos[nodo_id].get("titulo", nodo_id)
         return nodo_id or "?"
 
     # ¿`acusado` es un personaje del caso? (sin catálogo se asume que sí). Si no lo es, fue una opción como «no acusar».
     def es_personaje(self, caso_id, acusado):
-        caso = self.casos.get(caso_id)
-        return caso is None or acusado in caso.personajes
+        candidatos = self._candidatos(caso_id)
+        return not candidatos or any(acusado in c.personajes for c in candidatos)
 
     # Texto de la opción de acusación cuya id o personaje es `acusado` (o el propio id si no se encuentra).
     def texto_acusacion(self, caso_id, acusado):
-        caso = self.casos.get(caso_id)
-        if caso is not None:
+        for caso in self._candidatos(caso_id):
             for nodo in caso.nodos.values():
                 for opcion in modulo_casos.opciones_de(nodo) if nodo.get("tipo") == "acusacion" else ():
                     if acusado in (opcion.get("id"), opcion.get("personaje")):
-                        return opcion.get("texto", acusado)
+                        return opcion.get("texto") or opcion.get("etiqueta") or acusado
         return acusado or "?"
 
     def nombre_personaje(self, caso_id, personaje_id):
-        caso = self.casos.get(caso_id)
+        caso = next((c for c in self._candidatos(caso_id) if personaje_id in c.personajes),
+                    next(iter(self._candidatos(caso_id)), None))
         return caso.nombre_personaje(personaje_id) if caso is not None else (personaje_id or "?")
 
     # Primeras palabras del texto del nodo (para decir de qué fue la novedad).
     def resumen_nodo(self, caso_id, nodo_id, maximo=70):
-        caso = self.casos.get(caso_id)
-        if caso is not None and nodo_id in caso.nodos:
+        caso = self._con_nodo(caso_id, nodo_id)
+        if caso is not None:
             return recortar(caso.nodos[nodo_id].get("texto", ""), maximo)
         return nodo_id or "?"
 
@@ -317,13 +360,31 @@ class Contexto:
     def nombre_categoria(self, categoria):
         return self.textos["categorias"].get(categoria, categoria)
 
-    # «parkour:sector_1» -> «Parkour «Sector corrupto 1...»»; «caso:x» -> «Caso «Título»».
-    def describir_origen(self, origen):
+    # Nombre en la ficción del terminal del laboratorio de un caso v2 que corresponde a `nivel` («Servidor fantasma»,
+    # «Archivo del gráfico»...), o None. Sale del caso YA resuelto por casos_loader (el nivel efectivo: sector nuevo o
+    # su respaldo); si el nivel no coincide (p. ej. partida guardada con otra bandera), por la prueba que da.
+    def nombre_terminal(self, caso_id, nivel, evidencia_id=None):
+        if isinstance(evidencia_id, str) and evidencia.SEPARADOR_CASO not in evidencia_id:
+            return None                 # prueba del v1 o del parkour global (sin «<caso>.»): no es de un terminal v2
+        caso = self._v2().get(caso_id) if caso_id is not None else None
+        parkours = getattr(caso, "laboratorio", None) or []
+        corta = evidencia_id.partition(evidencia.SEPARADOR_CASO)[2] if isinstance(evidencia_id, str) else None
+        for clave, valor in (("nivel", nivel), ("evidencia", corta)):
+            for p in parkours:
+                if valor and p.get(clave) == valor and p.get("nombre"):
+                    return p["nombre"]
+        return None
+
+    # «parkour:sector_1» -> «Parkour «Sector corrupto 1...»»; «caso:x» -> «Caso «Título»». Con el caso (pendientes-a, P6):
+    # la prueba de un terminal de la Fiscalía v2 sale con el nombre del terminal en ese caso («Servidor fantasma»).
+    def describir_origen(self, origen, caso_id=None, evidencia_id=None):
         origenes = self.textos["origenes"]
         if isinstance(origen, str) and ":" in origen:
             tipo, _, resto = origen.partition(":")
             if tipo == "parkour":
-                nombre = self.nombre_nivel(resto) if callable(self.nombre_nivel) else resto
+                nombre = self.nombre_terminal(caso_id, resto, evidencia_id)
+                if nombre is None:
+                    nombre = self.nombre_nivel(resto) if callable(self.nombre_nivel) else resto
                 return _rellenar(origenes["parkour"], nombre=nombre or resto)
             if tipo == "caso":
                 return _rellenar(origenes["caso"], nombre=self.nombre_caso(resto))
@@ -338,7 +399,7 @@ def describir(entrada, ctx):
     if entrada.categoria == "evidencia":
         p = plantillas["evidencia"]
         return (_rellenar(p["titulo"], evidencia=ctx.nombre_evidencia(entrada.evidencia_id, caso)),
-                _rellenar(p["detalle"], origen=ctx.describir_origen(entrada.origen)))
+                _rellenar(p["detalle"], origen=ctx.describir_origen(entrada.origen, caso, entrada.evidencia_id)))
     if entrada.categoria == "decision":
         p = plantillas["decision"]
         por_tiempo = ctx.textos.get("por_tiempo", "") if d.get("por_tiempo") else ""
@@ -372,9 +433,17 @@ def texto_deltas(entrada, ctx):
     return " · ".join(partes)
 
 
+# Sin acusación (P1 de la verificación de la Fiscalía v2): «no acusar» o el reloj de la acusación agotado dejan como
+# acusado el id de la OPCIÓN (rastro del v1); en «Casos jugados» no se muestra ese id crudo sino este texto.
+SIN_ACUSACION = "{caso}: {final} · {resultado} · sin acusación"
+
+
 def texto_caso_jugado(resultado, ctx):
     claves = "caso_jugado_acusado" if resultado.acusado else "caso_jugado"
-    return _rellenar(ctx.textos[claves], caso=ctx.nombre_caso(resultado.caso_id),
+    plantilla = ctx.textos[claves]
+    if resultado.acusado and not ctx.es_personaje(resultado.caso_id, resultado.acusado):
+        plantilla = ctx.textos.get("caso_jugado_sin_acusacion", SIN_ACUSACION)
+    return _rellenar(plantilla, caso=ctx.nombre_caso(resultado.caso_id),
                      final=ctx.titulo_final(resultado.caso_id, resultado.final_id),
                      resultado=ctx.nombre_resultado(resultado.resultado),
                      acusado=ctx.nombre_personaje(resultado.caso_id, resultado.acusado))
@@ -382,7 +451,7 @@ def texto_caso_jugado(resultado, ctx):
 
 def texto_evidencia(obtenida, ctx):
     return _rellenar(ctx.textos["evidencia_linea"], evidencia=ctx.nombre_evidencia(obtenida.id, obtenida.caso_id),
-                     origen=ctx.describir_origen(obtenida.origen))
+                     origen=ctx.describir_origen(obtenida.origen, obtenida.caso_id, obtenida.id))
 
 
 # «Ciudadanos: +2.6 en 1 cambio»; si hubo subidas Y bajadas se desglosan: «Vecinos: +1.4 en 3 cambios (subió 4, bajó 2.6)».

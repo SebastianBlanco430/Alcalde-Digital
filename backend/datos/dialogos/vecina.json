@@ -9,6 +9,7 @@
     "relacion_min": 70,
     "texto": ["Mi sobrino trabaja en una oficina de datos. Me enseñó una lista rara de cuentas, mira."],
     "evidencia": "lista_cuentas",
-    "entrega": "Doña Neide te pasa una lista de cuentas falsas."
+    "entrega": "Doña Neide te pasa una lista de cuentas falsas.",
+    "solo_fiscalia_v1": true
   }
 }

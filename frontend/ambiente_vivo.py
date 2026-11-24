@@ -4,6 +4,7 @@
 #   from frontend import ambiente_vivo
 #   amb = ambiente_vivo.obtener()          # Ambiente (namedtuple); AMBIENTE_INICIAL si todavía no hay partida
 #   ambiente_vivo.hora()                   # hora de juego 0..24 del reloj de la partida, o None (sin reloj / en línea)
+#   ambiente_vivo.fijar_hora_forzada(h)    # el final animado fija la hora (None la suelta)
 #   ambiente_vivo.dia()                    # día 1..7, o None
 #   ambiente_vivo.en_linea()               # ¿la partida actual es en línea? (ver «En línea»)
 #   ambiente_vivo.version()                # entero que sube cada vez que se alimenta (para cachés por frame)
@@ -105,8 +106,19 @@ def _reloj():
     return reloj if reloj is not None and hasattr(reloj, "hora") else None
 
 
+_hora_forzada = None        # hora fija del final animado (frontend/final_animado/escenografia.py); None = la del reloj
+
+
+def fijar_hora_forzada(h):
+    """Fija la hora que devuelve hora() (el final animado: 22:00, 07:30, 17:50) o la suelta con None."""
+    global _hora_forzada
+    _hora_forzada = None if h is None else float(h) % 24.0
+
+
 def hora():
     """Hora de juego 0..24 (reloj_partida.hora()), o None sin reloj (ALCALDE_RELOJ=0, en línea, sin partida)."""
+    if _hora_forzada is not None:
+        return _hora_forzada
     reloj = _reloj()
     try:
         return None if reloj is None else float(reloj.hora())

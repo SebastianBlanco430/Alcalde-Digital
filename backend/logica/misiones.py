@@ -13,12 +13,21 @@
 #
 # Mundo 3D: `punto_interaccion(lugar) -> (x, z)` es opcional; si se da, "llegar" se mide
 # contra él (la PUERTA del edificio) en vez de contra el centro de la plaza.
+#
+# REPARTO POR DÍAS (sesión D; ALCALDE_MISIONES_DIAS, backend/logica/reparto_dias.py): si la bandera está encendida y el
+# catálogo es un fondo por días (sus misiones declaran `dia`), el sistema lleva un RepartoDias con la semana sorteada
+# (semilla `semilla_reparto`; por defecto reparto_dias.semilla_local()) y `_buscar_pendiente` solo mira lo ofrecible hoy:
+# primero la de Fiscalía si ya toca (es la segunda del día), luego la prioridad de rol de siempre. El día lo fija quien
+# tiene el reloj (fijar_dia; FlujoConTiempo); sin reloj el día avanza por progreso. `catalogo()` sigue siendo el fondo
+# completo; `catalogo_semana()` es lo que se juega. Con la bandera apagada o un catálogo sin días, todo como antes.
+# Si el reparto falla, se avisa por stderr y el sistema vuelve al reparto de siempre (red de seguridad).
 
 import copy
 import math
+import sys
 from dataclasses import dataclass
 
-from backend.logica import confianza_misiones, misiones_digitales, rutas_mision
+from backend.logica import confianza_misiones, misiones_digitales, reparto_dias, rutas_mision
 
 # m: «llegué» = a menos de esto de la PUERTA del destino. Única fuente: main.py, el modo online y el
 # servidor la importan; el default del sistema coincide con el juego real.
@@ -67,8 +76,20 @@ class Mision:
     rumor: str = ""
     pista: str = ""
     grupo: str = ""             # uno de GRUPOS_CONFIANZA
+    # Reparto por días (ALCALDE_MISIONES_DIAS, backend/logica/reparto_dias.py): día de la semana (1-7) en que aparece la
+    # misión; 0 = sin día (catálogo de siempre). `arco` + `paso` encadenan misiones del mismo rumor en días distintos
+    # (paso 1, 2, 3...); una misión suelta lleva arco "" y paso 0. Solo los lee el reparto: con la bandera en 0 no pesan.
+    dia: int = 0
+    arco: str = ""
+    paso: int = 0
 
     def __post_init__(self):
+        if isinstance(self.dia, bool) or not isinstance(self.dia, int) or not 0 <= self.dia <= 7:
+            raise ValueError(f"Día de misión inválido (dia) en {self.id!r}: {self.dia!r}; debe ser 0 (sin día) o 1-7.")
+        if isinstance(self.paso, bool) or not isinstance(self.paso, int) or self.paso < 0:
+            raise ValueError(f"Paso de arco inválido (paso) en {self.id!r}: {self.paso!r}.")
+        if bool(self.arco) != bool(self.paso):
+            raise ValueError(f"La misión {self.id!r} declara arco y paso a medias (arco={self.arco!r}, paso={self.paso!r}).")
         if self.tipo not in TIPOS_MISION:
             raise ValueError(f"Tipo de misión desconocido en {self.id!r}: {self.tipo!r}; válidos: {TIPOS_MISION}.")
         if self.dificultad not in DIFICULTADES:
@@ -100,7 +121,7 @@ class SistemaMisiones:
     # Valida el catálogo: ids únicos y destinos con coordenada en el mapa
     # (ValueError si no).
     def __init__(self, mapa, catalogo, radio_interaccion=RADIO_INTERACCION, histeresis=0.3,
-                 punto_interaccion=None):
+                 punto_interaccion=None, semilla_reparto=None):
         self._mapa = mapa
         self._punto_interaccion = punto_interaccion if punto_interaccion is not None else mapa.coordenada
         self._catalogo = list(catalogo)
@@ -123,6 +144,11 @@ class SistemaMisiones:
         self._resultado = None
         self._roles_en_juego = None
         self._rutas = {}        # {rol: ruta} (rutas_mision.ruta_de_rol); el catálogo no cambia, se calcula una vez
+        # RepartoDias o None (bandera apagada o catálogo sin días: reparto de siempre).
+        self._reparto = None
+        if reparto_dias.activo() and reparto_dias.tiene_dias(self._catalogo):
+            semilla = semilla_reparto if semilla_reparto is not None else reparto_dias.semilla_local()
+            self._reparto = reparto_dias.RepartoDias(self._catalogo, semilla)
 
     # Roles de los jugadores en juego (iterable) o None = desconocidos. Con roles conocidos,
     # las misiones de roles que NADIE juega (p. ej. influencer con 2 jugadores) pasan a ser
@@ -175,9 +201,77 @@ class SistemaMisiones:
     def puede_interactuar(self):
         return self._estado == EN_RADIO and self._mision.tipo == "verificar"
 
-    # True si queda alguna misión sin completar del rol o genérica.
+    # True si queda alguna misión sin completar del rol o genérica. Con reparto por días: alguna ofrecible HOY.
     def hay_misiones_pendientes(self, rol):
         return self._buscar_pendiente(rol) is not None
+
+    # -- Reparto por días (contrato-dias.md). Sin reparto: lo de siempre, resumen None y nada caduca --
+
+    # True si al rol aún le queda algo en toda la semana (aunque hoy no haya nada). Sin reparto = hay_misiones_pendientes.
+    def queda_algo_en_la_semana(self, rol):
+        if self._reparto is None:
+            return self.hay_misiones_pendientes(rol)
+        try:
+            return self._reparto.queda_algo_en_la_semana(self._ocupadas(), puede=lambda m: self._puede_hacerla(m, rol))
+        except Exception as error:      # red de seguridad: nunca hacia el frame
+            self._apagar_por_fallo(error)
+            return self.hay_misiones_pendientes(rol)
+
+    # Lo fija quien tiene el reloj (FlujoConTiempo): pasa el reparto al día `dia` (arrastra y caduca; la activa no
+    # caduca) y recuerda la hora (regla de la reserva). Desde la primera llamada el reparto va «con reloj». True si el día
+    # cambió. Sin reparto no hace nada (False). Los errores se propagan: los recoge FlujoConTiempo.
+    def fijar_dia(self, dia, hora=None):
+        if self._reparto is None:
+            return False
+        self._reparto.con_reloj = True
+        self._reparto.fijar_hora(hora)
+        cambio = self._reparto.avanzar_a(dia, activa=self._mision.id if self._mision is not None else None)
+        # Fiscalía activa al cambiar de día = APLAZADA: se suelta (sin completarla ni caducarla) para que el día nuevo
+        # traiga las de verificar; volverá la última (contrato-dias §4). Una Fiscalía ignorada no bloquea la semana.
+        if (cambio and self._mision is not None and self._mision.id in self._reparto.aplazadas()
+                and self._estado in (NOTIFICADA, EN_RUTA, EN_RADIO)):
+            self._mision = None
+            self._estado = SIN_MISION
+        return cambio
+
+    # True si el reparto por días lleva el día por el reloj (los avisos dicen «por hoy»).
+    def reparto_con_reloj(self):
+        return self._reparto is not None and self._reparto.con_reloj
+
+    # Ids caducados en el orden en que caducaron ([] sin reparto).
+    def caducadas(self):
+        return self._reparto.caducadas() if self._reparto is not None else []
+
+    # Dict de reparto_dias.RepartoDias.resumen() o None sin reparto.
+    def resumen_dia(self):
+        return self._reparto.resumen() if self._reparto is not None else None
+
+    # Lo que se juega en esta partida (la semana sorteada y las reservas abiertas), en orden de catálogo. Sin reparto,
+    # el catálogo entero.
+    def catalogo_semana(self):
+        if self._reparto is None:
+            return list(self._catalogo)
+        ids = set(self._reparto.ids_semana())
+        return [m for m in self._catalogo if m.id in ids]
+
+    # Red de seguridad: deja el sistema con el reparto de siempre (el FlujoConTiempo lo pide si algo falla).
+    def apagar_reparto(self):
+        self._reparto = None
+        self._rutas = {}
+
+    def _apagar_por_fallo(self, error):
+        print(f"[misiones] reparto por días desactivado por un error ({type(error).__name__}: {error}); "
+              "se reparte como siempre", file=sys.stderr)
+        self.apagar_reparto()
+
+    def _ocupadas(self):
+        return (self._mision.id,) if self._mision is not None else ()
+
+    # ¿Puede un jugador de `rol` recibir la misión? La suya, una genérica o la de un rol que nadie juega.
+    def _puede_hacerla(self, mision, rol):
+        if mision.rol is None or mision.rol == rol:
+            return True
+        return self._roles_en_juego is not None and mision.rol not in self._roles_en_juego
 
     # -- Transiciones --
 
@@ -232,6 +326,7 @@ class SistemaMisiones:
         decision = resultado.get("decision_mision") if isinstance(resultado, dict) else None
         self._anotar_veredicto(confianza_misiones.veredicto(self._mision, decision))
         self._completadas.append(self._mision.id)
+        self._anotar_en_reparto(self._mision.id)
         self._estado = COMPLETADA
         return self._mision
 
@@ -247,12 +342,21 @@ class SistemaMisiones:
         self._resultado = {"deltas": {}}
         self._anotar_veredicto(confianza_misiones.veredicto_digital(mision, game_state))
         self._completadas.append(mision.id)
+        self._anotar_en_reparto(mision.id)
         self._estado = COMPLETADA
         return mision
 
     def _anotar_veredicto(self, veredicto):
         if veredicto is not None:
             self._veredictos[self._mision.id] = veredicto
+
+    def _anotar_en_reparto(self, id_mision):
+        if self._reparto is None:
+            return
+        try:
+            self._reparto.registrar_completada(id_mision)
+        except Exception as error:      # completar una misión nunca falla por el reparto
+            self._apagar_por_fallo(error)
 
     # COMPLETADA -> SIN_MISION; el resultado_ultimo se conserva.
     def terminar(self):
@@ -263,8 +367,9 @@ class SistemaMisiones:
     # -- Serialización (JSON) --
     # El resultado debe ser JSON-serializable (p. ej. dict de deltas).
 
+    # Clave OPCIONAL «reparto» (reparto por días): semilla y estado de la semana; sin reparto no se escribe.
     def a_dict(self):
-        return {
+        datos = {
             "estado": self._estado,
             "mision_actual": self._mision.id if self._mision is not None else None,
             "completadas": list(self._completadas),
@@ -273,6 +378,9 @@ class SistemaMisiones:
             "radio_interaccion": self.radio_interaccion,
             "histeresis": self.histeresis,
         }
+        if self._reparto is not None:
+            datos["reparto"] = self._reparto.a_dict()
+        return datos
 
     # ValueError si el estado no existe o es incoherente con la misión guardada (un estado
     # activo exige misión; SIN_MISION no puede tener una). Los guardados antiguos sin
@@ -288,6 +396,10 @@ class SistemaMisiones:
                 f"Estado {estado!r} incoherente con la misión guardada {id_actual!r}."
             )
         extras = {k: datos[k] for k in ("radio_interaccion", "histeresis") if k in datos}
+        reparto = datos.get("reparto")
+        semilla = reparto.get("semilla") if isinstance(reparto, dict) else None
+        if isinstance(semilla, (int, str)) and not isinstance(semilla, bool):
+            extras["semilla_reparto"] = semilla        # la semana guardada: «Continuar» repite la misma
         sistema = cls(mapa, catalogo, punto_interaccion=punto_interaccion, **extras)
         por_id = {m.id: m for m in sistema._catalogo}
         if id_actual is not None and id_actual not in por_id:
@@ -301,7 +413,24 @@ class SistemaMisiones:
                 raise ValueError(f"Veredicto desconocido en los datos guardados para {id_mision!r}: {veredicto!r}")
             sistema._veredictos[id_mision] = veredicto
         sistema._resultado = copy.deepcopy(datos["resultado"])
+        sistema._restaurar_reparto(reparto)
         return sistema
+
+    # Guardado del reparto TOLERANTE: sin clave (guardado viejo) o dañada, el reparto recién creado (con la semilla
+    # guardada si se pudo leer) y se avisa por stderr; un guardado nunca impide jugar. Las completadas del sistema
+    # mandan: las que el reparto no conozca se anotan (día desconocido).
+    def _restaurar_reparto(self, guardado):
+        if self._reparto is None:
+            return
+        if guardado is not None:
+            try:
+                self._reparto = reparto_dias.RepartoDias.desde_dict(guardado, self._catalogo)
+            except (ValueError, TypeError, KeyError, IndexError) as error:
+                print(f"[misiones] «reparto» del guardado no se pudo leer ({error}); se empieza la semana de nuevo",
+                      file=sys.stderr)
+        for id_mision in self._completadas:
+            if id_mision not in self._reparto.completadas():
+                self._reparto.registrar_completada(id_mision, dia=0)
 
     # -- Internos --
 
@@ -313,7 +442,39 @@ class SistemaMisiones:
 
     # Con rutas (ALCALDE_RUTAS): la primera sin completar de la ruta del rol (rutas_mision.ruta_de_rol). Sin rutas: las
     # del rol y luego las genéricas, en orden de catálogo. En ambos casos, al final las de roles que nadie juega.
+    # Con reparto por días: lo mismo pero solo entre las ofrecibles de hoy (_buscar_pendiente_dias).
     def _buscar_pendiente(self, rol):
+        if self._reparto is not None:
+            try:
+                return self._buscar_pendiente_dias(rol)
+            except Exception as error:      # red de seguridad de la demo: el reparto de siempre
+                self._apagar_por_fallo(error)
+        return self._buscar_pendiente_catalogo(rol)
+
+    # Reparto por días: entre las ofrecibles de hoy, primero la de Fiscalía (el reparto solo la ofrece cuando ya toca:
+    # segunda del día) y luego la prioridad de siempre (ruta del rol o propias + genéricas; al final, roles ausentes),
+    # con la del lugar de inicio del rol al final (reparto_dias.elegir).
+    def _buscar_pendiente_dias(self, rol):
+        ofrecibles = set(self._reparto.ofrecibles(self._ocupadas())) - set(self._completadas)
+        if not ofrecibles:
+            return None
+        if rutas_mision.activo():
+            if rol not in self._rutas:
+                self._rutas[rol] = rutas_mision.ruta_de_rol(self._catalogo, rol)
+            orden = self._rutas[rol]
+        else:
+            orden = [m for m in self._catalogo if m.rol == rol] + [m for m in self._catalogo if m.rol is None]
+        if self._roles_en_juego is not None:
+            orden = orden + [m for m in self._catalogo
+                             if m.rol is not None and m.rol != rol and m.rol not in self._roles_en_juego]
+        candidatas, vistas = [], set()
+        for mision in orden:
+            if mision.id in ofrecibles and mision.id not in vistas:
+                vistas.add(mision.id)
+                candidatas.append(mision)
+        return reparto_dias.elegir(candidatas, rol)
+
+    def _buscar_pendiente_catalogo(self, rol):
         if rutas_mision.activo():
             if rol not in self._rutas:
                 self._rutas[rol] = rutas_mision.ruta_de_rol(self._catalogo, rol)

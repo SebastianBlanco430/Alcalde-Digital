@@ -269,6 +269,29 @@ def auriculares(color, color_almohadilla):
     return piezas
 
 
+CUELLO_AURICULARES = (0.0, 0.01, -0.03)      # centro del aro de los auriculares al cuello (bajo la mandíbula y las orejas)
+
+
+def auriculares_cuello(color, color_almohadilla, centro=CUELLO_AURICULARES, radio_x=0.078, radio_y=0.075):
+    # Auriculares colgados al cuello (operadora de radio): dos copas a los lados del cuello, mirando hacia afuera, y la
+    # diadema por detrás de la nuca (bolitas en semicírculo horizontal, sin giros).
+    c = GROSOR_CONTORNO_FINO
+    cx, cy, cz = centro
+    piezas = []
+    for lado in (-1, 1):
+        piezas.append(_pieza(f"auricular_cuello_{lado}", "cilindro", (cx + radio_x * lado, cy - 0.02, cz),
+                             (0.036, 0.036, 0.013), color, giro=(0, 90, 0), contorno=c))
+        piezas.append(_pieza(f"auricular_cuello_almohadilla_{lado}", "cilindro", (cx + (radio_x - 0.012) * lado, cy - 0.02, cz),
+                             (0.030, 0.030, 0.006), color_almohadilla, giro=(0, 90, 0), bandas=False))
+    n = 9
+    for i in range(n):
+        a = math.pi * (i + 0.5) / n
+        piezas.append(_pieza(f"auricular_cuello_diadema_{i}", "esfera",
+                             (cx + radio_x * math.cos(a), cy + radio_y * math.sin(a), cz - 0.004),
+                             (0.0085, 0.0085, 0.0085), color, bandas=False))
+    return piezas
+
+
 def gorra(color, color_visera, tinta=TINTA):
     # Gorra con cúpula, visera y botón (ciudadano).
     c = GROSOR_CONTORNO
@@ -400,6 +423,8 @@ def piezas_rostro(d, procedural=False):
         piezas += gafas_de_sol_en_la_frente(*d["gafas_sol"])
     if d.get("auriculares"):
         piezas += auriculares(*d["auriculares"])
+    if d.get("auriculares_cuello"):
+        piezas += auriculares_cuello(*d["auriculares_cuello"])
     if d.get("lapiz"):
         piezas += lapiz()
     if d.get("bigote"):
@@ -434,6 +459,12 @@ def descriptor_peaton(rasgos_peaton, piel, pelo):
         d["barba"] = rasgos_peaton["barba"]
         d["barba_color"] = tono(tuple(c / 255 for c in pelo), 0.8)
     d["arrugas"] = bool(rasgos_peaton.get("arrugas"))
+    # Personajes con nombre (backend/datos/personajes_fiscalia.json): canas y auriculares (en la cabeza o al cuello).
+    if rasgos_peaton.get("canas"):
+        d["canas"] = True
+    aur = rasgos_peaton.get("auriculares")
+    if aur:
+        d["auriculares_cuello" if aur.get("al_cuello") else "auriculares"] = (tuple(aur["color"]), tuple(aur["almohadilla"]))
     return d
 
 

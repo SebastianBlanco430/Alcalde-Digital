@@ -14,8 +14,14 @@
 # turno avanza una sola vez, al jugador siguiente.
 #
 # Las transiciones inválidas propagan el ValueError del SistemaMisiones.
+#
+# REPARTO POR DÍAS (contrato-dias.md; ALCALDE_MISIONES_DIAS): «no hay nada HOY» ya no es «no queda nada». El salto de
+# turno mira lo ofrecible hoy (hay_misiones_pendientes); la partida solo termina por misiones cuando no queda nada en la
+# SEMANA (queda_algo_en_la_semana). Con el reloj, el aviso del día agotado es MENSAJE_SIN_MISIONES_HOY y, al cambiar de
+# día (fijar_dia_misiones, lo llama FlujoConTiempo), el activo sin misión recibe una del día nuevo.
 
 MENSAJE_SIN_MISIONES = "Sin misiones nuevas por ahora"
+MENSAJE_SIN_MISIONES_HOY = "Sin misiones nuevas por hoy. Mañana llegan más."
 
 
 class FlujoPartida:
@@ -68,14 +74,52 @@ class FlujoPartida:
     def misiones_falladas(self):
         return self._sistema.falladas()
 
-    # True si no hay misión activa y a ningún jugador le quedan misiones.
+    # True si no hay misión activa y a ningún jugador le quedan misiones (en toda la semana, con reparto por días).
     def partida_terminada(self):
         self._sincronizar_roles()
         if self.hay_mision_activa():
             return False
-        return not any(
-            self._sistema.hay_misiones_pendientes(j.rol) for j in self._sesion.jugadores()
-        )
+        return not any(self._queda_en_la_semana(j.rol) for j in self._sesion.jugadores())
+
+    # -- Reparto por días (sin reparto: no hace nada, None y []) --
+
+    # Lo llama quien tiene el reloj (FlujoConTiempo) en cada cambio de día (y de tramo de hora). Si el día cambió y el
+    # activo está sin misión, le da una del día nuevo (o al siguiente que tenga). True si el día cambió.
+    def fijar_dia_misiones(self, dia, hora=None):
+        fijar = getattr(self._sistema, "fijar_dia", None)
+        if not callable(fijar) or not fijar(dia, hora):
+            return False
+        if self._sistema.mision_actual() is None and self._sesion.jugador_activo() is not None:
+            self._dar_turno(pasar_antes=False)
+        return True
+
+    # {"dia", "ofrecidas", "hechas", "pendientes", "arrastradas", "caducadas", "semana"} o None sin reparto por días.
+    def resumen_dia(self):
+        leer = getattr(self._sistema, "resumen_dia", None)
+        return leer() if callable(leer) else None
+
+    # Ids de las misiones caducadas, en el orden en que caducaron (no están ni en pasadas ni en falladas).
+    def misiones_caducadas(self):
+        leer = getattr(self._sistema, "caducadas", None)
+        return list(leer()) if callable(leer) else []
+
+    # Lo que se juega en la partida (semana sorteada + reservas abiertas); sin reparto, el catálogo entero.
+    def catalogo_semana(self):
+        leer = getattr(self._sistema, "catalogo_semana", None)
+        return leer() if callable(leer) else self._sistema.catalogo()
+
+    # Red de seguridad (FlujoConTiempo): vuelve al reparto de siempre y, si el activo quedó sin misión, le da una.
+    def apagar_reparto_dias(self):
+        apagar = getattr(self._sistema, "apagar_reparto", None)
+        if not callable(apagar):
+            return
+        apagar()
+        if self._sistema.mision_actual() is None and self._sesion.jugador_activo() is not None:
+            self._dar_turno(pasar_antes=False)
+
+    def _queda_en_la_semana(self, rol):
+        queda = getattr(self._sistema, "queda_algo_en_la_semana", None)
+        return queda(rol) if callable(queda) else self._sistema.hay_misiones_pendientes(rol)
 
     # -- Acciones --
 
@@ -169,9 +213,14 @@ class FlujoPartida:
     def _sincronizar_roles(self):
         self._sistema.fijar_roles_en_juego(j.rol for j in self._sesion.jugadores())
 
-    # No repite el aviso si el último mensaje del teléfono ya es ese.
+    # No repite el aviso si el último mensaje del teléfono ya es ese. Con el reloj y algo aún en la semana, el aviso dice
+    # que mañana llegan más.
     def _avisar_sin_misiones(self, jugador):
+        texto = MENSAJE_SIN_MISIONES
+        con_reloj = getattr(self._sistema, "reparto_con_reloj", None)
+        if callable(con_reloj) and con_reloj() and self._queda_en_la_semana(jugador.rol):
+            texto = MENSAJE_SIN_MISIONES_HOY
         mensajes = jugador.telefono.mensajes()
-        if mensajes and mensajes[-1].texto == MENSAJE_SIN_MISIONES:
+        if mensajes and mensajes[-1].texto == texto:
             return
-        jugador.telefono.notificar(MENSAJE_SIN_MISIONES)
+        jugador.telefono.notificar(texto)

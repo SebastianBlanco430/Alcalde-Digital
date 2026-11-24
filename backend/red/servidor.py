@@ -43,7 +43,9 @@ def construir_anfitrion(puerto=0, ambito="lan", semilla=SEMILLA_CASAS, abierto=F
     partida = PartidaCooperativa(
         estado, mundo, catalogo, grafo_social=construir_grafo_social_ejemplo(),
         escala_mundo=ESCALA_MUNDO, punto_interaccion=mundo.punto_interaccion,
-        radio_interaccion=RADIO_INTERACCION, **{"consecuencias": True, **(partida_opciones or {})})
+        radio_interaccion=RADIO_INTERACCION,
+        # semilla_misiones: la semana de misiones se sortea con la semilla del MUNDO (todos la comparten; contrato-dias §2)
+        **{"consecuencias": True, "semilla_misiones": semilla, **(partida_opciones or {})})
     recta_final.preparar_coop(partida)        # recta final en el anfitrión (ALCALDE_SIN_RECTA_FINAL=1 la apaga)
     h_mundo, h_contenido = calcular_huellas(mundo, semilla, catalogo, vehiculos=opciones.get("vehiculos"))
     return Anfitrion(partida, mundo, semilla, codigo, h_mundo, h_contenido, ambito=ambito,

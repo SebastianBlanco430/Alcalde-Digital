@@ -11,6 +11,24 @@ def nombre_flag(id_evidencia):
     return PREFIJO + id_evidencia.strip()
 
 
+# Casos v2 (backend/logica/casos_v2.py): las pruebas de un caso llevan su id delante, «<id_caso>.<id_prueba>», para que
+# dos casos puedan usar el mismo id de prueba sin mezclarse (flag «evidencia:<id_caso>.<id_prueba>»).
+SEPARADOR_CASO = "."
+
+
+def id_de_caso(id_caso, id_prueba):
+    for valor in (id_caso, id_prueba):
+        if not isinstance(valor, str) or not valor.strip() or SEPARADOR_CASO in valor:
+            raise ValueError(f"id de caso o de prueba inválido: {valor!r} (texto no vacío y sin '.').")
+    return id_caso.strip() + SEPARADOR_CASO + id_prueba.strip()
+
+
+# Ids (sin prefijo) de las pruebas del caso `id_caso` que tiene el jugador, ordenados.
+def de_caso(game_state, id_caso):
+    prefijo = id_caso + SEPARADOR_CASO
+    return [i[len(prefijo):] for i in listar(game_state) if i.startswith(prefijo)]
+
+
 def tiene(game_state, id_evidencia):
     return game_state.flag(nombre_flag(id_evidencia))
 

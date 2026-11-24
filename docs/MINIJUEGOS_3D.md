@@ -27,6 +27,7 @@ Valores: `0/false/no/off` apaga, `1/true/si/sí/on` enciende; sin variable manda
 | `ALCALDE_3D_DEMO` | apagada | Demostración de la infraestructura: la vista 2D de hoy dentro del monitor 3D. `1`/`todos` = los 6; `chat,rastrear` = esos. Respeta la maestra y la bandera del minijuego. Solo para pruebas. |
 | `ALCALDE_3D_PREVIA_MONITOR` | encendida | Familia PC en 3D: la pantalla «Antes de empezar» va DENTRO del monitor 3D (no a pantalla completa en 2D); al empezar, el minijuego ocupa su sitio en el mismo monitor. `0` = la previa de hoy en 2D y después el 3D. |
 | `ALCALDE_3D_SIN_DESTELLO` | encendida | Familia PC en 3D: la cinemática de sentarse llega al monitor SIN el destello blanco (EscenaInterior con `sin_destello`) y la presentación no pone velo de entrada. `0` = con destello, como antes. |
+| `ALCALDE_ANIM_SILLA` | encendida | Entrada y salida animadas (`frontend/cinematica_silla.py`): el personaje llega a la silla, la saca, se sienta, la acomoda y pone las manos donde juega (PC y mesa), o camina al corcho, levanta la vista y lleva la mano a una nota; la cámara hace un solo empuje continuo que termina EXACTAMENTE en la toma de juego. Incluye la antesala del parkour (terminal con silla). `0` = la entrada y la salida de antes, idénticas. |
 | `ALCALDE_3D_FALLO` | (sin variable) | SOLO PRUEBAS: `abrir`, `avanzar`, `tecla` o `resultado` hace fallar la presentación 3D en esa fase para ver el respaldo al 2D. |
 
 **Una bandera encendida no basta**: si la familia aún no escribió `frontend/minijuegos_3d/<id>_3d.py` (con `CLASE_3D`), o si
@@ -61,6 +62,40 @@ del rework, cada `ALCALDE_3D_<ID>` queda encendida si su minijuego pasó la veri
   empezar» → la cámara se separa hasta el hombro → «Empezar» (clic en el monitor o Enter/Espacio) → el minijuego en el mismo
   monitor. El tutorial de la primera vez sigue siendo el de hoy (2D, pantalla completa) y luego se pasa a la previa en el
   monitor.
+
+### Entrada y salida animadas (`ALCALDE_ANIM_SILLA`, sesión B del 23-nov)
+
+Con la bandera encendida (por defecto) y el minijuego en 3D, lo de arriba cambia así:
+
+- **Sin cortes después del fundido.** Mundo → puerta → fundido con el nombre del lugar → `EscenaMinijuego` directamente,
+  también en la familia PC (`ConexionFlujo._sentarse_al_pc` devuelve False; ya no se pasa por «sentarse» de
+  `EscenaInterior`). La animación corre DENTRO de la presentación 3D (`Minijuego3D.abrir()` crea la secuencia con
+  `auto=False` y `Minijuego3D.avanzar` la avanza): mismo set, mismo personaje y misma cámara con los que se juega.
+- **Silla (Chat, Contrarreloj, Comparar):** `cinematica_silla.sentarse_en` — llegar, sacar la silla con la mano en el
+  respaldo, sentarse, acomodarla y manos al teclado/ratón o a la mesa. 2,6 s la primera vez; 1,35 s desde la segunda.
+  En PC la cámara termina sobre el hombro (`toma_juego()`), nunca llena el monitor. En Comparar se juega sentado.
+- **Corcho (Rastrear, Ordenar la cadena):** `acercarse_a_corcho` — caminar, detenerse, levantar la vista, mano a una nota.
+  2,2 s / 1,2 s.
+- **Señales:** se queda con la entrada de antes (de pie): sentado, la mano no alcanza toda la foto (faltan 0,14–0,32 m).
+  El código de la versión sentada está escrito y apagado.
+- **Previa «Antes de empezar»:** en PC se ve en el monitor mientras se sienta; «Empezar» responde cuando la secuencia
+  terminó.
+- **Saltar:** Espacio / Enter / botón del mando saltan la secuencia (`conexion.saltadores` → `cinematica_silla.saltar_activa`)
+  y dejan el estado final exacto; esa pulsación no llega a la previa ni al juego.
+- **Versión rápida:** por `clave` (`pc`, `mesa`, `corcho`, `parkour`; la salida usa `<clave>_salida`) y por proceso: la
+  primera vez la completa, después la rápida. Saltar cuenta como vista.
+- **Salida:** al salir el resultado, `levantarse_de` (retira la silla, se levanta, la empuja a su sitio y se aparta;
+  1,6 s / 0,9 s) o `dejar_corcho` (0,9 s / 0,5 s); el banner aparece cuando el personaje ya se apartó. Después, la salida
+  al mundo de siempre.
+- **Parkour:** `EscenaParkour` muestra una antesala (terminal con silla, `frontend/parkour_antesala.py`): se sienta, la
+  cámara entra en la pantalla y el glitch da paso al nivel (3,0 s / 1,5 s); al salir, el camino inverso.
+  `registro_parkour.entrar(..., antesala=False)` la omite (lo usa quien hace su propia animación, p. ej. el laboratorio
+  de la Fiscalía).
+- **Reducir movimiento:** velo negro 0,25 s → estado final → se quita en 0,15 s (sin caminata ni curva de cámara).
+- **Red de seguridad:** cualquier excepción al crear o avanzar la secuencia deja el estado final de golpe (`fallo=True`) y
+  se sigue con el comportamiento de antes; si el 3D entero falla, el respaldo al 2D de siempre.
+- Contrato de la API (para otros módulos que quieran sentar a un personaje): `sesiones-24nov\animaciones\contrato-silla.md`
+  (fuera del repo); duraciones y tramos en `frontend/cinematica_silla_calculos.py` (`DURACIONES`, `DURACIONES_RAPIDA`).
 
 ## Rendimiento
 

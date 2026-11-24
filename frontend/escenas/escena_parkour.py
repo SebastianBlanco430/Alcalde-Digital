@@ -11,6 +11,15 @@
 #
 # Guarda y restaura lo que cambia del entorno: cámara (CamaraTerceraPersona), color de fondo de la ventana,
 # niebla y bloqueo del ratón.
+#
+# ANTESALA (sesión B, ALCALDE_ANIM_SILLA, frontend/parkour_antesala.py): con la bandera encendida y partida en curso,
+# al_entrar(..., antesala=None|True) no arranca el nivel en el acto: muestra el «terminal del servidor» (el protagonista
+# llega, saca la silla, se sienta y la cámara entra en la pantalla con el glitch) y al terminar arranca el nivel como
+# siempre (_arrancar_nivel). Mientras dura: la simulación no corre, el HUD está oculto, el ratón libre y Espacio/Enter
+# (conexion.saltadores -> saltar_antesala) la saltan sin convertirse en el primer salto del avatar. Al salir (_salir) se
+# vuelve a la antesala: sale de la pantalla, se levanta, empuja la silla y después la salida de siempre (`salir`).
+# antesala=False (el laboratorio de la Fiscalía, que hace su propia animación), bandera en 0, sin partida (modo
+# desarrollo) o cualquier fallo de la antesala: exactamente el camino de antes.
 
 import math
 
@@ -23,6 +32,7 @@ from frontend import materiales as mat
 from frontend.camara_tercera_persona import CamaraTerceraPersona
 from frontend.componentes import destruir_arbol, rgb
 from frontend.escenas.escena_base import Escena
+from frontend import parkour_antesala_calculos as pac
 from frontend import parkour_minimapa
 from frontend import parkour_skin_calculos as psc
 from frontend import parkour_visual_calculos as pvc
@@ -33,6 +43,7 @@ PASO_MAX = 1 / 60             # s: la simulación se parte en pasos de este tama
 DT_MAX = 0.05                 # s: un tirón de la ventana no se come el salto
 RAPIDEZ_CAMARA_Y = 7.0        # 1/s: suavizado de la altura que sigue la cámara (no rebota con cada salto)
 JUGANDO, PAUSA, FIN = "jugando", "pausa", "fin"
+ANTESALA, SALIENDO = "antesala", "saliendo"     # terminal del servidor: entrando al nivel / volviendo de él
 
 
 class EscenaParkour(Escena):
@@ -57,10 +68,19 @@ class EscenaParkour(Escena):
         self._y_apoyo = None          # altura del último apoyo en tierra (cámara estable, camara_calculos)
         self._guardado = None
         self._fov_extra = 0.0         # grados de FOV extra suavizados (aspecto nuevo: al caer rápido o saltar)
+        # Antesala (terminal del servidor). `velo()` = alfa del fundido que tapa la pantalla (lo cuelga registro_parkour):
+        # la secuencia espera debajo del negro.
+        self.velo = lambda: 0.0
+        self._antesala = None         # parkour_antesala.Antesala (se construye una vez, en la primera entrada con ella)
+        self._antesala_rota = False   # falló al construirse: no se reintenta en este proceso (camino de hoy)
+        self._con_antesala = False    # esta entrada pasó por la antesala (la salida también la usa)
+        self._saliendo = False        # la salida animada ya empezó (el `salir` de siempre se llama una sola vez)
+        self._descartar_salto = False  # la tecla que saltó la antesala no es el primer salto del avatar
+        self._t_antesala = 0.0
 
     # -- Gestor de escenas --
 
-    def al_entrar(self, nivel_id="sector_1", reiniciar=False, salir=None, **_):
+    def al_entrar(self, nivel_id="sector_1", reiniciar=False, salir=None, antesala=None, **_):
         nivel = parkour_loader.cargar_nivel(nivel_id)
         jugador = self._jugador_activo()
         if self.nivel is None or self.nivel.id != nivel.id or self._skin_cambio(jugador):
@@ -69,10 +89,21 @@ class EscenaParkour(Escena):
             self.mundo = MundoParkour(nivel, jugador=jugador, parent=self)
         self.nivel = nivel
         self._salir_a = salir
+        fijar_retorno = getattr(self.hud, "fijar_retorno", None)
+        if fijar_retorno is not None:
+            fijar_retorno(getattr(salir, "con_retorno", False))
         previa = self._partidas.get(nivel.id)
         self.sim = pk.Simulacion(nivel) if (reiniciar or previa is None or previa.terminado) else previa
         self._partidas[nivel.id] = self.sim
+        self._con_antesala = self._saliendo = self._descartar_salto = False
+        if self._quiere_antesala(antesala, jugador) and self._abrir_antesala(jugador):
+            return
+        self._arrancar_nivel()
 
+    # El nivel en marcha: cámara de tercera persona, HUD, estado JUGANDO, minimapa, misiones visuales y tutorial.
+    # Sin antesala corre dentro de al_entrar (lo de siempre); con ella, cuando la cámara ya entró en la pantalla.
+    def _arrancar_nivel(self):
+        nivel = self.nivel
         self._guardar_entorno()
         self.camara.preparar_camara()
         self.camara.yaw, self.camara.pitch = 0.0, 28.0
@@ -118,6 +149,146 @@ class EscenaParkour(Escena):
             except Exception:                    # noqa: BLE001
                 pass
 
+    # -- Antesala (terminal del servidor) --
+
+    def _quiere_antesala(self, pedida, jugador):
+        if pedida is False or self._antesala_rota:
+            return False
+        try:
+            from frontend import cinematica_silla
+            activa = cinematica_silla.activa()
+        except Exception:                        # noqa: BLE001  sin el módulo de la silla: el camino de hoy
+            activa = False
+        return pac.quiere_antesala(pedida, activa, jugador is not None)
+
+    # Pone la antesala y lanza la entrada. False (y todo como estaba) si algo falla: entonces arranca el nivel de hoy.
+    def _abrir_antesala(self, jugador):
+        try:
+            if self._antesala is None:
+                from frontend.parkour_antesala import Antesala
+                self._antesala = Antesala(parent=self)
+            self._guardar_entorno()
+            self.camara.preparar_camara()
+            self._ceder_camara()
+            self.estado = ANTESALA
+            self._t_antesala = 0.0
+            self._con_antesala = True
+            self._antesala.entrar(jugador, self.nivel.nombre, self._tras_antesala, window.aspect_ratio)
+            return True
+        except Exception as error:               # noqa: BLE001
+            self._avisar_antesala("entrada", error)
+            self._antesala_rota = self._antesala is None
+            self._recuperar_camara()
+            self._con_antesala = False
+            return False
+
+    # Mientras se ve la antesala: nivel y HUD ocultos, ratón libre, la cámara la mueve la secuencia.
+    def _ceder_camara(self):
+        self.hud.mostrar_pausa(False)
+        self.hud.enabled = False
+        mouse.locked = False
+        self.camara.bloquear(True)
+        self.camara.tomar_control()
+        if self.mundo is not None:
+            self.mundo.enabled = False
+
+    def _recuperar_camara(self):
+        if self._antesala is not None:
+            try:
+                self._antesala.ocultar()
+            except Exception:                    # noqa: BLE001
+                pass
+        if self.mundo is not None:
+            self.mundo.enabled = True
+        self.camara.soltar_control()
+
+    # al_terminar de entrar_a_pantalla (pantalla llena + glitch): fuera la antesala y el nivel arranca como siempre.
+    def _tras_antesala(self):
+        if self.estado != ANTESALA:
+            return
+        self._recuperar_camara()
+        self._descartar_salto = True
+        self.estado = JUGANDO                     # si _arrancar_nivel fallara, no se reintenta cada frame
+        self._arrancar_nivel()
+
+    # al_terminar de la salida animada (se levantó y se apartó): la salida de siempre, una sola vez.
+    def _tras_salida(self):
+        if self.estado != SALIENDO:
+            return
+        self.estado = FIN
+        if self._salir_a is not None:
+            self._salir_a()
+
+    # Saltador de conexion.saltadores (Espacio / Enter / botón del mando). True si había antesala que saltar.
+    def saltar_antesala(self):
+        if not self.enabled or self.estado not in (ANTESALA, SALIENDO) or self._antesala is None:
+            return False
+        if pac.tapado(self._alfa_velo()):        # bajo el negro manda el fundido (una pulsación, una cosa)
+            return False
+        try:
+            self._antesala.saltar()
+        except Exception as error:               # noqa: BLE001
+            self._fallo_antesala(error)
+            return True
+        if self.estado in (ANTESALA, SALIENDO) and not self._antesala.activa():
+            self._forzar_fin_antesala()          # la secuencia terminó sin avisar (o no había): se sigue igual
+        return True
+
+    def _avanzar_antesala(self, dt):
+        if self.estado == ANTESALA and pac.tapado(self._alfa_velo()):
+            return                                # el fundido de entrada aún tapa: la secuencia espera
+        self._t_antesala += dt
+        tope = pac.TOPE_ENTRADA if self.estado == ANTESALA else pac.TOPE_SALIDA
+        try:
+            if self._t_antesala > tope:
+                raise TimeoutError(f"la antesala no terminó en {tope:g} s")
+            self._antesala.avanzar(dt)
+        except Exception as error:               # noqa: BLE001
+            self._fallo_antesala(error)
+
+    # Termina lo que faltara sin la animación: entrando -> el nivel arranca; saliendo -> la salida de siempre.
+    def _forzar_fin_antesala(self):
+        if self.estado == ANTESALA:
+            self._tras_antesala()
+        elif self.estado == SALIENDO:
+            self._tras_salida()
+
+    def _fallo_antesala(self, error):
+        self._avisar_antesala("secuencia", error)
+        self._forzar_fin_antesala()
+
+    def _alfa_velo(self):
+        try:
+            return self.velo()
+        except Exception:                        # noqa: BLE001
+            return 0.0
+
+    _avisados = set()
+
+    @classmethod
+    def _avisar_antesala(cls, donde, error):
+        if donde not in cls._avisados:
+            cls._avisados.add(donde)
+            import sys
+            print(f"[parkour] antesala ({donde}) desactivada para esta entrada: {error!r}", file=sys.stderr)
+
+    # Salida animada: vuelve a la antesala (HUD fuera), sale de la pantalla y se levanta. False si no se puede.
+    def _abrir_salida(self):
+        try:
+            tutorial = getattr(self, "_tutorial", None)
+            if tutorial is not None and not tutorial.cerrado:
+                tutorial.saltar_todo()
+            if getattr(self, "_extra", None) is not None:              # medallas fuera de la vista
+                self._extra.al_salir()
+            self._ceder_camara()
+            self.estado = SALIENDO
+            self._t_antesala = 0.0
+            self._antesala.salir(self._tras_salida, window.aspect_ratio)
+            return True
+        except Exception as error:               # noqa: BLE001
+            self._avisar_antesala("salida", error)
+            return False
+
     def _jugador_activo(self):
         try:
             return self._jugador()
@@ -134,6 +305,16 @@ class EscenaParkour(Escena):
         tutorial = getattr(self, "_tutorial", None)
         if tutorial is not None and not tutorial.cerrado:
             tutorial.saltar_todo()                # devuelve la carrera real antes de salir
+        if self._con_antesala or self.estado in (ANTESALA, SALIENDO):   # antesala: fuera, sin luces, personaje suelto
+            self._recuperar_camara()
+            if self._antesala is not None:
+                try:
+                    self._antesala.ocultar(soltar=True)
+                except Exception:                # noqa: BLE001
+                    pass
+            if self.estado in (ANTESALA, SALIENDO):
+                self.estado = FIN
+            self._con_antesala = False
         parkour_minimapa.limpiar()
         mouse.locked = False
         self.camara.bloquear(False)
@@ -149,7 +330,7 @@ class EscenaParkour(Escena):
         if self._guardado is None:
             self._guardado = {"fondo": window.color, "niebla_color": scene.fog_color,
                               "niebla_densidad": scene.fog_density}
-        window.color = rgb(mat.tema(self.nivel.tema)["fondo"])
+        window.color = rgb(pvc.tema_base(self.nivel.tema)["fondo"])      # temas nuevos: su paleta o la «digital»
         scene.fog_density = 0
 
     def _restaurar_entorno(self):
@@ -190,12 +371,24 @@ class EscenaParkour(Escena):
             self._extra.reiniciar()
 
     def _salir(self):
-        if self._salir_a is not None:
-            self._salir_a()
+        if self._salir_a is None:
+            return
+        if self._con_antesala:                   # salida animada por la antesala (una sola vez)
+            if self._saliendo:
+                return
+            self._saliendo = True
+            if self._abrir_salida():
+                return
+            self._recuperar_camara()             # respaldo: la salida de siempre, sin animación
+            if self.estado == SALIENDO:
+                self.estado = FIN
+        self._salir_a()
 
     # -- Entrada --
 
     def input(self, key):
+        if self.estado in (ANTESALA, SALIENDO):  # la antesala no deja pasar teclas al nivel (saltar: saltar_antesala)
+            return
         if key == "escape":
             if self.estado == JUGANDO:
                 self.pausar()
@@ -226,6 +419,12 @@ class EscenaParkour(Escena):
     # -- Frame --
 
     def update(self):
+        if self.estado in (ANTESALA, SALIENDO):
+            self._avanzar_antesala(min(time.dt, 0.1))
+            return
+        if self._descartar_salto:               # la pulsación que saltó la antesala no salta en el nivel
+            self._descartar_salto = False
+            self._salto = False
         if self.sim is not None and self.estado == FIN and self.mundo is not None and self.mundo.visual:
             self.mundo.sincronizar(self.sim, min(time.dt, DT_MAX))      # que los efectos de la meta terminen de animarse
             if getattr(self, "_extra", None) is not None:                # misiones visuales: orbe y medalla de la meta
@@ -289,7 +488,9 @@ class EscenaParkour(Escena):
                 self.mundo.marcar_checkpoint(self.sim.checkpoint)
             elif evento.startswith("checkpoint:"):
                 self.hud.destello(mat.NEON_VERDE, 0.28)
-                self.hud.avisar("¡Checkpoint!", mat.NEON_VERDE)
+                purga = getattr(self.nivel, "purga", None)
+                if not (purga and evento == f"checkpoint:{purga.get('activa_en')}"):   # ahí manda el aviso de la purga
+                    self.hud.avisar("¡Checkpoint!", mat.NEON_VERDE)
                 self.mundo.marcar_checkpoint(self.sim.checkpoint)
             elif evento.startswith("interruptor:"):
                 self.hud.avisar("¡Interruptor activado! Aparecen plataformas", mat.NEON_MAGENTA)

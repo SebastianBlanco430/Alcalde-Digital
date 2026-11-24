@@ -7,7 +7,46 @@
 #     cinemática de salir por la puerta) sin la escena «levantarse» de la silla del PC del interior.
 # Sin marca (2D, maestra apagada, respaldo) todo es el camino de hoy.
 
-_estado = {"familia": None, "sin_destello": False}
+import time
+import weakref
+
+_estado = {"familia": None, "sin_destello": False, "abierta": False, "fundido": None, "salto": -1.0}
+
+VENTANA_SALTO_S = 0.12       # una pulsación = un solo salto: lo que tarde el mismo Espacio en llegar a la otra escena
+
+
+def vigilar_fundido(ocupado):
+    """Sesión B: ConexionFlujo deja aquí su `_transicion_en_curso` (método ligado; se guarda sin retenerlo)."""
+    try:
+        _estado["fundido"] = weakref.WeakMethod(ocupado)
+    except TypeError:
+        _estado["fundido"] = None
+
+
+def marcar_salto():
+    """ConexionFlujo.saltar_cinematica acaba de saltar algo (un fundido, una cinemática) con esta pulsación."""
+    _estado["salto"] = time.perf_counter()
+
+
+def pulsacion_gastada():
+    """¿Este Espacio/Enter ya saltó (o va a saltar) un fundido? Entonces NO salta además la entrada animada. Nunca lanza."""
+    try:
+        if 0.0 <= time.perf_counter() - _estado["salto"] <= VENTANA_SALTO_S:
+            return True
+        ref = _estado["fundido"]
+        ocupado = ref() if ref is not None else None
+        return bool(ocupado()) if ocupado is not None else False
+    except Exception:                # noqa: BLE001
+        return False
+
+
+def presentacion_abierta(si=None):
+    """Sesión B: ¿hay una presentación 3D abierta? (la marca base.abrir / cerrar). Con ella abierta, Espacio/Enter los
+    trata EscenaMinijuego (salta la entrada/salida animadas sin que la tecla llegue a la previa ni al juego) y
+    ConexionFlujo no las salta por su cuenta. `si` = True/False la fija; None solo la lee."""
+    if si is not None:
+        _estado["abierta"] = bool(si)
+    return _estado["abierta"]
 
 
 def entrada_sin_destello(si):

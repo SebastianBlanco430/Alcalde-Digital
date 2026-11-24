@@ -11,7 +11,9 @@ from backend.logica.parkour_calculos import (Arista, Interruptor, MEDALLAS, Nive
                                             ruta_optima)
 
 CARPETA = Path(__file__).resolve().parent / "parkour"
-TEMAS = ("corrupto", "digital")
+TEMAS = ("corrupto", "digital", "estudio", "feed", "radio", "edicion")
+ARRASTRE_MAXIMO = 5.0        # m/s de una cinta (menos que VELOCIDAD = 6.5: siempre se puede remontar)
+DURACION_PURGA = (8.0, 12.0) # s que dura la purga de punta a punta
 LIMITE_XZ = 5000.0           # |x|, |z| máximos (m): evita rejillas/mallas de tamaño absurdo en el frontend
 LIMITE_Y = 1000.0            # |y| máximo (m)
 ID_VALIDO = re.compile(r"[A-Za-z0-9_]+")
@@ -44,13 +46,107 @@ def _texto(nivel, valor, campo):
     return valor.strip()
 
 
+def _dict(nivel, valor, campo, ejemplo):
+    if not isinstance(valor, dict):
+        _falla(nivel, f"{campo} debe ser un objeto {ejemplo}.")
+    return valor
+
+
+# Campos de los tipos de la sesión E (capa, cinta, ritmo, clip). Retorna los kwargs extra de Plataforma.
+def _campos_nuevos(nivel, id_p, tipo, d):
+    extra = {}
+    if tipo == "capa":
+        m = _dict(nivel, d.get("movimiento"), f"{id_p}.movimiento", "{eje:[dx,0,dz], periodo, fase, reposo}")
+        eje = m.get("eje")
+        if not isinstance(eje, (list, tuple)) or len(eje) != 3:
+            _falla(nivel, f"{id_p}.movimiento.eje debe ser [dx, 0, dz].")
+        eje = tuple(_numero(nivel, v, f"{id_p}.movimiento.eje") for v in eje)
+        if eje[1] != 0:
+            _falla(nivel, f"{id_p}.movimiento.eje: una capa se desliza en horizontal; eje[1] debe ser 0 (llegó {eje[1]!r}).")
+        if eje[0] == 0 and eje[2] == 0:
+            _falla(nivel, f"{id_p}.movimiento.eje: una capa necesita desplazamiento en x o en z.")
+        extra["movimiento"] = {
+            "eje": eje, "periodo": _numero(nivel, m.get("periodo", 4.0), f"{id_p}.movimiento.periodo", minimo=0.5),
+            "fase": _numero(nivel, m.get("fase", 0.0), f"{id_p}.movimiento.fase"),
+            "reposo": _numero(nivel, m.get("reposo", 0.25), f"{id_p}.movimiento.reposo", minimo=0.0, maximo=0.45)}
+    elif tipo == "cinta":
+        arrastre = d.get("arrastre")
+        if not isinstance(arrastre, (list, tuple)) or len(arrastre) != 2:
+            _falla(nivel, f"{id_p}.arrastre: una cinta necesita arrastre [vx, vz] en m/s.")
+        vx, vz = (_numero(nivel, v, f"{id_p}.arrastre") for v in arrastre)
+        modulo = math.hypot(vx, vz)
+        if modulo <= 0 or modulo > ARRASTRE_MAXIMO:
+            _falla(nivel, f"{id_p}.arrastre: el módulo debe estar entre 0 (excluido) y {ARRASTRE_MAXIMO} m/s "
+                          f"(llegó {modulo:.2f}).")
+        extra["arrastre"] = (vx, vz)
+    elif tipo == "ritmo":
+        r = _dict(nivel, d.get("ritmo"), f"{id_p}.ritmo", "{pulso_s, patron:[dy…], fase, transicion}")
+        patron = r.get("patron")
+        if not isinstance(patron, (list, tuple)) or not 2 <= len(patron) <= 16:
+            _falla(nivel, f"{id_p}.ritmo.patron debe ser una lista de 2 a 16 desplazamientos (m).")
+        extra["ritmo"] = {
+            "pulso_s": _numero(nivel, r.get("pulso_s"), f"{id_p}.ritmo.pulso_s", minimo=0.3),
+            "patron": tuple(_numero(nivel, v, f"{id_p}.ritmo.patron", minimo=-3.0, maximo=3.0) for v in patron),
+            "fase": _numero(nivel, r.get("fase", 0.0), f"{id_p}.ritmo.fase"),
+            "transicion": _numero(nivel, r.get("transicion", 0.25), f"{id_p}.ritmo.transicion",
+                                  minimo=0.05, maximo=0.5)}
+    elif tipo == "clip":
+        c = _dict(nivel, d.get("ciclo"), f"{id_p}.ciclo", "{periodo, visible_s, fase, aviso_s}")
+        periodo = _numero(nivel, c.get("periodo"), f"{id_p}.ciclo.periodo", minimo=1.4)
+        visible = _numero(nivel, c.get("visible_s"), f"{id_p}.ciclo.visible_s", minimo=1.0)
+        if periodo - visible < 0.4:
+            _falla(nivel, f"{id_p}.ciclo: periodo - visible_s debe ser >= 0.4 s (oculta un rato; llegó "
+                          f"{periodo - visible:.2f}).")
+        aviso = _numero(nivel, c.get("aviso_s", 0.5), f"{id_p}.ciclo.aviso_s", minimo=0.0)
+        if aviso >= visible:
+            _falla(nivel, f"{id_p}.ciclo.aviso_s debe ser menor que visible_s ({visible}).")
+        extra["ciclo"] = {"periodo": periodo, "visible_s": visible, "aviso_s": aviso,
+                          "fase": _numero(nivel, c.get("fase", 0.0), f"{id_p}.ciclo.fase")}
+    purgable = d.get("purgable", False)
+    if not isinstance(purgable, bool):
+        _falla(nivel, f"{id_p}.purgable debe ser true o false.")
+    extra["purgable"] = purgable
+    return extra
+
+
+def _purga(nid, datos, plataformas, meta):
+    purga = datos.get("purga")
+    if purga is None:
+        return None
+    purga = _dict(nid, purga, "purga", "{activa_en, z_inicio, velocidad, z_fin, aviso_m}")
+    activa_en = purga.get("activa_en")
+    if activa_en not in plataformas:
+        _falla(nid, f"purga.activa_en {activa_en!r} no es una plataforma.")
+    if not plataformas[activa_en].checkpoint:
+        _falla(nid, f"purga.activa_en {activa_en!r} debe ser un checkpoint (ahí se reaparece y se rearma).")
+    for id_p in (activa_en, meta):
+        if plataformas[id_p].purgable:
+            _falla(nid, f"la plataforma {id_p!r} no puede ser purgable (es purga.activa_en o la meta).")
+    z_inicio = _coord(nid, purga.get("z_inicio"), "purga.z_inicio")
+    z_fin = _coord(nid, purga.get("z_fin"), "purga.z_fin")
+    velocidad = _numero(nid, purga.get("velocidad"), "purga.velocidad", minimo=0.1)
+    if z_fin <= z_inicio:
+        _falla(nid, "purga.z_fin debe ser mayor que purga.z_inicio (la purga avanza en +z).")
+    duracion = (z_fin - z_inicio) / velocidad
+    if not DURACION_PURGA[0] <= duracion <= DURACION_PURGA[1]:
+        _falla(nid, f"purga: (z_fin - z_inicio) / velocidad debe durar entre {DURACION_PURGA[0]:g} y "
+                    f"{DURACION_PURGA[1]:g} s (llegó {duracion:.2f} s).")
+    return {"activa_en": activa_en, "z_inicio": z_inicio, "velocidad": velocidad, "z_fin": z_fin,
+            "aviso_m": _numero(nid, purga.get("aviso_m", 3.0), "purga.aviso_m", minimo=0.0)}
+
+
 def _plataforma(nivel, d):
+    if not isinstance(d, dict):
+        _falla(nivel, "cada plataforma debe ser un objeto JSON.")
     id_p = _texto(nivel, d.get("id"), "plataforma.id")
     tipo = d.get("tipo", "fija")
     if tipo not in TIPOS:
         _falla(nivel, f"plataforma {id_p!r}: tipo {tipo!r} desconocido; usa {TIPOS}.")
+    extra = _campos_nuevos(nivel, id_p, tipo, d)
     movimiento = d.get("movimiento")
-    if tipo == "movil":
+    if tipo == "capa":
+        movimiento = extra.pop("movimiento")
+    elif tipo == "movil":
         if not isinstance(movimiento, dict) or len(movimiento.get("eje", ())) != 3:
             _falla(nivel, f"plataforma {id_p!r}: una móvil necesita movimiento {{eje:[dx,dy,dz], periodo}}.")
         _numero(nivel, movimiento.get("periodo", 4.0), f"{id_p}.movimiento.periodo", minimo=0.5)
@@ -66,7 +162,7 @@ def _plataforma(nivel, d):
         tipo=tipo, movimiento=movimiento,
         aviso_s=_numero(nivel, d.get("aviso_s", 1.0), f"{id_p}.aviso_s", minimo=0.1),
         oculta_s=_numero(nivel, d.get("oculta_s", 2.0), f"{id_p}.oculta_s", minimo=0.1),
-        requiere=d.get("requiere"), checkpoint=bool(d.get("checkpoint", False)))
+        requiere=d.get("requiere"), checkpoint=bool(d.get("checkpoint", False)), **extra)
 
 
 # Convierte un dict (el JSON ya leído) en Nivel validado. ValueError si algo no cuadra.
@@ -156,7 +252,8 @@ def nivel_desde_dict(datos):
         y_muerte=_numero(nid, datos.get("y_muerte", -8.0), "y_muerte", minimo=-LIMITE_Y, maximo=LIMITE_Y),
         penalizacion_caida_s=_numero(nid, datos.get("penalizacion_caida_s", 3.0), "penalizacion_caida_s", minimo=0.0),
         puntuacion=dict(puntuacion), medallas={k: float(v) for k, v in medallas.items()},
-        recompensa=dict(recompensa), descripcion=str(datos.get("descripcion", "")))
+        recompensa=dict(recompensa), descripcion=str(datos.get("descripcion", "")),
+        purga=_purga(nid, datos, plataformas, meta))
     if ruta_optima(nivel)[0] is None:
         _falla(nid, "no hay camino de inicio a meta en las aristas.")
     return nivel

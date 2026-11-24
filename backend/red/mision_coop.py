@@ -12,7 +12,18 @@
 # subclase redefine `_buscar_pendiente` (interno). Un test fija la paridad con la
 # implementación real para que un cambio en misiones.py no la rompa en silencio.
 
+#
+# REPARTO POR DÍAS (sesión D; ALCALDE_MISIONES_DIAS, contrato-dias.md §6): con la bandera y un fondo por días, la reserva
+# sortea la semana con `semilla` (la del mundo, que todos comparten; por defecto reparto_dias.SEMILLA_EN_LINEA para que
+# siga siendo determinista) y `siguiente_para` solo ofrece lo sorteado, por PROGRESO de días (sin reloj: el día d se abre
+# cuando lo de los días anteriores está completado o en curso) y con los arcos en orden. `reservar`/`completar` no miran
+# la semana: el espejo del cliente (frontend/online_flujo.py) reserva por id lo que mande el anfitrión. El protocolo no
+# cambia. Si el reparto falla, se avisa por stderr y se reparte como siempre.
+
+import sys
+
 from backend.logica import misiones as _misiones
+from backend.logica import reparto_dias
 from backend.logica.misiones import SistemaMisiones
 
 # Marca interna: "no se pasó el argumento" (None ya significa "roles desconocidos").
@@ -21,7 +32,7 @@ _SIN_DATO = object()
 
 class ReservaMisiones:
 
-    def __init__(self, catalogo):
+    def __init__(self, catalogo, semilla=None):
         self._catalogo = list(catalogo)
         ids = [m.id for m in self._catalogo]
         if len(set(ids)) != len(ids):
@@ -30,6 +41,20 @@ class ReservaMisiones:
         self._completadas = []          # ids en orden de cierre
         self._en_curso = {}             # id_mision -> id_jugador
         self._roles_en_juego = None     # None = desconocidos (sin tercer nivel de prioridad)
+        self._reparto = None            # RepartoDias por progreso, o None (bandera apagada / catálogo sin días)
+        if reparto_dias.activo() and reparto_dias.tiene_dias(self._catalogo):
+            self._reparto = reparto_dias.RepartoDias(
+                self._catalogo, reparto_dias.SEMILLA_EN_LINEA if semilla is None else semilla)
+
+    # Ids que se juegan en esta partida (la semana sorteada), en orden de catálogo; sin reparto, todo el catálogo.
+    def semana_ids(self):
+        if self._reparto is None:
+            return [m.id for m in self._catalogo]
+        return self._reparto.ids_semana()
+
+    def catalogo_semana(self):
+        ids = set(self.semana_ids())
+        return [m for m in self._catalogo if m.id in ids]
 
     # Roles que están en la sala (iterable) o None. Igual que SistemaMisiones.
     def fijar_roles_en_juego(self, roles):
@@ -62,6 +87,13 @@ class ReservaMisiones:
     def siguiente_para(self, rol, roles_en_juego=_SIN_DATO):
         roles = self._roles_en_juego if roles_en_juego is _SIN_DATO else (
             None if roles_en_juego is None else frozenset(roles_en_juego))
+        if self._reparto is not None:
+            try:
+                return self._siguiente_por_dias(rol, roles)
+            except Exception as error:          # red de seguridad: el reparto de siempre
+                print(f"[misiones] reparto por días en línea desactivado ({type(error).__name__}: {error})",
+                      file=sys.stderr)
+                self._reparto = None
         for m in self._catalogo:
             if m.rol == rol and self.disponible(m.id):
                 return m
@@ -73,6 +105,16 @@ class ReservaMisiones:
                 if m.rol is not None and m.rol not in roles and self.disponible(m.id):
                     return m
         return None
+
+    # Misma prioridad que el reparto de siempre (propia, genérica, roles ausentes) pero solo entre las ofrecibles del
+    # reparto por días y libres; la elección final es la de la partida local (reparto_dias.elegir).
+    def _siguiente_por_dias(self, rol, roles):
+        ofrecibles = set(self._reparto.ofrecibles(self._en_curso.keys()))
+        orden = [m for m in self._catalogo if m.rol == rol] + [m for m in self._catalogo if m.rol is None]
+        if roles is not None:
+            orden += [m for m in self._catalogo if m.rol is not None and m.rol != rol and m.rol not in roles]
+        candidatas = [m for m in orden if m.id in ofrecibles and self.disponible(m.id)]
+        return reparto_dias.elegir(candidatas, rol)
 
     # True si alguien de estos roles aún puede recibir una misión libre.
     def quedan_para(self, roles):
@@ -103,12 +145,15 @@ class ReservaMisiones:
             raise ValueError(f"La misión {id_mision!r} no está en curso para el jugador {id_jugador!r}.")
         del self._en_curso[id_mision]
         self._completadas.append(id_mision)
+        if self._reparto is not None:
+            self._reparto.registrar_completada(id_mision)
 
 
 class SistemaMisionesCoop(SistemaMisiones):
 
     def __init__(self, mapa, catalogo, reserva, id_jugador, **kwargs):
         super().__init__(mapa, catalogo, **kwargs)
+        self._reparto = None        # el reparto por días lo lleva la reserva COMPARTIDA, no cada jugador
         self._reserva = reserva
         self.id_jugador = id_jugador
 

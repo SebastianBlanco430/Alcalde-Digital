@@ -18,6 +18,8 @@
 #   p.celular_linterna(punto, lado)          -> celular en la mano apuntando a `punto` (cada frame); p.guardar_celular()
 #   p.trazar_plumon(punto, normal, lado)     -> mano con plumón cuya punta va a `punto` (cada frame); p.guardar_plumon()
 #   p.limitar(punto_plano, normal, margen)   -> la mano no atraviesa ese plano (mesa, corcho): ±2 cm por defecto
+#   p.postura(x, z, rumbo, bajada, pies)     -> pelvis continua y pies por IK (frontend/cinematica_silla.py)
+#   p.mano_directa(punto, lado) / p.mirar_arriba(grados)   -> mano sin suavizado / levantar la vista
 #   p.avanzar(dt)                            -> cada frame (lo llama Minijuego3D.avanzar)
 #   p.soltar()                               -> devuelve todo a la animación (lo llama Minijuego3D.cerrar)
 
@@ -68,13 +70,16 @@ class _Cadena:
         self.l1 = pc.largo(pc.resta(self.pos(m), self.pos(r)))
         self.l2 = pc.largo(pc.resta(self.pos(p), self.pos(m)))
 
-    def tomar(self):
+    def tomar(self, continuo=False):
         if self.ctrl:
             return
         if self.l1 is None:
             self.medir()
         for n in self.nombres[:2]:
+            actual = _transform_actual(self.actor, n) if continuo else None
             self.ctrl[n] = self.actor.controlJoint(None, "modelRoot", n)
+            if actual is not None:                  # parte de la pose animada (no de la de reposo): sin chasquido
+                self.ctrl[n].setMat(actual)
 
     def soltar(self):
         for n, nodo in list(self.ctrl.items()):
@@ -98,11 +103,12 @@ class _Cadena:
             return
         girar(self.exp[n], self.ctrl[n], pivote, pc.unitario(eje), angulo, pc.unitario(a), pc.unitario(b))
 
-    def resolver(self, objetivo, polo):
-        """IK: la punta a `objetivo` (mundo), el medio doblado hacia `polo`. Entradas no finitas: no hace nada."""
+    def resolver(self, objetivo, polo, continuo=False):
+        """IK: la punta a `objetivo` (mundo), el medio doblado hacia `polo`. Entradas no finitas: no hace nada.
+        `continuo`: al tomar el hueso parte de su pose animada de ese momento (cinematica_silla)."""
         if not (pc.finito(objetivo) and pc.finito(polo)):
             return
-        self.tomar()
+        self.tomar(continuo)
         r, m, p = self.nombres
         hombro = self.pos(r)
         if not pc.finito(hombro) or not self.l1 or not self.l2:
@@ -112,6 +118,20 @@ class _Cadena:
             return
         self._apuntar(r, m, codo)
         self._apuntar(m, p, mano)
+
+
+def _transform_actual(actor, nombre):
+    """Matriz LOCAL actual (animada) del hueso `nombre`, o None. controlJoint arranca el hueso en su pose de REPOSO
+    (T-pose): sin esto, la primera pasada de IK salta 2-3 frames."""
+    try:
+        joints = actor.getJoints(partName="modelRoot", jointName=nombre)
+        if not joints:
+            return None
+        m = LMatrix4()
+        joints[0].getTransform(m)
+        return m if _matriz_finita(m) else None
+    except Exception:                    # noqa: BLE001
+        return None
 
 
 def _matriz_finita(m):
@@ -243,6 +263,11 @@ class PosesPersonaje:
         self._plumon = None
         self._piernas = []               # [(cadena, pie, polo)] mientras está sentado
         self._sentar_pendiente = False
+        self._postura = None             # postura(): {"pies": (x, z)} mientras la pelvis baja de forma continua
+        self._tobillo = None             # y del tobillo sobre la base, de pie (medido; 0,08 hasta medirlo)
+        self._mirar = 0.0                # grados que levanta la vista (mirar_arriba)
+        self.tomar_continuo = False      # True (cinematica_silla): al tomar un hueso parte de su pose animada
+        self._cabeza = None              # _Columna del hueso de la cabeza (None = aún no; False = no hay)
         if self.actor is not None:
             try:
                 for lado in ("d", "i"):
@@ -311,7 +336,75 @@ class PosesPersonaje:
             self.p.aplicar_pose(poses_mundo.pose_teclear(0))
             return
         self.p.cuerpo.position = (0, -BAJADA_SENTADO, 0)
+        self._postura = None
         self._sentar_pendiente = True            # los objetivos de las piernas se fijan cuando los huesos ya se dibujaron
+
+    def postura(self, x, z, rumbo, bajada, pies=None):
+        """Postura continua (frontend/cinematica_silla.py): el personaje en (x, z) mirando a `rumbo` con la pelvis `bajada`
+        m más abajo. bajada > 0: piernas por IK con los pies plantados alrededor de `pies` (x, z) (cada pie a la altura del
+        tobillo, separado como sus caderas) y las rodillas hacia delante; bajada ~0: de pie, piernas de la animación. Se
+        llama cada frame mientras dura la bajada/subida; sostener el resultado = seguir llamando avanzar(). Sin esqueleto
+        (muñeco procedural): con bajada > 0,2 la pose sentada articulada."""
+        self._camino = None
+        self.p.colocar(x, z)
+        self.p.fijar_rumbo(rumbo)
+        if bajada <= 0.005:
+            if self.sentado:
+                self._levantar()
+            self._postura = None
+            return
+        if not self.con_ik:
+            if bajada > 0.2:
+                self.sentado = True
+                self.p.aplicar_pose(poses_mundo.pose_teclear(0))
+            return
+        self.sentado = True
+        self._sentar_pendiente = False
+        self.p.cuerpo.position = (0, -float(bajada), 0)
+        if pies is None:
+            adelante, _ = self._ejes()
+            pies = (x + adelante[0] * 0.45, z + adelante[2] * 0.45)
+        self._postura = {"pies": (float(pies[0]), float(pies[1]))}
+
+    def _piernas_postura(self):
+        """Objetivos de las piernas para postura(): cada pie en `pies` + su desplazamiento lateral de cadera."""
+        adelante, derecha = self._ejes()
+        fx, fz = self._postura["pies"]
+        base = self._base()
+        tobillo = self._tobillo if self._tobillo is not None else 0.08
+        piernas = []
+        for lado in ("d", "i"):
+            cad = self._cadenas["pierna_" + lado]
+            if cad.l1 is None:
+                cad.medir()
+            cadera = cad.pos(cad.nombres[0])
+            if not pc.finito(cadera):
+                continue
+            lateral = pc.punto(pc.resta(cadera, base), derecha)
+            pie = (fx + derecha[0] * lateral, base[1] + tobillo, fz + derecha[2] * lateral)
+            polo = pc.suma(pc.suma(cadera, pc.escala(adelante, 0.8)), (0.0, -0.1, 0.0))
+            piernas.append((cad, pie, polo))
+        self._piernas = piernas
+
+    def mirar_arriba(self, grados):
+        """Levanta la vista `grados` (la cabeza se echa atrás sobre su hueso; 0 = vuelve a la animación). Sin esqueleto o
+        sin hueso de cabeza no hace nada."""
+        try:
+            grados = float(grados)
+        except (TypeError, ValueError):
+            grados = 0.0
+        self._mirar = min(30.0, max(0.0, grados)) if math.isfinite(grados) else 0.0
+        if self._cabeza is None and self._mirar > 0.05 and self.con_ik:
+            try:
+                self._cabeza = _Columna(self.actor, self._hueso(("DEF-spine.006", "spine.006")))
+            except Exception:            # noqa: BLE001  sin hueso de cabeza: no mira arriba
+                self._cabeza = False
+
+    def mano_directa(self, punto, lado="d"):
+        """Como mano_a pero sin suavizado: la mano va a `punto` este mismo frame (la curva ya la da quien llama)."""
+        punto = tuple(punto)
+        self._objetivos[lado] = punto
+        self._actuales[lado] = punto
 
     def _sentar_piernas(self):
         """Objetivos de pie y rodilla (mundo) de las dos piernas; la IK los resuelve cada frame en avanzar() (Panda
@@ -336,6 +429,7 @@ class PosesPersonaje:
             cad.soltar()
         self._piernas = []
         self._sentar_pendiente = False
+        self._postura = None
         try:
             self.p.cuerpo.position = (0, 0, 0)
         except Exception:                # noqa: BLE001
@@ -588,10 +682,20 @@ class PosesPersonaje:
             return
         if self._sentar_pendiente:
             self._sentar_piernas()
+        if self._tobillo is None and not self.sentado:
+            self._medir_tobillo()
+        if self._postura is not None:
+            self._piernas_postura()
         for cad, pie, polo in self._piernas:
-            cad.resolver(pie, polo)
+            cad.resolver(pie, polo, self.tomar_continuo)
         adelante, derecha = self._ejes()
         self._inclinar(dt, adelante, derecha)
+        if self._cabeza:
+            try:
+                self._cabeza.fijar(self._mirar, derecha, pc.escala(adelante, -1.0))
+            except Exception:            # noqa: BLE001  una cabeza rara nunca rompe la pose
+                self._cabeza.soltar()
+                self._cabeza = False
         for lado, objetivo in list(self._objetivos.items()):
             cad = self._cadenas.get(lado)
             if cad is None:
@@ -610,7 +714,16 @@ class PosesPersonaje:
             signo = 1.0 if lado == "d" else -1.0
             polo = pc.suma(pc.suma(hombro, (0, -0.35, 0)), pc.suma(pc.escala(derecha, 0.35 * signo),
                                                                      pc.escala(adelante, -0.25)))
-            cad.resolver(actual, polo)
+            cad.resolver(actual, polo, self.tomar_continuo)
+
+    def _medir_tobillo(self):
+        try:
+            cad = self._cadenas.get("pierna_d")
+            y = cad.pos(cad.nombres[2])[1] - self._base()[1]
+            if math.isfinite(y) and 0.0 < y < 0.25:
+                self._tobillo = y
+        except Exception:                # noqa: BLE001
+            pass
 
     def _inclinar(self, dt, adelante, derecha):
         """De pie: el torso se inclina hacia delante mientras a alguna mano le falte para llegar y se endereza cuando
@@ -677,6 +790,9 @@ class PosesPersonaje:
         if self._columna is not None:
             self._columna.soltar()
             self.inclinacion = 0.0
+        if self._cabeza:
+            self._cabeza.soltar()
+        self._mirar = 0.0
         for cad in list(self._cadenas.values()):
             try:
                 cad.soltar()

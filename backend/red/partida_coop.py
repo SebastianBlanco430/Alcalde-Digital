@@ -72,7 +72,8 @@ class PartidaCooperativa:
 
     def __init__(self, estado_partida, mapa, catalogo, grafo_social=None, reloj=time.monotonic,
                  escala_mundo=1.0, punto_interaccion=None, radio_interaccion=RADIO_INTERACCION,
-                 histeresis=0.3, gracia=GRACIA_RECONEXION, consecuencias=False, anfitrion_cierra=True):
+                 histeresis=0.3, gracia=GRACIA_RECONEXION, consecuencias=False, anfitrion_cierra=True,
+                 semilla_misiones=None):
         self.sesion = SesionEnLinea(estado_partida, escala_mundo=escala_mundo)
         # NET-001: en el anfitrión con ventana, el primero en entrar ES el anfitrión (su cliente va por loopback) y si se va
         # se cierra la sala. En el servidor dedicado (backend/red/servidor.py) es un cliente más: anfitrion_cierra=False.
@@ -83,9 +84,12 @@ class PartidaCooperativa:
         self._carta_de = {}            # id jugador -> id de la carta de misión que tiene (o tuvo) en la mano
         self._decision_mision = {}     # id jugador -> decisión tomada sobre su carta de misión
         self._veredictos = {confianza_misiones.PASADA: 0, confianza_misiones.FALLADA: 0}
+        # Reparto por días (contrato-dias.md §6): la reserva sortea la semana con `semilla_misiones` (el servidor pasa la
+        # semilla del mundo) y solo reparte lo sorteado. Va antes de las consecuencias: la tabla de deltas es la de la
+        # SEMANA (lo que de verdad se juega), no la del fondo entero.
+        self.reserva = ReservaMisiones(catalogo, semilla=semilla_misiones)
         if consecuencias:
             self._activar_consecuencias(catalogo)
-        self.reserva = ReservaMisiones(catalogo)
         self._mapa = mapa
         self._catalogo = list(catalogo)
         # Recta final: ControladorRectaFinal o None (lo fija recta_final.preparar_coop desde el servidor).
@@ -118,7 +122,7 @@ class PartidaCooperativa:
             self._cartas = construir_cartas_mision(catalogo)
         except ValueError:
             return                     # catálogo sin cartas válidas: la partida sigue sin consecuencias
-        self._tabla = confianza_misiones.tabla_deltas(catalogo)
+        self._tabla = confianza_misiones.tabla_deltas(self.reserva.catalogo_semana())
         self._gs = GameState(npcs=[], reloj=lambda: len(self._cierres))
 
     # -- Consulta --
@@ -638,7 +642,7 @@ class PartidaCooperativa:
         hechas = set(self.reserva.completadas())
         return {
             "completadas": self.reserva.completadas(),
-            "pendientes": [m.id for m in self._catalogo if m.id not in hechas],
+            "pendientes": [i for i in self.reserva.semana_ids() if i not in hechas],     # de la semana sorteada
             "cierres": [dict(c) for c in self._cierres],
         }
 

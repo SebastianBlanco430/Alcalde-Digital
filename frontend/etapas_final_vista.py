@@ -442,6 +442,27 @@ def crear_controlador(escena, conexion):
             self._cambiar(etapa)
             self._t = PERIODO_LECTURA
 
+        # Final animado (frontend/final_animado/escenografia.py, el único que llama a estos dos): la etapa del final, sin
+        # aviso, sin NPC de etapa ni medidor mientras dura; soltar_final() deja la etapa que había. Sin final: nada cambia.
+        def forzar_para_final(self, etapa):
+            if getattr(self, "_etapa_antes_final", None) is None:
+                self._etapa_antes_final = self.etapa
+            self._cambiar(max(etapas_final.ETAPA_MIN, min(etapas_final.ETAPA_MAX, int(etapa))), avisar=False)
+            for cuerpo in self.cuerpos.values():
+                if cuerpo is not None:
+                    cuerpo.mostrar(False)
+            self._visibles = []
+            self._pedir_globos()                  # sin NPC visibles: la capa de globos queda vacía
+            self.medidor.enabled = False
+
+        def soltar_final(self):
+            antes = getattr(self, "_etapa_antes_final", None)
+            if antes is None:
+                return
+            self._etapa_antes_final = None
+            self._cambiar(antes, avisar=False)
+            self._repartir_npc()
+
         def input(self, key):
             if key in ("f8", "f9") and etapas_final.depuracion():
                 self.forzar_etapa(self.etapa + (1 if key == "f9" else -1))
@@ -509,8 +530,17 @@ def crear_controlador(escena, conexion):
                     return x, z
             return x, z                                       # sin punto libre a mano: se acepta el último
 
+        def _hay_candidato(self):
+            """¿Algún jugador de la partida es el candidato? Entonces el NPC «aspirante» (Octavio Ruedas) sería su doble."""
+            try:
+                return any(getattr(j, "rol", None) == "candidato" for j in escena._sesion.jugadores())
+            except Exception:
+                return False
+
         def _repartir_npc(self):
             quieren = etapas_final.npc_de_etapa(self.etapa)
+            if self._hay_candidato():
+                quieren = [tipo for tipo in quieren if tipo != "aspirante"]
             visibles = []
             jx, jz = self._jugador()
             for tipo in quieren:
@@ -595,6 +625,11 @@ def crear_controlador(escena, conexion):
             self.avanzar(min(time.dt, 0.1))
 
         def avanzar(self, dt):
+            if getattr(self, "_etapa_antes_final", None) is not None:      # final animado en curso: solo el tinte
+                self._avanzar_tinte(dt)
+                if self.medidor.enabled:
+                    self.medidor.enabled = False
+                return
             self._t -= dt
             if self._t <= 0:
                 self._t = PERIODO_LECTURA

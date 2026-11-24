@@ -935,7 +935,9 @@ class Anfitrion:
             prefijo = "decision_" if t == "rechazo_decision" else ""
             return [(para, {"t": "error", "motivo": _texto(prefijo + str(ev["motivo"]), 200)})]
         if t == "mision":
-            hechas = [_texto(h, 64) for h in self.partida.reserva.completadas()][:16]
+            # Las 16 MÁS RECIENTES (el mensaje admite 16): con la semana de 28 misiones, las primeras 16 dejaban al cliente
+            # sin enterarse de los cierres a partir de la 17.ª (sesión D).
+            hechas = [_texto(h, 64) for h in self.partida.reserva.completadas()][-16:]
             return [(para, {"t": "mision", "id": ev["id"], "mano": [str(m["id"]) for m in ev["mano"]][:8],
                             "hechas": hechas})]
         if t == "ind":

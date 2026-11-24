@@ -19,7 +19,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from backend.logica import evidencia
+from backend.logica import evidencia, fiscalia_bandera
 from backend.logica.game_state import RELACION_INICIAL
 
 CARPETA_DIALOGOS = Path(__file__).resolve().parents[1] / "datos" / "dialogos"
@@ -258,6 +258,10 @@ def _ayuda_posible(cooperacion, game_state, relacion):
     if not cooperacion or relacion < cooperacion["relacion_min"]:
         return None
     ev = cooperacion.get("evidencia")
+    # Fiscalía v2 (sesión A): una cooperación marcada «solo_fiscalia_v1» no entrega su prueba con ALCALDE_FISCALIA_V2
+    # encendida (las del caso solo se ganan dentro de la misión); el NPC sigue diciendo su texto.
+    if ev is not None and cooperacion.get("solo_fiscalia_v1") and fiscalia_bandera.activa():
+        return Ayuda(None, "")
     if ev is not None and evidencia.tiene(game_state, ev):
         return None
     return Ayuda(ev, cooperacion.get("entrega", ""))

@@ -55,7 +55,12 @@ class FlujoConGameState:
         if leer_catalogo is None:
             return
         catalogo = leer_catalogo()
-        self._tabla = confianza_misiones.tabla_deltas(catalogo)
+        # Reparto por días (sesión D): la confianza se escala a lo que se JUEGA en la partida (la semana sorteada), no al
+        # fondo entero; si no, acertarlo todo no llegaría al final perfecto. Las cartas sí cubren el fondo (la reserva
+        # del día también se puede jugar). Sin reparto, catalogo_semana no existe o devuelve el catálogo de siempre.
+        leer_semana = getattr(self._flujo, "catalogo_semana", None)
+        semana = leer_semana() if callable(leer_semana) else None
+        self._tabla = confianza_misiones.tabla_deltas(semana or catalogo)
         estado = getattr(getattr(self._flujo, "sesion", None), "estado_partida", None)
         if estado is None or not hasattr(estado, "forzar_noticia"):
             return

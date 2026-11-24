@@ -37,14 +37,48 @@ ESTILOS = {
     "meta": {"panel": (70, 54, 6), "tenue": (255, 248, 225), "acento": (255, 214, 60), "borde": (255, 240, 150),
              "patron": "bandera", "nombre": "Meta"},
 }
-CLAVES = tuple(ESTILOS)
+CLAVES = tuple(ESTILOS)            # los de siempre (la leyenda fija del HUD); los nuevos van aparte
 
+# Tipos de la sesión E (capa, cinta, ritmo, clip): cada uno con su patrón propio.
+ESTILOS_NUEVOS = {
+    "capa": {"panel": (16, 22, 44), "tenue": (26, 34, 64), "acento": (120, 170, 255), "borde": (190, 215, 255),
+             "patron": "ventana", "nombre": "Capa (se desliza)"},
+    "cinta": {"panel": (10, 36, 30), "tenue": (16, 52, 44), "acento": (60, 255, 190), "borde": (150, 255, 220),
+              "patron": "franjas", "nombre": "Cinta (arrastra)"},
+    "ritmo": {"panel": (40, 10, 40), "tenue": (60, 16, 60), "acento": (255, 90, 230), "borde": (255, 170, 240),
+              "patron": "segmentos", "nombre": "Barra al ritmo"},
+    "clip": {"panel": (44, 26, 8), "tenue": (64, 40, 12), "acento": (255, 150, 40), "borde": (255, 200, 120),
+             "patron": "clip", "nombre": "Clip (aparece y se corta)"},
+}
+ESTILOS.update(ESTILOS_NUEVOS)
+CLAVES_NUEVAS = tuple(ESTILOS_NUEVOS)
+COLOR_PURGA = (255, 40, 70)        # pared de borrado y tinte de las plataformas a punto de purgarse
+
+# Paletas por tema. Cada diseñador de nivel afina SOLO la entrada de su tema (estudio, feed, radio, edicion).
+# Claves opcionales de los temas nuevos: fondo (color de la ventana), acento (línea del HUD), guia (borde de las plataformas
+# de la ruta principal) y atajo (borde de las que solo están en aristas de riesgo >= 1). Sin guia/atajo no se tiñe.
 TEMAS_VISUALES = {
     # cielo: (cenit, horizonte, abismo); luz = color de las ventanas de las torres; rejilla = líneas del vacío
     "digital": {"cenit": (4, 8, 28), "horizonte": (20, 90, 140), "abismo": (2, 3, 12), "luz": (70, 230, 255),
                 "luz2": (255, 70, 200), "rejilla": (40, 130, 190)},
     "corrupto": {"cenit": (14, 2, 18), "horizonte": (150, 24, 70), "abismo": (8, 1, 10), "luz": (255, 80, 100),
                  "luz2": (255, 190, 60), "rejilla": (170, 36, 84)},
+    # sector_3 — estudio de diseño: azul de editor, ventanas
+    "estudio": {"cenit": (6, 10, 30), "horizonte": (60, 90, 170), "abismo": (3, 4, 14), "luz": (140, 180, 255),
+                "luz2": (255, 120, 200), "rejilla": (70, 100, 190), "fondo": (8, 10, 26), "acento": (140, 180, 255),
+                "guia": (110, 240, 255), "atajo": (255, 150, 40)},
+    # sector_4 — feed: verde agua de interfaz social
+    "feed": {"cenit": (2, 16, 16), "horizonte": (20, 120, 110), "abismo": (1, 6, 6), "luz": (60, 255, 190),
+             "luz2": (255, 90, 160), "rejilla": (30, 140, 120), "fondo": (4, 16, 16), "acento": (60, 255, 190),
+             "guia": (110, 240, 255), "atajo": (255, 150, 40)},
+    # sector_5 — radio: magenta/violeta de ecualizador
+    "radio": {"cenit": (14, 4, 22), "horizonte": (120, 40, 150), "abismo": (6, 2, 10), "luz": (255, 90, 230),
+              "luz2": (80, 220, 255), "rejilla": (140, 50, 170), "fondo": (14, 4, 20), "acento": (255, 90, 230),
+              "guia": (110, 240, 255), "atajo": (255, 150, 40)},
+    # sector_6 — edición: ámbar de línea de tiempo
+    "edicion": {"cenit": (16, 10, 4), "horizonte": (150, 90, 30), "abismo": (8, 4, 2), "luz": (255, 170, 60),
+                "luz2": (80, 200, 255), "rejilla": (160, 100, 40), "fondo": (16, 10, 6), "acento": (255, 170, 60),
+                "guia": (110, 240, 255), "atajo": (190, 255, 60)},
 }
 
 
@@ -60,7 +94,7 @@ def clave_estilo(tipo, requiere=None, es_meta=False, checkpoint=False):
         return "interruptor"
     if checkpoint:
         return "checkpoint"
-    return tipo if tipo in ("movil", "desaparece") else "fija"
+    return tipo if tipo in ("movil", "desaparece") or tipo in ESTILOS_NUEVOS else "fija"
 
 
 def mezclar(a, b, t):
@@ -95,6 +129,15 @@ def celdas_patron(patron, ancho, fondo, borde=BORDE):
             s += paso
             k += 1
         return celdas
+    if patron == "ventana":                                      # barra de título arriba (+z) y cuerpo liso
+        barra = max(0.3, min(0.7, h * 0.3))
+        return [(ix0, iz1 - barra, ix1, iz1, "acento"), (ix0, iz0, ix1, iz1 - barra, "tenue")]
+    if patron in ("segmentos", "clip"):                           # franjas en x (ecualizador / clip de línea de tiempo)
+        n = max(3, round(w / (0.32 if patron == "segmentos" else 0.6)))
+        if n % 2 == 0:
+            n += 1
+        dx = w / n
+        return [(ix0 + i * dx, iz0, ix0 + (i + 1) * dx, iz1, "acento" if i % 2 == 0 else "panel") for i in range(n)]
     if patron == "franjas":
         n = max(2, round(h / 0.55))
         if n % 2 == 0:
@@ -128,12 +171,12 @@ def _quad(v, c, t, pts, cols):
 
 # Caja neón centrada en (0, 0) del plano, con la cara superior en y = 0 y el fondo en y = -grosor.
 # Cara superior: franja de borde brillante + relleno con patrón. Paredes: franja de neón arriba y degradado a oscuro.
-def caja_neon(ancho, fondo, grosor, clave, borde=BORDE):
+def caja_neon(ancho, fondo, grosor, clave, borde=BORDE, color_borde=None):
     e = ESTILOS[clave]
     v, c, t = [], [], []
     b = min(borde, ancho / 4, fondo / 4)
     hx, hz = ancho / 2, fondo / 2
-    brillo = e["borde"]
+    brillo = color_borde or e["borde"]          # color_borde: color guía del tema (ruta principal / atajo)
 
     def arriba(x0, z0, x1, z1, col):
         _quad(v, c, t, [(x0, 0, z0), (x1, 0, z0), (x1, 0, z1), (x0, 0, z1)], [col] * 4)
@@ -418,3 +461,102 @@ def alfa_destello(edad, duracion, alfa_max):
 # Escala del texto de aviso a los `edad` s: nace un 35 % más grande y se asienta en 0.18 s.
 def escala_aviso(edad):
     return 1.0 + 0.35 * max(0.0, 1 - edad / 0.18) ** 2
+
+
+# -- Tipos de la sesión E: datos para la vista (puros) --
+
+# Colores base de un tema para la ventana y el HUD: los de materiales.py para digital/corrupto; para los temas nuevos,
+# los de su paleta de TEMAS_VISUALES; un tema desconocido usa digital. Dict con fondo, rejilla y acento.
+def tema_base(nombre):
+    from frontend import materiales as mat
+    try:
+        return mat.tema(nombre)
+    except ValueError:
+        pass
+    t = TEMAS_VISUALES.get(nombre)
+    if t is None:
+        return mat.tema("digital")
+    return {"fondo": t.get("fondo", t["abismo"]), "rejilla": t["rejilla"], "acento": t.get("acento", t["luz"])}
+
+
+# Ids de las plataformas del ATAJO: las que solo aparecen en aristas de riesgo >= 1 (ninguna arista segura las toca).
+def plataformas_atajo(nivel):
+    seguras, arriesgadas = set(), set()
+    for a in nivel.aristas:
+        (seguras if a.riesgo == 0 else arriesgadas).update((a.desde, a.hasta))
+    return arriesgadas - seguras
+
+
+# Color del borde de una plataforma según la regla de color guía del tema (None = el de su estilo, sin cambio). El atajo
+# se marca en cualquier tipo; el tono guía solo pinta las fijas (los demás tipos conservan su borde para distinguirse).
+def borde_guia(tema_visual, id_plataforma, atajo, clave):
+    if clave in ("meta", "checkpoint", "interruptor"):
+        return None
+    if id_plataforma in atajo:
+        return tema_visual.get("atajo")
+    return tema_visual.get("guia") if clave == "fija" else None
+
+
+# Chevrones de una cinta: segmentos ((x, z), (x, z)) en el plano local de flechas que apuntan en el sentido del arrastre,
+# cada `paso` m a lo largo de él y desplazados `fase` m (0 <= fase < paso). Quedan dentro de la plataforma (margen 0.35 m).
+def chevrones_cinta(ancho, fondo, arrastre, fase=0.0, paso=1.1, brazo=0.45):
+    vx, vz = arrastre
+    modulo = math.hypot(vx, vz)
+    if modulo <= 1e-9:
+        return []
+    ux, uz = vx / modulo, vz / modulo                     # sentido
+    px, pz = -uz, ux                                      # perpendicular
+    largo = abs(ux) * ancho + abs(uz) * fondo - 0.7       # recorrido útil a lo largo del arrastre
+    ancho_util = abs(px) * ancho + abs(pz) * fondo - 0.7
+    if largo <= brazo or ancho_util <= 0.2:
+        return []
+    segmentos = []
+    columnas = max(1, int(ancho_util // 1.2))
+    s = -largo / 2 + brazo + (fase % paso)
+    while s <= largo / 2 + 1e-9:
+        for c in range(columnas):
+            o = (c - (columnas - 1) / 2) * 1.2
+            punta = (ux * s + px * o, uz * s + pz * o)
+            par = [((punta[0] - ux * brazo + px * lado * brazo * 0.8, punta[1] - uz * brazo + pz * lado * brazo * 0.8),
+                    punta) for lado in (-1, 1)]
+            if all(abs(x) <= ancho / 2 and abs(z) <= fondo / 2 for seg in par for x, z in seg):
+                segmentos += par                          # en diagonal se descartan las que asomarían
+        s += paso
+    return segmentos
+
+
+# Fase (m) de los chevrones de una cinta en el instante t: avanzan a la velocidad del arrastre.
+def fase_cinta(t, arrastre, paso=1.1):
+    return (t * math.hypot(*arrastre)) % paso
+
+
+# Color de una barra de ritmo según su altura dentro de su patrón (0 = la más baja, 1 = la más alta): de cian a magenta.
+def color_ritmo(fraccion):
+    return mezclar((60, 200, 255), (255, 60, 200), fraccion)
+
+
+# Fracción 0-1 de la altura actual de la barra dentro del rango de su patrón.
+def altura_relativa_ritmo(desplazamiento, patron):
+    bajo, alto = min(patron), max(patron)
+    return 0.0 if alto - bajo <= 1e-9 else max(0.0, min(1.0, (desplazamiento - bajo) / (alto - bajo)))
+
+
+# Brillo extra de una barra de ritmo al empezar cada pulso (destello que decae en `dur` s): 1 al cambiar, 0 al final.
+def destello_pulso(fraccion, pulso_s, dur=0.18):
+    return max(0.0, 1.0 - fraccion * pulso_s / dur)
+
+
+# Largo (m) de la columna de una barra de ritmo: llega hasta el suelo del vacío desde su punto más alto.
+def largo_columna_ritmo(y, patron, y_muerte):
+    return max(1.0, y + max(patron) - (y_muerte + 1.0))
+
+
+# Escala de color de una plataforma purgable en aviso: de blanco a rojo según lo cerca que está el frente (0 lejos, 1 encima).
+def tinte_purga(cercania):
+    k = max(0.0, min(1.0, cercania))
+    return mezclar((1.0, 1.0, 1.0), (2.4, 0.5, 0.6), k)
+
+
+# Cuenta atrás de la purga para el HUD.
+def texto_purga(restante):
+    return f"PURGA  {max(0.0, restante):4.1f} s"

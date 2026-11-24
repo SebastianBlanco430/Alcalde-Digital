@@ -43,11 +43,18 @@
 #
 # EN LÍNEA: este envoltorio solo se crea para la partida local (main.py: crear_flujo). El flujo en línea
 # (frontend/online_flujo.py) no pasa por aquí: no tiene reloj, ni efectos retardados, ni cambia el protocolo.
+#
+# REPARTO POR DÍAS (contrato-dias.md §5): este envoltorio es quien avisa del día a las misiones. Al crearse, al restaurar
+# y en cada paso de tiempo en que cambia el día (o se cruza la hora límite de la reserva, HORA_LIMITE_RESERVA) llama a
+# `fijar_dia_misiones(dia, hora)` del flujo; entre cambios no llama a nada (comparar una tupla por frame). RED DE
+# SEGURIDAD: si eso falla, se avisa por stderr, se pide al flujo `apagar_reparto_dias()` (reparto de siempre) y no se
+# vuelve a intentar; nunca lanza hacia el frame. Un flujo sin `fijar_dia_misiones` (pruebas) se deja tal cual.
 
 import os
 import sys
 
-from backend.logica import ambiente_ciudad, confianza_misiones, costo_aislamiento, efectos_retardados, etapas_final, reloj_partida
+from backend.logica import (ambiente_ciudad, confianza_misiones, costo_aislamiento, efectos_retardados, etapas_final,
+                            reloj_partida, reparto_dias)
 from backend.logica.estado_partida import NOMBRES_INDICADORES
 from backend.logica.misiones import SIN_MISION
 
@@ -57,7 +64,8 @@ FINAL_PONDERADO = True  # el final con GameState mezcla confianza por grupo e in
 PESO_CIUDAD = 0.5       # peso del índice de la ciudad en el final ponderado (0 = solo grupos, como antes)
 
 _PROPIOS = ("_flujo", "reloj", "cola_efectos", "aislamiento", "ambiente_suave", "avisos_retardados",
-            "ultimo_aviso_retardado", "_indice_etapas", "_t_indice_etapas", "_etapa_vista")
+            "ultimo_aviso_retardado", "_indice_etapas", "_t_indice_etapas", "_etapa_vista", "_clave_dia_misiones",
+            "_reparto_roto")
 PERIODO_INDICE_ETAPAS = 0.5     # s reales entre dos lecturas del índice para el ambiente (finales por etapas)
 
 
@@ -142,6 +150,37 @@ class FlujoConTiempo:
         self._indice_etapas = None          # último índice leído para el ambiente (finales por etapas)
         self._t_indice_etapas = 0.0
         self._etapa_vista = None            # última etapa (con histéresis) que se vio durante la partida
+        self._clave_dia_misiones = None     # (día, antes de la hora límite de la reserva) avisado a las misiones
+        self._reparto_roto = False          # el reparto por días falló una vez: no se vuelve a llamar
+        self._sincronizar_dia_misiones(forzar=True)
+
+    # -- Reparto de misiones por días --
+
+    # Avisa a las misiones del día (y de si aún se puede abrir la reserva) solo cuando eso cambia. Nunca lanza.
+    def _sincronizar_dia_misiones(self, forzar=False):
+        if self._reparto_roto:
+            return
+        dia, hora = self.reloj.dia(), self.reloj.hora()
+        clave = (dia, hora < reparto_dias.HORA_LIMITE_RESERVA)
+        if not forzar and clave == self._clave_dia_misiones:
+            return
+        self._clave_dia_misiones = clave
+        try:
+            fijar = getattr(self._flujo, "fijar_dia_misiones", None)
+            if callable(fijar) and fijar(dia, hora) and getattr(self._flujo, "game_state", None) is not None:
+                # La misión asignada por el día nuevo puede ser una Fiscalía aplazada cuyo caso ya se resolvió: se
+                # cierra ya por la señal (el mismo «cierre inmediato» de FlujoConGameState, que cobra una sola vez).
+                self.revisar_misiones_digitales()
+        except Exception as error:          # red de seguridad de la demo: el juego sigue con el reparto de siempre
+            self._reparto_roto = True
+            print(f"[tiempo] reparto de misiones por días desactivado ({type(error).__name__}: {error}); "
+                  "se reparte como siempre", file=sys.stderr)
+            try:
+                apagar = getattr(self._flujo, "apagar_reparto_dias", None)
+                if callable(apagar):
+                    apagar()
+            except Exception as otro:
+                print(f"[tiempo] no se pudo apagar el reparto por días: {otro}", file=sys.stderr)
 
     # -- Tiempo --
 
@@ -170,6 +209,7 @@ class FlujoConTiempo:
         return getattr(self._flujo, "game_state", None)
 
     def _procesar_tiempo(self):
+        self._sincronizar_dia_misiones()        # antes del aislamiento: la misión del día nuevo ya cuenta como activa
         ahora = self.reloj.tiempo_absoluto()
         nuevos = []
         if self.cola_efectos is not None:
@@ -349,6 +389,7 @@ class FlujoConTiempo:
         self.ultimo_aviso_retardado = None
         self._etapa_vista = _etapa_guardada(datos.get("etapa_vista"))
         self._indice_etapas = None
+        self._sincronizar_dia_misiones(forzar=True)     # las misiones restauradas se ponen al día del reloj restaurado
 
     @staticmethod
     def _leer(datos, clave, leer, por_defecto):

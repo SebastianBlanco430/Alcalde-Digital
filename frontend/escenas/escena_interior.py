@@ -57,6 +57,30 @@ ANCLAS = {
 }
 
 
+def _silla_movible():
+    """¿La silla del escritorio va suelta? (sesión B: ALCALDE_ANIM_SILLA con frontend/cinematica_silla.py). Nunca lanza."""
+    try:
+        from frontend.minijuegos_3d import banderas
+        return banderas.anim_silla()
+    except Exception:                    # noqa: BLE001
+        return False
+
+
+def _silla_suelta(padre):
+    """La silla de siempre como entidad aparte (una malla): origen en el suelo bajo el centro del asiento (contrato de
+    cinematica_silla: `entidad_silla`), en ASIENTO."""
+    silla = Entity(parent=padre, position=(guion.ASIENTO[0], 0, guion.ASIENTO[1]), shader=lit_with_shadows_shader,
+                   name="silla_escritorio")
+    tela = rgb((52, 56, 74))
+    pieza(parent=silla, model="cube", color=tela, position=(0, 0.45, 0), scale=(0.48, 0.07, 0.48))
+    pieza(parent=silla, model="cube", color=tela, position=(0, 0.78, -0.22), scale=(0.46, 0.55, 0.06))
+    pieza(parent=silla, model="cube", color=rgb(COLOR_METAL), position=(0, 0.22, 0), scale=(0.06, 0.4, 0.06))
+    pieza(parent=silla, model="cube", color=rgb(COLOR_METAL), position=(0, 0.03, 0), scale=(0.5, 0.05, 0.5))
+    silla.combine()
+    silenciar(silla)
+    return silla
+
+
 # Destello blanco-cian que cubre la pantalla al "entrar" al monitor. Vive en camera.ui, fuera de
 # la escena, y se desvanece solo (update) aunque la escena ya esté desactivada.
 class Destello(Entity):
@@ -172,12 +196,23 @@ class EscenaInterior(Escena):
         # lámpara de escritorio
         pieza(parent=grupo, model="cube", color=rgb((200, 200, 205)), position=(mx - 0.75, 0.9, 2.2), scale=(0.03, 0.3, 0.03))
         pieza(parent=grupo, model="sphere", color=rgb((255, 238, 170)), position=(mx - 0.75, 1.08, 2.15), scale=0.14)
-        # silla
+        # silla: con ALCALDE_ANIM_SILLA (sesión B) es una entidad SUELTA (self.silla) que la entrada del minijuego 3D puede
+        # deslizar; misma forma, color y sitio. Sin la bandera, combinada en el grupo fijo como siempre.
+        self.silla = None
+        if _silla_movible():
+            self.silla = _silla_suelta(self)
+            return
         silla = rgb((52, 56, 74))
         pieza(parent=grupo, model="cube", color=silla, position=(guion.ASIENTO[0], 0.45, guion.ASIENTO[1]), scale=(0.48, 0.07, 0.48))
         pieza(parent=grupo, model="cube", color=silla, position=(guion.ASIENTO[0], 0.78, guion.ASIENTO[1] - 0.22), scale=(0.46, 0.55, 0.06))
         pieza(parent=grupo, model="cube", color=rgb(COLOR_METAL), position=(guion.ASIENTO[0], 0.22, guion.ASIENTO[1]), scale=(0.06, 0.4, 0.06))
         pieza(parent=grupo, model="cube", color=rgb(COLOR_METAL), position=(guion.ASIENTO[0], 0.03, guion.ASIENTO[1]), scale=(0.5, 0.05, 0.5))
+
+    def reponer_silla(self):
+        """Devuelve la silla suelta (ALCALDE_ANIM_SILLA) a su sitio de siempre (ASIENTO). Sin silla suelta, nada."""
+        if self.silla is not None:
+            self.silla.position = (guion.ASIENTO[0], 0, guion.ASIENTO[1])
+            self.silla.rotation = (0, 0, 0)
 
     def _ventana(self, grupo):
         x = guion.SALA_ANCHO / 2

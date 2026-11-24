@@ -174,12 +174,45 @@ class ControlReloj:
 # Cinemática del final (finales por etapas, frontend/cinematica_final.py): se muestra UNA vez por partida, antes de la
 # pantalla final, si el final es bueno o malo. «sesion» identifica la partida: otra sesión (Partida nueva) reinicia la marca.
 SEGUNDOS_VINETA_FINAL = None    # None = lo que diga cinematica_final (≈ 4 s); los scripts de humo lo bajan
+ESCALA_FINAL_ANIMADO = 1.0      # multiplica las duraciones del final animado (los scripts de humo lo bajan)
+FINALES_VINETAS = ("bueno", "malo")              # los que tienen viñetas 2D (el neutro no: va directo al panel)
+FINALES_ANIMADOS = ("bueno", "neutro", "malo")   # los que tienen final animado (frontend/final_animado)
 _cine_final = CINE_FINAL      # mismo dict que reloj_constantes.CINE_FINAL
 
 
-def _cinematica_del_final(escena_mundo, panel, resumen):
+def _final_animado_activo():
+    try:
+        from frontend import final_animado
+        return final_animado.activo()
+    except Exception:
+        return False
+
+
+def _crear_vinetas(final, al_terminar, guardia, padre):
+    """Viñetas 2D de siempre (frontend/cinematica_final.py). Aparte para que las pruebas la cambien sin ventana."""
+    from frontend.cinematica_final import crear_cinematica
+    opciones = {} if SEGUNDOS_VINETA_FINAL is None else {"segundos": SEGUNDOS_VINETA_FINAL}
+    return crear_cinematica(final, al_terminar, guardia=guardia, parent=padre, **opciones)
+
+
+def _crear_animado(escena_mundo, final, roles, al_terminar, al_fallo, conexion, guardia):
+    """Final animado en el mundo 3D (frontend/final_animado/director.py). Aparte para que las pruebas lo cambien."""
+    from frontend.final_animado.director import crear_final_animado
+    return crear_final_animado(escena_mundo, final, roles, al_terminar, al_fallo, conexion=conexion, guardia=guardia,
+                               escala=ESCALA_FINAL_ANIMADO)
+
+
+def _roles_de(escena_mundo):
+    try:
+        return [j.rol for j in escena_mundo._sesion.jugadores()]
+    except Exception:
+        return []
+
+
+def _cinematica_del_final(escena_mundo, panel, resumen, conexion=None):
     """True mientras la cinemática del final esté en pantalla (el panel final espera). Nunca lanza: si algo falla, se
-    marca como vista y sale el panel de siempre."""
+    marca como vista y sale el panel de siempre. Con el final animado (ALCALDE_FINAL_ANIMADO, encendido por defecto) los
+    tres finales lo tienen; si falla al crear o a mitad, bueno y malo caen a las viñetas y el neutro va al panel."""
     try:
         from backend.logica import etapas_final
         if not etapas_final.activo():
@@ -187,12 +220,14 @@ def _cinematica_del_final(escena_mundo, panel, resumen):
         sesion = escena_mundo._sesion
         if _cine_final["sesion"] is not sesion:
             _cine_final.update(sesion=sesion, vista=False, entidad=None)
-        if _cine_final["vista"] or resumen.get("final") not in ("bueno", "malo") or not escena_mundo.flujo.partida_terminada():
+        final = resumen.get("final")
+        animado = _final_animado_activo() and final in FINALES_ANIMADOS
+        if (_cine_final["vista"] or (final not in FINALES_VINETAS and not animado)
+                or not escena_mundo.flujo.partida_terminada()):
             return False
         if _cine_final["entidad"] is None:
-            from frontend.cinematica_final import crear_cinematica
 
-            def al_terminar():
+            def al_terminar(*_saltada):
                 _cine_final["vista"] = True
                 _cine_final["entidad"] = None
                 escena_mundo.refrescar()               # ahora sí: la pantalla final de siempre
@@ -201,9 +236,34 @@ def _cinematica_del_final(escena_mundo, panel, resumen):
                 if getattr(escena_mundo, "en_pausa", False):
                     escena_mundo.alternar_pausa(False)
 
-            opciones = {} if SEGUNDOS_VINETA_FINAL is None else {"segundos": SEGUNDOS_VINETA_FINAL}
-            _cine_final["entidad"] = crear_cinematica(resumen["final"], al_terminar, guardia=guardia, parent=escena_mundo.hud,
-                                                      **opciones)
+            def respaldo(error=None):
+                """Sin final animado: las viñetas (bueno / malo) o, en el neutro, directo al panel."""
+                if error is not None:
+                    print(f"[reloj] final animado: cae a las viñetas ({type(error).__name__}: {error})", file=sys.stderr)
+                _cine_final["entidad"] = None
+                if final in FINALES_VINETAS:
+                    _cine_final["entidad"] = _crear_vinetas(final, al_terminar, guardia, escena_mundo.hud)
+                    return True
+                _cine_final["vista"] = True
+                return False
+
+            def al_fallo(error):                       # a mitad (ya limpio): viñetas o panel
+                try:
+                    if not respaldo(error):
+                        escena_mundo.refrescar()
+                except Exception as otro:
+                    print(f"[reloj] respaldo del final omitido ({type(otro).__name__}: {otro})", file=sys.stderr)
+                    al_terminar()
+
+            if animado:
+                try:
+                    _cine_final["entidad"] = _crear_animado(escena_mundo, final, _roles_de(escena_mundo), al_terminar,
+                                                            al_fallo, conexion, guardia)
+                except Exception as error:             # no se pudo ni construir (ya limpio)
+                    if not respaldo(error):
+                        return False
+            elif not respaldo():
+                return False
         panel.ocultar()
         return True
     except Exception as error:
@@ -213,14 +273,14 @@ def _cinematica_del_final(escena_mundo, panel, resumen):
         return False
 
 
-def pintar_final_de(escena_mundo, panel):
+def pintar_final_de(escena_mundo, panel, conexion=None):
     """Gancho de EscenaMundo.refrescar (pintar_final): pinta la pantalla final de la semana si el flujo tiene reloj.
     Devuelve True si pintó (la escena no usa entonces sus paneles de siempre)."""
     flujo = escena_mundo.flujo
     if flujo is None or getattr(flujo, "reloj", None) is None or not callable(getattr(flujo, "resumen_final", None)):
         return False
     resumen = flujo.resumen_final()
-    if _cinematica_del_final(escena_mundo, panel, resumen):
+    if _cinematica_del_final(escena_mundo, panel, resumen, conexion):
         return True
     indicadores = escena_mundo._sesion.estado_partida.indicadores() if escena_mundo._sesion is not None else None
     # Sin nivel del ambiente: el Ambiente suavizado va con retraso (τ = 30 s) y al saltar al final podía decir «sana»
@@ -325,7 +385,7 @@ def registrar(gestor, conexion, escena_mundo):
     try:
         vigia = _crear_vigia(escena_mundo, conexion)
         conexion.vigia_reloj = vigia
-        escena_mundo.pintar_final = lambda flujo: pintar_final_de(escena_mundo, vigia.vista.panel_final)
+        escena_mundo.pintar_final = lambda flujo: pintar_final_de(escena_mundo, vigia.vista.panel_final, conexion)
         return vigia
     except Exception as error:
         print(f"[reloj] no instalado ({type(error).__name__}: {error})", file=sys.stderr)

@@ -382,7 +382,7 @@ class EscenaMundo(Escena):
         if destino is None:
             return 0.0
         activo = self.flujo.jugador_activo()
-        px, pz = self._mundo.punto_interaccion(destino)
+        px, pz = self._punto_exacto_de_mision() or self._mundo.punto_interaccion(destino)
         return geometria_mundo.rumbo_de(px - activo.x, pz - activo.z)
 
     # Vuelca el modelo (posiciones, turno, misión) a personajes, baliza y HUD.
@@ -464,12 +464,22 @@ class EscenaMundo(Escena):
         destino = self._destino_seguido()
         if destino is None or self.flujo.partida_terminada():
             self.ruta_piso.actualizar([])
+            self._ruta_al_minimapa(None, None)
             return
-        puntos = navegacion.ruta_gps_hasta_puerta(self._mundo, activo.x, activo.z, destino)
+        # Misión con punto exacto (puerta de la Fiscalía, terminal): la línea va directa a ese punto, sin pasar por la
+        # puerta del edificio del lugar (sesión E: antes iba a la Lan House da Praça y volvía cruzando la plaza).
         exacto = self._punto_exacto_de_mision()
-        if exacto is not None:                # misión digital: la línea sigue hasta el terminal (donde está la baliza)
-            puntos = list(puntos) + [exacto]
-        self.ruta_piso.actualizar([(activo.x, activo.z)] + puntos)
+        puntos = navegacion.puntos_ruta_piso(self._mundo, activo.x, activo.z, destino, exacto,
+                                             presupuesto=navegacion.PRESUPUESTO_FRAME)
+        self.ruta_piso.actualizar(puntos)
+        self._ruta_al_minimapa(exacto, puntos)
+
+    # El minimapa marca el mismo destino y la misma línea que el suelo cuando hay punto exacto (si no, los del lugar).
+    def _ruta_al_minimapa(self, exacto, puntos):
+        minimapa = getattr(self.hud, "minimapa", None)
+        if minimapa is not None:
+            minimapa.punto_destino = exacto
+            minimapa.ruta_puntos = puntos if exacto is not None else None
 
     # -- Cinemáticas --
 

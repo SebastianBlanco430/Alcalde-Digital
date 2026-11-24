@@ -142,6 +142,207 @@ def ruta_gps_hasta_puerta(mundo, x, z, destino):
     return rodear_obstaculos(mundo, (x, z), puntos + [edificio.punto_entrada()]) + [edificio.puerta()]
 
 
+# Puntos (x, z) para DIBUJAR el camino hasta un punto exacto (delante de la puerta de la Fiscalía, el terminal de una
+# misión digital) que queda en la plaza de `destino` o junto a ella. Sesión E (ruta-fiscalia): antes se dibujaba la ruta
+# hasta la puerta del EDIFICIO del lugar (la Lan House da Praça, dentro de su muro) y de allí una recta al punto: la
+# línea iba y volvía cruzando la plaza. Ahora: las esquinas del GPS SIN el centro de la plaza del destino (el punto está
+# en su borde; pasar por el centro obliga a volver sobre los propios pasos) y el punto, con los rodeos de siempre. Si
+# algún tramo sigue chocando, se repara con la rejilla (_reparar_tramos); si ni así, se pasa por el centro de la plaza.
+# ValueError si el destino no existe.
+def ruta_gps_hasta_punto(mundo, x, z, destino, punto, presupuesto=None):
+    punto = (float(punto[0]), float(punto[1]))
+    # Se pide en cada frame: caché por celda de CELDA_RUTA m del jugador (la línea se redibuja con PASO_FIRMA = 0,25 m).
+    clave = (id(mundo), _version_mundo(mundo), destino, round(punto[0], 2), round(punto[1], 2),
+             round(x / CELDA_RUTA), round(z / CELDA_RUTA))
+    if clave in _CACHE_RUTAS_PUNTO:
+        return list(_CACHE_RUTAS_PUNTO[clave])
+    ruta, definitiva = _calcular_ruta_hasta_punto(mundo, x, z, destino, punto, presupuesto)
+    if definitiva:
+        if len(_CACHE_RUTAS_PUNTO) > _MAX_CACHE:
+            _CACHE_RUTAS_PUNTO.clear()
+        _CACHE_RUTAS_PUNTO[clave] = ruta
+    return list(ruta)
+
+
+CELDA_RUTA = 0.25
+_CACHE_RUTAS_PUNTO = {}
+
+
+def _version_mundo(mundo):
+    """Cambia cuando el cliente agrega decorado con colisión (agregar_obstaculos): invalida las cachés de rutas."""
+    return len(getattr(mundo, "_fisicos", ()) or ())
+
+
+def _calcular_ruta_hasta_punto(mundo, x, z, destino, punto, presupuesto=None):
+    """(ruta, definitiva): definitiva=False si la reparación quedó a medias por el presupuesto (ruta provisional)."""
+    lugares = calcular_ruta_gps(mundo, x, z, destino)
+    esquinas = [mundo.coordenada(lugar) for lugar in lugares]
+    candidatas = [esquinas[:-1] + [punto]] if lugares and lugares[-1] == destino else []
+    candidatas.append(esquinas + [punto])
+    primera, reparada = None, None
+    for puntos in candidatas:
+        ruta = rodear_obstaculos(mundo, (x, z), puntos)
+        if _polilinea_libre(mundo, [(x, z)] + ruta):
+            return ruta, True
+        if primera is None:
+            primera = ruta
+            try:
+                reparada = _reparar_tramos(mundo, [(x, z)] + ruta, presupuesto)[1:]
+            except _Pendiente:
+                return ruta, False
+            if _polilinea_libre(mundo, [(x, z)] + reparada):
+                return reparada, True
+    return reparada, True
+
+
+def _polilinea_libre(mundo, puntos):
+    if not callable(getattr(mundo, "es_transitable", None)):
+        return True
+    return all(_tramo_libre(mundo, a, b) for a, b in zip(puntos, puntos[1:]))
+
+
+# Tramos que siguen chocando tras los rodeos (el rodeo de un solo punto lateral no basta, p. ej. entre la fuente y un
+# banco): se cambian por el camino más corto en una rejilla de PASO_REJILLA m (8 vecinos, sin cortar esquinas) y luego se
+# tensa (solo quedan los puntos sin línea de vista entre sí). La rejilla es un Dijkstra HACIA ATRÁS desde el extremo fijo
+# del tramo (la esquina o la puerta) que se guarda y solo crece lo necesario: al caminar, el jugador cae casi siempre en
+# celdas ya resueltas. Hasta RADIO_CAMPO m del extremo; más lejos (o sin camino) el tramo queda como estaba.
+# `presupuesto` (celdas por llamada; None = sin tope): en el juego el campo crece a trozos, unos ms por frame, y mientras
+# no llega al jugador la ruta es la de los rodeos (provisional; no se guarda en la caché).
+PASO_REJILLA = 0.5
+RADIO_CAMPO = 60.0
+PRESUPUESTO_FRAME = 150            # celdas del campo que se resuelven por frame en el juego (unos ms)
+_CAMPOS = {}
+_MAX_CAMPOS = 16
+
+
+class _Pendiente(Exception):
+    """El campo aún no llega al jugador (presupuesto agotado)."""
+
+
+def _reparar_tramos(mundo, puntos, presupuesto=None):
+    salida = [puntos[0]]
+    for a, b in zip(puntos, puntos[1:]):
+        if not _tramo_libre(mundo, a, b):
+            salida.extend(_camino_rejilla(mundo, a, b, presupuesto))
+        salida.append(b)
+    return salida
+
+
+class _CampoHacia:
+    """Dijkstra perezoso en rejilla hacia `meta` (x, z): distancia y siguiente celda hacia ella."""
+
+    VECINOS = [(dx, dz, math.hypot(dx, dz)) for dx in (-1, 0, 1) for dz in (-1, 0, 1) if dx or dz]
+
+    def __init__(self, mundo, meta):
+        self.mundo, self.meta = mundo, meta
+        self.fin = self.celda(meta)
+        self.costo, self.siguiente, self.cerradas = {self.fin: 0.0}, {self.fin: None}, set()
+        self.cola = [(0.0, self.fin)]
+        self.libres = {self.fin: True}
+        self.tope = RADIO_CAMPO / PASO_REJILLA
+        self.vista = {}                # celda -> la celda más lejana del camino que se ve en línea recta desde ella
+
+    @staticmethod
+    def celda(p):
+        return (round(p[0] / PASO_REJILLA), round(p[1] / PASO_REJILLA))
+
+    @staticmethod
+    def punto(c):
+        return (c[0] * PASO_REJILLA, c[1] * PASO_REJILLA)
+
+    def libre(self, c):
+        if c not in self.libres:
+            self.libres[c] = (math.hypot(c[0] - self.fin[0], c[1] - self.fin[1]) <= self.tope
+                              and self.mundo.es_transitable(*self.punto(c)))
+        return self.libres[c]
+
+    def resolver(self, objetivo, presupuesto=None):
+        """True si `objetivo` ya tiene camino; False si no lo habrá; _Pendiente si se agotó el presupuesto."""
+        import heapq
+        gastadas = 0
+        while objetivo not in self.cerradas and self.cola:
+            if presupuesto is not None and gastadas >= presupuesto:
+                raise _Pendiente()
+            g, c = heapq.heappop(self.cola)
+            if c in self.cerradas:
+                continue
+            self.cerradas.add(c)
+            gastadas += 1
+            for dx, dz, w in self.VECINOS:
+                n = (c[0] + dx, c[1] + dz)
+                # la celda del jugador puede tocar un borde (está pegado a una pared): se acepta como origen
+                if not (self.libre(n) or n == objetivo):
+                    continue
+                if dx and dz and not (self.libre((c[0] + dx, c[1])) and self.libre((c[0], c[1] + dz))):
+                    continue                                    # en diagonal no se cortan esquinas
+                if g + w < self.costo.get(n, math.inf):
+                    self.costo[n], self.siguiente[n] = g + w, c
+                    heapq.heappush(self.cola, (g + w, n))
+        return objetivo in self.cerradas
+
+    def _cadena(self, c):
+        cadena = []
+        while c is not None:
+            cadena.append(c)
+            c = self.siguiente[c]
+        return cadena
+
+    def _mas_lejana_visible(self, desde, cadena):
+        """Índice en `cadena` de la celda más lejana que se ve en línea recta desde el punto `desde`."""
+        if len(cadena) <= 1:
+            return 0
+        j = len(cadena) - 1
+        while j > 1 and not _tramo_libre(self.mundo, desde, self.lugar(cadena[j])):
+            j -= 1
+        return j
+
+    def lugar(self, c):
+        """Punto de la celda; la de la meta es la meta exacta (el centro de su celda puede caer a 0,35 m)."""
+        return self.meta if c == self.fin else self.punto(c)
+
+    def tenso_desde(self, a):
+        """Puntos intermedios tensos de `a` a la meta (sin `a` ni la meta)."""
+        cadena = self._cadena(self.celda(a))
+        if len(cadena) <= 1:
+            return []
+        intermedios = []
+        c = cadena[self._mas_lejana_visible(a, cadena)]
+        while c != self.fin:
+            if c not in self.vista:
+                resto = self._cadena(c)
+                self.vista[c] = resto[self._mas_lejana_visible(self.lugar(c), resto)]
+            intermedios.append(self.punto(c))
+            c = self.vista[c]
+        return intermedios
+
+
+def _camino_rejilla(mundo, a, b, presupuesto=None):
+    """Puntos intermedios (sin a ni b) de un camino libre de a a b; [] si no lo hay. _Pendiente con presupuesto agotado."""
+    clave = (id(mundo), _version_mundo(mundo), round(b[0], 2), round(b[1], 2))
+    campo = _CAMPOS.get(clave)
+    if campo is None:
+        if len(_CAMPOS) >= _MAX_CAMPOS:
+            _CAMPOS.clear()
+        campo = _CAMPOS[clave] = _CampoHacia(mundo, b)
+    if not campo.resolver(campo.celda(a), presupuesto):
+        return []
+    return campo.tenso_desde(a)
+
+
+# Polilínea completa que dibuja la ruta del piso (EscenaMundo._actualizar_ruta_piso): el jugador y los puntos hasta la
+# puerta del destino; con `exacto` (x, z) —la puerta de la Fiscalía, el terminal de una misión digital— hasta ese punto.
+# `presupuesto`: ver PRESUPUESTO_FRAME (el juego lo pasa; los tests calculan todo de una vez).
+def puntos_ruta_piso(mundo, x, z, destino, exacto=None, presupuesto=None):
+    if exacto is None:
+        return [(x, z)] + list(ruta_gps_hasta_puerta(mundo, x, z, destino))
+    try:
+        return [(x, z)] + ruta_gps_hasta_punto(mundo, x, z, destino, exacto, presupuesto)
+    except ValueError:
+        raise                                   # destino inexistente: igual que ruta_gps_hasta_puerta
+    except Exception:                           # noqa: BLE001 — red de seguridad: la composición de antes, sin caerse
+        return [(x, z)] + list(ruta_gps_hasta_puerta(mundo, x, z, destino)) + [(float(exacto[0]), float(exacto[1]))]
+
+
 # -- Rodeo de obstáculos (VIS-002 / EST-014 / REN-002) ---------------------------------------------------------------
 # Los puntos del GPS son centros de plaza: el de la Praça da Sé cae DENTRO de la fuente y la recta de la plaza del
 # Mercado cruza el toldo del puesto fijo de Seu Heitor. Con las colisiones reales del mundo (`es_transitable`):
@@ -288,6 +489,16 @@ def a_minimapa(x, z, limites, centro, tamano, yaw_grados=0):
 # horario: 0 arriba, 90 derecha, 180 abajo, -90 izquierda. Mismo punto -> 0.
 def angulo_hacia(u0, v0, u1, v1):
     return math.degrees(math.atan2(u1 - u0, v1 - v0))
+
+
+# Punto (x, z) que el minimapa marca como destino: el exacto de la misión si lo hay (puerta de la Fiscalía, terminal),
+# si no el centro del lugar. None sin destino.
+def destino_en_minimapa(mapa, destino, exacto=None):
+    if destino is None:
+        return None
+    if exacto is not None:
+        return (float(exacto[0]), float(exacto[1]))
+    return mapa.coordenada(destino)
 
 
 # -- Distancia --------------------------------------------------------------

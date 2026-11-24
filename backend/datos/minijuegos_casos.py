@@ -234,7 +234,7 @@ CRONOLOGIA = [
         "cierre": {"v": "El anuncio salió de la oficina de cultura y se fue repitiendo.", "f": "Nadie encontró el anuncio original: se fue repitiendo solo."},
     },
     {
-        "id": "k_rodoviaria", "temas": ["evento", "servicios"], "misiones": ["generica_rodoviaria", "influencer_samba"],
+        "id": "k_rodoviaria", "temas": ["evento", "servicios"], "misiones": ["generica_rodoviaria"],
         "titulo": "Los nuevos horarios",
         "intro": "Circula esto: «{rumor}». Ordena la cadena para ver cómo se fue contando.",
         "items": [
@@ -578,3 +578,11 @@ CASOS = {
     "senales": SENALES,
     "contrarreloj": CONTRARRELOJ,
 }
+
+# Casos PROPIOS de las 21 misiones del reparto por días (sesión D, 2026-11-23). Viven en dos módulos aparte (mismo
+# formato que las listas de arriba; `temas` vacío: solo salen para SU misión, así las 14 de siempre juegan lo de siempre).
+from backend.datos import minijuegos_casos_dias_a as _dias_a, minijuegos_casos_dias_b as _dias_b   # noqa: E402
+
+for _modulo in (_dias_a, _dias_b):
+    for _tipo, _lista in _modulo.CASOS_DIAS.items():
+        CASOS[_tipo].extend(_lista)

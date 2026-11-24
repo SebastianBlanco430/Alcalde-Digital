@@ -46,7 +46,9 @@ def plano_de_alturas(alturas, x_jugador=None, z_jugador=None, y_jugador=None, ma
         der = min(0.5, (p["x"] + p["ancho"] / 2 - cx) * escala)
         abajo = max(-0.5, (p["z"] - p["fondo"] / 2 - cz) * escala)
         arriba = min(0.5, (p["z"] + p["fondo"] / 2 - cz) * escala)
-        visible = der > izq and arriba > abajo
+        # un recorte que deja un residuo de coma flotante (borde justo en el radio) daba un quad de escala ~1e-15
+        # (matriz casi singular en Panda): menos de 1e-4 del recuadro no se ve y no se dibuja
+        visible = der - izq > 1e-4 and arriba - abajo > 1e-4
         salida.append({
             "id": p["id"], "x": (izq + der) / 2, "y": (abajo + arriba) / 2,
             "ancho": max(0.0, der - izq), "alto": max(0.0, arriba - abajo), "visible": visible,

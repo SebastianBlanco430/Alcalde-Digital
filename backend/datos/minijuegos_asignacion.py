@@ -17,13 +17,13 @@ ASIGNACION_POR_ID = {
     "candidato_morro": mj.RASTREAR,
     "candidato_mercado": mj.RASTREAR,
     "generica_universidade": mj.RASTREAR,
+    "influencer_samba": mj.RASTREAR,    # antes cronología: compartía k_rodoviaria (horarios de bus) el mismo día 1
     # -- Comparar versiones: fotos, videos, audios, carteles y volantes que circulan --
     "periodista_radio": mj.COMPARAR,
     "ciudadano_teleferico": mj.COMPARAR,
     # -- Ordenar la cadena: eventos, horarios y fechas --
     "ciudadano_praca": mj.CRONOLOGIA,
     "generica_rodoviaria": mj.CRONOLOGIA,
-    "influencer_samba": mj.CRONOLOGIA,
     "generica_feira": mj.CRONOLOGIA,
     # -- Chat del barrio: piden datos, cuentas, cuotas (dilema entre ayudar y proteger a un amigo) --
     "generica_mutirao": mj.CHAT,
@@ -32,6 +32,29 @@ ASIGNACION_POR_ID = {
     # -- Contrarreloj: salud, seguridad y servicios que se propagan rápido --
     "influencer_parque": mj.CONTRARRELOJ,
     "generica_santa_casa": mj.CONTRARRELOJ,
+    # ---- Reparto por días (sesión D, 2026-11-23): las 21 misiones nuevas. Total por minijuego en las 35: comparar 6,
+    # señales 5, chat 5, contrarreloj 6, cronología 6 y rastrear 7 (influencer_samba pasó a rastrear). Comparar y señales, solo con rumores falsos. ----
+    "generica_primo_audio": mj.COMPARAR,
+    "generica_primo_hospital": mj.COMPARAR,
+    "periodista_foto_mitin": mj.COMPARAR,
+    "periodista_boletin": mj.COMPARAR,
+    "generica_subsidio_cadena": mj.SENALES,
+    "influencer_te_dengue": mj.SENALES,
+    "generica_encuesta": mj.SENALES,
+    "influencer_voto_celular": mj.SENALES,
+    "ciudadano_biblioteca": mj.CHAT,
+    "generica_subsidio_gestor": mj.CHAT,
+    "ciudadano_tarjeta_bus": mj.CHAT,
+    "candidato_ley_seca": mj.CHAT,
+    "generica_agua_corte": mj.CONTRARRELOJ,
+    "generica_agua_turbia": mj.CONTRARRELOJ,
+    "generica_canastas_votos": mj.CONTRARRELOJ,
+    "generica_mesas_votacion": mj.CONTRARRELOJ,
+    "generica_auxilio_transporte": mj.CRONOLOGIA,
+    "candidato_debate": mj.CRONOLOGIA,
+    "ciudadano_teleferico_eleccion": mj.CRONOLOGIA,
+    "periodista_vacunas": mj.RASTREAR,
+    "candidato_tarifa_luz": mj.RASTREAR,
 }
 
 # Tema del rumor -> palabras clave (en minúsculas) que lo delatan en `mision.rumor`. El orden importa: gana el primero que case.

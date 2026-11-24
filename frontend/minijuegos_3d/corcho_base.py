@@ -34,6 +34,12 @@ class Corcho3D(Minijuego3D):
             self.set.pie = self.punto_reposo(corcho)
         super()._colocar_personaje()
 
+    def al_terminar_entrada(self):
+        """Entrada animada (sesión B): tocó la nota junto al borde izquierdo; suelta la mano y va a su reposo (como hoy
+        tras un gesto)."""
+        if self._corcho() is not None:
+            self.volver_al_reposo()
+
     @staticmethod
     def punto_reposo(corcho, atras=0.0):
         x, dist = cc.reposo(corcho.ancho, corcho.alto)

@@ -6,6 +6,7 @@
 #   cam.ir_a(toma, duracion=0.8, al_llegar=None)                # transición suave
 #   cam.avanzar(dt)                                             # cada frame (lo llama Minijuego3D.avanzar)
 #   cam.llegada  -> True cuando no hay transición en curso
+#   cam.poner(toma)                                             # corte a `toma` (cancela la transición); lo usa cinematica_silla
 #   cam.soltar()                                                # devuelve la cámara de Ursina como estaba
 
 from ursina import camera, scene
@@ -51,6 +52,17 @@ class CamaraMinijuego:
             return
         self._desde, self._hacia = dict(self.actual), toma
         self._t, self._duracion, self._al_llegar = 0.0, float(duracion), al_llegar
+
+    def poner(self, toma):
+        """Pone la cámara en `toma` en el acto (sin transición; cancela la que hubiera, SIN llamar su al_llegar). Si aún no
+        se había tomado la cámara de Ursina, la toma (como tomar). `actual` queda en `toma`: un ir_a posterior parte de
+        ahí. Lo usa frontend/cinematica_silla.py (contrato-silla §3, `camara=`)."""
+        if self._guardada is None:
+            self.tomar(toma)
+            return
+        self._hacia = None
+        self._al_llegar = None
+        self._poner(toma)
 
     def avanzar(self, dt):
         if self._hacia is None:

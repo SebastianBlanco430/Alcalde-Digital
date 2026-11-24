@@ -95,6 +95,13 @@ class Senales3D(Minijuego3D):
         p.caminar_a(ESQUINA_ENTRADA[0], ESQUINA_ENTRADA[1], 90.0, duracion=self.DURACION_CAMINAR,
                     al_llegar=lambda: p.caminar_a(x, z, rumbo, duracion=0.6))
 
+    # Entrada animada (sesión B): desde el lado de la puerta, a través de la mesa, se le ve sacar la silla al otro lado y
+    # sentarse de cara; la cámara sube hasta la toma casi cenital de juego.
+    TOMA_ESTABLECIMIENTO = {"position": (0.6, 1.7, -1.2), "target": (-0.05, 0.9, 1.25), "fov": 52.0}
+
+    def toma_establecimiento(self):
+        return dict(self.TOMA_ESTABLECIMIENTO)
+
     def toma_juego(self):
         objetivo = self.set.anclas["mesa"].mundo(TOMA["objetivo"][0], TOMA["objetivo"][1], 0)
         return mc.toma_mesa(objetivo, TOMA["inclinacion"], TOMA["rumbo"], TOMA["distancia"], TOMA["fov"],
@@ -297,6 +304,9 @@ class Senales3D(Minijuego3D):
         p = self.poses
         if getattr(p, "_camino", None) is not None or not self.listo or self.resultado_3d is not None:
             return
+        if self.entrada_animada and p.sentado:
+            self._volver_pendiente = False       # sentado (sesión B) no da pasos: nunca se levanta a medias
+            return
         self._volver_pendiente = False
         x, z, rumbo = PIE_SENALES
         base = self.set.personaje.world_position
@@ -306,9 +316,12 @@ class Senales3D(Minijuego3D):
     def _mover_mano(self, f, dt=1 / 60):
         if not self.listo or self.resultado_3d is not None:
             return
-        self._mano_libre_en_reposo()
+        sentado = self.entrada_animada and self.poses.sentado        # sesión B: juega sentado a la mesa
+        if not sentado:
+            self._mano_libre_en_reposo()             # sentado, la mano libre se queda apoyada donde la dejó la entrada
         n = self.normal
-        reposo = None if self._trazando else self.poses.mano_reposo("d")
+        # sentado no hay «colgando junto al costado» (caería sobre la silla): el plumón espera en el borde de la captura
+        reposo = None if (self._trazando or sentado) else self.poses.mano_reposo("d")
         if self._trazando:
             b = self._trazando[-1][0]
             x, y = b.trazo.punta()
@@ -382,8 +395,9 @@ class Senales3D(Minijuego3D):
     def al_resultado(self, resultado):
         self.plumon.enabled = False
         # la base suelta los dos brazos a la animación: colgarían sobre la captura (que ahora enseña la revisión); van
-        # juntos al costado, sin salto (alcanzar parte de donde está la mano)
-        for lado in ("d", MANO_LIBRE):
+        # juntos al costado, sin salto (alcanzar parte de donde está la mano). Sentado (sesión B) las manos las lleva la
+        # salida animada (se levanta y empuja la silla).
+        for lado in (() if self.entrada_animada else ("d", MANO_LIBRE)):
             punto = self.poses.mano_reposo(lado)
             if punto is not None and mc.finito(punto):
                 self.poses.alcanzar(punto, 0.4, None, lado, altura=0.0)

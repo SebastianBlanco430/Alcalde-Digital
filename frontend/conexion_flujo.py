@@ -49,6 +49,11 @@ class ConexionFlujo:
         # Callables sin argumentos que saltan lo que esté en curso (fundidos y cinemáticas de las
         # escenas); main los registra y Espacio/Enter los llama. Cada uno devuelve False si no hay nada.
         self.saltadores = []
+        try:                               # sesión B: EscenaMinijuego pregunta si un fundido tapa su entrada animada
+            from frontend.minijuegos_3d import estado as _estado_3d
+            _estado_3d.vigilar_fundido(self._transicion_en_curso)
+        except Exception:                  # noqa: BLE001
+            pass
         self.flujo = None
         self._trabajo_en_curso = None      # {"jugador", "trabajo", "nombre"} del turno de trabajo abierto
         # Minijuegos de verificar (frontend/registro_minijuegos.py): callable(contexto) -> nombre de escena o None. None = siempre
@@ -73,6 +78,7 @@ class ConexionFlujo:
             return
         contexto = flujo.iniciar_minijuego()
         self._salida_3d()               # rework 3D: una marca vieja (misión revertida a mitad) no decide esta salida
+        self._pc_sin_interior = False
         if self._con_interior:
             self._entrar_al_edificio(flujo, contexto)
             return
@@ -212,8 +218,33 @@ class ConexionFlujo:
     def saltar_cinematica(self):
         for saltar in list(self.saltadores):
             if saltar():
+                self._marcar_salto()
                 return True
-        return False
+        return self._saltar_silla()
+
+    # Sesión B: una pulsación que ya saltó un fundido no salta además la entrada animada del minijuego 3D.
+    @staticmethod
+    def _marcar_salto():
+        try:
+            from frontend.minijuegos_3d import estado as estado_3d
+            estado_3d.marcar_salto()
+        except Exception:            # noqa: BLE001
+            pass
+
+    # Sesión B (ALCALDE_ANIM_SILLA): el último saltador es el de las animaciones de silla, corcho y pantalla
+    # (frontend/cinematica_silla.saltar_activa: la más reciente en curso). Va aquí y no en `saltadores` porque main.py
+    # reemplaza esa lista al registrar las escenas. Con la bandera en 0 o sin el módulo: False (como hoy). Nunca lanza.
+    @staticmethod
+    def _saltar_silla():
+        try:
+            from frontend.minijuegos_3d import banderas as banderas_3d
+            from frontend.minijuegos_3d import estado as estado_3d
+            if not banderas_3d.anim_silla() or estado_3d.presentacion_abierta():
+                return False         # (con un minijuego 3D abierto, sus teclas las trata EscenaMinijuego)
+            from frontend import cinematica_silla
+            return bool(cinematica_silla.saltar_activa())
+        except Exception:            # noqa: BLE001
+            return False
 
     # Mundo (panel "Partida terminada"): regresa al menú de inicio.
     def volver_al_menu(self):
@@ -340,6 +371,8 @@ class ConexionFlujo:
     # Rework 3D (aditivo, frontend/minijuegos_3d): ¿se hace la cinemática de sentarse al PC del interior? Solo NO cuando la
     # misión va a la escena de minijuegos Y su minijuego se juega en 3D en el corcho o la mesa. Con ALCALDE_MINIJUEGOS_3D=0,
     # sin selector, sin implementación 3D o ante cualquier fallo: True (el camino de hoy).
+    # Sesión B (ALCALDE_ANIM_SILLA, con frontend/cinematica_silla.py presente): tampoco para la familia PC en 3D: el personaje
+    # saca la silla y se sienta DENTRO de la presentación 3D del minijuego (fundido con el nombre del lugar -> minijuego).
     def _sentarse_al_pc(self, contexto):
         try:
             from frontend.minijuegos_3d import banderas as banderas_3d
@@ -350,7 +383,15 @@ class ConexionFlujo:
             if not nombre or nombre == JUEGO:
                 return True
             from frontend.minijuegos_3d import selector as selector_3d
-            return selector_3d.sentarse_al_pc(contexto["mision"])
+            if not selector_3d.sentarse_al_pc(contexto["mision"]):
+                return False
+            if banderas_3d.anim_silla():
+                from backend.datos import minijuegos_asignacion as asignacion
+                if selector_3d.familia_efectiva(asignacion.asignar(contexto["mision"])) == "pc":
+                    # No pasó por «sentarse» del interior: si el 3D cae al 2D, la salida tampoco pasa por «levantarse».
+                    self._pc_sin_interior = True
+                    return False
+            return True
         except Exception:            # noqa: BLE001
             return True
 
@@ -392,6 +433,10 @@ class ConexionFlujo:
         flujo = self.flujo
         saliente, lugar = flujo.jugador_activo(), flujo.mision_actual().destino
         salida_3d = self._salida_3d()           # leer (y borrar) la marca ANTES de nada: nunca queda para la siguiente
+        # Sesión B: familia PC que entró directo al 3D (ALCALDE_ANIM_SILLA) y acabó en el respaldo 2D: nunca se sentó en
+        # el interior, así que sale directo al mundo en vez de «levantarse» de una silla en la que no estuvo.
+        sin_interior, self._pc_sin_interior = getattr(self, "_pc_sin_interior", False), False
+        salida_3d = salida_3d or sin_interior
         flujo.completar_mision(resultado)       # el modelo avanza en el acto: pasa el turno
         if self._sin_edificio(lugar):           # al aire libre: no hay interior ni puerta; fundido y de vuelta al mundo
             self._con_transicion(self._volver_al_mundo)

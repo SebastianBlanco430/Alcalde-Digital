@@ -28,6 +28,7 @@ MODULOS = (
     "frontend.registro_toon_personajes",   # punto 5 del pulido: luz del toon de los personajes según la hora (apagado; ALCALDE_TOON_PERSONAJES=1)
     "frontend.registro_momento_nivel",     # ambiente M1: titular + stinger al cruzar de nivel (ALCALDE_MOMENTO_NIVEL=0)
     "frontend.registro_fuente_firma",      # M4 firma: la fuente de la Praça da Sé muestra la salud (ALCALDE_FIRMA_FUENTE=0)
+    "frontend.fiscalia.registro",          # sesión A: Fiscalía v2 (edificio, despacho, laboratorio, sala; ALCALDE_FISCALIA_V2=0)
 )
 
 

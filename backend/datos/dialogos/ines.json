@@ -37,6 +37,7 @@
       "Escucha, confío en ti. Guardé una copia de mi bitácora de moderación."
     ],
     "evidencia": "bitacora_moderacion",
-    "entrega": "Inés te entrega la bitácora de moderación."
+    "entrega": "Inés te entrega la bitácora de moderación.",
+    "solo_fiscalia_v1": true
   }
 }

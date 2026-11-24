@@ -98,6 +98,7 @@ class EscenaMinijuego(Escena):
         self.t_banner = None
         self.t_panel = None
         self.t_previa = None
+        self._previa_tras_3d = False     # corcho/mesa con entrada animada: la previa espera oculta a que acabe
         self._clase = None
         self._clase3d = None
         self._caso = None
@@ -356,6 +357,55 @@ class EscenaMinijuego(Escena):
         self.t_previa = 0.0
         if en_monitor and self.vista3d is None:
             self._montar_3d(con_previa=True)
+        elif self._previa_tras_entrada_3d():
+            # Corcho y mesa con la entrada animada (sesión E): el fundido va directo a la animación 3D. El minijuego
+            # empieza ya (sin reloj en estas familias; las teclas siguen yendo a la previa) y la previa, oculta, sale
+            # cuando la entrada termina (_vigilar_previa_oculta). Si el 3D no monta, sale enseguida (la de hoy).
+            self._previa_tras_3d = True
+            self.previa.enabled = False
+            self.previa.z = -0.2                 # por encima de la vista 2D si el 3D cae al 2D
+            self.t_previa = None
+            self._arrancar_minijuego()
+            self._capa_3d(False)                 # sus botones («Confirmar»...) no se pulsan antes de la previa
+            self._vigilar_previa_oculta()
+
+    def _capa_3d(self, visible):
+        """Enciende/apaga la capa en pantalla de la presentación 3D (ayuda y botones). Nunca lanza."""
+        try:
+            capa = getattr(self.vista3d, "capa", None)
+            if capa is not None:
+                capa.enabled = bool(visible)
+        except Exception:                        # noqa: BLE001
+            pass
+
+    def _previa_tras_entrada_3d(self):
+        """¿Previa después de la entrada animada? (corcho/mesa, ALCALDE_ANIM_SILLA y el módulo activo). Nunca lanza."""
+        clase = self._clase3d
+        if clase is None or self.vista3d is not None:
+            return False
+        try:
+            from frontend.minijuegos_3d import banderas, entrada_calculos
+            animada = banderas.anim_silla()
+            if animada:
+                from frontend import cinematica_silla
+                animada = cinematica_silla.activa()
+            return entrada_calculos.previa_tras_entrada(getattr(clase, "FAMILIA", None), animada)
+        except Exception:                        # noqa: BLE001
+            return False
+
+    def _vigilar_previa_oculta(self):
+        """Previa oculta tras la entrada 3D: se enseña cuando la entrada terminó (o si ya no hay 3D). Nunca lanza."""
+        previa = self.previa
+        if previa is None or not self._previa_tras_3d or previa.enabled:
+            return
+        try:
+            v = self.vista3d
+            lista = v is None or (bool(getattr(v, "listo", False)) and not v.secuencia_activa())
+        except Exception:                        # noqa: BLE001
+            lista = True
+        if lista:
+            previa.enabled = True
+            self.t_previa = 0.0
 
     # -- Tutorial de la primera vez (frontend/registro_tutorial_mision.py): no cambia reglas, resultados ni pagos --
 
@@ -395,24 +445,34 @@ class EscenaMinijuego(Escena):
         destruir_arbol(self.previa)
         self.previa = None
         self.t_previa = None
-        if self.vista3d is not None:             # previa en el monitor 3D: el tutorial es el de hoy (2D, pantalla completa)
+        if self.vista3d is not None or self._previa_tras_3d:   # previa con el 3D ya montado: el tutorial de hoy (2D)
             self._cerrar_3d()
             if self.contenido is not None:
                 destruir_arbol(self.contenido)
                 self.contenido = None
+            if self._previa_tras_3d:
+                self._previa_tras_3d = False
+                self.minijuego = None            # se volverá a empezar con la previa (iba dentro de `contenido`)
         if not self._abrir_tutorial(textos, forzar_ver=True):
             self._mostrar_previa(textos)
 
     def _empezar_desde_previa(self):
         if self.previa is None:
             return
+        if self._previa_tras_3d and not self.previa.enabled:
+            return                               # aún oculta: la entrada 3D sigue (Espacio/Enter la saltan antes)
         # Misma demora que el banner: la tecla con la que se entró a la misión no salta las instrucciones.
-        if self.t_previa is not None and self.t_previa < DEMORA_CONTINUAR:
+        if (self.t_previa is not None and self.t_previa < DEMORA_CONTINUAR) or self._animacion_3d_en_curso():
+            # (sesión B: «Empezar» solo responde cuando el personaje ya se sentó: la entrada animada terminó)
             self.previa.al_empezar = self._empezar_desde_previa      # el botón se «gastó»: se vuelve a armar
             return
         destruir_arbol(self.previa)
         self.previa = None
         self.t_previa = None
+        if self._previa_tras_3d:
+            self._previa_tras_3d = False
+            self._capa_3d(True)
+            return                               # el minijuego ya empezó bajo la entrada 3D
         self._arrancar_minijuego()
 
     # -- Fin del minijuego: banner y «Continuar» --
@@ -574,8 +634,31 @@ class EscenaMinijuego(Escena):
 
     # -- Entrada y tiempo (Ursina los llama solo con la escena activa) --
 
+    def _saltar_animacion_3d(self, key):
+        """Sesión B (ALCALDE_ANIM_SILLA): Espacio/Enter (y el botón A del mando, que manda Espacio) durante la entrada o
+        la salida animadas del 3D la SALTAN y no llegan a la previa, al juego ni al «Continuar» (ConexionFlujo no las salta
+        mientras la presentación 3D está abierta: no hay doble salto). Nunca lanza."""
+        if key not in ("enter", "space", "return") or self.vista3d is None:
+            return False
+        try:
+            if self.vista3d.secuencia_activa():
+                from frontend.minijuegos_3d import banderas as _banderas_3d, estado as _estado_3d
+                if _banderas_3d.anim_silla() and _estado_3d.pulsacion_gastada():
+                    return True              # esa pulsación es del fundido: se la come sin saltar la animación
+            return bool(self.vista3d.saltar_secuencia())
+        except Exception:                        # noqa: BLE001
+            return False
+
+    def _animacion_3d_en_curso(self):
+        try:
+            return self.vista3d is not None and self.vista3d.secuencia_activa()
+        except Exception:                        # noqa: BLE001
+            return False
+
     def input(self, key):
         if self.en_respaldo or self.cerrado and self.t_panel is not None:
+            return
+        if self._saltar_animacion_3d(key):
             return
         try:
             if self.previa is not None:
@@ -599,6 +682,8 @@ class EscenaMinijuego(Escena):
         dt = time.dt
         self._en_3d(lambda v: v.avanzar(dt))
         try:
+            if self.previa is not None and self._previa_tras_3d:
+                self._vigilar_previa_oculta()
             if self.t_previa is not None:
                 self.t_previa += dt
             if self.t_banner is not None:

@@ -44,6 +44,18 @@ class Comparar3D(Minijuego3D):
         self.set.pie = (x, z, rumbo)          # esquina cercana izquierda: no tapa los papeles (ver mesa_calculos)
         super()._colocar_personaje()
 
+    # Entrada animada (sesión B): toma abierta desde la esquina derecha del lado de la puerta (se le ve llegar por la
+    # izquierda, sacar la silla y sentarse) que sube hasta la toma cenital de juego. Con la toma de juego retrocedida
+    # (la del módulo) la cámara quedaba encima de su cabeza mientras caminaba (capturas m3_cmp2_per).
+    TOMA_ESTABLECIMIENTO = {"position": (0.9, 1.9, -1.9), "target": (-0.45, 0.85, 0.0), "fov": 55.0}
+    PARTIDA_ENTRADA = (-1.45, -0.55, 90.0)
+
+    def toma_establecimiento(self):
+        return dict(self.TOMA_ESTABLECIMIENTO)
+
+    def partida_entrada(self):
+        return self.PARTIDA_ENTRADA
+
     def toma_juego(self):
         t = mc.TOMA_COMPARAR
         objetivo = self.set.anclas["mesa"].mundo(t["objetivo"][0], t["objetivo"][1], 0)
@@ -211,7 +223,9 @@ class Comparar3D(Minijuego3D):
             return
         p = self.set.personaje
         base = tuple(p.world_position)
-        hombro = mc.hombro_estimado(base, getattr(p, "rumbo", 0.0), LADO)
+        # sentado (sesión B, ALCALDE_ANIM_SILLA) el hombro baja lo que bajó la pelvis (cuerpo.y < 0)
+        bajada = float(getattr(getattr(p, "cuerpo", None), "y", 0.0) or 0.0) if self.poses.sentado else 0.0
+        hombro = mc.hombro_estimado(base, getattr(p, "rumbo", 0.0), LADO, alto=1.40 + min(0.0, bajada))
         objetivo = mc.mano_pecho(hombro, getattr(p, "rumbo", 0.0), centro, self.mesa_y)
         if not mc.finito(objetivo):
             return

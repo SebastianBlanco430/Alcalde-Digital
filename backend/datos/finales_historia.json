@@ -1,8 +1,8 @@
 {
   "_nota": "Textos y datos de los finales por etapas (docs/PLAN_FINALES_HISTORIA.md). Se edita sin tocar código: backend/logica/etapas_final.py lo carga. Los candidatos son ficticios.",
   "candidatos": {
-    "actual": {"nombre": "Octavio Ruedas", "partido": "Partido de la Tradición", "papel": "alcalde actual"},
-    "aspirante": {"nombre": "Tomás Arenas", "partido": "independiente", "papel": "aspirante"}
+    "actual": {"nombre": "Tomás Arenas", "partido": "Partido de la Tradición", "papel": "alcalde actual"},
+    "aspirante": {"nombre": "Octavio Ruedas", "partido": "independiente", "papel": "aspirante"}
   },
   "medidor": {"titulo": "Confianza de Ciudad Nova"},
   "etapas": {
@@ -26,8 +26,8 @@
     "-1": ["jibaro", "extorsionador", "raponero"],
     "0": [],
     "1": ["florista", "panadero", "escobita"],
-    "2": ["florista", "panadero", "escobita", "arenas"],
-    "3": ["florista", "panadero", "escobita", "arenas", "musico"]
+    "2": ["florista", "panadero", "escobita", "aspirante"],
+    "3": ["florista", "panadero", "escobita", "aspirante", "musico"]
   },
   "npc": {
     "jibaro": {
@@ -58,9 +58,94 @@
       "nombre": "Músico", "bando": "bueno", "modelo": 7, "color": [60, 120, 190], "prop": "guitarra",
       "frases": ["¡Esta va por Ciudad Nova!", "Hacía años no tocaba en la calle.", "Pida una canción, que hoy es fiesta."]
     },
-    "arenas": {
-      "nombre": "Tomás Arenas", "bando": "bueno", "modelo": 4, "color": [44, 138, 214], "prop": "banda",
+    "aspirante": {
+      "nombre": "Octavio Ruedas", "bando": "bueno", "modelo": 4, "color": [44, 138, 214], "prop": "banda",
       "frases": ["¡Gracias por informarte antes de compartir!", "Una ciudad que verifica es una ciudad que decide mejor.", "No me crean a mí: pregunten, comparen, revisen.", "Gracias por escuchar a sus vecinos antes que al rumor."]
+    }
+  },
+  "animacion": {
+    "_nota": "Final animado en la Ciudad Nova real (frontend/final_animado/, bandera ALCALDE_FINAL_ANIMADO). Cada final es una lista de planos: «id», «segundos», «ancla» (frontend/final_animado/lugares.py) y «subtitulos» (frases cortas; se reparten el tiempo del plano según su largo). El plano {«rol»: true} es el hueco donde entran los planos propios de cada rol presente («por_rol»). Cámaras: camaras.py; decorado y actores: puesta.py. Guion: sesiones-24nov/final/guion.md.",
+    "saltar": "Mantén para saltar",
+    "segundos_rol": {"solo": 8.0, "varios": 5.0},
+    "malo": {
+      "etapa": -3, "hora": 22.0, "musica": null, "sonido": "mision_fallo",
+      "planos": [
+        {"id": "m1_reelegido", "segundos": 8.0, "ancla": "prefeitura",
+         "subtitulos": ["Tomás Arenas, reelegido: el Partido de la Tradición gana otra vez.", "Entre rumores y miedo, casi nadie fue a votar."]},
+        {"id": "m2_calles_arden", "segundos": 9.0, "ancla": "plaza",
+         "subtitulos": ["Las calles arden: cada cadena reenviada sin revisar fue una chispa.", "Ahora nadie sabe a quién creerle."]},
+        {"id": "m3_protesta", "segundos": 10.0, "ancla": "protesta",
+         "subtitulos": ["Los vecinos salen a la plaza con pancartas.", "Piden respuestas, pero ya no se ponen de acuerdo ni en las preguntas."]},
+        {"rol": true},
+        {"id": "m5_plaza_vacia", "segundos": 9.0, "ancla": "protesta",
+         "subtitulos": ["Las protestas no cambiaron nada: la plaza quedó vacía y las pancartas, en el suelo.", "En el despacho del alcalde, la luz de siempre."]},
+        {"id": "m6_cierre", "segundos": 10.0, "ancla": "azotea",
+         "subtitulos": ["Ciudadano, periodista, influencer y candidato miran la ciudad apagada.", "Compartir sin verificar también decide. La próxima vez: revisar antes de reenviar."]}
+      ],
+      "por_rol": {
+        "ciudadano": {"id": "m4_ciudadano", "ancla": "morro",
+          "subtitulos": ["Desde tu ventana en el Morro se ve el humo.", "Reenviar era más fácil que ir a mirar."]},
+        "periodista": {"id": "m4_periodista", "ancla": "radio",
+          "subtitulos": ["Publicas la nota, pero ya nadie la lee.", "Tu desmentido llegó después del rumor."]},
+        "influencer": {"id": "m4_influencer", "ancla": "directo",
+          "subtitulos": ["Sales en vivo, pero el chat ya no te cree.", "Tu alcance multiplicó el rumor."]},
+        "candidato": {"id": "m4_candidato", "ancla": "tarima",
+          "subtitulos": ["Reconoces la derrota ante los pocos que quedaron:", "«La próxima campaña empieza por decir la verdad»."]}
+      }
+    },
+    "bueno": {
+      "etapa": 3, "hora": 7.5, "musica": "musica_fiesta", "sonido": "mision_exito",
+      "planos": [
+        {"id": "b1_gana", "segundos": 8.0, "ancla": "urna",
+         "subtitulos": ["Octavio Ruedas gana la alcaldía: un independiente casi desconocido hace una semana.", "Ganó donde la gente se informó antes de votar."]},
+        {"id": "b2_sede_oscura", "segundos": 8.0, "ancla": "prefeitura",
+         "subtitulos": ["En la sede del Partido de la Tradición se apagan las luces.", "Los rumores ya no encuentran quién los reenvíe."]},
+        {"id": "b3_calles_limpias", "segundos": 9.0, "ancla": "calle",
+         "subtitulos": ["Calles limpias: vuelven las floristas y los panaderos.", "Los vecinos barren juntos lo que dejó la semana."]},
+        {"id": "b4_musica", "segundos": 7.0, "ancla": "calle",
+         "subtitulos": ["Los músicos salen a tocar y los banderines cruzan de farol a farol."]},
+        {"rol": true},
+        {"id": "b6_podio", "segundos": 10.0, "ancla": "podio",
+         "subtitulos": ["Fiesta en la plaza: Octavio sube al podio y lo primero que hace es dar las gracias.", "«Esta alcaldía la ganó la gente que pregunta»."]},
+        {"id": "b7_cierre", "segundos": 10.0, "ancla": "azotea",
+         "subtitulos": ["Ciudadano, periodista, influencer y candidato, juntos frente a una ciudad encendida.", "Informarse también decide: preguntar, comparar y verificar antes de compartir."]}
+      ],
+      "por_rol": {
+        "ciudadano": {"id": "b5_ciudadano", "ancla": "morro",
+          "subtitulos": ["Desde tu ventana en el Morro, la calle vuelve a sonar.", "Fuiste a mirar antes de compartir, y se nota."]},
+        "periodista": {"id": "b5_periodista", "ancla": "radio",
+          "subtitulos": ["Publicas la nota del día: «Ciudad Nova votó informada».", "Cada dato, comprobado antes de salir al aire."]},
+        "influencer": {"id": "b5_influencer", "ancla": "directo",
+          "subtitulos": ["En vivo para todo Civitas: «Gracias por preguntar antes de reenviar».", "Tu alcance sirvió para aclarar."]},
+        "candidato": {"id": "b5_candidato", "ancla": "tarima",
+          "subtitulos": ["Antes de subir al podio respiras hondo.", "Ganaste sin un solo rumor a tu favor."]}
+      }
+    },
+    "neutro": {
+      "etapa": 0, "hora": 17.8, "musica": "musica_ambiente", "sonido": null,
+      "planos": [
+        {"id": "n1_conteo", "segundos": 8.0, "ancla": "urna",
+         "subtitulos": ["Resultado ajustado: la alcaldía se decide por un puñado de votos.", "Ciudad Nova contiene el aliento."]},
+        {"id": "n2_plaza_a_medias", "segundos": 9.0, "ancla": "podio",
+         "subtitulos": ["La plaza, a medias: unos celebran y otros no.", "Algunas mentiras se frenaron a tiempo; otras corrieron más rápido que su desmentido."]},
+        {"id": "n3_calle", "segundos": 8.0, "ancla": "calle",
+         "subtitulos": ["En la calle, la ciudad sigue como siempre.", "Ni fiesta ni fuego: una calma tensa."]},
+        {"rol": true},
+        {"id": "n5_candidatos", "segundos": 8.0, "ancla": "prefeitura",
+         "subtitulos": ["Gane quien gane, le tocará gobernar una ciudad que duda.", "La confianza quedó a medias."]},
+        {"id": "n6_cierre", "segundos": 10.0, "ancla": "azotea",
+         "subtitulos": ["Ciudadano, periodista, influencer y candidato miran una ciudad en suspenso.", "Lo que venga depende de lo mismo: mirar, comparar y verificar antes de compartir."]}
+      ],
+      "por_rol": {
+        "ciudadano": {"id": "n4_ciudadano", "ancla": "morro",
+          "subtitulos": ["Desde tu ventana, el Morro se ve igual que ayer.", "A veces fuiste a mirar; a veces no."]},
+        "periodista": {"id": "n4_periodista", "ancla": "radio",
+          "subtitulos": ["Publicas la nota: «Resultado ajustado».", "Unos te creen; otros todavía dudan."]},
+        "influencer": {"id": "n4_influencer", "ancla": "directo",
+          "subtitulos": ["En vivo: medio chat celebra y el otro medio duda.", "Tu alcance pesó para los dos lados."]},
+        "candidato": {"id": "n4_candidato", "ancla": "tarima",
+          "subtitulos": ["Esperas el conteo junto a la urna.", "Gane quien gane, la confianza habrá que construirla."]}
+      }
     }
   },
   "cinematicas": {
@@ -68,12 +153,12 @@
     "continuar": "Continuar",
     "malo": [
       {
-        "fondo": [70, 62, 60], "titulo": "Octavio Ruedas, reelegido",
+        "fondo": [70, 62, 60], "titulo": "Tomás Arenas, reelegido",
         "texto": "El Partido de la Tradición gana otra vez. Entre rumores y miedo, casi nadie fue a votar.",
         "sonido": "mision_fallo",
         "figuras": [
           {"tipo": "suelo", "color": [48, 44, 46]},
-          {"tipo": "periodico", "x": 0.0, "y": 0.02, "titular": "RUEDAS, REELEGIDO", "bajada": "Cuatro años más de lo mismo"},
+          {"tipo": "periodico", "x": 0.0, "y": 0.02, "titular": "ARENAS, REELEGIDO", "bajada": "Cuatro años más de lo mismo"},
           {"tipo": "persona", "x": -0.52, "y": 0.0, "alto": 0.20, "color": [40, 40, 52]},
           {"tipo": "persona", "x": 0.54, "y": 0.0, "alto": 0.19, "color": [52, 44, 48]}
         ]
@@ -124,7 +209,7 @@
       },
       {
         "fondo": [40, 40, 56], "titulo": "Compartir sin verificar también decide",
-        "texto": "Un ciudadano, una influencer y un detective miran la ciudad apagada. Cada rumor que dejaron pasar pesó en este resultado. La próxima vez: revisar antes de reenviar.",
+        "texto": "Ciudadano, periodista, influencer y candidato miran la ciudad apagada. Cada rumor que dejaron pasar pesó en este resultado. La próxima vez: revisar antes de reenviar.",
         "figuras": [
           {"tipo": "suelo", "color": [30, 30, 42]},
           {"tipo": "luna", "x": 0.50, "y": 0.30, "color": [200, 205, 225]},
@@ -139,12 +224,12 @@
     ],
     "bueno": [
       {
-        "fondo": [120, 190, 235], "titulo": "Tomás Arenas gana la alcaldía",
+        "fondo": [120, 190, 235], "titulo": "Octavio Ruedas gana la alcaldía",
         "texto": "Un aspirante independiente, casi desconocido hace una semana. Ganó donde la gente se informó antes de votar.",
         "sonido": "mision_exito",
         "figuras": [
           {"tipo": "suelo", "color": [96, 170, 110]},
-          {"tipo": "periodico", "x": 0.0, "y": 0.02, "titular": "ARENAS GANA LA ALCALDÍA", "bajada": "Ciudad Nova votó informada"},
+          {"tipo": "periodico", "x": 0.0, "y": 0.02, "titular": "RUEDAS GANA LA ALCALDÍA", "bajada": "Ciudad Nova votó informada"},
           {"tipo": "persona", "x": -0.52, "y": 0.0, "alto": 0.20, "color": [214, 80, 70]},
           {"tipo": "persona", "x": 0.54, "y": 0.0, "alto": 0.19, "color": [60, 120, 190]}
         ]
@@ -194,7 +279,7 @@
       },
       {
         "fondo": [110, 185, 240], "titulo": "Fiesta en la plaza",
-        "texto": "Arenas sube al podio y lo primero que hace es dar las gracias: «Esta alcaldía la ganó la gente que pregunta».",
+        "texto": "Ruedas sube al podio y lo primero que hace es dar las gracias: «Esta alcaldía la ganó la gente que pregunta».",
         "sonido": "mision_exito",
         "figuras": [
           {"tipo": "suelo", "color": [110, 180, 116]},
@@ -212,7 +297,7 @@
       },
       {
         "fondo": [140, 205, 240], "titulo": "Informarse también decide",
-        "texto": "El ciudadano, la influencer y el detective, juntos frente a una ciudad encendida. Preguntar, comparar y verificar antes de compartir: así se cuida una ciudad.",
+        "texto": "Ciudadano, periodista, influencer y candidato, juntos frente a una ciudad encendida. Preguntar, comparar y verificar antes de compartir: así se cuida una ciudad.",
         "figuras": [
           {"tipo": "suelo", "color": [96, 170, 110]},
           {"tipo": "sol", "x": -0.50, "y": 0.30, "color": [245, 196, 40]},

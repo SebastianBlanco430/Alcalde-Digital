@@ -1,0 +1,282 @@
+{
+  "_comentario": "Caso v2 (Fiscalía estilo Detroit, sesión A 2026-11-23). Formato: sesiones-24nov/fiscalia/contrato-caso.md; textos: sesiones-24nov/fiscalia/guion.md. Mismo id que el caso v1 (comparten el rastro del Archivo de casos). Solo se usa con ALCALDE_FISCALIA_V2 encendida.",
+  "formato": 2,
+  "id": "cuentas_fantasma",
+  "titulo": "Cuentas fantasma en Civitas",
+  "resumen": "Una oleada de cuentas falsas difundió un rumor sobre el agua de Ciudad Nova justo antes del debate. La Fiscalía te pide averiguar quién las activó.",
+  "rejugable": false,
+  "mision": {
+    "id": "investigacion_cuentas",
+    "titulo": "Cuentas fantasma",
+    "mensaje": "Hay cuentas falsas en Civitas. Preséntate en la Fiscalía de Ciudad Nova, junto a la Praça da Sé.",
+    "pago": 110,
+    "dificultad": "dificil",
+    "grupo": "policia",
+    "dia": 1
+  },
+  "solidez": {"inicial": 15, "umbrales": {"solido": 85, "suficiente": 60, "indicios": 30}},
+  "personajes": {
+    "fiscal": {
+      "nombre": "Fiscal Rojas", "rol": "Fiscalía de Ciudad Nova", "modelo": "npc_hombre_03.glb", "personaje": "fiscal",
+      "retrato": {"piel": [214, 170, 130], "pelo": [92, 92, 104], "pelo_estilo": "corto",
+                  "ropa": [58, 68, 112], "accesorio": "gafas",
+                  "expresiones": ["neutral", "serio", "satisfecho"]}
+    },
+    "ines": {
+      "nombre": "Inés Duarte", "rol": "Moderadora de Civitas", "modelo": "npc_mujer_01.glb", "personaje": "ines",
+      "retrato": {"piel": [236, 190, 152], "pelo": [74, 42, 32], "pelo_estilo": "largo",
+                  "ropa": [66, 168, 158], "accesorio": "ninguno",
+                  "expresiones": ["neutral", "nervioso", "enojado", "triste", "sorprendido"]}
+    },
+    "marcos": {
+      "nombre": "Marcos Vela", "rol": "Asesor de la campaña rival", "modelo": "npc_hombre_02.glb", "personaje": "marcos",
+      "retrato": {"piel": [176, 124, 92], "pelo": [30, 26, 34], "pelo_estilo": "corto",
+                  "ropa": [120, 44, 64], "accesorio": "barba",
+                  "expresiones": ["neutral", "nervioso", "enojado", "triste"]}
+    }
+  },
+  "evidencias": {
+    "registro_acceso": {"nombre": "Registro de accesos", "solidez": 12,
+                        "descripcion": "El servidor fantasma se abrió a las 02:14 con una credencial temporal, desde la oficina de la campaña rival."},
+    "granja_de_bots": {"nombre": "Granja de bots", "solidez": 12,
+                       "descripcion": "Doscientas cuentas con el mismo patrón, creadas por una sola máquina. La factura la pagó la campaña rival."},
+    "declaracion_ines": {"nombre": "Declaración de Inés", "solidez": 8,
+                         "descripcion": "Inés admite que prestó una credencial temporal a un consultor externo."},
+    "bitacora_moderacion": {"nombre": "Bitácora de moderación", "solidez": 7,
+                            "descripcion": "Inés reportó las cuentas sospechosas dos días antes de que explotara el rumor."},
+    "captura_chat": {"nombre": "Captura de chat", "solidez": 8,
+                     "descripcion": "Un mensaje de Marcos pide «activar las cuentas del agua antes del debate»."}
+  },
+  "laboratorio": {
+    "parkours": [
+      {"nivel": "sector_1", "nombre": "Servidor fantasma", "evidencia": "registro_acceso",
+       "descripcion": "El servidor abandonado desde el que se activaron las cuentas. Guarda el registro de accesos."},
+      {"nivel": "sector_2", "nombre": "Granja de bots", "evidencia": "granja_de_bots",
+       "descripcion": "La máquina que fabricó las doscientas cuentas. Guarda quién la pagó."}
+    ]
+  },
+  "escenas": {
+    "oficina": {"rotulo": "Despacho del fiscal"},
+    "laboratorio": {"rotulo": "Laboratorio forense"},
+    "sala": {"rotulo": "Sala de interrogatorio"}
+  },
+  "inicio": "n_intro",
+  "final_abandono": "final_archivo",
+  "nodos": {
+    "n_intro": {"tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "serio", "plano": "general",
+                "texto": "Gracias por venir. Alguien llenó Civitas de cuentas falsas. Dicen que el agua de Ciudad Nova está contaminada.",
+                "siguiente": "n_intro_2"},
+    "n_intro_2": {"tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "serio", "plano": "pecho",
+                  "texto": "No es cierto. Pero el debate es mañana y media ciudad ya compró agua embotellada.",
+                  "siguiente": "n_rueda_contexto"},
+    "n_rueda_contexto": {
+      "tipo": "rueda", "escena": "oficina", "personaje": "fiscal", "expresion": "neutral",
+      "texto": "Pregunta lo que necesites.",
+      "al_terminar": "n_rueda_ruta",
+      "opciones": [
+        {"id": "que_paso", "etiqueta": "¿Qué pasó?", "dice": "¿Qué pasó exactamente?", "destino": "r_que_paso"},
+        {"id": "quienes", "etiqueta": "¿Quiénes son?", "dice": "¿A quién tiene en la sala?", "destino": "r_quienes",
+         "solidez": 3},
+        {"id": "que_tenemos", "etiqueta": "¿Qué tenemos?", "dice": "¿Con qué pruebas contamos?",
+         "destino": "r_que_tenemos", "solidez": 3},
+        {"id": "empezar", "etiqueta": "Empezar", "dice": "Suficiente. Vamos.", "destino": "n_rueda_ruta",
+         "una_vez": false}
+      ]
+    },
+    "r_que_paso": {"tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "serio",
+                   "texto": "Doscientas cuentas nuevas en una hora, a las dos de la mañana. Todas repitieron el mismo rumor.",
+                   "siguiente": "@volver"},
+    "r_quienes": {"tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "neutral",
+                  "texto": "Inés Duarte, moderadora de Civitas: tenía las llaves. Marcos Vela, asesor de la campaña rival: tenía el motivo.",
+                  "hito": "Dos nombres", "siguiente": "@volver"},
+    "r_que_tenemos": {"tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "serio",
+                      "texto": "Nada firme. Hay dos equipos incautados en el laboratorio. Nadie los ha revisado todavía.",
+                      "hito": "Dos equipos sin revisar", "siguiente": "@volver"},
+    "n_rueda_ruta": {
+      "tipo": "rueda", "escena": "oficina", "personaje": "fiscal", "expresion": "neutral",
+      "texto": "Los dos esperan en la sala. ¿Cómo quieres hacerlo?",
+      "opciones": [
+        {"id": "ir_lab", "etiqueta": "Al laboratorio", "dice": "Primero quiero ver esos equipos.", "destino": "n_lab"},
+        {"id": "ir_sala", "etiqueta": "A la sala", "dice": "Vamos directo con ellos.", "destino": "n_sin_lab"}
+      ]
+    },
+    "n_lab": {"tipo": "laboratorio", "escena": "laboratorio", "personaje": "fiscal", "expresion": "neutral",
+              "texto": "El servidor fantasma y la granja de bots. Revisa lo que quieras. Cuando pases a la sala, esto se cierra.",
+              "hito": "Laboratorio forense", "siguiente": "n_ines_entra"},
+    "n_sin_lab": {"tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "serio", "plano": "primer_plano",
+                  "texto": "Sin el laboratorio vas a ciegas. Es tu caso.",
+                  "hito": "Directo a la sala", "siguiente": "n_ines_entra"},
+
+    "n_ines_entra": {"tipo": "dialogo", "escena": "sala", "personaje": "ines", "expresion": "nervioso", "plano": "general",
+                     "texto": "Soy Inés Duarte. Modero Civitas. Llevo dos días sin dormir.",
+                     "siguiente": "n_rueda_ines_a"},
+    "n_rueda_ines_a": {
+      "tipo": "rueda", "escena": "sala", "personaje": "ines", "expresion": "neutral",
+      "texto": "«Yo no creé esas cuentas.»",
+      "reloj": {"segundos": 14, "por_defecto": "@terminar"}, "turnos": 2, "al_terminar": "n_ines_pausa",
+      "opciones": [
+        {"id": "empatizar", "etiqueta": "Empatizar", "dice": "Nadie la está acusando. Cuénteme qué vio.",
+         "destino": "r_ines_empatia", "solidez": 3},
+        {"id": "presionar", "etiqueta": "Presionar", "dice": "Usted tenía las llaves. Empiece a hablar.",
+         "destino": "r_ines_presion", "solidez": -6},
+        {"id": "cuentas", "etiqueta": "Las cuentas", "dice": "¿Cómo nacen doscientas cuentas en una hora?",
+         "destino": "r_ines_cuentas", "solidez": 2},
+        {"id": "mostrar_registro", "etiqueta": "Mostrar registro", "dice": "Las 02:14. Una credencial temporal. ¿De quién era?",
+         "destino": "r_ines_registro", "presenta": "registro_acceso", "requiere": {"evidencia": ["registro_acceso"]}}
+      ]
+    },
+    "r_ines_empatia": {"tipo": "dialogo", "escena": "sala", "personaje": "ines", "expresion": "triste", "plano": "primer_plano",
+                       "texto": "Vi las cuentas antes que nadie. Avisé. Nadie me contestó.",
+                       "efectos": {"marcas": ["ines_confia"]}, "hito": "Inés confía en ti", "siguiente": "@volver"},
+    "r_ines_presion": {"tipo": "dialogo", "escena": "sala", "personaje": "ines", "expresion": "enojado", "plano": "primer_plano",
+                       "texto": "¡No me hable así! No digo nada más sin una prueba delante.",
+                       "efectos": {"marcas": ["ines_cerrada"]}, "hito": "Inés se cierra", "siguiente": "@volver"},
+    "r_ines_cuentas": {"tipo": "dialogo", "escena": "sala", "personaje": "ines", "expresion": "neutral",
+                       "texto": "El mismo patrón de nombres, la misma hora. Eso no lo hace una persona. Lo hace una máquina.",
+                       "siguiente": "@volver"},
+    "r_ines_registro": {"tipo": "dialogo", "escena": "sala", "personaje": "ines", "expresion": "nervioso", "plano": "primer_plano",
+                        "texto": "Las 02:14... Presté una credencial temporal a un consultor. Dijo que era una auditoría.",
+                        "efectos": {"da_evidencia": ["declaracion_ines"], "marcas": ["ines_admitio"]},
+                        "hito": "Inés admite la credencial", "siguiente": "@volver"},
+    "n_ines_pausa": {"tipo": "dialogo", "escena": "sala", "personaje": "ines", "expresion": "neutral", "plano": "pecho",
+                     "texto": "¿Algo más? Quiero irme a casa.",
+                     "siguiente": "n_rueda_ines_b"},
+    "n_rueda_ines_b": {
+      "tipo": "rueda", "escena": "sala", "personaje": "ines", "expresion": "neutral",
+      "texto": "Pregunte.",
+      "reloj": {"segundos": 14, "por_defecto": "terminar"}, "turnos": 2, "al_terminar": "n_marcos_entra",
+      "opciones": [
+        {"id": "reporte", "etiqueta": "Su reporte", "dice": "Dijo que avisó. ¿Tiene cómo probarlo?",
+         "destino": "r_ines_reporte", "requiere": {"marcas": ["ines_confia"], "sin_marcas": ["ines_cerrada"]},
+         "pista": "[Falta confianza]"},
+        {"id": "mostrar_granja", "etiqueta": "Mostrar granja", "dice": "Doscientas cuentas, una sola máquina. ¿Le suena?",
+         "destino": "r_ines_granja", "presenta": "granja_de_bots", "requiere": {"evidencia": ["granja_de_bots"]}},
+        {"id": "consultor", "etiqueta": "El consultor", "dice": "¿Para quién trabajaba ese consultor?",
+         "destino": "r_ines_consultor", "solidez": 4, "requiere": {"marcas": ["ines_admitio"]}, "pista": "[Falta un dato]"},
+        {"id": "terminar", "etiqueta": "Terminar", "dice": "Es todo por ahora. Gracias.", "destino": "n_marcos_entra",
+         "una_vez": false}
+      ]
+    },
+    "r_ines_reporte": {"tipo": "dialogo", "escena": "sala", "personaje": "ines", "expresion": "neutral",
+                       "texto": "Aquí está mi bitácora. Reporté las cuentas dos días antes. Alguien con más permisos tapó la alerta.",
+                       "efectos": {"da_evidencia": ["bitacora_moderacion"]}, "hito": "La bitácora de Inés",
+                       "siguiente": "@volver"},
+    "r_ines_granja": {"tipo": "dialogo", "escena": "sala", "personaje": "ines", "expresion": "sorprendido", "plano": "primer_plano",
+                      "texto": "Es el patrón que reporté. Esa noche el consultor me reenvió un mensaje por error. Guardé la captura.",
+                      "efectos": {"da_evidencia": ["captura_chat"]}, "hito": "La captura del chat", "siguiente": "@volver"},
+    "r_ines_consultor": {"tipo": "dialogo", "escena": "sala", "personaje": "ines", "expresion": "nervioso",
+                         "texto": "Nunca dio su nombre. Pero la factura de la auditoría venía de la oficina de campaña de Marcos Vela.",
+                         "efectos": {"marcas": ["sabe_consultor"]}, "hito": "El consultor tiene dueño",
+                         "siguiente": "@volver"},
+
+    "n_marcos_entra": {"tipo": "dialogo", "escena": "sala", "personaje": "marcos", "expresion": "neutral", "plano": "general",
+                       "texto": "Marcos Vela. Vengo por voluntad propia, que quede claro.",
+                       "siguiente": "n_rueda_marcos_a"},
+    "n_rueda_marcos_a": {
+      "tipo": "rueda", "escena": "sala", "personaje": "marcos", "expresion": "neutral",
+      "texto": "«Nunca tuve acceso a Civitas.»",
+      "reloj": {"segundos": 12, "por_defecto": "callar"}, "turnos": 2, "al_terminar": "n_marcos_pausa",
+      "opciones": [
+        {"id": "coartada", "etiqueta": "Su coartada", "dice": "¿Dónde estaba a las 02:14?",
+         "destino": "r_marcos_coartada", "solidez": 2},
+        {"id": "mostrar_registro", "etiqueta": "Mostrar registro", "dice": "Esta credencial se usó desde su oficina.",
+         "destino": "r_marcos_registro", "solidez": 7, "presenta": "registro_acceso",
+         "requiere": {"evidencia": ["registro_acceso"]}},
+        {"id": "mostrar_granja", "etiqueta": "Mostrar granja", "dice": "Esta máquina la pagó su campaña.",
+         "destino": "r_marcos_granja", "solidez": 7, "presenta": "granja_de_bots",
+         "requiere": {"evidencia": ["granja_de_bots"]}},
+        {"id": "callar", "etiqueta": "Callar", "dice": "(Lo miras sin decir nada.)", "destino": "n_marcos_pausa",
+         "una_vez": false}
+      ]
+    },
+    "r_marcos_coartada": {"tipo": "dialogo", "escena": "sala", "personaje": "marcos", "expresion": "nervioso",
+                          "texto": "Dormía. El teléfono, apagado. No tengo más que decir sobre eso.",
+                          "siguiente": "@volver"},
+    "r_marcos_registro": {"tipo": "dialogo", "escena": "sala", "personaje": "marcos", "expresion": "enojado", "plano": "primer_plano",
+                          "texto": "En esa oficina entra mucha gente. Eso no prueba que fui yo.",
+                          "efectos": {"marcas": ["marcos_acorralado"]}, "hito": "El registro lo incomoda",
+                          "siguiente": "@volver"},
+    "r_marcos_granja": {"tipo": "dialogo", "escena": "sala", "personaje": "marcos", "expresion": "nervioso", "plano": "primer_plano",
+                        "texto": "Pagar publicidad no es delito... ¿Quién le dio esa factura?",
+                        "efectos": {"marcas": ["marcos_acorralado"]}, "hito": "La granja tiene factura",
+                        "siguiente": "@volver"},
+    "n_marcos_pausa": {"tipo": "dialogo", "escena": "sala", "personaje": "marcos", "expresion": "neutral", "plano": "pecho",
+                       "texto": "¿Terminamos? Tengo un debate que preparar.",
+                       "siguiente": "n_rueda_marcos_b"},
+    "n_rueda_marcos_b": {
+      "tipo": "rueda", "escena": "sala", "personaje": "marcos", "expresion": "neutral",
+      "texto": "«No hay nada contra mí.»",
+      "reloj": {"segundos": 10, "por_defecto": "terminar"}, "turnos": 2, "al_terminar": "n_vuelta",
+      "opciones": [
+        {"id": "mostrar_chat", "etiqueta": "Mostrar chat",
+         "dice": "«Activen las cuentas del agua antes del debate.» ¿Lo reconoce?",
+         "destino": "r_marcos_chat", "solidez": 9, "presenta": "captura_chat",
+         "requiere": {"evidencia": ["captura_chat"]}},
+        {"id": "citar_ines", "etiqueta": "Citar a Inés", "dice": "Inés declaró que su consultor le pidió la credencial.",
+         "destino": "r_marcos_ines", "solidez": 5, "presenta": "declaracion_ines",
+         "requiere": {"evidencia": ["declaracion_ines"]}},
+        {"id": "presionar", "etiqueta": "Presionar", "dice": "Ya vio lo que tengo. Ahórrese el juicio.",
+         "destino": "r_marcos_presion", "solidez": 4, "requiere": {"marcas": ["marcos_acorralado"]},
+         "pista": "[Falta acorralarlo]"},
+        {"id": "terminar", "etiqueta": "Terminar", "dice": "Puede retirarse.", "destino": "n_vuelta", "una_vez": false}
+      ]
+    },
+    "r_marcos_chat": {"tipo": "dialogo", "escena": "sala", "personaje": "marcos", "expresion": "triste", "plano": "primer_plano",
+                      "texto": "...Solo queríamos que la gente dudara unos días. Hasta pasado el debate.",
+                      "efectos": {"marcas": ["marcos_confeso"]}, "hito": "Marcos se quiebra", "siguiente": "@volver"},
+    "r_marcos_ines": {"tipo": "dialogo", "escena": "sala", "personaje": "marcos", "expresion": "nervioso",
+                      "texto": "Ese consultor es un contratista. Yo no respondo por lo que haga.",
+                      "hito": "La versión de Inés pesa", "siguiente": "@volver"},
+    "r_marcos_presion": {"tipo": "dialogo", "escena": "sala", "personaje": "marcos", "expresion": "nervioso", "plano": "primer_plano",
+                         "texto": "No digo una palabra más. Quiero a mi abogado.",
+                         "hito": "Marcos pide abogado", "siguiente": "@volver"},
+
+    "n_vuelta": {"tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "serio", "plano": "pecho",
+                 "texto": "Los oí a los dos desde el vidrio. Ahora dime qué tenemos.",
+                 "siguiente": "n_acusacion"},
+    "n_acusacion": {
+      "tipo": "acusacion", "escena": "oficina", "personaje": "fiscal", "expresion": "serio",
+      "texto": "Es la hora. ¿A quién acusas formalmente?",
+      "reloj": {"segundos": 20, "por_defecto": "no_acusar"},
+      "acusados": [
+        {"id": "acusar_marcos", "etiqueta": "Acusar a Marcos", "personaje": "marcos",
+         "rutas": [
+           {"requiere": {"solidez": {"min": "solido"}}, "destino": "final_justicia"},
+           {"requiere": {"solidez": {"min": "suficiente"}}, "destino": "final_cargos"},
+           {"requiere": {"solidez": {"min": "indicios"}}, "destino": "final_sin_pruebas"}
+         ],
+         "destino": "final_archivo"},
+        {"id": "acusar_ines", "etiqueta": "Acusar a Inés", "personaje": "ines", "destino": "final_inocente_acusada"},
+        {"id": "no_acusar", "etiqueta": "No acusar", "destino": "final_archivo"}
+      ]
+    },
+
+    "final_justicia": {"tipo": "final", "personaje": "fiscal", "expresion": "satisfecho", "resultado": "exito",
+                       "titulo": "Justicia con pruebas",
+                       "texto": "Con el registro, la granja y el chat sobre la mesa, la Fiscalía abre el caso contra Marcos Vela y su campaña. Civitas retira las cuentas y Ciudad Nova vuelve a confiar en lo que lee.",
+                       "efectos": {"grupos": {"policia": {"investigacion": 20, "moral": 10},
+                                              "instituciones": {"investigacion": 30, "moral": 10},
+                                              "ciudadanos": {"moral": 20, "secundarios": 5}}}},
+    "final_cargos": {"tipo": "final", "personaje": "fiscal", "expresion": "neutral", "resultado": "exito",
+                     "titulo": "Marcos, a juicio",
+                     "texto": "La acusación se sostiene. Marcos Vela irá a juicio, aunque su campaña dice que actuó solo. Las cuentas se cierran antes del debate.",
+                     "efectos": {"grupos": {"policia": {"investigacion": 12, "moral": 5},
+                                            "instituciones": {"investigacion": 18, "moral": 6},
+                                            "ciudadanos": {"moral": 10}}}},
+    "final_sin_pruebas": {"tipo": "final", "personaje": "fiscal", "expresion": "neutral", "resultado": "parcial",
+                          "titulo": "Acusación débil",
+                          "texto": "Marcos queda citado, pero sin pruebas suficientes su abogado desmonta casi todo. Las cuentas se cierran; el responsable sale poco castigado.",
+                          "efectos": {"grupos": {"instituciones": {"investigacion": 5, "moral": 5},
+                                                 "ciudadanos": {"secundarios": -5}}}},
+    "final_inocente_acusada": {"tipo": "final", "personaje": "fiscal", "expresion": "serio", "resultado": "fracaso",
+                               "titulo": "Una inocente pagó",
+                               "texto": "Inés pierde su empleo y su nombre por una credencial prestada. El verdadero responsable sigue libre y Civitas desconfía de la investigación.",
+                               "efectos": {"grupos": {"ciudadanos": {"moral": -30, "secundarios": -10},
+                                                      "instituciones": {"investigacion": -20, "moral": -25}}}},
+    "final_archivo": {"tipo": "final", "personaje": "fiscal", "expresion": "serio", "resultado": "fracaso",
+                      "titulo": "Caso archivado",
+                      "texto": "Sin una acusación sustentada, la Fiscalía archiva el caso. El rumor del agua se apaga solo, pero nadie responde por él.",
+                      "efectos": {"grupos": {"instituciones": {"investigacion": -15, "moral": -5},
+                                             "ciudadanos": {"secundarios": -10}}}}
+  }
+}

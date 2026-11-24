@@ -20,6 +20,7 @@ import math
 from panda3d.core import LVecBase4, ScissorEffect
 from ursina import Entity, Mesh, camera, color
 
+from backend.logica import navegacion
 from frontend import diseno_adaptable, estilo, hud_calculos, minimapa_calculos as mm
 from frontend.componentes import destruir_arbol, rgb
 
@@ -178,7 +179,8 @@ class MinimapaFoto(Entity):
         if destino is None:
             self.marca_destino.enabled = self.flecha_destino.enabled = False
             return
-        x, z = self._mapa.coordenada(destino)
+        # punto exacto de la misión (puerta de la Fiscalía), el mismo en que termina la ruta del suelo; si no, el lugar
+        x, z = navegacion.destino_en_minimapa(self._mapa, destino, getattr(self._minimapa, "punto_destino", None))
         flecha = g.flecha_de_borde(x, z, margen=LARGO_FLECHA * 0.9)
         self.marca_destino.enabled = flecha is None
         self.flecha_destino.enabled = flecha is not None
@@ -191,7 +193,11 @@ class MinimapaFoto(Entity):
 
     def _ruta(self, pos, ruta):
         g = self.g
-        puntos = [] if pos is None or not ruta else [g.punto(*p) for p in hud_calculos.puntos_de_ruta(self._mapa, pos[0], pos[1], ruta)]
+        exacta = getattr(self._minimapa, "ruta_puntos", None)       # la polilínea del suelo (misión con punto exacto)
+        if pos is not None and exacta and len(exacta) > 1:
+            puntos = [g.punto(*p) for p in [pos] + list(exacta[1:])]
+        else:
+            puntos = [] if pos is None or not ruta else [g.punto(*p) for p in hud_calculos.puntos_de_ruta(self._mapa, pos[0], pos[1], ruta)]
         pares = list(zip(puntos, puntos[1:]))
         while len(self.segmentos_ruta) < len(pares):
             self.segmentos_ruta.append(Entity(parent=self.capa_ruta, model="quad", color=rgb(estilo.COLOR_RUTA)))

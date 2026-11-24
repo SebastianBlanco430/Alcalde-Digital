@@ -96,6 +96,10 @@ def vista_telefono(telefono, mision, nuevos_al_abrir=0):
     else:
         linea_mision = f"Misión: {glosar_texto(mision.titulo)}"
         linea_destino = f"Destino: {nombre_visible(mision.destino)}"
+        if getattr(mision, "tipo", None) == "investigacion":      # Fiscalía v2: los casos se juegan en su edificio
+            from backend.logica import fiscalia_bandera
+            if fiscalia_bandera.activa():
+                linea_destino = f"Destino: {fiscalia_bandera.NOMBRE_FISCALIA} ({nombre_visible(mision.destino)})"
         texto_seguir = texto_casilla_seguir(sigue)
     return VistaTelefono(
         modo=_MODO_POR_ESTADO.get(telefono.estado(), MODO_ICONO),

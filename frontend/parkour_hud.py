@@ -10,6 +10,11 @@ from frontend import parkour_visual_calculos as pvc
 from frontend.componentes import BotonPrimario, BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb
 
 DURACION_AVISO = 2.2
+DURACION_AVISO_PURGA = 1.4
+# Aviso («¡Checkpoint!», «¡Purga!…»): pegado bajo el panel del tiempo (que acaba en y = 0,3555) y más fino. Antes, en
+# y = 0,325 con 0,062 de alto, tapaba la franja de arriba del cuadro, donde se ve la plataforma siguiente (S2).
+Y_AVISO, ALTO_PASTILLA_AVISO, PX_AVISO = 0.333, 0.046, 21
+Y_PURGA = 0.345              # cuenta atrás de la purga: arriba a la izquierda, bajo «Caídas»
 AYUDA = "WASD mover   Espacio saltar (otra vez en el aire: doble salto)   R volver al checkpoint   Esc pausa"
 MARGEN = 0.03
 
@@ -19,6 +24,10 @@ def _texto(padre, cadena, px, tono, pos, origen=(0, 0), negrita=False):
     return Text(cadena, parent=padre, origin=origen, position=(pos[0], pos[1], -0.01),
                 scale=escala_fuente(px), color=rgb(tono), **opciones)
 
+
+# (nota de la pausa, rótulo del botón) según haya o no un destino de retorno distinto del mundo.
+TEXTOS_SALIDA = {False: ("Tu avance se conserva: puedes salir al mundo y volver.", "Salir al mundo"),
+                 True: ("Tu avance se conserva: puedes salir y volver.", "Volver")}
 
 LADO_PLANO = 0.24            # lado del plano de alturas (unidades de camera.ui)
 RADIO_PLANO_M = 14.0         # el plano muestra ±este radio (m) alrededor del jugador
@@ -115,7 +124,7 @@ class HudParkour(Entity):
         self.caidas = _texto(self.izquierda, "", 16, estilo.COLOR_TEXTO_TENUE, (x0, 0.392), origen=(-0.5, 0))
         diseno_adaptable.anclar(self.izquierda, "izquierda")
 
-        self.aviso = _texto(self, "", 24, estilo.COLOR_ACENTO, (0, 0.325), negrita=True)
+        self.aviso = _texto(self, "", PX_AVISO, estilo.COLOR_ACENTO, (0, Y_AVISO), negrita=True)
         self.ayuda = _texto(self, AYUDA, 14, estilo.COLOR_TEXTO_TENUE, (0, -0.46))
 
         self.plano = PlanoAlturas(self)
@@ -126,6 +135,14 @@ class HudParkour(Entity):
         self._aviso_edad = 9.0
         self._tema_aplicado = None
         self._nivel_pistas = None
+        # Purga (sesión E): cuenta atrás roja arriba a la izquierda, bajo «Caídas», con su pastilla oscura. Antes iba en
+        # el centro (y = 0,255) y, con el aviso, tapaba la cabeza del personaje y la plataforma a la que salta (S2).
+        self.purga_fondo = Entity(parent=self.izquierda, model="quad", position=(x0 + 0.13, Y_PURGA, 0.02),
+                                  scale=(0.27, 0.05), color=color.rgba(40 / 255, 4 / 255, 12 / 255, 0.78), enabled=False)
+        self.purga_txt = _texto(self.izquierda, "", 24, pvc.COLOR_PURGA, (x0 + 0.012, Y_PURGA), origen=(-0.5, 0),
+                                negrita=True)
+        self._purga_corria = False
+        self.leyenda_extra = None
         if self.visual:
             self._decorar()
 
@@ -141,7 +158,7 @@ class HudParkour(Entity):
         self.barra_fondo = quad(self, 0, 0.372, 0.36, 0.011, (30, 36, 60), 0.9, 0.015)
         self.barra_relleno = quad(self, -0.18, 0.372, 0.0001, 0.011, estilo.COLOR_ACENTO, 1.0, 0.012)
         self.barra_relleno.origin = (-0.5, 0)
-        self.pastilla_aviso = quad(self, 0, 0.325, 0.74, 0.062, (6, 8, 20), 0.72, 0.02)
+        self.pastilla_aviso = quad(self, 0, Y_AVISO, 0.66, ALTO_PASTILLA_AVISO, (6, 8, 20), 0.72, 0.02)
         # Fondos oscuros tras el texto de arriba a la izquierda y la línea de teclas: encima de las plataformas claras
         # (cian, verde, amarillo) no se leían.
         xi = -diseno_adaptable.aspecto() / 2 + MARGEN
@@ -163,6 +180,32 @@ class HudParkour(Entity):
             quad(self.leyenda, x0 + 0.012, y - 0.0, 0.016, 0.011, e["acento"] if clave != "fija" else e["panel"], 1.0, 0.01)
             _texto(self.leyenda, e["nombre"], 13, estilo.COLOR_TEXTO_TENUE, (x0 + 0.04, y), origen=(-0.5, 0))
         diseno_adaptable.anclar(self.leyenda, "izquierda")
+
+    # Leyenda de los tipos de la sesión E presentes en el nivel (y de la purga), bajo la de siempre.
+    def _leyenda_nueva(self, nivel):
+        if self.leyenda_extra is not None:
+            self.leyenda_extra.disable()
+            self.leyenda_extra = None
+        tipos = [c for c in pvc.CLAVES_NUEVAS if any(p.tipo == c for p in nivel.plataformas.values())]
+        filas = [(pvc.ESTILOS[c]["borde"], pvc.ESTILOS[c]["acento"], pvc.ESTILOS[c]["nombre"]) for c in tipos]
+        if nivel.purga:
+            filas.append((pvc.COLOR_PURGA, (255, 200, 210), "Purga (se borra)"))
+        if not filas:
+            return
+        self.leyenda_extra = Entity(parent=self)
+        x0 = -diseno_adaptable.aspecto() / 2 + MARGEN
+        y_base = -0.02 - 0.034 * len(pvc.CLAVES)
+        alto = 0.034 * len(filas) + 0.02
+        Entity(parent=self.leyenda_extra, model="quad", position=(x0 + 0.14, y_base - alto / 2 + 0.027, 0.02),
+               scale=(0.31, alto), color=color.rgba(6 / 255, 8 / 255, 20 / 255, 0.5))
+        for i, (borde, acento, nombre) in enumerate(filas):
+            y = y_base - 0.034 * i
+            Entity(parent=self.leyenda_extra, model="quad", position=(x0 + 0.012, y, 0.012), scale=(0.026, 0.02),
+                   color=color.rgb32(*borde))
+            Entity(parent=self.leyenda_extra, model="quad", position=(x0 + 0.012, y, 0.01), scale=(0.016, 0.011),
+                   color=color.rgb32(*acento))
+            _texto(self.leyenda_extra, nombre, 13, estilo.COLOR_TEXTO_TENUE, (x0 + 0.04, y), origen=(-0.5, 0))
+        diseno_adaptable.anclar(self.leyenda_extra, "izquierda")
 
     def destello(self, tono, alfa=0.38, duracion=0.45):
         if self.visual:
@@ -190,7 +233,8 @@ class HudParkour(Entity):
     def _actualizar_visual(self, sim, nivel):
         if self._tema_aplicado != nivel.id:
             self._tema_aplicado = nivel.id
-            acento = mat.tema(nivel.tema)["acento"]
+            acento = pvc.tema_base(nivel.tema)["acento"]
+            self._leyenda_nueva(nivel)
             self.linea_tema.color = color.rgb32(*acento)
             ini, meta = nivel.plataformas[nivel.inicio], nivel.plataformas[nivel.meta]
             self._pistas = ((ini.x, ini.z), (meta.x, meta.z))
@@ -205,13 +249,13 @@ class HudParkour(Entity):
         panel = panel_tinta(self, 0.62, 0.52)
         panel.z = -0.5
         _texto(panel, "Pausa", 30, estilo.COLOR_TEXTO, (0, 0.18), negrita=True)
-        _texto(panel, "Tu avance se conserva: puedes salir al mundo y volver.", 15, estilo.COLOR_TEXTO_TENUE, (0, 0.11))
+        self._nota_pausa = _texto(panel, TEXTOS_SALIDA[False][0], 15, estilo.COLOR_TEXTO_TENUE, (0, 0.11))
         BotonPrimario("Continuar", al_clic=lambda: self.al_continuar and self.al_continuar(), parent=panel,
                       position=(0, 0.03, -0.01), ancho=a_unidades(260))
         BotonSecundario("Reiniciar el nivel", al_clic=lambda: self.al_reiniciar and self.al_reiniciar(), parent=panel,
                         position=(0, -0.08, -0.01), ancho=a_unidades(260))
-        BotonSecundario("Salir al mundo", al_clic=lambda: self.al_salir and self.al_salir(), parent=panel,
-                        position=(0, -0.19, -0.01), ancho=a_unidades(260))
+        self._boton_salir = BotonSecundario(TEXTOS_SALIDA[False][1], al_clic=lambda: self.al_salir and self.al_salir(),
+                                            parent=panel, position=(0, -0.19, -0.01), ancho=a_unidades(260))
         panel.enabled = False
         diseno_adaptable.ajustar_escala(panel)
         return panel
@@ -240,6 +284,8 @@ class HudParkour(Entity):
             mensaje, tono = "Evidencia obtenida: queda en tu archivo de casos.", estilo.ESTADO_EXITO
         elif not hay_recompensa:
             mensaje, tono = "Este nivel no otorga evidencia.", estilo.COLOR_TEXTO_TENUE
+        elif not con_estado and getattr(self, "_hay_retorno", False):   # desde la Fiscalía: la prueba la entrega el caso
+            mensaje, tono = "La prueba se entrega al caso al volver al laboratorio.", estilo.COLOR_TEXTO
         elif not con_estado:
             mensaje, tono = "Sin partida activa: la evidencia no se guarda.", estilo.ESTADO_AVISO
         else:
@@ -247,7 +293,8 @@ class HudParkour(Entity):
         # el aviso más largo (74 letras) a 17 px se salía unos píxeles del panel (visto en ventana a 1280x720): con el
         # resultado v2 los largos van a 15 px
         _texto(panel, mensaje, 15 if pk.resultado_v2_activo() and len(mensaje) > 60 else 17, tono, (0, y_mensaje))
-        BotonPrimario("Volver al mundo", al_clic=lambda: self.al_salir and self.al_salir(), parent=panel,
+        # con destino de retorno propio (laboratorio de la Fiscalía) el botón no promete «el mundo»
+        BotonPrimario("Volver" if getattr(self, "_hay_retorno", False) else "Volver al mundo", al_clic=lambda: self.al_salir and self.al_salir(), parent=panel,
                       position=(-0.2, -0.27, -0.01), ancho=a_unidades(230))
         BotonSecundario("Reintentar", al_clic=lambda: self.al_reiniciar and self.al_reiniciar(), parent=panel,
                         position=(0.2, -0.27, -0.01), ancho=a_unidades(230))
@@ -277,6 +324,16 @@ class HudParkour(Entity):
             destruir_arbol(self.resultado)
             self.resultado = None
 
+    # Con destino de retorno propio (p. ej. el laboratorio de la Fiscalía) la pausa no promete «el mundo».
+    def fijar_retorno(self, hay_retorno):
+        nota, boton = TEXTOS_SALIDA[bool(hay_retorno)]
+        self._hay_retorno = bool(hay_retorno)
+        try:
+            self._nota_pausa.text = nota
+            self._boton_salir.text = boton
+        except Exception:                                # noqa: BLE001  solo es texto: nunca tumba la entrada
+            pass
+
     def mostrar_pausa(self, visible):
         self.pausa.enabled = bool(visible)
 
@@ -304,6 +361,7 @@ class HudParkour(Entity):
         self._poner(self.caidas, f"Caídas: {sim.caidas}")
         self._poner(self.nivel_txt, nivel.nombre)
         self.plano.actualizar(sim.x, sim.z, sim.y)
+        self._actualizar_purga(sim, nivel)
         if self.visual:
             self._actualizar_visual(sim, nivel)
             self.avanzar(dt)
@@ -311,3 +369,14 @@ class HudParkour(Entity):
             self._aviso_restante -= dt
             if self._aviso_restante <= 0:
                 self.aviso.text = ""
+
+    # Cuenta atrás de la purga (sesión E) y aviso al empezar. Sin purga en el nivel no muestra nada.
+    def _actualizar_purga(self, sim, nivel):
+        restante = sim.purga_restante() if getattr(nivel, "purga", None) else None
+        corre = restante is not None
+        if corre and not self._purga_corria:
+            self.avisar("¡Purga! El suelo se borra detrás de ti", pvc.COLOR_PURGA)
+            self._aviso_restante = DURACION_AVISO_PURGA          # más breve: el tramo de la purga es el más exigente
+        self._purga_corria = corre
+        self._poner(self.purga_txt, pvc.texto_purga(restante) if corre else "")
+        self.purga_fondo.enabled = corre

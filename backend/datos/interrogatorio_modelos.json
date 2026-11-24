@@ -1,14 +1,14 @@
 {
-  "_comentario": "Qué modelo 3D usa cada personaje de un caso en el interrogatorio de novela visual (frontend/interrogatorio_vn.py). Los colores (piel, pelo, ropa) y el accesorio salen del retrato del JSON del caso; aquí solo se elige el .glb. Un personaje sin entrada usa 'por_defecto' (mujer si su pelo_estilo es 'largo', hombre si no). Modelos válidos: periodista.glb, smoking.glb, ciudadano.glb, npc_hombre_01..03.glb, npc_mujer_01..02.glb.",
+  "_comentario": "Qué modelo 3D usa cada personaje de un caso en el interrogatorio de novela visual (frontend/interrogatorio_vn.py). Los colores (piel, pelo, ropa) y el accesorio salen del retrato del JSON del caso; aquí solo se elige el .glb. Un personaje sin entrada usa 'por_defecto' (mujer si su pelo_estilo es 'largo', hombre si no). Modelos válidos: periodista.glb, smoking.glb, ciudadano.glb, npc_hombre_01..03.glb, npc_mujer_01..02.glb. Desde el 24-nov el cuerpo de cada personaje con nombre es el de su receta en backend/datos/personajes_fiscalia.json (fuente única; 'personaje' = su id): nadie lleva el cuerpo de un protagonista y el test tests/test_personajes_fiscalia.py exige que coincidan.",
   "por_defecto": {
     "mujer": {"modelo": "npc_mujer_02.glb"},
     "hombre": {"modelo": "npc_hombre_01.glb"}
   },
   "casos": {
     "cuentas_fantasma": {
-      "fiscal": {"modelo": "smoking.glb"},
-      "ines": {"modelo": "npc_mujer_01.glb"},
-      "marcos": {"modelo": "npc_hombre_02.glb"}
+      "fiscal": {"modelo": "npc_hombre_03.glb", "personaje": "fiscal"},
+      "ines": {"modelo": "npc_mujer_01.glb", "personaje": "ines"},
+      "marcos": {"modelo": "npc_hombre_02.glb", "personaje": "marcos"}
     }
   }
 }

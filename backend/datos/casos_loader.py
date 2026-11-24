@@ -2,7 +2,8 @@
 # backend/logica/casos.py y devuelve objetos Caso. cargar_caso (UN archivo) lanza CasoError con el nombre del archivo
 # (y la línea, si es un error de sintaxis) si el JSON está roto o es inválido; nunca devuelve un caso a medias.
 # cargar_catalogo (la carpeta) se SALTA solo el archivo roto, avisa por stderr y sigue con los demás: un caso mal
-# escrito no deja al juego sin los otros.
+# escrito no deja al juego sin los otros. Los archivos con "formato": 2 (casos v2) los ignora en silencio: son de
+# cargar_catalogo_v2 (al final del archivo).
 
 import json
 import sys
@@ -35,6 +36,8 @@ def cargar_catalogo(carpeta=None, errores=None):
     carpeta = Path(carpeta) if carpeta is not None else CARPETA_CASOS
     catalogo, origen = {}, {}
     for ruta in sorted(carpeta.glob("*.json")):
+        if _es_v2(ruta):
+            continue                                   # los casos v2 los carga cargar_catalogo_v2 (sin avisos aquí)
         try:
             caso = cargar_caso(ruta)
         except CasoError as error:
@@ -56,4 +59,94 @@ def cargar_caso_por_id(id_caso, carpeta=None):
     if id_caso not in catalogo:
         omitidos = f" Archivos omitidos: {'; '.join(errores)}" if errores else ""
         raise CasoError(f"No hay un caso con id {id_caso!r}; hay: {sorted(catalogo)}.{omitidos}")
+    return catalogo[id_caso]
+
+
+# -- Casos v2 (Fiscalía estilo Detroit, sesión A): backend/logica/casos_v2.py --
+# Archivos `caso_*.json` con "formato": 2. Un archivo roto, inválido o con un id repetido se omite con un aviso por stderr
+# (todos sus errores juntos, con la ruta dentro del JSON) y el juego sigue con los demás. Validar un caso recorre todos
+# sus estados (~1 s), así que cada archivo válido se guarda en memoria mientras no cambie (ruta, fecha y tamaño).
+
+_cache_v2 = {}
+
+
+def _es_v2(ruta):
+    try:
+        datos = json.loads(Path(ruta).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(datos, dict) and datos.get("formato") == 2
+
+
+def _leer_v2(ruta):
+    """(datos, None) si es un caso v2, (None, None) si es de otro formato, (None, mensaje) si está roto."""
+    try:
+        datos = json.loads(ruta.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        return None, f"{ruta.name}: JSON inválido (línea {error.lineno}, columna {error.colno}): {error.msg}"
+    except OSError as error:
+        return None, f"{ruta.name}: no se pudo leer ({error})"
+    if not isinstance(datos, dict) or datos.get("formato") != 2:
+        return None, None
+    return datos, None
+
+
+def cargar_caso_v2(ruta):
+    """Carga y valida UN caso v2 (CasoError con el nombre del archivo y todos los errores si está roto)."""
+    from backend.logica.casos_v2 import CasoV2
+
+    ruta = Path(ruta)
+    try:
+        sello = (str(ruta.resolve()), ruta.stat().st_mtime_ns, ruta.stat().st_size)
+    except OSError:
+        raise CasoError(f"{ruta.name}: el archivo no existe.") from None
+    if sello in _cache_v2:
+        return _cache_v2[sello]
+    datos, error = _leer_v2(ruta)
+    if error is not None:
+        raise CasoError(error)
+    if datos is None:
+        raise CasoError(f"{ruta.name}: no es un caso v2 (falta \"formato\": 2).")
+    try:
+        # Parkours por caso (sesión E): cada `nivel` se cambia por el efectivo (sector nuevo si su bandera
+        # ALCALDE_PK_SECTOR_<n> está encendida y el archivo carga; si no, su `_respaldo`).
+        from backend.logica import parkour_banderas
+        caso = CasoV2.desde_dict(parkour_banderas.resolver_caso(datos), niveles_validos=parkour_banderas.niveles_validos())
+    except CasoError as error:
+        raise CasoError(f"{ruta.name}: {error}") from None
+    _cache_v2[sello] = caso
+    return caso
+
+
+def cargar_catalogo_v2(carpeta=None, errores=None):
+    """Todos los casos v2 VÁLIDOS de la carpeta, {id: CasoV2}, por nombre de archivo. Ignora los v1 sin avisar."""
+    carpeta = Path(carpeta) if carpeta is not None else CARPETA_CASOS
+    catalogo, origen = {}, {}
+    for ruta in sorted(carpeta.glob("caso_*.json")):
+        datos, error = _leer_v2(ruta)
+        if datos is None and error is None:
+            continue
+        try:
+            if error is not None:
+                raise CasoError(error)
+            caso = cargar_caso_v2(ruta)
+            if caso.id in catalogo:
+                raise CasoError(f"{ruta.name}: el id {caso.id!r} ya lo usa {origen[caso.id]}.")
+        except CasoError as fallo:
+            print(f"[casos v2] se omite {fallo}", file=sys.stderr)
+            if errores is not None:
+                errores.append(str(fallo))
+            continue
+        catalogo[caso.id] = caso
+        origen[caso.id] = ruta.name
+    return catalogo
+
+
+def cargar_caso_v2_por_id(id_caso, carpeta=None):
+    """El caso v2 con ese id, o CasoError (con los archivos omitidos por estar rotos)."""
+    errores = []
+    catalogo = cargar_catalogo_v2(carpeta, errores=errores)
+    if id_caso not in catalogo:
+        omitidos = f" Archivos omitidos: {'; '.join(errores)}" if errores else ""
+        raise CasoError(f"No hay un caso v2 con id {id_caso!r}; hay: {sorted(catalogo)}.{omitidos}")
     return catalogo[id_caso]

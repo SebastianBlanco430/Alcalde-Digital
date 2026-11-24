@@ -34,13 +34,15 @@ PERFILES = {
                 "parpadeo": 1.0, "menton": 0.0, "balanceo": 0.0, "braceo": 0.0},
     "serio": {"postura": "neutro", "alza": 0.00, "frunce": 0.45, "sonrisa": 0.12, "mirada": (0.0, 0.0), "esquiva": 0.0,
               "parpadeo": 0.7, "menton": -2.0, "balanceo": 0.0, "braceo": 0.0},
-    "nervioso": {"postura": "aislado", "alza": 0.55, "frunce": 0.10, "sonrisa": 0.15, "mirada": (0.6, -0.3), "esquiva": 1.0,
+    # nervioso y triste: cuerpo con la postura neutra (la «aislado» de los peatones suma ~80° de cabeza gacha y en el
+    # pecho y el primer plano solo se veía el pelo, S4); se leen por cejas, mirada esquiva y parpadeo.
+    "nervioso": {"postura": "neutro", "alza": 0.55, "frunce": 0.10, "sonrisa": 0.15, "mirada": (0.6, -0.3), "esquiva": 1.0,
                  "parpadeo": 2.6, "menton": -4.0, "balanceo": 0.025, "braceo": 0.0},
     "enojado": {"postura": "enojado", "alza": 0.00, "frunce": 1.00, "sonrisa": 0.00, "mirada": (0.0, 0.05), "esquiva": 0.1,
                 "parpadeo": 0.8, "menton": 2.0, "balanceo": 0.0, "braceo": 3.0},
     "satisfecho": {"postura": "sociable", "alza": 0.35, "frunce": 0.00, "sonrisa": 0.95, "mirada": (0.0, 0.1),
                    "esquiva": 0.2, "parpadeo": 1.0, "menton": 6.0, "balanceo": 0.0, "braceo": 0.0},
-    "triste": {"postura": "aislado", "alza": 0.40, "frunce": 0.20, "sonrisa": 0.05, "mirada": (0.0, -0.5), "esquiva": 0.4,
+    "triste": {"postura": "neutro", "alza": 0.40, "frunce": 0.20, "sonrisa": 0.05, "mirada": (0.0, -0.5), "esquiva": 0.4,
                "parpadeo": 1.2, "menton": -6.0, "balanceo": 0.0, "braceo": 0.0},
     "sorprendido": {"postura": "neutro", "alza": 1.00, "frunce": 0.00, "sonrisa": 0.20, "mirada": (0.0, 0.1),
                     "esquiva": 0.0, "parpadeo": 0.4, "menton": 3.0, "balanceo": 0.0, "braceo": 0.0},

@@ -2,7 +2,7 @@
 # misión paga al jugador que la cerró (se captura ANTES de delegar, porque completar_mision pasa el turno) y
 # todos los jugadores descansan un poco (-30 de fatiga). Lo demás se delega con __getattr__.
 
-from backend.logica import dinero
+from backend.logica import dinero, misiones_digitales
 from backend.logica.perfil_economia import perfil_de
 
 
@@ -38,7 +38,8 @@ class FlujoConEconomia:
         if not self._flujo.revisar_misiones_digitales(game_state):
             return False
         self.ultimo_pago = None
-        self._cobrar(jugador, mision)
+        # sesión E (P5): un caso de la Fiscalía abandonado cierra su misión sin pago (el descanso sí se aplica)
+        self._cobrar(jugador, mision if misiones_digitales.cobra(mision, game_state) else None)
         return True
 
     # Paga al jugador que cerró la misión (capturados ANTES de cerrar: cerrar pasa el turno) y descansa a todos.

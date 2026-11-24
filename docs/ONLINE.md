@@ -3,7 +3,7 @@
 > **Borrador para revisión legal antes de publicar.** El autor de este texto no es abogado. Es material de un
 > proyecto de aprendizaje con datos ficticios; no es asesoría legal.
 >
-> Versión 1.2 · 2026-11-22 · Protocolo de red v6
+> Versión 1.3 · 2026-11-23 · Protocolo de red v6
 
 El modo online permite jugar en cooperación en tiempo real hasta 4 personas. **Una persona aloja la partida** y
 las demás se conectan a su dirección IP y puerto. No hay servidores externos ni cuentas: todo ocurre entre los
@@ -23,6 +23,7 @@ Todos los jugadores deben arrancar el juego con las mismas opciones. Si difieren
 | `ALCALDE_VEHICULOS_ONLINE` | Bicis y motos en línea. Activo salvo que valga `0` | **Debe coincidir en todos** (entra en la huella: si difiere, «Mundo distinto») |
 | `ALCALDE_SEMILLA=N` | Entero que decide la disposición de la favela | **Debe coincidir en todos** |
 | `ALCALDE_PUESTOS_FIJOS` | Puestos de comercio fijos y feria alargada (activo por defecto) | **Debe coincidir en todos** (cambia el mundo: si difiere, «Mundo distinto») |
+| `ALCALDE_MISIONES_DIAS` | Misiones repartidas por días: fondo de 35 y semana sorteada de 28 (activo por defecto; `0` deja las 14 de siempre) | **Debe coincidir en todos** (cambia el contenido: si difiere, «Mundo distinto») |
 
 Ejemplo (macOS, desde la carpeta del proyecto):
 
@@ -149,8 +150,22 @@ Versión actual del protocolo: **v6** (`backend/red/protocolo.PROTOCOLO_V`). His
 - **2026-11-22, retoques de la recta final (sin cambiar de versión):** Beto y Zeca quedan centrados en esa pared con
   cualquier semilla (las casas y la vegetación del barrio reservan antes el sitio de los puestos fijos y su pasillo).
   Con la semilla por defecto la huella del mundo pasa de `42363471…` a `4b3d197c…`; la del contenido no cambia
-  (`bb48a187…`). Otra vez: **todos con el mismo código**.
-- **Un solo mundo:** anfitrión y clientes construyen el MISMO mundo (Ciudad3D, 11 lugares) y el catálogo de 14 misiones.
+  (`d10bd61a…`; el `bb48a187…` anotado antes era un error de medición: recalculado el 2026-11-23 en `bb373b9`, `f0846c7` y `0b7e148`, da `d10bd61a…` en los tres). Otra vez: **todos con el mismo código**.
+- **2026-11-23, misiones por días (sin cambiar de versión):** el catálogo en línea pasa de 14 a un **fondo de 35 misiones**
+  (5 por día) y cada partida juega una **semana sorteada de 28** (4 por día; un arco de rumores entra entero o no entra).
+  La semana se sortea con la **semilla del mundo** (`ALCALDE_SEMILLA` / `--semilla`), que decide el anfitrión y ya comparten
+  todos: no hay mensajes nuevos en el protocolo. En línea no hay reloj, así que el «día» avanza por progreso: las misiones
+  del día siguiente se abren cuando las del anterior están hechas o en curso; no hay arrastre ni caducidad, y los casos de
+  Fiscalía siguen sin existir en línea. Con la semilla por defecto la huella del **contenido** pasa de `d10bd61a…` a
+  `35b84ee7…`; la del mundo no cambia (`4b3d197c…`: la Fiscalía es una casa decorativa rotulada, no un lugar nuevo). Con
+  `ALCALDE_MISIONES_DIAS=0` vuelven las 14 misiones y la huella `d10bd61a…`. Otra vez: **todos con el mismo código y la
+  misma bandera**. Huellas sin abrir el juego: `sesiones-24nov\misiones\arnes\huella.py`.
+- **2026-11-24 (sin cambiar de versión):** correcciones de texto del catálogo por días (`ciudadano_tarjeta_bus`, el rumor
+  de `generica_encuesta`, `generica_primo_audio`, un mensaje de `k_teleferico_eleccion`) e `influencer_samba` pasa a
+  «rastrear». Con la semilla por defecto la huella del **contenido** pasa de `35b84ee7…` a `24d85220…`; la del mundo no
+  cambia (`4b3d197c…`) y con `ALCALDE_MISIONES_DIAS=0` sigue `d10bd61a…`. Los parkours nuevos (`sector_3`…`sector_6`), los
+  personajes de la Fiscalía y la ruta del GPS **no entran** en las huellas. Otra vez: **todos con el mismo código**.
+- **Un solo mundo:** anfitrión y clientes construyen el MISMO mundo (Ciudad3D, 11 lugares) y el mismo catálogo (el fondo de 35 misiones; 14 con `ALCALDE_MISIONES_DIAS=0`).
   En línea existen 8 vehículos (el protocolo nombra 0..7; `N_VEHICULOS_MAX = 8`). El «mapa grande» (900 x 650 m, 24 lugares,
   47 misiones, 24 vehículos, viaje rápido en mototáxi y teleférico, mensajes `viaje`/`viaje_ok`/`viaje_no`) y su variable
   `ALCALDE_MAPA_GRANDE` se eliminaron el 2026-11-18; el número de versión del protocolo no cambió porque nada que usara el
@@ -162,7 +177,7 @@ Versión actual del protocolo: **v6** (`backend/red/protocolo.PROTOCOLO_V`). His
 
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
-| «Tu mundo es distinto» | `ALCALDE_SEMILLA`, `ALCALDE_PUESTOS_FIJOS` o `ALCALDE_VEHICULOS_ONLINE` distintos, o código del juego distinto | Igualarlos en todos y reiniciar |
+| «Tu mundo es distinto» | `ALCALDE_SEMILLA`, `ALCALDE_PUESTOS_FIJOS`, `ALCALDE_VEHICULOS_ONLINE` o `ALCALDE_MISIONES_DIAS` distintos, o código del juego distinto | Igualarlos en todos y reiniciar |
 | «Versión del protocolo distinta» | Un equipo tiene otra versión del juego (p. ej. sin la recta final v6) | Actualizar todos a la misma versión |
 | «Código incorrecto» | Código mal escrito, o varios intentos fallidos desde ese equipo (veto de 60 s) | Pedirlo de nuevo (no distingue mayúsculas); tras varios fallos, esperar un minuto |
 | «Sala ocupada» | Límite por IP (2) o sala llena (4) | Subir `--max-por-ip` o esperar |

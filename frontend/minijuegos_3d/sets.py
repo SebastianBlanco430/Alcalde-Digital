@@ -97,6 +97,12 @@ class SetMinijuego:
         self._sol = None
         self._ocultos = []
         self.creadas = []                    # (interior) entidades propias colgadas de la EscenaInterior: se destruyen al cerrar
+        # Entrada/salida animadas (sesión B, ALCALDE_ANIM_SILLA): los pone preparar_entrada() SOLO en el camino nuevo.
+        self.silla = None                    # cinematica_silla_calculos.Silla
+        self.mesa_silla = None               # cinematica_silla_calculos.Mesa
+        self.entidad_silla = None            # Entity suelta de la silla (la oficina: EscenaInterior.silla)
+        self.corcho_desc = None              # cinematica_silla_calculos.Corcho
+        self.limites = None                  # (x0, x1, z0, z1) de la sala (entrada_calculos)
 
     def nueva(self, entidad):
         """Registra una entidad creada dentro del interior (se destruye con el set). Devuelve la entidad."""
@@ -128,6 +134,12 @@ class SetMinijuego:
             except Exception:                # noqa: BLE001
                 pass
         if self.interior is not None:
+            try:
+                reponer = getattr(self.interior, "reponer_silla", None)
+                if callable(reponer):
+                    reponer()                # la silla suelta vuelve a su sitio de siempre (la deslizó la entrada)
+            except Exception:                # noqa: BLE001
+                pass
             try:
                 for e in self.creadas:
                     destruir_arbol(e)
@@ -344,6 +356,86 @@ def _set_cuarto_mesa(jugador, lugar):
     s.pie = (-LATERAL_PIE * tablero[0], mesa_z - tablero[1] / 2 - MESA_PIE_BORDE, 0.0)
     s.luces[0].update_bounds(raiz)
     return s
+
+
+# -- Entrada/salida animadas (sesión B, ALCALDE_ANIM_SILLA). Solo las llama base.py en el camino nuevo: con la bandera en
+#    0 (o si algo falla) el set queda EXACTAMENTE como lo deja crear(). --
+
+def preparar_entrada(s, familia, minijuego_id, manos=None):
+    """Pone en el set `s` los descriptores del contrato de cinematica_silla (Silla, Mesa, entidad de la silla; o Corcho) y,
+    en el cuarto_mesa, la silla. `manos` = {"i", "d"} (mundo) donde terminan las manos en la familia PC (teclado y ratón).
+    Devuelve True si quedó listo para la entrada nueva; False (y el set intacto) si esta familia/set no la tiene. Lanza si
+    el módulo del contrato no se puede importar (lo captura base.py)."""
+    from frontend import cinematica_silla_calculos as csc
+    from frontend.minijuegos_3d import entrada_calculos as ec
+    if familia == "pc":
+        if s.asiento is None or s.interior is None or getattr(s.interior, "silla", None) is None:
+            return False
+        from frontend.minijuegos_3d.base import ADELANTE_SENTADO
+        silla = ec.silla_pc(s.asiento, ADELANTE_SENTADO)
+        mesa = ec.mesa_pc(silla, manos)
+        s.limites = ec.OFICINA_LIMITES
+        s.entidad_silla = s.interior.silla
+        _poner_silla(s.entidad_silla, silla)
+    elif familia == "mesa":
+        silla = ec.silla_mesa(minijuego_id)
+        if silla is None or s.nombre != interiores.CUARTO_MESA or minijuego_id not in ec.MESA_SENTADO:
+            return False
+        mesa = ec.mesa_cuarto(silla, minijuego_id)
+        s.limites = ec.CUARTO_LIMITES
+        s.entidad_silla = _silla_entidad(s.raiz, silla)
+    elif familia == "corcho":
+        ancla = s.anclas.get("corcho")
+        if ancla is None:
+            return False
+        d = ancla.datos_toma()
+        derecha = _resta(ancla.mundo(1, 0, 0), d["centro"])
+        pie, nota = ec.corcho_pie_y_nota(d["centro"], d["normal"], derecha, ancla.ancho)
+        s.corcho_desc = csc.Corcho(centro=tuple(d["centro"]), normal=tuple(d["normal"]), ancho=ancla.ancho,
+                                   alto=ancla.alto, pie=pie, nota=nota)
+        s.limites = ec.OFICINA_LIMITES if s.interior is not None else ec.CUARTO_LIMITES
+        return True
+    else:
+        return False
+    s.silla = csc.Silla(**silla)
+    s.mesa_silla = csc.Mesa(**mesa)
+    return True
+
+
+def _poner_silla(entidad, silla):
+    """La silla suelta en su sitio ACOMODADO (donde queda para jugar), mirando al rumbo del asiento."""
+    x, z = silla["posicion"]
+    entidad.world_position = (x, silla.get("suelo_y", 0.0), z)
+    entidad.world_rotation_y = silla["rumbo"]
+
+
+def _silla_entidad(padre, silla):
+    """Silla estándar suelta (la misma forma y color que la de la oficina, una malla) con el origen en el suelo bajo el
+    centro del asiento, ya acomodada en `silla` (contrato de cinematica_silla: entidad_silla)."""
+    e = Entity(parent=padre, shader=lit_with_shadows_shader, name="silla_mesa")
+    tela = rgb((52, 56, 74))
+    pieza(parent=e, model="cube", color=tela, position=(0, 0.45, 0), scale=(0.48, 0.07, 0.48))
+    pieza(parent=e, model="cube", color=tela, position=(0, 0.78, -0.22), scale=(0.46, 0.55, 0.06))
+    pieza(parent=e, model="cube", color=rgb(METAL), position=(0, 0.22, 0), scale=(0.06, 0.4, 0.06))
+    pieza(parent=e, model="cube", color=rgb(METAL), position=(0, 0.03, 0), scale=(0.5, 0.05, 0.5))
+    e.combine()
+    silenciar(e)
+    _poner_silla(e, silla)
+    return e
+
+
+def deshacer_entrada(s):
+    """Quita lo que puso preparar_entrada (el camino nuevo falló): el set queda como lo dejó crear(). Nunca lanza."""
+    try:
+        if s.interior is not None:
+            reponer = getattr(s.interior, "reponer_silla", None)
+            if callable(reponer):
+                reponer()
+        elif s.entidad_silla is not None:
+            destruir_arbol(s.entidad_silla)
+    except Exception:                    # noqa: BLE001
+        pass
+    s.silla = s.mesa_silla = s.entidad_silla = s.corcho_desc = None
 
 
 def rotulo(ancla, texto, y_local=0.0, escala=1.0):

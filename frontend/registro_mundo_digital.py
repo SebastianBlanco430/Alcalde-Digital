@@ -71,6 +71,14 @@ def _puestos_fijos(mundo):
         return []
 
 
+def _hay_casos_v2():
+    """¿Hay algún caso v2 válido? (sin ninguno, catalogo_solo vuelve a las misiones viejas y el PC de la calle se queda)."""
+    try:
+        return bool(casos_loader.cargar_catalogo_v2())
+    except Exception:                    # noqa: BLE001
+        return False
+
+
 def registrar(gestor, conexion, escena_mundo):
     from frontend import economia_config
     if not economia_config.GAMESTATE:        # sin GameState (ALCALDE_GAMESTATE=0) el mundo es el de antes: sin computador
@@ -125,8 +133,12 @@ def registrar(gestor, conexion, escena_mundo):
         print("[mundo digital] ALCALDE_ECONOMIA=0: sin registro de interacciones; no hay computador en el mundo "
               "(la escena sigue accesible con conexion.ir_a_mundo_digital).", file=sys.stderr)
         return escena
+    # Fiscalía v2 (ALCALDE_FISCALIA_V2, frontend/fiscalia/): el caso se juega dentro de su edificio; el PC suelto de la
+    # calle desaparece. La sala digital sigue registrada (respaldo de la Fiscalía y camino con la bandera apagada).
+    from backend.logica import fiscalia_bandera
+    pc_suelto = not fiscalia_bandera.activa() or not _hay_casos_v2()
     for caso in catalogo.values():
-        if not caso.terminal:
+        if not caso.terminal or not pc_suelto:
             continue
         try:
             x, z, rumbo = resolver_ancla(escena_mundo._mundo, caso.terminal["ancla"])

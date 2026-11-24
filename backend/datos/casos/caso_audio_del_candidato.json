@@ -1,0 +1,337 @@
+{
+  "_comentario": "Caso v2 de la sesión D (2026-11-23). Formato: sesiones-24nov/fiscalia/contrato-caso.md. Solidez máxima por camino: 2 parkours 94, solo sector_1 68, solo sector_2 62, sin parkours 36 (umbrales 80 / 55). Señalar solo la difusión (Nico) da un final parcial con cualquier número de parkours.",
+  "formato": 2,
+  "id": "audio_del_candidato",
+  "titulo": "El audio del candidato",
+  "resumen": "Circula un audio en el que un candidato parece comprar votos. Es un montaje con frases de una entrevista real. La Fiscalía quiere saber quién lo fabricó.",
+  "rejugable": false,
+  "mision": {
+    "id": "fiscalia_audio_del_candidato",
+    "titulo": "El audio del candidato",
+    "mensaje": "Circula un audio de un candidato ofreciendo dinero por votos. Puede ser un montaje. Preséntate en la Fiscalía.",
+    "pago": 60,
+    "dificultad": "dificil",
+    "grupo": "policia",
+    "dia": 5
+  },
+  "solidez": {"inicial": 15, "umbrales": {"solido": 80, "suficiente": 55}},
+  "personajes": {
+    "fiscal": {
+      "nombre": "Fiscal Rojas", "rol": "Fiscalía de Ciudad Nova", "modelo": "npc_hombre_03.glb", "personaje": "fiscal",
+      "retrato": {"piel": [214, 170, 130], "pelo": [92, 92, 104], "pelo_estilo": "corto",
+                  "ropa": [58, 68, 112], "accesorio": "gafas",
+                  "expresiones": ["neutral", "serio", "satisfecho"]}
+    },
+    "jandira": {
+      "nombre": "Jandira Lopes", "rol": "Operadora de la Rádio Comunitária", "modelo": "npc_mujer_02.glb", "personaje": "jandira",
+      "retrato": {"piel": [150, 100, 74], "pelo": [24, 20, 22], "pelo_estilo": "largo",
+                  "ropa": [90, 140, 190], "accesorio": "ninguno",
+                  "expresiones": ["neutral", "nervioso", "triste", "enojado"]}
+    },
+    "nico": {
+      "nombre": "Nico Barreto", "rol": "Administrador de un grupo de chat", "modelo": "npc_hombre_01.glb", "personaje": "nico",
+      "retrato": {"piel": [222, 178, 140], "pelo": [120, 80, 40], "pelo_estilo": "corto",
+                  "ropa": [60, 150, 90], "accesorio": "ninguno",
+                  "expresiones": ["nervioso", "sorprendido", "neutral", "triste"]}
+    },
+    "ramiro": {
+      "nombre": "Ramiro Pestana", "rol": "Dueño de un estudio de jingles", "modelo": "npc_hombre_02.glb", "personaje": "ramiro",
+      "retrato": {"piel": [196, 140, 100], "pelo": [70, 50, 36], "pelo_estilo": "corto",
+                  "ropa": [170, 60, 60], "accesorio": "barba",
+                  "expresiones": ["satisfecho", "neutral", "nervioso", "enojado"]}
+    }
+  },
+  "evidencias": {
+    "entrevista_original": {
+      "nombre": "Entrevista original",
+      "descripcion": "La grabación sin editar de la Rádio Comunitária. Las frases del audio existen, pero en otro orden y con otro sentido.",
+      "solidez": 15
+    },
+    "proyecto_edicion": {
+      "nombre": "Proyecto de edición",
+      "descripcion": "La sesión de montaje, con las pistas cortadas y una voz imitada, guardada en el equipo del estudio de Ramiro.",
+      "solidez": 15
+    },
+    "declaracion_jandira": {
+      "nombre": "Declaración de Jandira",
+      "descripcion": "Hace una semana, alguien de un estudio de jingles pidió a la radio una copia de la entrevista completa.",
+      "solidez": 6
+    },
+    "frase_inventada": {
+      "nombre": "La frase que no existe",
+      "descripcion": "La frase sobre comprar votos no está en la grabación sin editar. Nadie la dijo en la radio.",
+      "solidez": 6
+    },
+    "primer_reenvio": {
+      "nombre": "Primer reenvío",
+      "descripcion": "Nico recibió el audio de un número desconocido con el logo de una página de apuestas sobre la elección.",
+      "solidez": 5
+    },
+    "pago_apuestas": {
+      "nombre": "Pago de la página",
+      "descripcion": "Ramiro admite que una página de apuestas sobre la elección le pagó por el montaje.",
+      "solidez": 8
+    }
+  },
+  "laboratorio": {
+    "parkours": [
+      {"nivel": "sector_5", "_respaldo": "sector_1", "nombre": "Archivo de la radio",
+       "descripcion": "El servidor de la Rádio Comunitária. Guarda la grabación sin editar de la entrevista.",
+       "evidencia": "entrevista_original"},
+      {"nivel": "sector_6", "_respaldo": "sector_2", "nombre": "Equipo del estudio",
+       "descripcion": "El computador incautado en el estudio de jingles. ¿Qué proyectos guarda?",
+       "evidencia": "proyecto_edicion"}
+    ]
+  },
+  "escenas": {
+    "oficina": {"rotulo": "Despacho del fiscal"},
+    "laboratorio": {"rotulo": "Laboratorio forense"},
+    "sala": {"rotulo": "Sala de interrogatorio 2"}
+  },
+  "inicio": "n_intro",
+  "final_abandono": "final_archivo",
+  "nodos": {
+    "n_intro": {
+      "tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "serio", "plano": "pecho",
+      "texto": "Circula un audio. Se oye la voz de un candidato ofreciendo dinero por votos. Lo escuchó media ciudad.",
+      "siguiente": "n_intro_2"
+    },
+    "n_intro_2": {
+      "tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "neutral",
+      "texto": "Suena raro. Hay saltos y una frase con otro tono. Si es un montaje, el candidato es la víctima. Quiero saber quién lo fabricó.",
+      "siguiente": "n_rueda_fiscal"
+    },
+    "n_rueda_fiscal": {
+      "tipo": "rueda", "escena": "oficina", "personaje": "fiscal", "expresion": "neutral",
+      "texto": "Tengo tres personas en la sala y dos equipos en el laboratorio. ¿Por dónde empiezas?",
+      "al_terminar": "n_sala_entra",
+      "opciones": [
+        {"id": "ver_expediente", "etiqueta": "Ver expediente", "dice": "¿Qué sabemos del audio?",
+         "destino": "r_fiscal_expediente"},
+        {"id": "ir_lab", "etiqueta": "Al laboratorio", "dice": "Primero, los equipos.", "destino": "n_lab"},
+        {"id": "ir_sala", "etiqueta": "A la sala", "dice": "Vamos directo a los interrogatorios.",
+         "destino": "n_sala_entra"}
+      ]
+    },
+    "r_fiscal_expediente": {
+      "tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "serio",
+      "texto": "Las frases parecen de una entrevista en la Rádio Comunitária. La operadora, un dueño de estudio y el que lo difundió primero esperan en la sala.",
+      "siguiente": "@volver"
+    },
+    "n_lab": {
+      "tipo": "laboratorio", "escena": "laboratorio", "personaje": "fiscal", "expresion": "neutral",
+      "texto": "El servidor de la radio y el computador del estudio. Revisa los que quieras. Cuando salgas, el laboratorio se cierra.",
+      "siguiente": "n_sala_entra", "hito": "Laboratorio forense"
+    },
+    "n_sala_entra": {
+      "tipo": "dialogo", "escena": "sala", "personaje": null, "plano": "general",
+      "texto": "Sala de interrogatorio 2. Primero entra la operadora de la radio.",
+      "siguiente": "n_jandira_entra"
+    },
+    "n_jandira_entra": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "jandira", "expresion": "nervioso",
+      "texto": "Jandira Lopes, de la Rádio Comunitária. Todos dicen que el audio salió de la radio. Yo edité esa entrevista, sí. Pero no así.",
+      "siguiente": "n_rueda_jandira"
+    },
+    "n_rueda_jandira": {
+      "tipo": "rueda", "escena": "sala", "personaje": "jandira", "expresion": "nervioso",
+      "texto": "«En la radio cortamos para que se entienda. No para que diga otra cosa.»",
+      "reloj": {"segundos": 15, "por_defecto": "@terminar"},
+      "turnos": 3, "al_terminar": "n_jandira_sale",
+      "opciones": [
+        {"id": "presionar", "etiqueta": "Presionar", "dice": "El audio salió de su mesa de edición. Admítalo.",
+         "destino": "r_jandira_presion", "solidez": -6},
+        {"id": "empatizar", "etiqueta": "Empatizar", "dice": "La están señalando sin pruebas. Ayúdeme a entender qué pasó.",
+         "destino": "r_jandira_empatia", "solidez": 3},
+        {"id": "mostrar_entrevista", "etiqueta": "Mostrar entrevista", "dice": "Esta es su grabación sin editar. Compárela con el audio.",
+         "destino": "r_jandira_entrevista", "solidez": 2, "presenta": "entrevista_original",
+         "requiere": {"evidencia": ["entrevista_original"]}, "pista": "[Falta una prueba]"},
+        {"id": "mostrar_proyecto", "etiqueta": "Mostrar proyecto", "dice": "¿Usted armó esta sesión de montaje?",
+         "destino": "r_jandira_proyecto", "solidez": -5, "presenta": "proyecto_edicion",
+         "requiere": {"evidencia": ["proyecto_edicion"]}, "pista": "[Falta una prueba]"}
+      ]
+    },
+    "r_jandira_presion": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "jandira", "expresion": "enojado", "plano": "primer_plano",
+      "texto": "¿Admitir qué? Llevo doce años en esa radio. Si me trata así, no hablo más.",
+      "hito": "Jandira se cierra", "siguiente": "@volver"
+    },
+    "r_jandira_empatia": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "jandira", "expresion": "triste",
+      "texto": "Hace una semana vino un hombre de un estudio de jingles. Pidió la entrevista completa «para un homenaje». Se la di. Fui tonta.",
+      "efectos": {"da_evidencia": ["declaracion_jandira"]},
+      "hito": "Jandira recuerda una visita", "siguiente": "@volver"
+    },
+    "r_jandira_entrevista": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "jandira", "expresion": "neutral",
+      "texto": "Mire: estas frases están, pero en otro orden. Y esta última no existe. Nunca la dijo. Es otra voz.",
+      "efectos": {"da_evidencia": ["frase_inventada"]},
+      "hito": "Una frase que no existe", "siguiente": "@volver"
+    },
+    "r_jandira_proyecto": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "jandira", "expresion": "nervioso",
+      "texto": "Ese programa no lo tenemos en la radio. Yo trabajo con una mesa de hace veinte años.",
+      "hito": "Una prueba fuera de lugar", "siguiente": "@volver"
+    },
+    "n_jandira_sale": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "jandira", "expresion": "triste",
+      "texto": "Si me necesitan, estoy en la radio. Si todavía tengo trabajo mañana.",
+      "siguiente": "n_nico_entra"
+    },
+    "n_nico_entra": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "nico", "expresion": "nervioso",
+      "texto": "Nico Barreto. Administro «Ciudad Nova sin filtro». Somos cuatro mil en el grupo. Yo solo compartí lo que me llegó.",
+      "siguiente": "n_rueda_nico"
+    },
+    "n_rueda_nico": {
+      "tipo": "rueda", "escena": "sala", "personaje": "nico", "expresion": "nervioso",
+      "texto": "«La gente tiene derecho a saber. ¿O no?»",
+      "reloj": {"segundos": 12, "por_defecto": "@terminar"},
+      "turnos": 2, "al_terminar": "n_nico_sale",
+      "opciones": [
+        {"id": "presionar", "etiqueta": "Presionar", "dice": "Usted difundió un montaje a cuatro mil personas.",
+         "destino": "r_nico_presion", "solidez": -5},
+        {"id": "empatizar", "etiqueta": "Empatizar", "dice": "No lo acuso de fabricarlo. ¿Quién se lo mandó?",
+         "destino": "r_nico_empatia", "solidez": 3},
+        {"id": "mostrar_entrevista", "etiqueta": "Mostrar entrevista", "dice": "Escuche la entrevista original.",
+         "destino": "r_nico_entrevista", "solidez": 4, "presenta": "entrevista_original",
+         "requiere": {"evidencia": ["entrevista_original"]}, "pista": "[Falta una prueba]"},
+        {"id": "mostrar_proyecto", "etiqueta": "Mostrar proyecto", "dice": "¿Usted montó estas pistas?",
+         "destino": "r_nico_proyecto", "solidez": -4, "presenta": "proyecto_edicion",
+         "requiere": {"evidencia": ["proyecto_edicion"]}, "pista": "[Falta una prueba]"}
+      ]
+    },
+    "r_nico_presion": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "nico", "expresion": "sorprendido", "plano": "primer_plano",
+      "texto": "¿Montaje? ¡Yo qué sabía! Todo el mundo lo compartió. No me puede culpar a mí de todo.",
+      "hito": "Nico se defiende", "siguiente": "@volver"
+    },
+    "r_nico_empatia": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "nico", "expresion": "neutral",
+      "texto": "Me llegó de un número que no conocía. Tenía de foto el logo de una página de apuestas sobre la elección. Se lo muestro.",
+      "efectos": {"da_evidencia": ["primer_reenvio"]},
+      "hito": "Nico muestra el primer envío", "siguiente": "@volver"
+    },
+    "r_nico_entrevista": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "nico", "expresion": "triste",
+      "texto": "Entonces lo cortaron. Y yo lo pasé sin escucharlo dos veces. Hoy mismo aviso al grupo.",
+      "hito": "Nico escucha el original", "siguiente": "@volver"
+    },
+    "r_nico_proyecto": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "nico", "expresion": "sorprendido",
+      "texto": "¿Pistas? Yo no sé editar ni una foto. Solo reenvío cosas.",
+      "siguiente": "@volver"
+    },
+    "n_nico_sale": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "nico", "expresion": "nervioso",
+      "texto": "¿Me puedo ir? El grupo no para de preguntar qué pasó.",
+      "siguiente": "n_ramiro_entra"
+    },
+    "n_ramiro_entra": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "ramiro", "expresion": "satisfecho",
+      "texto": "Ramiro Pestana, estudio de jingles. ¿Necesita una cuña para la Fiscalía? Es broma. Pregunte, pregunte.",
+      "siguiente": "n_rueda_ramiro"
+    },
+    "n_rueda_ramiro": {
+      "tipo": "rueda", "escena": "sala", "personaje": "ramiro", "expresion": "satisfecho",
+      "texto": "«Yo hago canciones para panaderías. ¿Audios de candidatos? Ni los escucho.»",
+      "reloj": {"segundos": 12, "por_defecto": "@terminar"},
+      "turnos": 3, "al_terminar": "n_ramiro_sale",
+      "opciones": [
+        {"id": "presionar", "etiqueta": "Presionar", "dice": "Usted fabricó ese audio.",
+         "destino": "r_ramiro_presion", "solidez": -8},
+        {"id": "mostrar_reenvio", "etiqueta": "Mostrar reenvío", "dice": "El audio salió con el logo de una página de apuestas.",
+         "destino": "r_ramiro_reenvio", "solidez": 4, "presenta": "primer_reenvio",
+         "requiere": {"evidencia": ["primer_reenvio"]}, "pista": "[Falta una prueba]"},
+        {"id": "mostrar_proyecto", "etiqueta": "Mostrar proyecto", "dice": "Esta sesión de montaje estaba en su computador.",
+         "destino": "r_ramiro_proyecto", "solidez": 3, "presenta": "proyecto_edicion",
+         "requiere": {"evidencia": ["proyecto_edicion"]}, "pista": "[Falta una prueba]"},
+        {"id": "mostrar_frase", "etiqueta": "Mostrar la frase", "dice": "Esta frase no está en la entrevista. Alguien la imitó.",
+         "destino": "r_ramiro_frase", "solidez": 5, "presenta": "frase_inventada",
+         "requiere": {"evidencia": ["frase_inventada"]}, "pista": "[Falta una prueba]"}
+      ]
+    },
+    "r_ramiro_presion": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "ramiro", "expresion": "satisfecho",
+      "texto": "¿Con qué? ¿Con una corazonada? Así no funciona, amigo.",
+      "hito": "Ramiro sonríe", "siguiente": "@volver"
+    },
+    "r_ramiro_reenvio": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "ramiro", "expresion": "neutral",
+      "texto": "¿Apuestas? Conozco esa página de oídas. Medio Ciudad Nova apuesta. No es ilegal.",
+      "hito": "Ramiro y la página de apuestas", "siguiente": "@volver"
+    },
+    "r_ramiro_proyecto": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "ramiro", "expresion": "nervioso", "plano": "primer_plano",
+      "texto": "Está bien. Lo monté yo. La página de apuestas me pagó. Ganan si el candidato se hunde. Para mí era un encargo más.",
+      "efectos": {"da_evidencia": ["pago_apuestas"]},
+      "hito": "Ramiro admite el encargo", "siguiente": "@volver"
+    },
+    "r_ramiro_frase": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "ramiro", "expresion": "enojado",
+      "texto": "Una imitación... Hay imitadores por todas partes. Eso es humor, no un delito.",
+      "hito": "La voz imitada", "siguiente": "@volver"
+    },
+    "n_ramiro_sale": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "ramiro", "expresion": "neutral",
+      "texto": "Bueno, si eso es todo, tengo un jingle que entregar.",
+      "siguiente": "n_vuelta"
+    },
+    "n_vuelta": {
+      "tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "serio",
+      "texto": "Ya oíste a los tres. El audio sigue circulando. Mira lo que tienes antes de decidir.",
+      "siguiente": "n_acusacion"
+    },
+    "n_acusacion": {
+      "tipo": "acusacion", "escena": "oficina", "personaje": "fiscal", "expresion": "serio",
+      "texto": "Es la hora. ¿Quién responde por el audio?",
+      "hito": "La acusación",
+      "acusados": [
+        {"id": "acusar_ramiro", "etiqueta": "Acusar a Ramiro", "personaje": "ramiro",
+         "rutas": [
+           {"requiere": {"solidez": {"min": "solido"}, "evidencia": ["entrevista_original", "proyecto_edicion"]},
+            "destino": "final_audio_retirado"},
+           {"requiere": {"solidez": {"min": "suficiente"}}, "destino": "final_citado"}
+         ],
+         "destino": "final_archivo"},
+        {"id": "acusar_nico", "etiqueta": "Acusar a Nico", "personaje": "nico",
+         "rutas": [
+           {"requiere": {"evidencia": ["primer_reenvio"]}, "destino": "final_difusion"}
+         ],
+         "destino": "final_archivo"},
+        {"id": "acusar_jandira", "etiqueta": "Acusar a Jandira", "personaje": "jandira", "destino": "final_jandira"},
+        {"id": "nadie", "etiqueta": "No acusar", "destino": "final_archivo"}
+      ]
+    },
+    "final_audio_retirado": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "satisfecho", "resultado": "exito",
+      "titulo": "El audio se retira",
+      "texto": "Con la grabación sin editar, el proyecto de edición y su admisión, Ramiro queda imputado. El audio se retira y la Rádio Comunitária publica la entrevista completa.",
+      "efectos": {"grupos": {"policia": {"investigacion": 30, "moral": 10}, "ciudadanos": {"moral": 10}}}
+    },
+    "final_citado": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "neutral", "resultado": "parcial",
+      "titulo": "Citado, pero suelto",
+      "texto": "Ramiro queda citado a declarar, pero su abogado desmonta casi todo. El audio sigue en los grupos.",
+      "efectos": {"grupos": {"policia": {"investigacion": 10}, "ciudadanos": {"moral": -5}}}
+    },
+    "final_difusion": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "neutral", "resultado": "parcial",
+      "titulo": "Se frena el grupo",
+      "texto": "Nico responde por difundir sin verificar y borra el audio de su grupo. Pero quien lo fabricó sigue libre.",
+      "efectos": {"grupos": {"policia": {"investigacion": 5}, "ciudadanos": {"moral": 5}}}
+    },
+    "final_jandira": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "serio", "resultado": "fracaso",
+      "titulo": "La radio pierde su voz",
+      "texto": "Jandira deja la Rádio Comunitária. El audio sigue circulando y ahora parece confirmado.",
+      "efectos": {"grupos": {"ciudadanos": {"moral": -20}, "policia": {"investigacion": -15}}}
+    },
+    "final_archivo": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "serio", "resultado": "fracaso",
+      "titulo": "Caso archivado",
+      "texto": "Sin una acusación sustentada, la Fiscalía archiva el caso. El audio sigue sonando en la ciudad.",
+      "efectos": {"grupos": {"policia": {"investigacion": -10}}}
+    }
+  }
+}

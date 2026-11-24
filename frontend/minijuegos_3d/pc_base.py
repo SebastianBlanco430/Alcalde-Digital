@@ -18,6 +18,7 @@ from frontend.minijuegos_3d.poses_calculos import seguir
 RAPIDEZ_RATON = 14.0              # 1/s: la misma que la mano (poses_3d.RAPIDEZ_MANO): ratón y mano van pegados
 ALTURA_CADERA = 0.97              # m sobre el origen del cuerpo: pivote del reclinado (la pelvis del .glb de pie)
 DURACION_A_SALIDA = 0.7           # s de la cámara hacia la toma de salida
+FOV_ESTABLECIMIENTO = 54.0        # entrada animada (sesión B): la toma abierta de la salida, algo más cerrada
 # Velo de entrada: el color del destello de la cinemática de sentarse (EscenaInterior.COLOR_DESTELLO) cubre los primeros
 # frames del 3D (los huesos aún no se han dibujado y los brazos salen en la pose de la animación, no en el ratón y el
 # teclado: visto en rework-3d/capturas/chat/flujo3/flujo_c_000.png) y se desvanece cuando la IK ya colocó las manos.
@@ -58,6 +59,13 @@ class MinijuegoPC(Minijuego3D):
 
     def toma_salida(self):
         return calc.toma_abierta(self._monitor(), aspecto_ventana(), calc.SALIDA_PC)
+
+    def toma_establecimiento(self):
+        """Entrada animada (sesión B): empieza en la toma ABIERTA de la salida (por detrás y a la derecha: el personaje
+        entero, la silla y el escritorio), algo más cerrada, y se acerca al hombro. La del módulo (la toma de juego
+        retrocedida, fov 34) es un teleobjetivo: el personaje pasaba pegado a la cámara (capturas m3_chat_per)."""
+        abierta = self.toma_salida()
+        return {"position": tuple(abierta["position"]), "target": tuple(abierta["target"]), "fov": FOV_ESTABLECIMIENTO}
 
     def toma_inicial(self):
         """El monitor llenando la pantalla en el eje de la toma de juego: la base hace el travelling recto hasta el hombro
@@ -135,22 +143,36 @@ class MinijuegoPC(Minijuego3D):
         """Para las subclases."""
 
     def al_tecla(self, k):
-        if self.escritorio is None or self._salida_t is not None:
+        if self.escritorio is None or self._salida_t is not None or self.resultado_3d is not None:
             return
         if k == "left mouse down":
             self.escritorio.clic()
         else:
             self.escritorio.pulsar_tecla(k)
 
-    # -- Salida: se reclina, se levanta y después el banner de siempre --
+    # -- Entrada animada (sesión B, ALCALDE_ANIM_SILLA): las manos terminan donde las pone imitar_pc (sin salto) --
+
+    def manos_entrada(self):
+        if self.escritorio is None:
+            return None
+        manos = {"d": tuple(calc.posicion_mano(self.escritorio.centro))}
+        teclado = self.set.anclas.get("teclado")
+        if teclado is not None:
+            manos["i"] = tuple(teclado.mundo(-0.14, 0.03, -0.05))
+        return manos
+
+    # -- Salida: se levanta (sesión B: saca la silla, se levanta y la empuja; hoy: se reclina y se levanta) y después
+    #    el banner de siempre --
 
     def al_resultado(self, resultado):
-        self._salida_t = 0.0
         escena = getattr(self.ctx, "escena", None)
         banner = getattr(escena, "banner", None)
         if banner is not None:
             banner.enabled = False
             self._banner = banner
+        if self.salida_silla(al_terminar=self._mostrar_banner, toma_final=self.toma_salida()):
+            return
+        self._salida_t = 0.0
         self.poses.soltar_mano("d")
         self.poses.soltar_mano("i")
         self.camara.ir_a(self.toma_salida(), DURACION_A_SALIDA)
@@ -172,6 +194,10 @@ class MinijuegoPC(Minijuego3D):
                 self.poses.de_pie(x, z - s["retroceso"], rumbo)
         if s["banner"]:
             self._mostrar_banner()
+
+    def al_rescatar_secuencia(self):
+        super().al_rescatar_secuencia()
+        self._mostrar_banner()           # la salida animada falló: el banner de siempre, ya
 
     def _mostrar_banner(self):
         banner, self._banner = self._banner, None

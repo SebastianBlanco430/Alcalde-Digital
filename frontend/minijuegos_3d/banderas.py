@@ -89,6 +89,25 @@ def entrada_sin_destello(entorno=None):
     return maestra(entorno) and _leer(ENTRADA_SIN_DESTELLO, VARIABLE_DESTELLO, entorno)
 
 
+ANIM_SILLA = True                    # sesión B: entrada/salida animadas (silla, corcho) DENTRO del 3D del minijuego
+VARIABLE_ANIM_SILLA = "ALCALDE_ANIM_SILLA"
+MODULO_SILLA = "frontend.cinematica_silla"
+
+
+def anim_silla(entorno=None, modulo_existe=None):
+    """¿Entrada y salida animadas de los minijuegos 3D (sesión B)? ALCALDE_ANIM_SILLA encendida (por defecto) Y el
+    módulo frontend/cinematica_silla.py presente (sin él: el camino de hoy). No importa ursina. Nunca lanza."""
+    try:
+        if not _leer(ANIM_SILLA, VARIABLE_ANIM_SILLA, entorno):
+            return False
+        if modulo_existe is None:
+            import importlib.util
+            modulo_existe = importlib.util.find_spec(MODULO_SILLA) is not None
+        return bool(modulo_existe)
+    except Exception:                    # noqa: BLE001
+        return False
+
+
 VARIABLE_FALLO = "ALCALDE_3D_FALLO"
 FASES_FALLO = ("abrir", "avanzar", "tecla", "resultado")
 

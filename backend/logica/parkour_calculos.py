@@ -7,6 +7,12 @@
 #       movil       oscila alrededor de su posición base: movimiento = {"eje": [dx,dy,dz], "periodo": s, "fase": 0..1}
 #                   (amplitud = el eje; posición = base + eje * sin(2π(t/periodo + fase))). Lleva al jugador.
 #       desaparece  al pisarla avisa `aviso_s`, desaparece `oculta_s` y reaparece.
+#       capa        (sesión E) se desliza en horizontal de un extremo al otro con reposo en cada extremo (onda trapezoidal
+#                   suavizada): movimiento = {"eje": [dx,0,dz], "periodo", "fase", "reposo"}. Lleva al jugador.
+#       cinta       quieta; su superficie arrastra al jugador apoyado: arrastre = (vx, vz) m/s. En el aire no arrastra.
+#       ritmo       cambia de altura por pulsos: ritmo = {"pulso_s", "patron": [dy…], "fase", "transicion"}. Lo lleva en vertical.
+#       clip        existe solo una parte de un ciclo fijo (sin pisarla): ciclo = {"periodo", "visible_s", "fase", "aviso_s"}.
+#     `purgable` = la purga del nivel (campo `purga` de Nivel) la borra cuando el frente pasa por ella.
 #     `requiere` = id de un interruptor: la plataforma solo existe mientras ese interruptor esté activo.
 #     `checkpoint` = al pisarla se guarda como punto de reaparición.
 #   - Interruptor: punto que se activa al acercarse (radio) y habilita plataformas; `duracion_s` None = permanente.
@@ -30,7 +36,9 @@ TOLERANCIA_ESCALON = 0.35     # m: una cara superior hasta tanto sobre los pies 
 COSTE_POR_METRO = 0.45        # s por metro de salto sin arista declarada (estimación)
 COSTE_SALTO_SIN_ARISTA = 2.0  # s fijos extra de un salto que no está en el grafo (el jugador improvisó)
 ALCANCE_INTERRUPTOR = 1.4     # m de altura sobre el interruptor dentro de los que se activa
-TIPOS = ("fija", "movil", "desaparece")
+TIPOS = ("fija", "movil", "desaparece", "capa", "cinta", "ritmo", "clip")
+MOVILES = ("movil", "capa")        # tipos que llevan al jugador en horizontal
+FRACCION_PURGA = 0.3               # la purga se come una plataforma al pasar 3/10 de su fondo
 MEDALLAS = ("bronce", "plata", "oro")
 CATEGORIAS = ("facil", "dificil")
 
@@ -70,6 +78,10 @@ class Plataforma:
     oculta_s: float = 2.0
     requiere: str | None = None
     checkpoint: bool = False
+    arrastre: tuple | None = None      # cinta: (vx, vz) m/s
+    ritmo: dict | None = None          # ritmo: {"pulso_s", "patron", "fase", "transicion"}
+    ciclo: dict | None = None          # clip: {"periodo", "visible_s", "fase", "aviso_s"}
+    purgable: bool = False
 
 
 @dataclass(frozen=True)
@@ -107,12 +119,69 @@ class Nivel:
     medallas: dict = field(default_factory=dict)
     recompensa: dict = field(default_factory=dict)
     descripcion: str = ""
+    purga: dict | None = None          # {"activa_en", "z_inicio", "velocidad", "z_fin", "aviso_m"} (avanza en +z)
 
 
 # -- Plataformas en el tiempo --
 
+def _suave(u):
+    u = max(0.0, min(1.0, u))
+    return u * u * (3 - 2 * u)
+
+
+# Onda de la capa en [-1, 1]: con u = fracción del periodo, en cada medio periodo queda quieta en un extremo durante
+# `reposo` (fracción del periodo) y el resto se desliza al otro extremo con smoothstep. Fase 0: quieta en +1.
+def onda_capa(t, periodo, fase=0.0, reposo=0.25):
+    u = (t / max(1e-6, periodo) + fase) % 1.0
+    reposo = max(0.0, min(0.45, reposo))
+    signo = 1.0 if u < 0.5 else -1.0
+    resto = u if u < 0.5 else u - 0.5
+    if resto < reposo:
+        return signo
+    return signo * (1 - 2 * _suave((resto - reposo) / (0.5 - reposo)))
+
+
+# Ritmo: (índice del pulso dentro del patrón, fracción 0-1 del pulso) en el instante `t`.
+def pulso_actual(p, t):
+    r = p.ritmo or {}
+    q = t / max(1e-6, float(r.get("pulso_s", 0.6))) + float(r.get("fase", 0.0))
+    i = math.floor(q)
+    return int(i % max(1, len(r.get("patron") or (0,)))), q - i
+
+
+# Ritmo: desplazamiento vertical (m) sobre `y` en `t`. Al empezar un pulso viaja de la altura anterior a la nueva
+# durante `transicion` (fracción del pulso, suavizado) y el resto del pulso queda quieta.
+def desplazamiento_ritmo(p, t):
+    r = p.ritmo or {}
+    patron = r.get("patron") or (0.0,)
+    i, f = pulso_actual(p, t)
+    actual, previo = patron[i], patron[(i - 1) % len(patron)]
+    transicion = float(r.get("transicion", 0.25))
+    if f >= transicion:
+        return float(actual)
+    return previo + (actual - previo) * _suave(f / transicion)
+
+
+# Clip: "solida" | "aviso" (aún sostiene, parpadea) | "oculta" en `t`, por su ciclo fijo.
+def fase_clip(p, t):
+    c = p.ciclo or {}
+    periodo = max(1e-6, float(c.get("periodo", 4.0)))
+    visible = float(c.get("visible_s", periodo))
+    u = (t + float(c.get("fase", 0.0)) * periodo) % periodo
+    if u < visible - float(c.get("aviso_s", 0.5)):
+        return "solida"
+    return "aviso" if u < visible else "oculta"
+
+
 # Posición (x, y, z) de la cara superior de `p` en el instante `t`.
 def posicion_plataforma(p, t):
+    if p.tipo == "capa" and p.movimiento:
+        m = p.movimiento
+        onda = onda_capa(t, float(m.get("periodo", 4.0)), float(m.get("fase", 0.0)), float(m.get("reposo", 0.25)))
+        ex, _, ez = m.get("eje", (0.0, 0.0, 0.0))
+        return (p.x + ex * onda, p.y, p.z + ez * onda)
+    if p.tipo == "ritmo" and p.ritmo:
+        return (p.x, p.y + desplazamiento_ritmo(p, t), p.z)
     if p.tipo != "movil" or not p.movimiento:
         return (p.x, p.y, p.z)
     periodo = max(1e-6, float(p.movimiento.get("periodo", 4.0)))
@@ -152,7 +221,7 @@ def alcance_de_salto(dh, doble=True, velocidad=VELOCIDAD):
 # posición de las que oscilan (se muestrea un periodo).
 def separacion_minima(a, b, muestras=24):
     mejor = None
-    for i in range(muestras if "movil" in (a.tipo, b.tipo) else 1):
+    for i in range(muestras if ({"movil", "capa", "ritmo"} & {a.tipo, b.tipo}) else 1):
         t = i / muestras * 8.0
         ax, ay, az = posicion_plataforma(a, t)
         bx, by, bz = posicion_plataforma(b, t)
@@ -355,7 +424,7 @@ def alturas_para_minimapa(nivel):
         lista.append({
             "id": p.id, "x": p.x, "z": p.z, "ancho": p.ancho, "fondo": p.fondo, "y": p.y,
             "y_norm": 0.0 if rango <= 0 else round((p.y - minimo) / rango, 4),
-            "movil": p.tipo == "movil", "checkpoint": p.checkpoint,
+            "movil": p.tipo == "movil", "checkpoint": p.checkpoint, "tipo": p.tipo, "purgable": p.purgable,
             "meta": p.id == nivel.meta, "inicio": p.id == nivel.inicio,
         })
     return {"minimo": minimo, "maximo": maximo, "plataformas": lista}
@@ -365,7 +434,7 @@ def alturas_para_minimapa(nivel):
 
 # Estado de una carrera. `paso()` avanza un instante con la entrada ya traducida a ejes del MUNDO.
 # Eventos que devuelve paso(): "salto", "doble_salto", "aterrizo", "checkpoint:<id>", "interruptor:<id>",
-# "interruptor_apagado:<id>", "caida", "meta".
+# "interruptor_apagado:<id>", "caida", "meta", "purga_inicio", "purga_fin".
 class Simulacion:
 
     def __init__(self, nivel):
@@ -380,6 +449,8 @@ class Simulacion:
         self.sobre = None                 # id de la plataforma que sostiene al jugador
         self.checkpoint = nivel.inicio
         self.ruta = []
+        self.purga_t0 = None              # instante en que se armó la purga (None = no corre)
+        self.purga_acabada = False
         inicial = nivel.plataformas[nivel.inicio]
         self.x, y, self.z = posicion_plataforma(inicial, 0.0)
         self.vertical.reiniciar(y)
@@ -393,15 +464,57 @@ class Simulacion:
     def activa(self, p):
         if p.requiere is not None and self.interruptores.get(p.requiere, -1.0) <= self.t:
             return False
+        if p.purgable and self._fase_purga(p) == "oculta":
+            return False
         if p.tipo == "desaparece":
             return fase_desaparece(p, self.pisada_desaparece.get(p.id), self.t) != "oculta"
+        if p.tipo == "clip":
+            return fase_clip(p, self.t) != "oculta"
         return True
 
     def interruptor_activo(self, id_interruptor):
         return self.interruptores.get(id_interruptor, -1.0) > self.t
 
     def fase(self, p):
-        return fase_desaparece(p, self.pisada_desaparece.get(p.id), self.t) if p.tipo == "desaparece" else "solida"
+        if p.tipo == "desaparece":
+            propia = fase_desaparece(p, self.pisada_desaparece.get(p.id), self.t)
+        elif p.tipo == "clip":
+            propia = fase_clip(p, self.t)
+        else:
+            propia = "solida"
+        if p.purgable and propia != "oculta":
+            purga = self._fase_purga(p)
+            if purga != "solida":
+                return purga
+        return propia
+
+    # -- Purga: el frente avanza en +z desde que se pisa `activa_en` --
+
+    def _frente(self):
+        purga = self.nivel.purga
+        if not purga or self.purga_t0 is None:
+            return None
+        return min(purga["z_fin"], purga["z_inicio"] + purga["velocidad"] * (self.t - self.purga_t0))
+
+    def _fase_purga(self, p):
+        frente = self._frente()
+        if frente is None:
+            return "solida"
+        corte = p.z - p.fondo / 2 + FRACCION_PURGA * p.fondo
+        if frente >= corte:
+            return "oculta"
+        return "aviso" if frente >= corte - self.nivel.purga.get("aviso_m", 3.0) else "solida"
+
+    # z del frente de la purga mientras corre; None si no está armada o ya acabó.
+    def purga_frente(self):
+        return None if self.purga_acabada else self._frente()
+
+    # Segundos que le quedan a la purga en curso (para la cuenta atrás del HUD); None si no corre.
+    def purga_restante(self):
+        frente = self.purga_frente()
+        if frente is None:
+            return None
+        return max(0.0, (self.nivel.purga["z_fin"] - frente) / self.nivel.purga["velocidad"])
 
     def _registrar_nodo(self, id_plataforma):
         if not self.ruta or self.ruta[-1] != id_plataforma:
@@ -441,6 +554,9 @@ class Simulacion:
         self.vertical.reiniciar(py)
         self.doble_usado = False
         self.sobre = cp.id
+        if self.nivel.purga is not None:          # la purga se rearma: todo vuelve y empieza otra vez al pisar activa_en
+            self.purga_t0 = None
+            self.purga_acabada = False
         if resultado_v2_activo():
             self.ruta = ruta_tras_reaparecer(self.ruta, cp.id)
         else:
@@ -461,11 +577,17 @@ class Simulacion:
 
         # Arrastre de la plataforma móvil bajo los pies.
         previa = self.nivel.plataformas.get(self.sobre) if self.sobre else None
-        if previa is not None and not self.vertical.en_aire and previa.tipo == "movil":
+        if previa is not None and not self.vertical.en_aire and previa.tipo in MOVILES:
             ax, _, az = posicion_plataforma(previa, antes)
             bx, _, bz = posicion_plataforma(previa, self.t)
             self.x += bx - ax
             self.z += bz - az
+        if previa is not None and not self.vertical.en_aire:
+            if previa.tipo == "cinta" and previa.arrastre:          # la cinta arrastra (en el aire no)
+                self.x += previa.arrastre[0] * dt
+                self.z += previa.arrastre[1] * dt
+            elif previa.tipo == "ritmo":                           # la barra sube o baja con el jugador encima
+                self.vertical.y += posicion_plataforma(previa, self.t)[1] - posicion_plataforma(previa, antes)[1]
 
         largo = math.hypot(mx, mz)
         if largo > 1.0:
@@ -503,11 +625,21 @@ class Simulacion:
             if soporte.checkpoint and self.checkpoint != soporte.id:
                 self.checkpoint = soporte.id
                 eventos.append(f"checkpoint:{soporte.id}")
+            purga = self.nivel.purga
+            if purga is not None and soporte.id == purga["activa_en"] and self.purga_t0 is None:
+                self.purga_t0 = self.t
+                self.purga_acabada = False
+                eventos.append("purga_inicio")
             if soporte.id == self.nivel.meta:
                 self.terminado = True
                 eventos.append("meta")
         elif v.en_aire:
             self.sobre = None
+
+        if self.purga_t0 is not None and not self.purga_acabada and (
+                self.terminado or self._frente() >= self.nivel.purga["z_fin"]):
+            self.purga_acabada = True
+            eventos.append("purga_fin")
 
         for sw in self.nivel.interruptores.values():
             if (math.hypot(self.x - sw.x, self.z - sw.z) <= sw.radio

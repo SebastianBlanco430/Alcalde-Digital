@@ -68,7 +68,9 @@ class PersonajeNPC(PersonajeModelo):
     # Copia del Actor del rol con la ropa y la piel del plan.
     def _crear_actor(self, rol):
         if self._plan.get("nuevo"):       # npc_hombre_*/npc_mujer_*: carga, clips y recolor propios (npc_nuevos_modelo.py)
-            return nnm.crear_actor(self._plan)
+            actor = nnm.crear_actor(self._plan)
+            self._poner_corbata(actor)    # antes del skinning en la GPU (toon duro): la corbata es parte de la malla
+            return actor
         actor = npc_postura.cargar_actor_de_siempre(rol) or _cargar_actor(rol)     # con variantes de postura si se puede
         try:
             recolorear_actor(actor, nc.objetivos_recolor(self._plan))
@@ -190,12 +192,83 @@ class PersonajeNPC(PersonajeModelo):
         except Exception as error:
             _avisar(f"no se pudo poner la mochila ({error})")
 
+    # Camisa y corbata (personajes con nombre cuya receta la trae): pegadas a la malla con sus mismos huesos, así se
+    # deforman con el pecho sentado y de pie (frontend/personajes_receta_calculos.py, corbata_en_malla). Nunca lanza.
+    def _poner_corbata(self, actor):
+        color = self._plan.get("corbata")
+        if color is None:
+            return
+        try:
+            poner_camisa(actor)
+        except Exception as error:
+            _avisar(f"no se pudo poner la corbata ({error})")
+
+
+# Camisa en el escote (S1, retoques-personajes): los 12 triángulos de piel en V del pecho pasan a tener filas de vértice
+# PROPIAS (copias con el mismo esqueleto y los mismos pesos) pintadas de blanco, dentro de la misma Geom del cuerpo. Se
+# deforma exactamente igual que el pecho (sentado, de pie, con el skinning en la GPU) y no hay piezas que se crucen.
+# Los tres cuerpos de hombre comparten topología (prc.ESCOTE_TRIANGULOS). Lanza si la malla no es la esperada.
+def poner_camisa(actor):
+    from panda3d.core import Geom, GeomTriangles, GeomVertexWriter, Thread
+    from frontend import personajes_receta_calculos as prc
+    for nodo in actor.findAllMatches("**/+GeomNode"):
+        geom_node = nodo.node()
+        if geom_node.getNumGeoms() == 0:
+            continue
+        origen = geom_node.getGeom(0)
+        if origen.getVertexData().getTransformBlendTable() is None:
+            continue
+        triangulos = _triangulos(origen)
+        if len(triangulos) != prc.TRIANGULOS_CUERPO_HOMBRE:
+            raise ValueError(f"la malla {nodo.getName()} tiene {len(triangulos)} triángulos")
+        geom = geom_node.modifyGeom(0)
+        datos = geom.modifyVertexData()                   # la copia de este actor (no altera a las demás)
+        n0 = datos.getNumRows()
+        escote = prc.ESCOTE_TRIANGULOS
+        datos.setNumRows(n0 + 3 * len(escote))
+        hilo = Thread.getCurrentThread()
+        fila = n0
+        nuevos = {}
+        for k in escote:
+            filas = []
+            for r in triangulos[k]:
+                datos.copyRowFrom(fila, datos, r, hilo)  # mismo vértice, mismos huesos y pesos
+                filas.append(fila)
+                fila += 1
+            nuevos[k] = tuple(filas)
+        colores = GeomVertexWriter(datos, "color")       # después de copiar: un escritor anterior quedaría viejo
+        colores.setRow(n0)
+        for _ in range(3 * len(escote)):
+            colores.setData4(*prc.CAMISA, 1.0)
+        tris = GeomTriangles(Geom.UHStatic)
+        for k, tri in enumerate(triangulos):
+            tris.addVertices(*nuevos.get(k, tri))
+        tris.closePrimitive()
+        geom.clearPrimitives()
+        geom.addPrimitive(tris)
+        return len(escote)
+    raise ValueError("la malla no tiene esqueleto")
+
+
+def _triangulos(geom):
+    salida = []
+    for primitiva in geom.getPrimitives():
+        primitiva = primitiva.decompose()
+        v = [primitiva.getVertex(i) for i in range(primitiva.getNumVertices())]
+        salida += [tuple(v[t:t + 3]) for t in range(0, len(v) - 2, 3)]
+    return salida
+
 
 # Fábrica: PersonajeNPC del peatón `indice`; si algo falla devuelve el muñeco procedural de siempre.
 # `color_ropa` solo lo usa el respaldo procedural.
 # `nombre` (opcional): nombre visible del NPC; con NOMBRES_POR_GENERO su modelo pasa a ser de su género
 # (frontend/npc_genero_calculos.py). None = como siempre.
-def crear_npc(indice, semilla, aspecto, rasgos, color_ropa, nombre=None, **opciones):
+def crear_npc(indice, semilla, aspecto, rasgos, color_ropa, nombre=None, personaje=None, **opciones):
+    receta = _receta(personaje, nombre)
+    if receta is not None:          # personaje con nombre: el mismo que en la Fiscalía (backend/datos/personajes_fiscalia.json)
+        npc = crear_desde_receta(receta, **opciones)
+        if npc is not None:
+            return npc
     try:
         from frontend import npc_genero_calculos as ng
         plan = nc.plan_npc(indice, semilla, aspecto)
@@ -211,6 +284,47 @@ def crear_npc(indice, semilla, aspecto, rasgos, color_ropa, nombre=None, **opcio
         _avisar(f"peatón {indice}: no se pudo crear el modelo ({error}); se usa el muñeco procedural")
         return Personaje("", color_ropa, apariencia=dict(aspecto, rasgos=rasgos, piel_rgb=aspecto["piel"],
                                                           pelo_rgb=aspecto["pelo"]), **opciones)
+
+
+def _receta(personaje, nombre):
+    try:
+        from backend.datos import personajes_loader as pl
+        return pl.por_id(personaje) if personaje else pl.por_nombre(nombre)
+    except Exception as error:      # noqa: BLE001  fuente rota: el NPC sale como antes
+        _avisar(f"fuente de personajes: {error}")
+        return None
+
+
+# PersonajeNPC de un personaje con nombre hecho con su receta (fuente única). Si su cuerpo no carga prueba los otros de su
+# género y, como último recurso, el cuerpo de emergencia (visible, con aviso por stderr). None si nada carga.
+def crear_desde_receta(receta, **opciones):
+    from frontend import personajes_receta_calculos as prc
+    rasgos = prc.rasgos(receta)
+    aspecto = prc.aspecto(receta)
+    cuerpos = [receta.cuerpo] + prc.respaldos(receta)
+    for cuerpo in cuerpos:
+        plan = prc.plan(receta, cuerpo)
+        if not nnm.disponible(plan):
+            continue
+        try:
+            if cuerpo != receta.cuerpo:
+                _avisar(f"{receta.nombre}: {receta.cuerpo} no carga; se usa {cuerpo} (respaldo)")
+            return PersonajeNPC(receta.nombre, plan, aspecto, rasgos, **opciones)
+        except Exception as error:      # noqa: BLE001
+            _avisar(f"{receta.nombre}: no se pudo crear con {cuerpo} ({error})")
+    try:
+        archivo, rol = prc.CUERPO_EMERGENCIA
+        s = prc.semilla(receta)
+        plan = nc.plan_npc(s, s, aspecto, modelo=(archivo, rol))
+        plan["colores"]["camiseta"] = tuple(c / 255 for c in receta.camiseta)
+        plan["colores"]["pantalon"] = tuple(c / 255 for c in receta.pantalon)
+        plan["mochila"] = None
+        plan["escala"] = 1.0
+        _avisar(f"{receta.nombre}: ningún cuerpo de NPC carga; se usa el de emergencia ({archivo})")
+        return PersonajeNPC(receta.nombre, plan, aspecto, rasgos, **opciones)
+    except Exception as error:          # noqa: BLE001
+        _avisar(f"{receta.nombre}: tampoco carga el cuerpo de emergencia ({error})")
+        return None
 
 
 # Argumentos extra para pasar el nombre a una fábrica de NPC: solo la de siempre (crear_npc) lo acepta; una fábrica

@@ -1,0 +1,339 @@
+{
+  "_comentario": "Caso v2 de la sesión D (2026-11-23). Formato: sesiones-24nov/fiscalia/contrato-caso.md. Solidez máxima por camino: 2 parkours 91, solo sector_1 65, solo sector_2 62, sin parkours 36 (umbrales 80 / 55).",
+  "formato": 2,
+  "id": "encuesta_trucada",
+  "titulo": "La encuesta trucada",
+  "resumen": "Una cuenta que imita al «Diário de Ciudad Nova» publicó una encuesta inventada con el logo de la Universidade. La Fiscalía quiere saber quién la fabricó.",
+  "rejugable": false,
+  "mision": {
+    "id": "fiscalia_encuesta_trucada",
+    "titulo": "La encuesta trucada",
+    "mensaje": "Una encuesta falsa con el logo de la Universidade da el 71 % a un candidato. Preséntate en la Fiscalía.",
+    "pago": 60,
+    "dificultad": "dificil",
+    "grupo": "instituciones",
+    "dia": 3
+  },
+  "solidez": {"inicial": 15, "umbrales": {"solido": 80, "suficiente": 55}},
+  "personajes": {
+    "fiscal": {
+      "nombre": "Fiscal Rojas", "rol": "Fiscalía de Ciudad Nova", "modelo": "npc_hombre_03.glb", "personaje": "fiscal",
+      "retrato": {"piel": [214, 170, 130], "pelo": [92, 92, 104], "pelo_estilo": "corto",
+                  "ropa": [58, 68, 112], "accesorio": "gafas",
+                  "expresiones": ["neutral", "serio", "satisfecho"]}
+    },
+    "livia": {
+      "nombre": "Lívia Sampaio", "rol": "Diseñadora independiente", "modelo": "npc_mujer_01.glb", "personaje": "livia",
+      "retrato": {"piel": [228, 184, 150], "pelo": [150, 70, 50], "pelo_estilo": "largo",
+                  "ropa": [214, 120, 90], "accesorio": "gafas",
+                  "expresiones": ["neutral", "nervioso", "triste", "sorprendido"]}
+    },
+    "eurico": {
+      "nombre": "Profesor Eurico Matos", "rol": "Director del instituto de encuestas", "modelo": "npc_hombre_01.glb", "personaje": "eurico",
+      "retrato": {"piel": [170, 120, 90], "pelo": [210, 210, 214], "pelo_estilo": "calvo",
+                  "ropa": [110, 84, 60], "accesorio": "gafas",
+                  "expresiones": ["serio", "enojado", "sorprendido", "neutral"]}
+    },
+    "baltazar": {
+      "nombre": "Baltazar Quirino", "rol": "Consultor de imagen", "modelo": "npc_hombre_03.glb", "personaje": "baltazar",
+      "retrato": {"piel": [200, 150, 112], "pelo": [50, 44, 40], "pelo_estilo": "corto",
+                  "ropa": [40, 40, 48], "accesorio": "corbata",
+                  "expresiones": ["neutral", "satisfecho", "enojado", "nervioso"]}
+    }
+  },
+  "evidencias": {
+    "plantilla_original": {
+      "nombre": "Plantilla original",
+      "descripcion": "El archivo del gráfico se creó antes de cualquier trabajo de campo. Los porcentajes están escritos a mano.",
+      "solidez": 15
+    },
+    "panel_cuenta": {
+      "nombre": "Panel de la cuenta",
+      "descripcion": "La cuenta «Diário Nova Hoje» se administra desde un equipo de la consultora de Baltazar Quirino.",
+      "solidez": 15
+    },
+    "declaracion_livia": {
+      "nombre": "Declaración de Lívia",
+      "descripcion": "Lívia dibujó el gráfico por encargo. Le dijeron que era una maqueta para una presentación.",
+      "solidez": 6
+    },
+    "correo_encargo": {
+      "nombre": "Correo del encargo",
+      "descripcion": "El pedido del gráfico llegó desde la consultora de Baltazar, con los números ya puestos.",
+      "solidez": 6
+    },
+    "ficha_inexistente": {
+      "nombre": "Sin ficha técnica",
+      "descripcion": "El instituto de la Universidade no hizo esa encuesta. No hay muestra, ni fechas, ni encuestadores.",
+      "solidez": 5
+    },
+    "denuncia_logo": {
+      "nombre": "Denuncia por el logo",
+      "descripcion": "El profesor Matos denunció el uso de su logo sin permiso el mismo día en que salió la encuesta.",
+      "solidez": 3
+    },
+    "admision_baltazar": {
+      "nombre": "Admisión de Baltazar",
+      "descripcion": "Baltazar reconoce que su consultora maneja la cuenta que imita al periódico.",
+      "solidez": 8
+    }
+  },
+  "laboratorio": {
+    "parkours": [
+      {"nivel": "sector_3", "_respaldo": "sector_1", "nombre": "Archivo del gráfico",
+       "descripcion": "El disco del estudio de diseño. Guarda la plantilla original de la encuesta.",
+       "evidencia": "plantilla_original"},
+      {"nivel": "sector_4", "_respaldo": "sector_2", "nombre": "Panel de la cuenta",
+       "descripcion": "Los accesos a la cuenta que imita al periódico. ¿Desde qué equipo se publica?",
+       "evidencia": "panel_cuenta"}
+    ]
+  },
+  "escenas": {
+    "oficina": {"rotulo": "Despacho del fiscal"},
+    "laboratorio": {"rotulo": "Laboratorio forense"},
+    "sala": {"rotulo": "Sala de interrogatorio 2"}
+  },
+  "inicio": "n_intro",
+  "final_abandono": "final_archivo",
+  "nodos": {
+    "n_intro": {
+      "tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "serio", "plano": "pecho",
+      "texto": "Una cuenta llamada «Diário Nova Hoje» publicó una encuesta: 71 % para un candidato. Dice que es del instituto de la Universidade.",
+      "siguiente": "n_intro_2"
+    },
+    "n_intro_2": {
+      "tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "neutral",
+      "texto": "La cuenta imita el nombre y el logo del «Diário de Ciudad Nova». Ya la compartieron miles de personas. Quiero saber quién la fabricó.",
+      "siguiente": "n_rueda_fiscal"
+    },
+    "n_rueda_fiscal": {
+      "tipo": "rueda", "escena": "oficina", "personaje": "fiscal", "expresion": "neutral",
+      "texto": "Tengo tres personas en la sala y dos equipos en el laboratorio. ¿Por dónde empiezas?",
+      "al_terminar": "n_sala_entra",
+      "opciones": [
+        {"id": "ver_expediente", "etiqueta": "Ver expediente", "dice": "¿Qué sabemos de la encuesta?",
+         "destino": "r_fiscal_expediente"},
+        {"id": "ir_lab", "etiqueta": "Al laboratorio", "dice": "Primero, los equipos.", "destino": "n_lab"},
+        {"id": "ir_sala", "etiqueta": "A la sala", "dice": "Vamos directo a los interrogatorios.",
+         "destino": "n_sala_entra"}
+      ]
+    },
+    "r_fiscal_expediente": {
+      "tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "serio",
+      "texto": "Una diseñadora hizo el gráfico. Un consultor de imagen aparece en todo esto. Y el profesor Matos dice que su instituto no sabía nada.",
+      "siguiente": "@volver"
+    },
+    "n_lab": {
+      "tipo": "laboratorio", "escena": "laboratorio", "personaje": "fiscal", "expresion": "neutral",
+      "texto": "El disco del estudio de diseño y los accesos de la cuenta. Revisa los que quieras. Cuando salgas, el laboratorio se cierra.",
+      "siguiente": "n_sala_entra", "hito": "Laboratorio forense"
+    },
+    "n_sala_entra": {
+      "tipo": "dialogo", "escena": "sala", "personaje": null, "plano": "general",
+      "texto": "Sala de interrogatorio 2. Primero entra la diseñadora del gráfico.",
+      "siguiente": "n_livia_entra"
+    },
+    "n_livia_entra": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "livia", "expresion": "nervioso",
+      "texto": "Soy Lívia Sampaio. Hago gráficos por encargo. No entiendo qué hago aquí. Yo no publiqué nada.",
+      "siguiente": "n_rueda_livia"
+    },
+    "n_rueda_livia": {
+      "tipo": "rueda", "escena": "sala", "personaje": "livia", "expresion": "nervioso",
+      "texto": "«Era un trabajo más. Lo entregué y me pagaron.»",
+      "reloj": {"segundos": 15, "por_defecto": "@terminar"},
+      "turnos": 3, "al_terminar": "n_livia_sale",
+      "opciones": [
+        {"id": "presionar", "etiqueta": "Presionar", "dice": "Usted dibujó una encuesta falsa. Eso es un delito.",
+         "destino": "r_livia_presion", "solidez": -6},
+        {"id": "empatizar", "etiqueta": "Empatizar", "dice": "Nadie dice que usted mintió. ¿Qué le pidieron exactamente?",
+         "destino": "r_livia_empatia", "solidez": 3},
+        {"id": "mostrar_plantilla", "etiqueta": "Mostrar plantilla", "dice": "Este es su archivo. Los números ya estaban escritos.",
+         "destino": "r_livia_plantilla", "solidez": 2, "presenta": "plantilla_original",
+         "requiere": {"evidencia": ["plantilla_original"]}, "pista": "[Falta una prueba]"},
+        {"id": "mostrar_panel", "etiqueta": "Mostrar el panel", "dice": "¿Usted maneja esta cuenta?",
+         "destino": "r_livia_panel", "solidez": -5, "presenta": "panel_cuenta",
+         "requiere": {"evidencia": ["panel_cuenta"]}, "pista": "[Falta una prueba]"}
+      ]
+    },
+    "r_livia_presion": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "livia", "expresion": "triste", "plano": "primer_plano",
+      "texto": "¿Un delito? Yo solo dibujo. No voy a decir nada más sin un abogado.",
+      "hito": "Lívia se cierra", "siguiente": "@volver"
+    },
+    "r_livia_empatia": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "livia", "expresion": "triste",
+      "texto": "Me dijeron que era una maqueta para una presentación interna. Que nadie la iba a publicar. Me pagaron bien y no pregunté.",
+      "efectos": {"da_evidencia": ["declaracion_livia"]},
+      "hito": "Lívia cuenta el encargo", "siguiente": "@volver"
+    },
+    "r_livia_plantilla": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "livia", "expresion": "sorprendido",
+      "texto": "Sí, es mi archivo. Los números venían en el correo del pedido. Aquí está: lo mandó la consultora de Baltazar Quirino.",
+      "efectos": {"da_evidencia": ["correo_encargo"]},
+      "hito": "Lívia entrega el correo", "siguiente": "@volver"
+    },
+    "r_livia_panel": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "livia", "expresion": "sorprendido",
+      "texto": "¿Una cuenta de un periódico? No. Yo no publico nada. Ni siquiera tengo Civitas.",
+      "hito": "Una prueba fuera de lugar", "siguiente": "@volver"
+    },
+    "n_livia_sale": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "livia", "expresion": "neutral",
+      "texto": "¿Puedo irme? Tengo otro encargo esta tarde. Ahora voy a leer todo dos veces.",
+      "siguiente": "n_eurico_entra"
+    },
+    "n_eurico_entra": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "eurico", "expresion": "enojado",
+      "texto": "Eurico Matos, director del instituto de encuestas de la Universidade. Treinta años de trabajo serio, y ahora mi logo sale en una mentira.",
+      "siguiente": "n_rueda_eurico"
+    },
+    "n_rueda_eurico": {
+      "tipo": "rueda", "escena": "sala", "personaje": "eurico", "expresion": "serio",
+      "texto": "«Pregunte. Pero rápido: tengo clase a las cuatro.»",
+      "reloj": {"segundos": 15, "por_defecto": "@terminar"},
+      "turnos": 2, "al_terminar": "n_eurico_sale",
+      "opciones": [
+        {"id": "preguntar_ficha", "etiqueta": "Pedir la ficha", "dice": "¿Dónde está la ficha técnica de esa encuesta?",
+         "destino": "r_eurico_ficha"},
+        {"id": "empatizar", "etiqueta": "Empatizar", "dice": "Usaron su nombre sin permiso. Debe de ser duro.",
+         "destino": "r_eurico_empatia"},
+        {"id": "presionar", "etiqueta": "Presionar", "dice": "Su instituto vende encuestas. ¿Por qué no esta?",
+         "destino": "r_eurico_presion", "solidez": -6},
+        {"id": "mostrar_plantilla", "etiqueta": "Mostrar plantilla", "dice": "Mire cómo se hizo el gráfico.",
+         "destino": "r_eurico_plantilla", "solidez": 4, "presenta": "plantilla_original",
+         "requiere": {"evidencia": ["plantilla_original"]}, "pista": "[Falta una prueba]"}
+      ]
+    },
+    "r_eurico_ficha": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "eurico", "expresion": "serio",
+      "texto": "No hay ficha. No hubo muestra, ni fechas, ni encuestadores. Nosotros no hicimos esa encuesta. Se lo firmo ahora mismo.",
+      "efectos": {"da_evidencia": ["ficha_inexistente"]},
+      "hito": "La encuesta no existe", "siguiente": "@volver"
+    },
+    "r_eurico_empatia": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "eurico", "expresion": "neutral",
+      "texto": "Gracias. Lo denuncié el mismo día. Nadie me llamó. Si la gente deja de creer en las encuestas, perdemos todos.",
+      "efectos": {"da_evidencia": ["denuncia_logo"]},
+      "hito": "El profesor ya lo denunció", "siguiente": "@volver"
+    },
+    "r_eurico_presion": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "eurico", "expresion": "enojado", "plano": "primer_plano",
+      "texto": "¿Me acusa a mí? Yo soy la víctima. Hable con mi abogado.",
+      "hito": "El profesor se ofende", "siguiente": "@volver"
+    },
+    "r_eurico_plantilla": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "eurico", "expresion": "sorprendido",
+      "texto": "Porcentajes escritos a mano, antes de cualquier trabajo de campo. Ningún instituto trabaja así. Esto es un decorado.",
+      "hito": "El profesor lee la plantilla", "siguiente": "@volver"
+    },
+    "n_eurico_sale": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "eurico", "expresion": "serio",
+      "texto": "Encuentre a quien lo hizo. Mi instituto no puede publicar nada hasta que esto se aclare.",
+      "siguiente": "n_baltazar_entra"
+    },
+    "n_baltazar_entra": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "baltazar", "expresion": "satisfecho",
+      "texto": "Baltazar Quirino, consultor de imagen. Encantado. Le adelanto algo: yo solo asesoro. No publico, no firmo, no opino.",
+      "siguiente": "n_rueda_baltazar"
+    },
+    "n_rueda_baltazar": {
+      "tipo": "rueda", "escena": "sala", "personaje": "baltazar", "expresion": "satisfecho",
+      "texto": "«¿Una encuesta? Yo leo muchas. Como todo el mundo.»",
+      "reloj": {"segundos": 12, "por_defecto": "@terminar"},
+      "turnos": 3, "al_terminar": "n_baltazar_sale",
+      "opciones": [
+        {"id": "presionar", "etiqueta": "Presionar", "dice": "Usted fabricó esa encuesta. Lo sabemos.",
+         "destino": "r_balt_presion", "solidez": -8},
+        {"id": "mostrar_correo", "etiqueta": "Mostrar correo", "dice": "Este pedido salió de su consultora.",
+         "destino": "r_balt_correo", "solidez": 5, "presenta": "correo_encargo",
+         "requiere": {"evidencia": ["correo_encargo"]}, "pista": "[Falta una prueba]"},
+        {"id": "mostrar_panel", "etiqueta": "Mostrar el panel", "dice": "La cuenta falsa se publica desde su oficina.",
+         "destino": "r_balt_panel", "solidez": 3, "presenta": "panel_cuenta",
+         "requiere": {"evidencia": ["panel_cuenta"]}, "pista": "[Falta una prueba]"},
+        {"id": "mostrar_carta", "etiqueta": "Sin ficha técnica", "dice": "La Universidade no hizo ninguna encuesta.",
+         "destino": "r_balt_carta", "solidez": 4, "presenta": "ficha_inexistente",
+         "requiere": {"evidencia": ["ficha_inexistente"]}, "pista": "[Falta una prueba]"}
+      ]
+    },
+    "r_balt_presion": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "baltazar", "expresion": "satisfecho",
+      "texto": "¿Lo saben? Entonces no necesitan preguntarme. Yo solo asesoro, ya se lo dije.",
+      "hito": "Baltazar se escuda", "siguiente": "@volver"
+    },
+    "r_balt_correo": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "baltazar", "expresion": "nervioso",
+      "texto": "Un encargo de maqueta. Mis clientes piden escenarios. ¿Es delito imaginar un resultado?",
+      "hito": "Baltazar ve el correo", "siguiente": "@volver"
+    },
+    "r_balt_panel": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "baltazar", "expresion": "enojado", "plano": "primer_plano",
+      "texto": "Está bien. La cuenta la manejamos nosotros. Es un servicio. Hay gente que paga por la encuesta que quiere ver.",
+      "efectos": {"da_evidencia": ["admision_baltazar"]},
+      "hito": "Baltazar admite la cuenta", "siguiente": "@volver"
+    },
+    "r_balt_carta": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "baltazar", "expresion": "nervioso",
+      "texto": "Las encuestas se interpretan. Quizá alguien se confundió de instituto. No es mi problema.",
+      "hito": "La ficha que no existe", "siguiente": "@volver"
+    },
+    "n_baltazar_sale": {
+      "tipo": "dialogo", "escena": "sala", "personaje": "baltazar", "expresion": "neutral",
+      "texto": "Si terminamos, me voy. Tengo clientes esperando.",
+      "siguiente": "n_vuelta"
+    },
+    "n_vuelta": {
+      "tipo": "dialogo", "escena": "oficina", "personaje": "fiscal", "expresion": "serio",
+      "texto": "Ya oíste a los tres. La encuesta sigue circulando. Mira lo que tienes antes de decidir.",
+      "siguiente": "n_acusacion"
+    },
+    "n_acusacion": {
+      "tipo": "acusacion", "escena": "oficina", "personaje": "fiscal", "expresion": "serio",
+      "texto": "Es la hora. ¿Quién fabricó la encuesta?",
+      "hito": "La acusación",
+      "acusados": [
+        {"id": "acusar_baltazar", "etiqueta": "Acusar a Baltazar", "personaje": "baltazar",
+         "rutas": [
+           {"requiere": {"solidez": {"min": "solido"}, "evidencia": ["plantilla_original", "panel_cuenta"]},
+            "destino": "final_cuenta_cerrada"},
+           {"requiere": {"solidez": {"min": "suficiente"}}, "destino": "final_citado"}
+         ],
+         "destino": "final_archivo"},
+        {"id": "acusar_livia", "etiqueta": "Acusar a Lívia", "personaje": "livia", "destino": "final_livia"},
+        {"id": "acusar_profesor", "etiqueta": "Acusar al profesor", "personaje": "eurico",
+         "destino": "final_universidad"},
+        {"id": "nadie", "etiqueta": "No acusar", "destino": "final_archivo"}
+      ]
+    },
+    "final_cuenta_cerrada": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "satisfecho", "resultado": "exito",
+      "titulo": "La cuenta se cierra",
+      "texto": "Con la plantilla, el panel y su admisión, Baltazar queda imputado. La cuenta falsa se cierra y el «Diário de Ciudad Nova» publica la aclaración en portada.",
+      "efectos": {"grupos": {"instituciones": {"investigacion": 30, "moral": 10}, "ciudadanos": {"moral": 10}}}
+    },
+    "final_citado": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "neutral", "resultado": "parcial",
+      "titulo": "Citado, pero sigue circulando",
+      "texto": "Baltazar queda citado a declarar. Su abogado gana tiempo y la encuesta sigue circulando por Civitas.",
+      "efectos": {"grupos": {"instituciones": {"investigacion": 10}, "ciudadanos": {"moral": -5}}}
+    },
+    "final_livia": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "serio", "resultado": "fracaso",
+      "titulo": "Pagó la que dibujó",
+      "texto": "Lívia pierde sus clientes. Quien encargó la encuesta y maneja la cuenta falsa sigue vendiendo resultados a medida.",
+      "efectos": {"grupos": {"ciudadanos": {"moral": -20}, "instituciones": {"investigacion": -15}}}
+    },
+    "final_universidad": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "serio", "resultado": "fracaso",
+      "titulo": "La Universidade se calla",
+      "texto": "Acusar a la víctima hunde al instituto. La Universidade deja de publicar encuestas y solo quedan las inventadas.",
+      "efectos": {"grupos": {"instituciones": {"investigacion": -25, "moral": -10}, "ciudadanos": {"moral": -10}}}
+    },
+    "final_archivo": {
+      "tipo": "final", "personaje": "fiscal", "expresion": "serio", "resultado": "fracaso",
+      "titulo": "Caso archivado",
+      "texto": "Sin una acusación sustentada, la Fiscalía archiva el caso. La encuesta inventada se cita en los debates como si fuera real.",
+      "efectos": {"grupos": {"instituciones": {"investigacion": -10}}}
+    }
+  }
+}

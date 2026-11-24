@@ -21,6 +21,7 @@ from ursina import Entity, Mesh, Text, camera, color, window
 
 from backend.datos.nombres_visibles import nombre_visible
 from backend.logica import ajustes as modelo_ajustes
+from backend.logica import navegacion
 from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 from backend.logica.roles import ROLES
 from frontend import (
@@ -550,7 +551,11 @@ class Minimapa(Entity):
         self.modo_rotacion = "camara"          # «camara» (gira con la cámara) | «norte» (norte arriba)
         self._satelite = None                  # foto aérea de la ciudad de fondo (mapa_satelite); None = el minimapa vectorial de siempre
         self.fondo_satelite = None
-        self.densidad = 2                      # nivel de detalle 1..3 (minimapa_calculos.detalle)
+        # Misión con punto exacto (puerta de la Fiscalía): EscenaMundo deja aquí el punto y la línea del suelo para que
+        # el minimapa marque ese mismo destino (sesión E, ruta-fiscalia). None = el lugar y la ruta de esquinas.
+        self.punto_destino = None
+        self.ruta_puntos = None
+        self.densidad = 2                     # nivel de detalle 1..3 (minimapa_calculos.detalle)
         self._yaw_camara = yaw                 # yaw real de la cámara (la geometría usa el efectivo según el modo)
         self.geometria = hud_calculos.GeometriaMinimapa(
             mapa, (self.ANCHO, self.ALTO), yaw, rotacion_libre=rotacion_libre)
@@ -990,7 +995,8 @@ class Minimapa(Entity):
             self.marcador_destino.enabled = False
         else:
             self.marcador_destino.enabled = True
-            self.marcador_destino.position = g.acotar(*g.lugar(destino), margen=0.014)
+            exacto = self.punto_destino                 # puerta de la Fiscalía: el mismo punto que la ruta del suelo
+            self.marcador_destino.position = g.acotar(*(g.punto(*exacto) if exacto else g.lugar(destino)), margen=0.014)
             self.marcador_destino.scale = g.diametro_plaza() * 1.6
 
         self._actualizar_capas(posiciones, activo)
@@ -1033,12 +1039,19 @@ class Minimapa(Entity):
             self._poner_etiqueta_destino(actual)
 
     def _dibujar_ruta(self, x, z, ruta):
-        firma = (tuple(ruta), round(x, 3), round(z, 3))
+        # Misión con punto exacto (puerta de la Fiscalía): la misma línea que el suelo, no la de centros de plaza.
+        exacta = [tuple(p) for p in (self.ruta_puntos or ())[1:]]
+        firma = (tuple(ruta), tuple(exacta), round(x, 3), round(z, 3))
         if firma == self._firma_ruta:
             return
         self._firma_ruta = firma
         g = self.geometria
-        segmentos = [r for r in (g.recortar_segmento(p0, p1) for p0, p1 in g.segmentos_ruta(x, z, ruta))
+        if exacta:
+            puntos = [g.punto(x, z)] + [g.punto(*p) for p in exacta]
+            pares = list(zip(puntos, puntos[1:]))
+        else:
+            pares = g.segmentos_ruta(x, z, ruta)
+        segmentos = [r for r in (g.recortar_segmento(p0, p1) for p0, p1 in pares)
                      if r is not None]        # lo que queda fuera del recuadro no se dibuja
         while len(self.segmentos_ruta) < len(segmentos):
             self.segmentos_ruta.append(Entity(parent=self.capa_ruta, model="quad"))
@@ -1048,7 +1061,11 @@ class Minimapa(Entity):
         for cuadro in self.segmentos_ruta[len(segmentos):]:
             cuadro.enabled = False
 
-        flecha = g.flecha(x, z, ruta)
+        if exacta:
+            (u0, v0), (u1, v1) = pares[0]
+            flecha = (u0, v0, navegacion.angulo_hacia(u0, v0, u1, v1))
+        else:
+            flecha = g.flecha(x, z, ruta)
         self.flecha.enabled = flecha is not None
         if flecha is not None:
             self.flecha.position = g.acotar(flecha[0], flecha[1], margen=self.LARGO_FLECHA)

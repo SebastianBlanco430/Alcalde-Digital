@@ -11,11 +11,12 @@ import sys
 from panda3d.core import TransparencyAttrib
 from ursina import Entity, color
 
-from backend.logica.parkour_calculos import VELOCIDAD, posicion_plataforma
+from backend.logica.parkour_calculos import FRACCION_PURGA, MOVILES, VELOCIDAD, posicion_plataforma
 from frontend import materiales as mat
 from frontend.componentes import rgb
 from frontend.parkour_decoracion import DecoracionParkour, nodo_malla
 from frontend.parkour_efectos import EfectosParkour
+from frontend.parkour_tipos_vista import PiezasNuevas
 from frontend.piezas import lineas_sueltas, silenciar
 from frontend import parkour_skin_calculos as psc
 from frontend import parkour_visual_calculos as pvc
@@ -74,9 +75,9 @@ class MundoParkour(Entity):
         # clave_pedida la lee la escena para saber si hay que rehacer la skin (clave_skin pasa a None si la carga falla)
         self._skin = None           # personaje con skin .glb (None = muñeco de cubos)
         self._pos_previa = None     # (x, z) del frame anterior, para la velocidad real
-        self.tema = mat.tema(nivel.tema)
+        self.tema = pvc.tema_base(nivel.tema)        # temas nuevos (estudio, feed…): paleta propia o la «digital»
         self.visual = pvc.visual_activo()          # ALCALDE_PARKOUR_VISUAL=0: aspecto anterior (cubos lisos + rejilla)
-        self.decoracion = self.efectos = None
+        self.decoracion = self.efectos = self.piezas = None
         self.acento = self.tema["acento"]
         self._dinamicas = {}        # id -> (entidad, color base RGB)
         self._interruptores = {}    # id -> entidad
@@ -113,7 +114,7 @@ class MundoParkour(Entity):
         estaticas, aristas = [], []
         for p in self.nivel.plataformas.values():
             tono = self._color_base(p)
-            if p.tipo == "fija" and not p.requiere:
+            if p.tipo == "fija" and not p.requiere and not p.purgable:
                 estaticas.append(Entity(
                     parent=self, model="cube", color=rgb(tono),
                     position=(p.x, p.y - GROSOR / 2, p.z), scale=(p.ancho, GROSOR, p.fondo)))
@@ -207,7 +208,7 @@ class MundoParkour(Entity):
             return
         arrastre = (0.0, 0.0)
         movil = self.nivel.plataformas.get(sim.sobre) if sim.sobre else None
-        if movil is not None and movil.tipo == "movil" and not v.en_aire:
+        if movil is not None and movil.tipo in MOVILES and not v.en_aire:
             ax, _, az = posicion_plataforma(movil, sim.t - dt)
             bx, _, bz = posicion_plataforma(movil, sim.t)
             arrastre = (bx - ax, bz - az)
@@ -242,6 +243,8 @@ class MundoParkour(Entity):
         self.baliza.alpha = 0.45 + 0.2 * math.sin(sim.t * 3.0)
         if self.visual:
             self._sincronizar_visual(sim, dt)
+        if self.piezas is not None:
+            self.piezas.sincronizar(sim, dt)
 
     def orientar_avatar(self, mx, mz, dt):
         if abs(mx) + abs(mz) < 1e-3:
@@ -280,10 +283,16 @@ class MundoParkour(Entity):
     # desaparecen y ligadas a interruptor: una entidad con su propia caja neón (el estado se tiñe con el color de la entidad).
     def _construir_plataformas_neon(self):
         mallas, guias, gv, gc = [], [], [], []
+        tema_v = pvc.tema_visual(self.nivel.tema)
+        atajo = pvc.plataformas_atajo(self.nivel)      # color guía: ruta principal vs atajo (solo temas con guia/atajo)
         for p in self.nivel.plataformas.values():
             clave = pvc.clave_estilo(p.tipo, p.requiere, p.id == self.nivel.meta, p.checkpoint)
-            caja = pvc.caja_neon(p.ancho, p.fondo, GROSOR + (0.15 if clave in ("meta", "checkpoint") else 0.0), clave)
-            if p.tipo == "fija" and not p.requiere:
+            grosor = GROSOR + (0.15 if clave in ("meta", "checkpoint") else 0.0)
+            if p.tipo == "ritmo" and p.ritmo:              # barra de ecualizador: columna hasta el vacío
+                grosor = pvc.largo_columna_ritmo(p.y, p.ritmo["patron"], self.nivel.y_muerte)
+            caja = pvc.caja_neon(p.ancho, p.fondo, grosor, clave,
+                                 color_borde=pvc.borde_guia(tema_v, p.id, atajo, clave))
+            if p.tipo == "fija" and not p.requiere and not p.purgable:
                 v, c, t = caja
                 mallas.append((pvc.desplazar(v, p.x, p.y, p.z), c, t))
             else:
@@ -291,9 +300,9 @@ class MundoParkour(Entity):
                 nodo_malla(*caja, nombre=f"plat_{p.id}").reparent_to(entidad)
                 entidad.setTwoSided(True)
                 self._dinamicas[p.id] = (entidad, None)
-                if p.tipo == "movil" and p.movimiento:       # guía del recorrido: se ve hasta dónde llega la plataforma
+                if p.tipo in MOVILES and p.movimiento:      # guía del recorrido: se ve hasta dónde llega la plataforma
                     ex, ey, ez = p.movimiento.get("eje", (0, 0, 0))
-                    col = pvc.ESTILOS["movil"]["borde"]
+                    col = pvc.ESTILOS[p.tipo]["borde"]
                     gv += [(p.x - ex, p.y - ey + 0.02, p.z - ez), (p.x + ex, p.y + ey + 0.02, p.z + ez)]
                     gc += [pvc.escalar(col, 0.7)] * 2
         if mallas:
@@ -312,6 +321,8 @@ class MundoParkour(Entity):
     def _construir_visual(self):
         self.decoracion = DecoracionParkour(self.nivel, parent=self)
         self.efectos = EfectosParkour(self.nivel, parent=self)
+        if any(p.tipo in pvc.CLAVES_NUEVAS for p in self.nivel.plataformas.values()) or self.nivel.purga:
+            self.piezas = PiezasNuevas(self.nivel, self._dinamicas, parent=self)
         for pid in self._marcas_cp:
             self._marcas_cp[pid].scale = 0.4
 
@@ -326,7 +337,15 @@ class MundoParkour(Entity):
             caja.enabled = False
             return
         caja.enabled = True
+        frente = sim.purga_frente() if p.purgable else None
+        if frente is not None and sim.fase(p) == "aviso" and sim.activa(p):     # la purga se acerca: se tiñe de rojo
+            corte = p.z - p.fondo / 2 + FRACCION_PURGA * p.fondo
+            r, g, b = pvc.tinte_purga(1.0 - (corte - frente) / max(0.1, self.nivel.purga.get("aviso_m", 3.0)))
+            caja.setColorScale(color.rgba(r, g, b, 1))
+            return
         brillo = sim.fase(p) == "aviso" and int(sim.t * PARPADEO_HZ * 2) % 2 == 0
+        if p.tipo == "ritmo" and not brillo:
+            return                                   # el color de la barra lo pone PiezasNuevas (altura y pulso)
         caja.setColorScale(color.rgba(2.6, 2.6, 2.6, 1) if brillo else color.white)
 
     def _sincronizar_visual(self, sim, dt):

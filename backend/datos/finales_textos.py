@@ -13,8 +13,8 @@ FINALES_TEXTOS = {
         "texto": (
             "La campaña termina y Civitas amanece más tranquila. Los rumores siguieron circulando, pero casi siempre "
             "hubo alguien que fue a mirar antes de compartir. La policía, los vecinos y las instituciones saben que "
-            "pueden creer en lo que se publica, y el día de la elección Ciudad Nova vota informada. Gane quien gane, "
-            "el nuevo alcalde recibe una ciudad que aprendió a comprobar antes de creer."
+            "pueden creer en lo que se publica, y el día de la elección Ciudad Nova vota informada: gana Octavio Ruedas, "
+            "el aspirante independiente, y recibe una ciudad que aprendió a comprobar antes de creer."
         ),
     },
     "neutro": {
@@ -22,7 +22,7 @@ FINALES_TEXTOS = {
         "texto": (
             "La campaña termina con la ciudad partida en dos. Algunas mentiras se frenaron a tiempo y otras corrieron "
             "más rápido que su desmentido. En Civitas ya nadie sabe del todo a quién creerle: unos vecinos confían, "
-            "otros prefieren callar. Ciudad Nova llega a la elección con más preguntas que certezas, y el próximo "
+            "otros prefieren callar. La elección se decide por un puñado de votos y, gane quien gane, el próximo "
             "alcalde tendrá que ganarse, paso a paso, la confianza que quedó a medias."
         ),
     },
@@ -31,7 +31,7 @@ FINALES_TEXTOS = {
         "texto": (
             "La campaña termina y en Civitas manda el rumor. Lo que era mentira se compartió como cierto, y lo "
             "que era cierto se denunció como mentira. La policía, los vecinos y las instituciones dejaron de creerse "
-            "entre sí, y el día de la elección muchos se quedan en casa. Ciudad Nova tendrá alcalde, pero le tocará "
+            "entre sí, y el día de la elección muchos se quedan en casa. Tomás Arenas sigue de alcalde, pero le tocará "
             "gobernar una ciudad que ya no sabe en qué creer. Recuperar esa confianza será la primera tarea."
         ),
     },
