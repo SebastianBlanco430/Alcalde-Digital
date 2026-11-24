@@ -2,10 +2,14 @@
 # No conoce al gestor de escenas: recibe los callbacks `al_comenzar` y `al_salir`.
 # Visual (T7): fondo de menú en capas con deriva lenta, wordmark dibujado por código y botones
 # de tinta (primario amarillo / secundario). Teclado: flechas o Tab mueven el foco, Enter activa.
+# Menú BOTW (sesión G, ALCALDE_MENU_BOTW, encendido por defecto): frontend/menu_botw.py pone encima una piel con el fondo
+# del póster, logo y opciones en cursiva; estos botones siguen siendo los controles (mismos callbacks y confirmaciones).
+# Con =0, sin recursos o si la piel falla, este menú se ve tal cual.
 
 from ursina import Entity, Text, color, time
 
 from frontend import diseno_adaptable, estilo
+from frontend import menu_botw_calculos as mbc
 from frontend import menu_inicio_calculos as mic
 from frontend.componentes import (
     BotonPrimario, BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb,
@@ -99,6 +103,10 @@ class EscenaInicio(Escena):
         self._al_continuar = None
         self._resumen_guardado = None
         self._crear_confirmacion(alto_b)
+        self.botw = None
+        if mbc.activo():
+            from frontend import menu_botw
+            self.botw = menu_botw.crear(self)      # None si faltan recursos o falla: queda el menú de siempre
 
     X_PAREJA = a_unidades(140)          # con «Continuar» a la vista, él y «Partida nueva» van uno al lado del otro
 
@@ -201,9 +209,13 @@ class EscenaInicio(Escena):
 
     def al_salir(self):
         self._cerrar_confirmacion()
+        if self.botw is not None:
+            self.botw.al_salir()
 
     def al_entrar(self, **datos):
         self._cerrar_confirmacion()
         self._refrescar_continuar()
         self.foco.reiniciar()
         self.fondo.t = 0.0
+        if self.botw is not None:
+            self.botw.al_entrar()

@@ -141,3 +141,15 @@ Fecha: [...]
   la carpeta del usuario ejecutaría código al arrancar (ya tendría acceso equivalente a ese usuario). No se cambió el
   formato. Si algún día la caché se distribuye o se comparte (p. ej. una carpeta de red o un aula), hay que cambiarla a
   un formato de datos (JSON o `marshal` de tipos simples) o firmarla con HMAC. Para anularla: `ALCALDE_SIN_CACHE_MUNDO=1`.
+
+## 9. Menú de inicio estilo BOTW: fuentes e ilustración (sesión G, 24-nov)
+
+| Activo | Archivo | Autor / origen | Licencia |
+|---|---|---|---|
+| Fuente Luckiest Guy (logo del menú) | `assets/fuentes/LuckiestGuy-Regular.ttf` | Astigmatic (Google Fonts, `github.com/google/fonts`, carpeta `apache/luckiestguy`) | **Apache 2.0** (no OFL): texto completo en `assets/fuentes/LuckiestGuy-LICENCIA-Apache-2.0.txt` |
+| Atkinson Hyperlegible Italic y Bold Italic (opciones del menú) | `assets/fuentes/AtkinsonHyperlegible-Italic.ttf`, `-BoldItalic.ttf` | Braille Institute (Google Fonts, `ofl/atkinsonhyperlegible`) | SIL OFL 1.1, la misma `assets/fuentes/OFL.txt` de las Regular y Bold |
+| Fondo del menú | `assets/ui/menu/fondo_menu.jpg` | Ilustración del póster del proyecto, recortada sin textos; versión **provisional** con el lado derecho rellenado en espejo | Del equipo. Pendiente: confirmar con el dueño las condiciones de la herramienta con que se hizo el póster antes de publicar el juego fuera de la Feria |
+| Logo del menú | `assets/ui/menu/logo.png` | Generado por `tools/generar_logo_menu.py` con Luckiest Guy y Atkinson Hyperlegible | Del equipo (las fuentes, con sus licencias de arriba) |
+
+- Apache 2.0 permite redistribuir la fuente dentro del juego; hay que conservar el archivo de licencia junto a ella.
+- Si se cambia el fondo por la versión ampliada con IA, anotar aquí la herramienta usada y sus condiciones.

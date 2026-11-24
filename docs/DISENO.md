@@ -59,6 +59,34 @@ Módulo nuevo `frontend/iconos.py` con **Pillow** (ya llega con Ursina): se dibu
 
 ## 6. Pantallas 2D
 - **Inicio (opción segura)**: fondo `frontend/fondo_menu.py`: cielo degradado por colores de vértice (zenit→horizonte), 3 capas de siluetas de casas en quads (tintes de la paleta de edificios, cada capa más oscura y con deriva lenta 0,01-0,03 u/s), rombo amarillo como sol bajo, velo TINTA alfa 90. Wordmark centrado arriba; «Empezar» primario, «Salir» secundario. **Opción grande**: ciudad 3D real orbitando (ver T17).
+- **Inicio estilo BOTW (sesión G, 24-nov; `ALCALDE_MENU_BOTW`, encendido por defecto)**: piel sobre la escena de inicio
+  (`frontend/menu_botw.py` + `frontend/menu_botw_calculos.py`, puro y con tests). Medidas a 720p, todo escala con la
+  ventana y se recoloca al cambiar la proporción (16:9, 16:10, 21:9, 4:3):
+  - **Fondo**: `assets/ui/menu/fondo_menu.jpg` (2560 × 1440, ilustración del póster sin textos) ajustado tipo *cover*
+    (llena sin deformar; recorta por los lados o por arriba y abajo), con mipmaps, filtrado lineal y anisotrópico ×4.
+    **Para cambiarlo por el ampliado con IA basta reemplazar ese archivo** (misma ruta, 16:9; ideal 2560 × 1440, JPEG
+    ≈ 85): no hay que tocar código. Hoy es el provisional (lado derecho en espejo; el velo tapa la costura).
+  - **Movimiento**: solo zoom lento (Ken Burns), sin parallax: escala 1,02 → 1,09 con −1,5 % x y −1 % y, 40 s de ida y
+    40 de vuelta, suavizado con coseno. Velos: degradado desde la derecha rgba(24,18,44) 78 % → 45 % (26 % del ancho)
+    → 0 % (52 %) y degradado inferior de 200 px al 55 %.
+  - **Logo** arriba a la derecha (64 px del borde derecho, 40 del de arriba): UNA textura `assets/ui/menu/logo.png`
+    que genera `tools/generar_logo_menu.py` (Pillow, a 2× de 1440p): «ALCALDE» en Luckiest Guy amarillo con contorno
+    y sombra de tinta, rombo + pastilla cian «DIGITAL», lema «Verifica antes de compartir. Tu barrio decide.» en
+    Atkinson negrita. Flota 6 px (3,2 s de subida y 3,2 de bajada).
+  - **Opciones** abajo a la derecha (72 px del borde, 112 de abajo, 14 de separación), Atkinson Hyperlegible cursiva
+    29 px blancas con sombra; la seleccionada amarilla, negrita, 6 px a la izquierda y con la flecha. Orden:
+    Continuar (con guardado; muestra debajo «Partida guardada: …» cuando está elegida), Partida nueva / Empezar, En
+    línea (ONLINE), Ajustes (si hay), Salir. Foco inicial en Continuar o, sin guardado, en Partida nueva.
+  - **Pie**: «↑ ↓ elegir · Enter / A aceptar · Esc / B volver» abajo a la izquierda (las flechas van dibujadas: la
+    fuente no las trae) y versión en dos líneas abajo a la derecha.
+  - **Entrada** (solo al abrir el juego): fundido desde negro 0,6 s, rebote del logo 0,9 → 1,03 → 1 en 0,5 s y opciones
+    escalonadas cada 60 ms. **Reducir movimiento**: fondo y logo quietos, entrada con solo el fundido.
+  - **Controles**: ratón (pasar por encima elige si el ratón se mueve; clic acepta), teclado (↑/↓ con repetición:
+    una pulsación da la vuelta, sostener se para en el extremo), mando (cruceta y palo con zona muerta y repetición;
+    A acepta, B = Esc). Los botones de siempre siguen siendo los controles lógicos (ocultos): mismos callbacks y
+    mismas confirmaciones de «Salir» y «Partida nueva» (cuadro de tinta centrado encima).
+  - **Respaldo**: `ALCALDE_MENU_BOTW=0`, falta de `fondo_menu.jpg` o `logo.png`, o un fallo al construir o en un frame
+    → el menú de siempre (siluetas), con un aviso por stderr. La selección de rol conserva el fondo de siluetas.
 - **Selección de rol**: `retrato_rol(rol)` en `iconos.py`: busto (cabeza color piel, cuerpo del color del rol, contorno de tinta) con un objeto: libreta (periodista), teléfono con selfie (influencer), corbatín y banda (candidato), gorra (ciudadano). Se asigna como `texture` a la `muestras_rol[rol]` existente (de 0,04 de ancho a 0,09 cuadrado), sin cambiar nombres ni botones. Rol tomado: retrato en gris y sin sombra.
 - **Pausa**: `panel_tinta` 0,5×0,52, velo alfa 170; «Reanudar» primario; fila de teclas (WASD mover · Shift correr · E entrar · Tab teléfono) con el componente tecla.
 - **Fin**: `BarraIndicador` ×3 con su icono a la izquierda y la cifra en 48 px; las barras crecen 0→valor en 0,8 s (llamar `actualizar` con valores intermedios); frase de cierre por rango (bajo/medio/alto); «Volver al menú» primario.

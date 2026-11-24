@@ -7,7 +7,10 @@ Esta guía describe lo que el juego hace **hoy** en `main`; si algo cambia en el
 
 ```
 assets/
-  fuentes/              AtkinsonHyperlegible-Regular.ttf, -Bold.ttf y OFL.txt (licencia)
+  fuentes/              AtkinsonHyperlegible-Regular.ttf, -Bold.ttf, -Italic.ttf, -BoldItalic.ttf y OFL.txt (licencia);
+                        LuckiestGuy-Regular.ttf + LuckiestGuy-LICENCIA-Apache-2.0.txt (logo del menú de inicio)
+  ui/menu/              fondo_menu.jpg (fondo del menú de inicio, 2560 × 1440; reemplazable sin tocar código) y logo.png
+                        (lo genera tools/generar_logo_menu.py)
   modelos/
     edificios/          casaN.glb y casaN_puerta.jpg (las genera buildings/exportar_edificios.py)
     personajes/         periodista.glb, smoking.glb (uno por rol con modelo)
