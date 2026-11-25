@@ -56,6 +56,7 @@ MODULOS_HILO = (
     "frontend.radio_registro",             # Rádio Comunitária: mañana, noche y puente del final (ALCALDE_HILO_RADIO)
     "frontend.modo_feria_registro",        # modo feria: sin chip del reloj (ALCALDE_FERIA)
     "frontend.carteles_campana",           # día 5: carteles de campaña con el sello (ALCALDE_HILO_SELLO)
+    "frontend.prologo_cinematica",         # prólogo 3D tras elegir personaje, antes del tutorial (ALCALDE_PROLOGO)
 )
 
 

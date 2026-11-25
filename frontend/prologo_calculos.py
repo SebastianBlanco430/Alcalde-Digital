@@ -1,14 +1,17 @@
-# Prólogo: la parte PURA (no importa ursina). Ver frontend/prologo_cinematica.py (lo que dibuja) y el guion en
+# Prólogo en 3D: la parte PURA (no importa ursina). Ver frontend/prologo_cinematica.py (lo que se ve) y el guion en
 # backend/datos/prologo_cinematica.json. Hilo conductor: docs/HILO_CONDUCTOR.md.
 #
-# armar_vinetas(guion, cinematicas) -> lista de viñetas para cinematica_final.crear_vinetas, en orden:
-#   1. CONTEXTO: las viñetas propias del guion (Ciudad Nova, el partido de siempre, los dos candidatos).
-#   2. PRESAGIO: una cartela negra («Dentro de siete días...») y fragmentos de los dos finales, tomados POR REFERENCIA
-#      ([final, índice]) de las cinemáticas de backend/datos/finales_historia.json (las mismas viñetas que pinta el final;
-#      no se copian): se ve su dibujo y su título, sin el cuerpo (o con «texto_presagio» si el guion lo trae).
-#   3. CIERRE: pantalla negra con «La decisión depende de ti y de tus acciones.».
-# Cada viñeta lleva «segundos» = regla de lectura (radio_guion.segundos_lectura: 1,5 s + 0,06 s por carácter, mín. 2,5 s).
-# Una referencia que no exista se salta (el prólogo nunca falla por un índice).
+# El prólogo es una lista de TRAMOS:
+#   - «animado»: planos rodados en la Ciudad Nova real con el director del final animado (frontend/final_animado/). Cada
+#     plano reutiliza un id con toma (camaras.TOMAS) y puesta (puesta.py) ya escritas, con subtítulos propios; «final»
+#     fija el estado de la ciudad (neutro = hoy, malo = etapa -3 de noche, bueno = etapa +3 de mañana).
+#   - «cartela»: pantalla negra con un texto («Dentro de siete días...», «La decisión depende de ti...»).
+#
+#   cargar_guion(ruta=None)        -> dict del JSON
+#   tramos(guion)                  -> tramos válidos (lo que no se pueda rodar se salta: el prólogo nunca falla por datos)
+#   guion_animado(guion, tramo)    -> la sección «animacion» que espera final_animado.director (solo ese final)
+#   segundos_cartela(texto)        -> cuánto dura una cartela (entrada + lectura + salida)
+#   alfa_cartela(t, segundos)      -> 0..1 del texto de la cartela en el instante t
 
 import copy
 import json
@@ -17,7 +20,10 @@ from pathlib import Path
 from backend.logica import radio_guion
 
 RUTA_GUION = Path(__file__).resolve().parent.parent / "backend" / "datos" / "prologo_cinematica.json"
-NEGRO = [0, 0, 0]
+FINALES = ("bueno", "neutro", "malo")
+CARTELA_ENTRADA = 0.7           # s en que aparece el texto de una cartela
+CARTELA_SALIDA = 0.5            # s en que se va
+SALTAR = "Mantén para saltar"
 
 
 def cargar_guion(ruta=None):
@@ -25,37 +31,63 @@ def cargar_guion(ruta=None):
         return json.load(archivo)
 
 
-def _con_segundos(vineta):
-    lectura = f"{vineta.get('titulo', '')} {vineta.get('texto', '')}".strip()
-    vineta["segundos"] = radio_guion.segundos_lectura(lectura)
-    return vineta
+def _tomas():
+    from frontend.final_animado import camaras
+    return camaras.TOMAS
 
 
-def _cartela(texto, fondo=NEGRO):
-    return _con_segundos({"fondo": list(fondo), "figuras": [], "titulo": "", "texto": texto})
+def _plano_valido(plano, tomas):
+    try:
+        return (str(plano["id"]) in tomas and float(plano["segundos"]) > 0 and bool(plano.get("ancla"))
+                and isinstance(plano.get("subtitulos", []), list))
+    except (KeyError, TypeError, ValueError):
+        return False
 
 
-def presagios(guion, cinematicas):
-    """Las viñetas de los finales a las que apunta el guion (copias), con el cuerpo del guion."""
-    vinetas = []
-    for referencia in guion.get("presagios", []):
-        try:
-            final, indice = referencia
-            vineta = copy.deepcopy(cinematicas[final][int(indice)])
-        except (KeyError, IndexError, TypeError, ValueError):
+def tramos(guion):
+    """Los tramos que se pueden rodar, en orden. Un plano sin toma conocida se quita; un tramo sin planos o una cartela
+    sin texto, también."""
+    tomas = _tomas()
+    salida = []
+    for tramo in (guion or {}).get("tramos", []):
+        if not isinstance(tramo, dict):
             continue
-        vineta["texto"] = guion.get("texto_presagio", "")
-        vinetas.append(_con_segundos(vineta))
-    return vinetas
+        if tramo.get("tipo") == "cartela" and str(tramo.get("texto", "")).strip():
+            salida.append({"tipo": "cartela", "texto": str(tramo["texto"]).strip()})
+        elif tramo.get("tipo") == "animado" and tramo.get("final") in FINALES:
+            planos = [copy.deepcopy(p) for p in tramo.get("planos", []) if isinstance(p, dict) and _plano_valido(p, tomas)]
+            if planos:
+                salida.append({"tipo": "animado", "final": tramo["final"], "planos": planos})
+    return salida
 
 
-def armar_vinetas(guion, cinematicas):
-    vinetas = [_con_segundos(copy.deepcopy(v)) for v in guion.get("contexto", [])]
-    fragmentos = presagios(guion, cinematicas)
-    if fragmentos:
-        if guion.get("titulo_presagio"):
-            vinetas.append(_cartela(guion["titulo_presagio"]))
-        vinetas += fragmentos
-    if guion.get("cierre"):
-        vinetas.append(_cartela(guion["cierre"], guion.get("fondo_cierre", NEGRO)))
-    return vinetas
+def guion_animado(guion, tramo):
+    """Sección «animacion» con SOLO el final del tramo y sus planos (sin hueco de rol, sin sonido ni música: el estado
+    de la ciudad, etapa y hora, lo pone la escenografía del final)."""
+    return {"saltar": str((guion or {}).get("saltar", SALTAR)),
+            tramo["final"]: {"musica": None, "sonido": None, "planos": copy.deepcopy(tramo["planos"])}}
+
+
+def segundos_cartela(texto):
+    return CARTELA_ENTRADA + radio_guion.segundos_lectura(texto) + CARTELA_SALIDA
+
+
+def alfa_cartela(t, segundos):
+    if t <= 0.0 or t >= segundos:
+        return 0.0
+    if t < CARTELA_ENTRADA:
+        return t / CARTELA_ENTRADA
+    if t > segundos - CARTELA_SALIDA:
+        return max(0.0, (segundos - t) / CARTELA_SALIDA)
+    return 1.0
+
+
+def duracion_estimada(lista):
+    """Segundos aproximados del prólogo entero (sin las cargas)."""
+    total = 0.0
+    for tramo in lista:
+        if tramo["tipo"] == "cartela":
+            total += segundos_cartela(tramo["texto"])
+        else:
+            total += sum(float(p["segundos"]) for p in tramo["planos"]) + 1.8
+    return total

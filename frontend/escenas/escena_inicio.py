@@ -7,7 +7,8 @@
 # Con =0, sin recursos o si la piel falla, este menú se ve tal cual.
 # Hilo conductor (docs/MODO_FERIA.md, docs/HILO_CONDUCTOR.md): botón «Modo feria» tras «Empezar» (ALCALDE_FERIA_MENU=0 lo
 # quita): deja ALCALDE_FERIA=1 en el entorno y empieza como «Empezar»; «Empezar» y «Continuar» lo dejan en 0. Antes de
-# una partida nueva (normal o de feria) se ve el PRÓLOGO (frontend/prologo_cinematica.py, ALCALDE_PROLOGO=0 lo quita).
+# una partida nueva (normal o de feria) va a la selección de rol; el PRÓLOGO en 3D sale después, al entrar al mundo
+# (frontend/prologo_cinematica.py, ALCALDE_PROLOGO=0 lo quita).
 
 from ursina import Entity, Text, color, time
 
@@ -109,7 +110,6 @@ class EscenaInicio(Escena):
                 self.boton_online, self.boton_salir)
         if self.boton_feria is not None:
             self.botones = (self.boton_comenzar, self.boton_feria) + self.botones[1:]
-        self.prologo = None
         self.foco = FocoTeclado(lambda: self.botones, parent=self)
         # «Continuar» (guardado de partida): oculto hasta que frontend/registro_guardado.py lo ofrece y hay un guardado.
         self.boton_continuar = BotonPrimario(
@@ -225,33 +225,13 @@ class EscenaInicio(Escena):
         if self._al_comenzar is not None:
             self._empezar(feria=True)
 
-    # Partida nueva: fija el modo (ALCALDE_FERIA, lo lee crear_flujo) y pasa por el prólogo antes de `al_comenzar`.
+    # Partida nueva: fija el modo (ALCALDE_FERIA, lo lee crear_flujo) y va a la selección de rol. El prólogo en 3D sale
+    # al entrar al mundo, después de elegir personaje (frontend/prologo_cinematica.py).
     def _empezar(self, feria):
-        if self.prologo is not None:
-            return
         modo_feria.encender(feria)
-        from frontend import prologo_cinematica
-        if not prologo_cinematica.activo():
-            self._al_comenzar()
-            return
-
-        def al_terminar():
-            self.prologo = None
-            self.foco.enabled = True
-            self._al_comenzar()
-
-        self.foco.enabled = False               # Enter/Espacio adelantan el prólogo, no activan otro botón
-        try:
-            self.prologo = prologo_cinematica.crear_prologo(self, al_terminar)
-        except Exception as error:              # noqa: BLE001  sin prólogo: se empieza como siempre
-            print(f"[prologo] omitido ({type(error).__name__}: {error})")
-            self.prologo = None
-            self.foco.enabled = True
-            self._al_comenzar()
+        self._al_comenzar()
 
     def input(self, key):
-        if self.prologo is not None:
-            return
         if self.confirmacion.tecla(key):
             self._cerrar_confirmacion()
 
@@ -261,11 +241,6 @@ class EscenaInicio(Escena):
 
     def al_salir(self):
         self._cerrar_confirmacion()
-        negro = getattr(self, "negro_prologo", None)
-        if negro is not None:                   # el negro del prólogo (frontend/prologo_cinematica.py) ya cumplió
-            from ursina import destroy
-            destroy(negro)
-            self.negro_prologo = None
         if self.botw is not None:
             self.botw.al_salir()
 

@@ -1,48 +1,47 @@
 {
-  "_nota": "Prólogo (frontend/prologo_cinematica.py, ALCALDE_PROLOGO): se ve antes de la intro de siempre, al empezar una partida nueva. «contexto»: viñetas de cómic propias (mismo formato que finales_historia.json, «cinematicas»). «presagios»: fragmentos de las cinemáticas de los dos finales, por referencia [final, índice] a finales_historia.json (no se copian sus textos); «texto_presagio» reemplaza el cuerpo para que solo se lea el título. «cierre»: pantalla negra con el texto final, que se queda en negro hasta la escena siguiente. Cada viñeta dura lo que dicta la regla de lectura (1,5 s + 0,06 s por carácter, mínimo 2,5 s).",
-  "contexto": [
+  "_nota": "Prólogo en 3D (frontend/prologo_cinematica.py, ALCALDE_PROLOGO): se ve en la Ciudad Nova real DESPUÉS de elegir personaje y ANTES de la cinemática del tutorial (frontend/intro_cinematica.py). «tramos» en orden: «animado» = planos rodados con el director del final animado (frontend/final_animado/): «final» fija el estado de la ciudad (neutro = hoy; malo = etapa -3, de noche y en llamas; bueno = etapa +3, en fiesta) y cada plano usa un «id» con toma y puesta ya escritas (camaras.py, puesta.py) y sus propios subtítulos. «cartela» = pantalla negra con un texto. El último tramo deja la pantalla en negro y salta al tutorial.",
+  "saltar": "Mantén para saltar",
+  "tramos": [
     {
-      "titulo": "Ciudad Nova",
-      "texto": "Una favela en la ladera: calles empinadas, vecinos que se conocen y teléfonos que no paran de sonar.",
-      "fondo": [150, 196, 230],
-      "figuras": [
-        {"tipo": "suelo", "color": [120, 96, 72]},
-        {"tipo": "sol", "x": 0.52, "y": 0.34},
-        {"tipo": "edificio", "x": -0.46, "ancho": 0.22, "alto": 0.3, "color": [196, 120, 84]},
-        {"tipo": "edificio", "x": -0.2, "ancho": 0.2, "alto": 0.22, "color": [222, 186, 96]},
-        {"tipo": "edificio", "x": 0.06, "ancho": 0.24, "alto": 0.34, "color": [120, 160, 196]},
-        {"tipo": "edificio", "x": 0.34, "ancho": 0.2, "alto": 0.26, "color": [214, 140, 160]},
-        {"tipo": "persona", "x": -0.34, "alto": 0.16, "color": [60, 90, 150]},
-        {"tipo": "persona", "x": 0.2, "alto": 0.15, "color": [150, 70, 60]}
+      "tipo": "animado",
+      "final": "neutro",
+      "planos": [
+        {"id": "m2_calles_arden", "ancla": "plaza", "segundos": 9.0, "subtitulos": [
+          "Ciudad Nova: una favela en la ladera, de calles empinadas.",
+          "Aquí los vecinos se conocen y los teléfonos no paran de sonar."
+        ]},
+        {"id": "n5_candidatos", "ancla": "prefeitura", "segundos": 12.0, "subtitulos": [
+          "Desde que nadie recuerda, gobierna el Partido de la Tradición.",
+          "Tomás Arenas, el alcalde de siempre, contra Octavio Ruedas, un aspirante independiente.",
+          "Faltan siete días para votar."
+        ]}
+      ]
+    },
+    {"tipo": "cartela", "texto": "Dentro de siete días..."},
+    {
+      "tipo": "animado",
+      "final": "malo",
+      "planos": [
+        {"id": "m1_reelegido", "ancla": "prefeitura", "segundos": 6.0, "subtitulos": [
+          "¿El partido de siempre, reelegido otra vez?"
+        ]},
+        {"id": "m2_calles_arden", "ancla": "plaza", "segundos": 6.5, "subtitulos": [
+          "¿Una ciudad que arde, donde nadie sabe a quién creer?"
+        ]}
       ]
     },
     {
-      "titulo": "Siempre el mismo partido",
-      "texto": "Desde que nadie recuerda, gobierna el Partido de la Tradición. Faltan siete días para votar.",
-      "fondo": [96, 80, 74],
-      "figuras": [
-        {"tipo": "suelo", "color": [70, 60, 56]},
-        {"tipo": "edificio", "x": 0.0, "ancho": 0.46, "alto": 0.36, "color": [150, 46, 52], "rotulo": "PREFEITURA", "luz": true},
-        {"tipo": "persona", "x": -0.38, "alto": 0.16, "color": [50, 50, 60]},
-        {"tipo": "persona", "x": 0.4, "alto": 0.15, "color": [60, 56, 70]}
+      "tipo": "animado",
+      "final": "bueno",
+      "planos": [
+        {"id": "b1_gana", "ancla": "urna", "segundos": 6.0, "subtitulos": [
+          "¿O un independiente que gana porque la gente se informó?"
+        ]},
+        {"id": "b6_podio", "ancla": "podio", "segundos": 6.5, "subtitulos": [
+          "¿Una plaza en fiesta?"
+        ]}
       ]
     },
-    {
-      "titulo": "Dos candidatos",
-      "texto": "Tomás Arenas, el alcalde de siempre, contra Octavio Ruedas, un aspirante independiente.",
-      "fondo": [228, 214, 186],
-      "figuras": [
-        {"tipo": "suelo", "color": [150, 120, 90]},
-        {"tipo": "podio", "x": -0.3},
-        {"tipo": "persona", "x": -0.3, "y": 0.07, "alto": 0.22, "color": [150, 46, 52]},
-        {"tipo": "podio", "x": 0.3},
-        {"tipo": "persona", "x": 0.3, "y": 0.07, "alto": 0.22, "color": [44, 138, 214]}
-      ]
-    }
-  ],
-  "titulo_presagio": "Dentro de siete días...",
-  "presagios": [["malo", 0], ["bueno", 0], ["malo", 1], ["bueno", 3]],
-  "texto_presagio": "",
-  "cierre": "La decisión depende de ti y de tus acciones.",
-  "fondo_cierre": [0, 0, 0]
+    {"tipo": "cartela", "texto": "La decisión depende de ti y de tus acciones."}
+  ]
 }

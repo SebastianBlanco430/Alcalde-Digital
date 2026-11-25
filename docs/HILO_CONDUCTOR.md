@@ -21,7 +21,7 @@ prólogo y la feria.
 | `ALCALDE_HILO_NPC` | encendida | Frases de vecinos según el tema y el resultado del día anterior. |
 | `ALCALDE_HILO_NOCHES` | encendida | Días de 08:00 a 20:00, noches saltadas y fin el día 7 a las 20:00 (84 h activas ≈ 15 min). |
 | `ALCALDE_HILO_LEY_SECA` | encendida | Cambia solo el `mensaje` de `candidato_ley_seca` («¡Atención! …»). |
-| `ALCALDE_PROLOGO` | encendida | Prólogo antes de elegir rol. `0` = se empieza como antes. |
+| `ALCALDE_PROLOGO` | encendida | Prólogo 3D tras elegir personaje y antes del tutorial. `0` = directo al tutorial. |
 | `ALCALDE_SEG_POR_HORA` | — | Sigue mandando sobre la escala del reloj (p. ej. `2` para probar la semana rápido). |
 
 ## Piezas
@@ -72,14 +72,25 @@ prólogo y la feria.
 - `backend/logica/flujo_tiempo.py`: si nadie retiene la noche, la salta solo. Expone `retener_noches()` y el diario del
   día que usa la radio.
 
-### Prólogo
-- `frontend/prologo_cinematica.py` y `prologo_calculos.py`, con el guion en `backend/datos/prologo_cinematica.json`.
-  Reutiliza fragmentos de `finales_historia.json` sin copiarlos.
-- Se ve al pulsar «Empezar» o «Modo feria» (`frontend/escenas/escena_inicio.py`), antes de elegir rol. La intro de
-  siempre no cambia. Espacio o clic adelantan y Escape salta.
+### Prólogo (3D)
+- En 3D en la Ciudad Nova real, con el motor y los modelos del juego: `frontend/prologo_cinematica.py` (vista) y
+  `prologo_calculos.py` (puro), con el guion en `backend/datos/prologo_cinematica.json`.
+- Cuándo: partida local nueva (normal o feria), DESPUÉS de elegir personaje, al entrar al mundo; nunca al «Continuar»
+  ni en línea. Al terminar queda la pantalla en negro y sale la cinemática del tutorial (`intro_cinematica.py`, sin
+  cambios): el prólogo pone `escena._cinematica = True` y el vigía del tutorial espera a que vuelva a `False`.
+- Qué se ve: plano aéreo de la plaza («Ciudad Nova…»), los dos candidatos ante la Prefeitura (Tomás Arenas y Octavio
+  Ruedas; «Faltan siete días para votar»), cartela «Dentro de siete días...», el futuro malo (Arenas reelegido, la
+  ciudad ardiendo de noche), el bueno (Octavio gana, fiesta en la plaza) y la cartela final «La decisión depende de ti
+  y de tus acciones.» (unos 70 s).
+- Cómo: cada tramo «animado» lo rueda el director del final animado (`frontend/final_animado/director.py`) con un guion
+  propio que reutiliza tomas y puestas ya hechas (`camaras.py`, `puesta.py`); el estado de la ciudad (neutro, malo,
+  bueno) lo pone su escenografía. Un velo negro propio (`fundido_prologo`) tapa cargas y cortes.
+- Saltar: mantener Espacio/Escape en los planos o Escape en una cartela salta todo el prólogo (después sale el
+  tutorial). Si un tramo falla se salta y sigue; si falla todo, se va al tutorial.
+- El menú ya no muestra nada: «Empezar» y «Modo feria» van directo a la selección de rol.
 
 ## Carga
-`main.py` carga `radio_registro`, `modo_feria_registro` y `carteles_campana` con
+`main.py` carga `radio_registro`, `modo_feria_registro`, `carteles_campana` y `prologo_cinematica` con
 `extensiones.aplicar(..., modulos=MODULOS_HILO)`, después de las extensiones de siempre. No se editan los módulos
 congelados (`registro_reloj.py`, `reloj_calculos.py`, `registro_tutorial.py`, `reparto_dias.py`, `extensiones.py`,
 `guardado.py`, …): solo se usa su API pública.
