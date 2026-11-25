@@ -30,7 +30,7 @@ class EscenaErrorRed(Escena):
         anadir_filo(self.panel, ANCHO_PANEL, ALTO_PANEL, estilo.RADIO_PANEL_PX)
         self.franja = Entity(parent=self.raiz, model="quad", color=rgb(estilo.ESTADO_ERROR),
                              scale=(ANCHO_PANEL - 0.06, 0.008), position=(0, 0.17, -0.004))
-        self.t_titulo = crear_texto(self.raiz, "Error", 0, 0.225, 32, origen=(0, 0), font=tipografia.FUENTE_TITULO)
+        self.t_titulo = crear_texto(self.raiz, "Error", 0, 0.225, 32, origen=(0, 0), font=tipografia.fuente_piel(titulo=True))
         self.t_texto = crear_texto(self.raiz, " ", -ANCHO_PANEL / 2 + 0.07, 0.11, 21, estilo.COLOR_TEXTO, origen=(-0.5, 0.5))
         self.t_codigo = crear_texto(self.raiz, " ", -ANCHO_PANEL / 2 + 0.07, -0.13, 15, estilo.COLOR_TEXTO_TENUE)
         self.btn_reintentar = boton_piel_primario("Reintentar", al_clic=self.reintentar, ancho=0.36, alto=a_unidades(54),
@@ -38,7 +38,7 @@ class EscenaErrorRed(Escena):
         self.btn_menu = boton_piel_secundario("Volver al menú", al_clic=self.volver, ancho=0.40, alto=a_unidades(54),
                                               tamano_fuente_px=22, parent=self.raiz, position=(-0.22, -0.22, -0.003))
         self.foco = FocoTeclado(lambda: [self.btn_menu, self.btn_reintentar], parent=self)
-        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra, velo, flecha del foco y
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva negrita, velo, flecha del foco y
         # entrada desde la derecha. None = la pantalla de siempre.
         self.piel = ui_botw_b.vestir(self.raiz, titulos=(self.t_titulo,), foco=self.foco, piezas=(self.raiz,), velo=True)
 

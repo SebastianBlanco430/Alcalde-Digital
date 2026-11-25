@@ -59,7 +59,7 @@ class Ficha(Hueco):
                             scale=(DIAMETRO, DIAMETRO), position=(-self.ancho / 2 + 0.035 + DIAMETRO / 2, 0, -0.005),
                             color=color.rgba32(*estilo.PAPEL, 40))
         self.nombre = Text("", parent=self.panel, origin=(-0.5, 0), position=(x_texto, 0.018, -0.01),
-                           scale=escala_fuente(uc.TAM["ficha_nombre"]), font=tipografia.FUENTE_TITULO,
+                           scale=escala_fuente(uc.TAM["ficha_nombre"]), font=tipografia.fuente_piel(titulo=True),
                            color=rgb(estilo.COLOR_TEXTO))
         self.texto = Text("", parent=self.panel, origin=(-0.5, 0), position=(x_texto, -0.02, -0.01),
                           scale=escala_fuente(uc.TAM["ficha_etiqueta"]), color=rgb(estilo.COLOR_TEXTO))

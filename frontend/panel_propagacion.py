@@ -52,8 +52,8 @@ class PanelPropagacion(Entity):
         Entity(parent=self, model=modelo_redondeado(self.ANCHO, self.ALTO, 10),
                scale=(self.ANCHO, self.ALTO), color=rgb(COLOR_FONDO_PANEL), z=0.001)
         titulo = Text(self.TITULO, parent=self, origin=(0, 0), position=(0, self.ALTO / 2 - 0.028, -0.001),
-                      scale=escala_fuente(15), color=rgb(estilo.COLOR_TEXTO))
-        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): el título en cursiva con sombra plana de tinta.
+                      scale=escala_fuente(16), color=rgb(estilo.COLOR_TEXTO))
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): el título en cursiva negrita.
         ui_botw_b.vestir(self, titulos=(titulo,))
         self.texto_resultado = Text(
             "", parent=self, origin=(0, 0), position=(0, -self.ALTO / 2 + 0.042, -0.001),

@@ -335,7 +335,7 @@ class EscenaTrabajo(Escena):
         panel = panel_piel(s, 0.9, 0.5, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX, z=0)
         _texto(panel, "Tu turno", 15, estilo.COLOR_TEXTO_TENUE, (0, 0.205), z=-0.01)
         titulo = _texto(panel, t.nombre, 28, estilo.COLOR_ACENTO, (0, 0.155), negrita=True, z=-0.01)
-        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título con sombra de tinta y el panel entra desde la derecha.
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva negrita y el panel entra desde la derecha.
         ui_botw_b.vestir(panel, titulos=(titulo,), piezas=(panel,))
         texto = self._instrucciones() + (" " + TEMAS[t.id] if t.id in TEMAS else "")
         if t.motor == RITMO:
@@ -375,7 +375,7 @@ class EscenaTrabajo(Escena):
         self._velo(s)
         panel = panel_piel(s, 0.9, 0.66, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX, z=0)
         titulo = _texto(panel, "TURNO TERMINADO", 28, estilo.COLOR_ACENTO, (0, 0.265), negrita=True, z=-0.01)
-        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título con sombra de tinta y el panel entra desde la derecha.
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva negrita y el panel entra desde la derecha.
         ui_botw_b.vestir(panel, titulos=(titulo,), piezas=(panel,))
         if self.trabajo.motor == RITMO:
             from backend.logica.taller_ritmo import etiqueta_calidad

@@ -233,12 +233,12 @@ def _crear_vista(escena_mundo):
 
     from backend.logica import manillas as mdl
     from frontend import diseno_adaptable, estilo, tipografia
-    from frontend.componentes import escala_fuente, panel_tinta, rgb
+    from frontend.componentes import escala_fuente, panel_piel, rgb
 
     textura, dije = texturas()
 
     def texto(padre, cadena, px, posicion, origen=(-0.5, 0), titulo=False, tono=None):
-        extra = {"font": tipografia.FUENTE_TITULO} if titulo else {}
+        extra = {"font": tipografia.fuente_piel(titulo=True)} if titulo else {}
         return Text(cadena, parent=padre, origin=origen, position=posicion, scale=escala_fuente(px),
                     color=rgb(tono or estilo.COLOR_TEXTO), **extra)
 
@@ -295,7 +295,7 @@ def _crear_vista(escena_mundo):
             self.chip = Entity(parent=escena.hud, enabled=False)
             # Estilo único (M3.3, ALCALDE_PANEL_UNICO): las pulseras son una «tarjeta» (radio 10, borde denso).
             radio = pu.estilo_de("pulseras").radio_px if pu.activo() else estilo.RADIO_CHIP_PX
-            self.chip.fondo = panel_tinta(self.chip, ANCHO_CHIP, ALTO_CHIP, tono=estilo.COLOR_FONDO,
+            self.chip.fondo = panel_piel(self.chip, ANCHO_CHIP, ALTO_CHIP, tono=estilo.COLOR_FONDO,
                                           radio_px=radio, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
             texto(self.chip, "Pulseras" if mcal.pulseras_jugador_activo() else "Manillas", 13, (-ANCHO_CHIP / 2 + 0.014, ALTO_CHIP / 2 - 0.022, -0.01), titulo=True)
             tecla = texto(self.chip, mcal.TECLA.upper(), 13, (ANCHO_CHIP / 2 - 0.014, ALTO_CHIP / 2 - 0.022, -0.01),
@@ -339,7 +339,7 @@ def _crear_vista(escena_mundo):
 
         def _crear_tooltip(self, padre):
             t = Entity(parent=padre, enabled=False)
-            t.fondo = panel_tinta(t, 0.44, 0.075, tono=estilo.COLOR_FONDO, radio_px=estilo.RADIO_CHIP_PX,
+            t.fondo = panel_piel(t, 0.44, 0.075, tono=estilo.COLOR_FONDO, radio_px=estilo.RADIO_CHIP_PX,
                                   borde_px=estilo.GROSOR_BORDE_DENSO_PX)
             t.linea1 = texto(t, "", 14, (-0.205, 0.016, -0.01), titulo=True)
             t.linea2 = texto(t, "", 12, (-0.205, -0.016, -0.01))
@@ -424,7 +424,7 @@ def _crear_vista(escena_mundo):
             info = mcal.lineas_leyenda()
             ANCHO, ALTO = 0.94, 0.88
             L = Entity(parent=padre, enabled=False, z=-0.02)
-            L.fondo = panel_tinta(L, ANCHO, ALTO, tono=estilo.COLOR_FONDO)
+            L.fondo = panel_piel(L, ANCHO, ALTO, tono=estilo.COLOR_FONDO)
             texto(L, info["titulo"], 22, (-ANCHO / 2 + 0.03, ALTO / 2 - 0.045, -0.01), titulo=True)
             texto(L, f"{mcal.TECLA.upper()} para cerrar", 13, (ANCHO / 2 - 0.03, ALTO / 2 - 0.045, -0.01), origen=(0.5, 0),
                   tono=estilo.ACENTO_SECUNDARIO)

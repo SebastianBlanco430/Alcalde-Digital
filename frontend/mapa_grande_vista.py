@@ -242,7 +242,7 @@ class MapaGrandeVista(Entity):
         self.etiquetas = textos
 
         # encabezado y leyenda
-        Text("Mapa de Ciudad Nova", parent=raiz, origin=(-0.5, 0.5), scale=escala_fuente(22), font=tipografia.FUENTE_TITULO,
+        Text("Mapa de Ciudad Nova", parent=raiz, origin=(-0.5, 0.5), scale=escala_fuente(22), font=tipografia.fuente_piel(titulo=True),
              color=rgb(estilo.COLOR_TEXTO), position=(-aspecto / 2 + 0.05, 0.5 - 0.045, -0.006))
         self.texto_destino = Text("", parent=raiz, origin=(0.5, 0.5), scale=escala_fuente(17), color=rgb(COLOR_DESTINO),
                                   position=(aspecto / 2 - 0.05, 0.5 - 0.05, -0.006))

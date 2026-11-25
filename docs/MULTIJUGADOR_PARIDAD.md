@@ -122,11 +122,11 @@ deja como está (28 misiones por semana repartidas entre los jugadores).
 
 | Bandera | Por defecto | Qué hace | Dónde se lee |
 |---|---|---|---|
-| `ALCALDE_UI_BOTW` (compartida con A) | 1 | Títulos en cursiva con sombra plana de tinta, velo violeta detrás del contenido, flecha amarilla junto al control enfocado y entrada escalonada | `frontend/ui_botw_b_calculos.activa()` (lee el entorno, no importa nada de A) |
+| `ALCALDE_UI_BOTW` (compartida con A) | 1 | Títulos en cursiva negrita (sin sombra), velo violeta detrás del contenido, la flecha amarilla de los botones de A junto al control enfocado y la entrada del kit de A (0,28 s desde la derecha) | `frontend/ui_botw_b_calculos.activa()` (lee el entorno, no importa nada de A) |
 
 - `frontend/ui_botw_b_calculos.py` (puro): paleta tomada de `ui_botw_calculos` de A si existe (mismos nombres); si no,
   del menú BOTW (`menu_botw_calculos`: TINTA, VELO, AMARILLO, BLANCO) y de `estilo.py`. Propio solo lo de composición
-  (sombra de títulos, alfa del velo, separación de la flecha).
+  (alfa del velo y separación de la flecha, igual a la de `componentes.BotonBotw`).
 - `frontend/ui_botw_b.py` (visual): `vestir(raiz, titulos, foco, piezas, velo)`, con guardián (si algo falla, la
   pantalla queda como estaba y se avisa una vez) y «reducir movimiento» (sin entrada ni vaivén de la flecha).
 - Paneles y botones con las piezas de la piel de A (`componentes.panel_piel` y `boton_piel_primario/secundario/

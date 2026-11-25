@@ -51,6 +51,7 @@ ESCALA_GLOBO = 1.8
 # el globo, a la izquierda de la cabeza del cliente (a la derecha va el cartel)
 DX_GLOBO = -0.62
 ANCHO_CARTEL = 0.34
+ALTO_LINEA_AYUDA = 0.024      # una línea de la ayuda del cartel (16 px encogidos hasta 0,75) con su interlineado
 MADERA, MADERA_OSCURA = (150, 104, 64), (104, 70, 44)
 VERDE_GLOBO, ROJO_GLOBO = (90, 200, 110), (230, 80, 70)
 
@@ -250,25 +251,29 @@ class JuegoMostrador:
 
     def _construir_cartel(self):
         """Cartel 2D a la derecha: cliente, pedido, lo entregado, total, pago y el cambio que llevas."""
-        ancho, alto = ANCHO_CARTEL, 0.4
-        c = self.cartel = panel_piel(self.raiz, ancho, alto, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX,
-                                      position=(0.39, -0.03), z=-0.005)
-        izq = -ancho / 2 + 0.02
-        self.t_cliente = _texto(c, "", 12, estilo.COLOR_TEXTO_TENUE, (izq, 0.175), (-0.5, 0), z=-0.01)
-        self.t_pide = _texto(c, "", 16, estilo.COLOR_ACENTO, (izq, 0.14), (-0.5, 0), negrita=True, z=-0.01)
-        self.t_dado = _texto(c, "", 13, estilo.COLOR_TEXTO, (izq, 0.103), (-0.5, 0), z=-0.01)
-        self.t_total = _texto(c, "", 16, estilo.COLOR_TEXTO, (izq, 0.06), (-0.5, 0), negrita=True, z=-0.01)
-        self.t_paga = _texto(c, "", 16, estilo.COLOR_TEXTO, (izq, 0.025), (-0.5, 0), negrita=True, z=-0.01)
-        self.t_cambio = _texto(c, "", 18, estilo.COLOR_ACENTO, (izq, -0.015), (-0.5, 0), negrita=True, z=-0.01)
-        self.t_aviso = _texto(c, "", 14, estilo.COLOR_TEXTO, (0, -0.045), negrita=True, z=-0.01)
-        self.boton_dar = boton_piel_primario("Dar cambio (Enter)", al_clic=self._dar_cambio, ancho=0.3, alto=0.055,
-                                             tamano_fuente_px=17, parent=c, position=(0, -0.095, -0.02))
-        self.boton_quitar = boton_piel_secundario("Quitar el último (Retroceso)", al_clic=lambda: self._quitar(-1), ancho=0.3,
-                                                  alto=0.045, tamano_fuente_px=13, parent=c, position=(0, -0.147, -0.02))
+        # Todo a 16 px o más (docs/DISENO.md §3). Las filas se miden desde el borde de arriba, que queda donde estaba; el
+        # cartel crece hacia abajo lo que pida la ayuda (2 líneas, 4 con la de mirar).
         mirar = "Mirar: clic derecho y mueve el ratón (o flechas), C centra.  " if self._mirada_libre else ""
-        ayuda = _texto(c, mirar + "Productos: clic o 1-4.  Cambio: clic en la caja.  Esc: salir", 11, estilo.COLOR_TEXTO_TENUE,
-                       (0, -0.178), z=-0.01)
-        diseno_adaptable.ajustar_texto(ayuda, ancho - 0.03, escala_min=0.6)
+        lineas_ayuda = 4 if mirar else 2
+        ancho, arriba = ANCHO_CARTEL, 0.17
+        alto = 0.44 + ALTO_LINEA_AYUDA * lineas_ayuda
+        c = self.cartel = panel_piel(self.raiz, ancho, alto, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX,
+                                      position=(0.39, arriba - alto / 2), z=-0.005)
+        izq, y0 = -ancho / 2 + 0.02, alto / 2
+        self.t_cliente = _texto(c, "", 16, estilo.COLOR_TEXTO_TENUE, (izq, y0 - 0.035), (-0.5, 0), z=-0.01)
+        self.t_pide = _texto(c, "", 16, estilo.COLOR_ACENTO, (izq, y0 - 0.072), (-0.5, 0), negrita=True, z=-0.01)
+        self.t_dado = _texto(c, "", 16, estilo.COLOR_TEXTO, (izq, y0 - 0.109), (-0.5, 0), z=-0.01)
+        self.t_total = _texto(c, "", 16, estilo.COLOR_TEXTO, (izq, y0 - 0.149), (-0.5, 0), negrita=True, z=-0.01)
+        self.t_paga = _texto(c, "", 16, estilo.COLOR_TEXTO, (izq, y0 - 0.186), (-0.5, 0), negrita=True, z=-0.01)
+        self.t_cambio = _texto(c, "", 18, estilo.COLOR_ACENTO, (izq, y0 - 0.227), (-0.5, 0), negrita=True, z=-0.01)
+        self.t_aviso = _texto(c, "", 16, estilo.COLOR_TEXTO, (0, y0 - 0.273), negrita=True, z=-0.01)
+        self.boton_dar = boton_piel_primario("Dar cambio (Enter)", al_clic=self._dar_cambio, ancho=0.3, alto=0.055,
+                                             tamano_fuente_px=17, parent=c, position=(0, y0 - 0.34, -0.02))
+        self.boton_quitar = boton_piel_secundario("Quitar el último (Retroceso)", al_clic=lambda: self._quitar(-1), ancho=0.3,
+                                                  alto=0.045, tamano_fuente_px=13, parent=c, position=(0, y0 - 0.394, -0.02))
+        ayuda = _texto(c, mirar + "Productos: clic o 1-4.  Cambio: clic en la caja.  Esc: salir", 16, estilo.COLOR_TEXTO_TENUE,
+                       (0, y0 - 0.428), (0, 0.5), z=-0.01)
+        diseno_adaptable.ajustar_texto(ayuda, ancho - 0.03, escala_min=0.75, max_lineas=lineas_ayuda)
 
     # -- Acciones --
 
@@ -450,7 +455,7 @@ class JuegoMostrador:
         self._poner(self.t_cliente, f"CLIENTE {t.cliente + 1}")
         self._poner(self.t_pide, f"Pide: {t.pedido_texto()}" if t.estado != mt.LLEGANDO else "Llega un cliente...", 16)
         partes = [f"{p} {dado.get(p, 0)}/{n}" for p, n in pedido.items()]
-        self._poner(self.t_dado, "Dado: " + " · ".join(partes) if t.estado == mt.PEDIDO else "", 13)
+        self._poner(self.t_dado, "Dado: " + " · ".join(partes) if t.estado == mt.PEDIDO else "", 16)
         con_pago = t.estado in (mt.CAMBIO, mt.SALIENDO)
         self._poner(self.t_total, f"Total: {dinero.formatear(t.total())}" if t.estado != mt.LLEGANDO else "")
         self._poner(self.t_paga, f"Te paga: {dinero.formatear(sum(t.pagado()))}" if con_pago else "")
@@ -463,7 +468,7 @@ class JuegoMostrador:
         cadena = texto if resta > 0 else ""
         if self.t_aviso.text != cadena:
             self.t_aviso.text = _seguro(cadena)
-            diseno_adaptable.ajustar_texto(self.t_aviso, ANCHO_CARTEL - 0.03, escala_base=escala_fuente(14),
+            diseno_adaptable.ajustar_texto(self.t_aviso, ANCHO_CARTEL - 0.03, escala_base=escala_fuente(16),
                                            escala_min=0.75, max_lineas=2)
         self.t_aviso.color = rgb(estilo.ESTADO_EXITO if ok else estilo.ESTADO_ERROR)
 

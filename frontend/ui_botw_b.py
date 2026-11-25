@@ -4,10 +4,10 @@
 # cuando la persona A suba su rediseño de componentes.py, sin que aquí se toque nada de ellos.
 #
 #   vestir(raiz, titulos=(), foco=None, piezas=(), velo=False)   -> Piel | None
-#       titulos: Text que pasan a cursiva negrita con sombra plana de tinta (la sombra sigue al texto si cambia).
+#       titulos: Text que pasan a cursiva negrita (tipografia.fuente_piel(titulo=True)), sin sombra, como los de A.
 #       foco:    un FocoTeclado (fondo_menu) o algo con enfocado(): la flecha amarilla se pone a la izquierda del control
-#                enfocado (dibujada con PIL: la fuente no trae flechas).
-#       piezas:  entidades que entran escalonadas (desde la derecha), como las opciones del menú BOTW.
+#                enfocado. Es la MISMA de los botones de A (componentes.textura_flecha_botw), con su tamaño y hueco.
+#       piezas:  entidades que entran desde la derecha con la entrada del kit de A (ui_botw_calculos.entrada).
 #       velo:    velo violeta de pantalla completa detrás de `raiz` (degradado de abajo arriba).
 #   piel.reiniciar()   vuelve a pasar la entrada (al volver a mostrar la pantalla)
 #
@@ -15,19 +15,17 @@
 # GUARDIÁN: si algo falla al vestir o en un frame, la piel se quita sola, la pantalla sigue como estaba y se avisa UNA
 # vez por stderr. Respeta «reducir movimiento» (banderas_visuales.reducir_movimiento): sin entrada ni deslizamientos.
 
-import math
 import sys
 
 from ursina import Entity, Text, Texture, camera, color, time
 
+from frontend import componentes, tipografia
 from frontend import ui_botw_b_calculos as calc
 
 _avisados = set()
 # camera.ui: z mayor = más atrás. El velo va bien por detrás de todas las capas de la pantalla (sus paneles usan z
 # pequeñas) y por delante del fondo de los menús.
 PROFUNDIDAD_VELO = 0.4
-# La flecha mide 26 × 18 px a 720p en el menú BOTW; dentro de las pantallas escaladas de B se ve a este tamaño.
-ESCALA_FLECHA = 1.6
 
 
 def _avisar(texto):
@@ -53,25 +51,6 @@ def _reducido():
 _texturas = {}
 
 
-def _textura_flecha(escala=4):
-    """Flecha amarilla con borde de tinta, punta a la derecha (señala al control), 26 × 18 px a 720p."""
-    if "flecha" in _texturas:
-        return _texturas["flecha"]
-    from PIL import Image, ImageDraw
-    p = calc.paleta()
-    s = escala
-    img = Image.new("RGBA", (26 * s, 18 * s), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    punta = [(24 * s, 9 * s), (8 * s, 2 * s), (11 * s, 9 * s), (8 * s, 16 * s)]
-    d.polygon(punta, fill=(*p["amarillo"], 255))
-    d.line(punta + [punta[0]], fill=(*p["tinta"], 255), width=int(2.5 * s), joint="curve")
-    d.line([(1 * s, 9 * s), (10 * s, 9 * s)], fill=(*p["amarillo"], 255), width=int(3 * s))
-    tex = Texture(img)
-    tex.filtering = "mipmap"
-    _texturas["flecha"] = tex
-    return tex
-
-
 def _textura_velo(n=128):
     """Degradado vertical del color del velo: transparente arriba, ALFA_VELO_PANEL abajo."""
     if "velo" in _texturas:
@@ -92,40 +71,19 @@ def _textura_velo(n=128):
 
 # -- Piezas ------------------------------------------------------------------------------------------------------------
 
-class SombraTitulo(Entity):
-    """Sombra plana de tinta de un Text (hija suya): copia su texto cada frame si cambió."""
-
-    def __init__(self, texto):
-        super().__init__(parent=texto)
-        d = calc.u(calc.SOMBRA_TITULO_PX) / max(1e-6, float(texto.scale_y))
-        self.origen = texto
-        # Un Text("") centrado falla en Ursina (nota de frontend/online_ui.py): la copia nunca queda vacía.
-        self.copia = Text(texto.text or " ", parent=self, font=calc.FUENTE_TITULO, origin=texto.origin,
-                          position=(d, -d, 0.001), color=_c(calc.paleta()["tinta"]))
-        self.copia.ignore = True
-
-    def update(self):
-        texto = self.origen.text or " "
-        if self.copia.text != texto:
-            self.copia.text = texto
-        if self.copia.origin != self.origen.origin:
-            self.copia.origin = self.origen.origin
-        if self.copia.line_height != self.origen.line_height:
-            self.copia.line_height = self.origen.line_height
-
-
 class FlechaFoco(Entity):
-    """La flecha amarilla a la izquierda del control enfocado (solo con el foco de teclado a la vista)."""
+    """La flecha amarilla a la izquierda del control enfocado (solo con el foco de teclado a la vista): la de los botones
+    de A (componentes.BotonBotw), con su textura, alto y proporción."""
 
     def __init__(self, foco, **opciones):
-        super().__init__(model="quad", texture=_textura_flecha(), color=color.white, **opciones)
+        super().__init__(model="quad", texture=componentes.textura_flecha_botw(), color=color.white, **opciones)
         self.foco = foco
         self.ignore = True
-        self.alto = calc.u(18) * ESCALA_FLECHA
-        self.ancho = calc.u(26) * ESCALA_FLECHA
+        self.alto = componentes.a_unidades(componentes.BotonBotw.ALTO_FLECHA_PX)
+        self.ancho = self.alto * componentes.FLECHA_BOTW_PX[0] / componentes.FLECHA_BOTW_PX[1]
         self.enabled = False
 
-    def colocar(self, t):
+    def colocar(self):
         control = self.foco.enfocado() if self.foco is not None else None
         # Los botones de la piel de A (componentes.BotonBotw*, vía boton_piel_*) ya dibujan su flecha con el foco: aquí
         # solo se señalan los controles propios (tarjetas de rol, selectores, campos).
@@ -139,23 +97,22 @@ class FlechaFoco(Entity):
         if self.parent is not control.parent:
             self.parent = control.parent
         ancho_control = abs(float(getattr(control, "scale_x", 0.3)))
+        # quieta, como la de los botones de A
         x = calc.x_flecha(control.x - ancho_control / 2, self.ancho)
-        vaiven = 0.0 if _reducido() else calc.u(3) * (0.5 - 0.5 * math.cos(t * 4.0))
-        self.position = (x - vaiven, control.y, control.z - 0.01)
+        self.position = (x, control.y, control.z - 0.01)
         self.scale = (self.ancho, self.alto)
 
 
 class Piel(Entity):
-    """Lo que vistió una pantalla: sombras, flecha, velo y la entrada escalonada."""
+    """Lo que vistió una pantalla: títulos, flecha, velo y la entrada."""
 
     def __init__(self, raiz, titulos=(), foco=None, piezas=(), velo=False):
         super().__init__(parent=raiz)
         self.raiz = raiz
         self.t = 0.0
-        self.sombras = [SombraTitulo(t) for t in titulos if t is not None]
         for texto in titulos:
             if texto is not None:
-                texto.font = calc.FUENTE_TITULO
+                texto.font = tipografia.fuente_piel(titulo=True)
         self.flecha = FlechaFoco(foco, parent=raiz) if foco is not None else None
         if self.flecha is not None:
             self.flecha.enabled = True
@@ -190,7 +147,7 @@ class Piel(Entity):
             if self.piezas and not calc.entrada_terminada(self.t - time.dt, len(self.piezas), _reducido()):
                 self._colocar_piezas()
             if self.flecha is not None:
-                self.flecha.colocar(self.t)
+                self.flecha.colocar()
         except Exception as error:      # noqa: BLE001
             self.quitar(error)
 
@@ -204,7 +161,7 @@ class Piel(Entity):
                 pieza.x = x0
             except Exception:           # noqa: BLE001
                 pass
-        for parte in [self.flecha, self.velo] + [s for s in self.sombras]:
+        for parte in (self.flecha, self.velo):
             try:
                 if parte is not None:
                     parte.enabled = False

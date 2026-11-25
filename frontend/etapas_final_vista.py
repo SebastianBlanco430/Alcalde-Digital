@@ -126,7 +126,7 @@ def crear_controlador(escena, conexion):
             self.titulo = Text(textos["medidor"]["titulo"], parent=self, origin=(-0.5, 0), position=(izquierda, 0.026, -0.01),
                                scale=escala_fuente(13), color=rgb(estilo.COLOR_TEXTO_TENUE))
             self.numero = Text("50", parent=self, origin=(0.5, 0), position=(ANCHO_BARRA / 2, 0.026, -0.01),
-                               scale=escala_fuente(15), color=rgb(estilo.COLOR_TEXTO), font=tipografia.FUENTE_TITULO)
+                               scale=escala_fuente(15), color=rgb(estilo.COLOR_TEXTO), font=tipografia.fuente_piel(titulo=True))
             self.borde = Entity(parent=self, model="quad", scale=(ANCHO_BARRA + 0.006, ALTO_BARRA + 0.006),
                                 position=(0, 0.003, -0.008), color=rgb(estilo.TINTA))
             self.barra_fondo = Entity(parent=self, model="quad", scale=(ANCHO_BARRA, ALTO_BARRA), position=(0, 0.003, -0.009),
@@ -140,7 +140,7 @@ def crear_controlador(escena, conexion):
             self.guion = Entity(parent=self, model="quad", scale=(0.016, 0.004), position=(0, -0.026, -0.01),
                                 color=rgb(estilo.PAPEL))
             self.etiqueta = Text("", parent=self, origin=(0, 0), position=(0.012, -0.026, -0.01), scale=escala_fuente(14),
-                                 color=rgb(estilo.COLOR_TEXTO), font=tipografia.FUENTE_TITULO)
+                                 color=rgb(estilo.COLOR_TEXTO), font=tipografia.fuente_piel(titulo=True))
             self._pintado = None
             self.enabled = False
             diseno_adaptable.ajustar_escala(self)

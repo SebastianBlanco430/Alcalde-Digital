@@ -6,7 +6,7 @@
 from ursina import Entity, Text
 
 from frontend import estilo, tipografia
-from frontend.componentes import escala_fuente, panel_tinta, rgb
+from frontend.componentes import escala_fuente, rgb, panel_piel
 from frontend.fiscalia import ui_calculos as uc
 from frontend.fiscalia.rueda import ajustar, ancho_real
 
@@ -23,20 +23,20 @@ class Subtitulos(Entity):
 
     def __init__(self, **opciones):
         super().__init__(position=(*POS, 0), **opciones)
-        self.panel = panel_tinta(self, ANCHO, ALTO, tono=estilo.COLOR_PANEL)
+        self.panel = panel_piel(self, ANCHO, ALTO, tono=estilo.COLOR_PANEL)
         self.nombre = Text("", parent=self, origin=(-0.5, 0), position=(X0, Y_NOMBRE, -0.01),
-                           scale=escala_fuente(uc.TAM["nombre"]), font=tipografia.FUENTE_TITULO,
+                           scale=escala_fuente(uc.TAM["nombre"]), font=tipografia.fuente_piel(titulo=True),
                            color=rgb(estilo.COLOR_ACENTO))
         self.texto = Text("", parent=self, origin=(-0.5, 0.5), position=(X0, Y_TEXTO, -0.01),
                           scale=escala_fuente(uc.TAM["subtitulo"]), color=rgb(estilo.COLOR_TEXTO))
         self.texto.line_height = 1.15
         self.siguiente = Text("»", parent=self, origin=(0, 0), position=(ANCHO / 2 - 0.03, -ALTO / 2 + 0.024, -0.01),
-                              scale=escala_fuente(22), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_ACENTO),
+                              scale=escala_fuente(22), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_ACENTO),
                               enabled=False)
         self.dice = Text("", parent=self, origin=(0, 0), position=(POS_DICE[0], POS_DICE[1] - POS[1], -0.01),
-                         scale=escala_fuente(uc.TAM["dice"]), font=tipografia.FUENTE_TITULO, color=rgb(CIAN),
+                         scale=escala_fuente(uc.TAM["dice"]), font=tipografia.fuente_piel(titulo=True), color=rgb(CIAN),
                          enabled=False)
-        self.dice_fondo = panel_tinta(self, 0.5, 0.05, tono=estilo.TINTA, sombra=False, borde_px=2,
+        self.dice_fondo = panel_piel(self, 0.5, 0.05, tono=estilo.TINTA, sombra=False, borde_px=2,
                                       position=(POS_DICE[0], POS_DICE[1] - POS[1], -0.005), enabled=False)
         self._completo = ""
         self._t = 0.0

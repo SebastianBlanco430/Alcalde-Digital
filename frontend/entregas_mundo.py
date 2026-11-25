@@ -24,7 +24,7 @@ from backend.datos.nombres_visibles import nombre_visible
 from backend.logica import entregas as le
 from backend.logica.trabajos import ENTREGAS
 from frontend import estilo, tipografia
-from frontend.componentes import escala_fuente, panel_tinta, rgb
+from frontend.componentes import escala_fuente, rgb, panel_piel
 
 ENTREGAS_EN_MUNDO = True
 FUENTE_MINIMAPA = "entregas"
@@ -255,9 +255,9 @@ class EntregasMundo(Entity):
     def _crear_hud(self):
         if self.hud is None:
             hud = Entity(parent=self.escena.hud, y=Y_HUD, z=-0.04)
-            panel_tinta(hud, ANCHO_HUD, ALTO_HUD, z=-0.01)
+            panel_piel(hud, ANCHO_HUD, ALTO_HUD, z=-0.01)
             hud.titulo = Text("", parent=hud, origin=(0, 0), position=(0, 0.025, -0.02), scale=escala_fuente(20),
-                              color=rgb(estilo.COLOR_ACENTO), font=tipografia.FUENTE_TITULO)
+                              color=rgb(estilo.COLOR_ACENTO), font=tipografia.fuente_piel(titulo=True))
             hud.texto = Text("", parent=hud, origin=(0, 0), position=(0, -0.022, -0.02), scale=escala_fuente(16),
                              color=rgb(estilo.COLOR_TEXTO))
             self.hud = hud

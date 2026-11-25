@@ -70,7 +70,7 @@ class Medidor:
 
     def __init__(self):
         normal = Text("", add_to_scene_entities=False)
-        negrita = Text("", font=tipografia.FUENTE_TITULO, add_to_scene_entities=False)
+        negrita = Text("", font=tipografia.fuente_piel(titulo=True), add_to_scene_entities=False)
         self._fuentes = {False: normal.font, True: negrita.font}
         from ursina import destroy
         destroy(normal)
@@ -86,7 +86,7 @@ class Medidor:
 
 
 def _texto(padre, cadena, px, pos, tono, origen=(-0.5, 0), negrita=False, z=-0.01):
-    opciones = {"font": tipografia.FUENTE_TITULO} if negrita else {}
+    opciones = {"font": tipografia.fuente_piel(titulo=True)} if negrita else {}
     return Text(cadena, parent=padre, origin=origen, position=(pos[0], pos[1], z),
                 scale=escala_fuente(px), color=rgb(tono), **opciones)
 
@@ -129,7 +129,7 @@ class Avatar(Entity):
         self.disco = Entity(parent=self, model="circle", scale=diametro * 0.86, z=0.001)
         px = max(17, int(diametro * 600 * 0.5))
         self.letra = Text("", parent=self, origin=(0, 0), position=(0, 0.0015, -0.002),
-                          scale=escala_fuente(px), font=tipografia.FUENTE_TITULO)
+                          scale=escala_fuente(px), font=tipografia.fuente_piel(titulo=True))
 
     def fijar(self, autor):
         self.disco.color = rgb(autor["color_avatar"])
@@ -188,7 +188,7 @@ class Aviso(Entity):
         self._medidor = medidor
         self.panel = panel_piel(self, 0.3, 0.06, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX)
         self.icono = Entity(parent=self, model="quad", scale=0.034, z=-0.01)
-        self.texto = Text("", parent=self, origin=(-0.5, 0), scale=escala_fuente(19), font=tipografia.FUENTE_TITULO,
+        self.texto = Text("", parent=self, origin=(-0.5, 0), scale=escala_fuente(19), font=tipografia.fuente_piel(titulo=True),
                           color=rgb(estilo.COLOR_TEXTO), position=(0, 0, -0.01))
         self.y_reposo = 0.0
 
@@ -246,7 +246,7 @@ class TarjetaPost(Entity):
         self.enlace_miniatura = Entity(parent=self.enlace, model="quad", z=-0.01)
         self.enlace_dominio = _texto(self.enlace, "", PX_META, (0, 0), COLOR_TENUE, z=-0.01)
         self.enlace_titulo = Text("", parent=self.enlace, origin=(-0.5, 0.5), scale=escala_fuente(PX_RESPUESTA),
-                                  font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO), z=-0.01)
+                                  font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO), z=-0.01)
         self.enlace_titulo.line_height = 1.2
         # Carta de misión: chip en la cabecera y caja con la pista (ocultos salvo en esa carta).
         ancho_chip = medidor.ancho(TEXTO_CHIP_MISION, PX_META, True) + 0.04
@@ -277,7 +277,7 @@ class TarjetaPost(Entity):
                                                    parent=self, z=-0.02, tamano_fuente_px=22)
         self.boton_reportar = boton_piel_peligro("Reportar", al_clic=al_reportar, ancho=0.30, alto=self.ALTO_BOTON,
                                                  parent=self, z=-0.02, tamano_fuente_px=22)
-        self.boton_reportar.text_entity.font = tipografia.FUENTE_TITULO
+        self.boton_reportar.text_entity.font = tipografia.fuente_piel(titulo=True)
         for boton, nombre, tono in ((self.boton_compartir, "republicar", estilo.COLOR_ACENTO_TEXTO),
                                     (self.boton_reportar, "bandera", (250, 244, 228))):
             lado_x, lado_y = 0.038 / boton.base_scale[0], 0.038 / boton.base_scale[1]
@@ -511,7 +511,7 @@ class VistaRedSocial(Entity):
         self.sello = Entity(parent=self, position=(CX_FEED, -0.02, -0.25), rotation_z=-3, enabled=False)
         self.sello.panel = panel_piel(self.sello, 0.62, 0.1, tono=(60, 170, 100), radio_px=estilo.RADIO_PANEL_PX)
         self.sello.texto = Text("", parent=self.sello, origin=(0, 0), position=(0, 0, -0.01),
-                                scale=escala_fuente(34), font=tipografia.FUENTE_TITULO,
+                                scale=escala_fuente(34), font=tipografia.fuente_piel(titulo=True),
                                 color=rgb((250, 244, 228)))
 
     # -- construcción --

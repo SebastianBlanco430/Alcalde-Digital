@@ -210,8 +210,8 @@ class FinalAnimado(Entity):
         # «Mantén para saltar»: abajo a la derecha, con un anillo de puntos que se llena.
         self.salto = Entity(parent=self.raizui, z=-0.02)
         self.salto_fondo = Entity(parent=self.salto, model="quad", z=0.005, color=color.rgba(0, 0, 0, 0))
-        self.salto_texto = Text(self._texto_saltar, parent=self.salto, origin=(0.5, 0), scale=escala_fuente(15),
-                                color=color.rgba(1, 1, 1, 0.9), font=tipografia.FUENTE_TITULO)
+        self.salto_texto = Text(self._texto_saltar, parent=self.salto, origin=(0.5, 0), scale=escala_fuente(16),
+                                color=color.rgba(1, 1, 1, 0.9), font=tipografia.fuente_piel(titulo=True))
         self.anillo = []
         for k in range(PUNTOS_ANILLO):
             ang = 2 * math.pi * k / PUNTOS_ANILLO

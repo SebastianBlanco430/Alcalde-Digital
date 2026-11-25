@@ -10,7 +10,7 @@ import time
 from ursina import Entity, Text, color
 
 from frontend import estilo, tipografia
-from frontend.componentes import escala_fuente, modelo_redondeado, panel_tinta, rgb
+from frontend.componentes import escala_fuente, modelo_redondeado, rgb, panel_piel
 from frontend.fiscalia import ui_calculos as uc
 from frontend.fiscalia.rueda import ajustar, ancho_real, triangulo
 
@@ -29,9 +29,9 @@ class MedidorSolidez(Entity):
     def __init__(self, umbrales=None, **opciones):
         super().__init__(position=(*POS, 0), **opciones)
         self.umbrales = dict(umbrales or {})
-        self.panel = panel_tinta(self, ANCHO, ALTO, tono=estilo.COLOR_PANEL)
+        self.panel = panel_piel(self, ANCHO, ALTO, tono=estilo.COLOR_PANEL)
         self.titulo = Text("", parent=self, origin=(-0.5, 0), position=(X_TITULO, 0.0, -0.01),
-                           scale=escala_fuente(uc.TAM["medidor"]), font=tipografia.FUENTE_TITULO,
+                           scale=escala_fuente(uc.TAM["medidor"]), font=tipografia.fuente_piel(titulo=True),
                            color=rgb(estilo.COLOR_TEXTO))
         self.fondo_barra = Entity(parent=self, model=modelo_redondeado(ANCHO_BARRA, ALTO_BARRA, 4),
                                   position=(X_BARRA + ANCHO_BARRA / 2, Y_BARRA, -0.004), scale=(ANCHO_BARRA, ALTO_BARRA),
@@ -57,13 +57,13 @@ class MedidorSolidez(Entity):
         self.flecha_sube = triangulo(self.delta, (0.026, 0.022), True, VERDE, position=(0.0, 0.0))
         self.flecha_baja = triangulo(self.delta, (0.026, 0.022), False, ROJO, position=(0.0, 0.0))
         self.delta_txt = Text("", parent=self.delta, origin=(-0.5, 0), position=(0.022, 0.0, 0),
-                              scale=escala_fuente(uc.TAM["delta"]), font=tipografia.FUENTE_TITULO)
+                              scale=escala_fuente(uc.TAM["delta"]), font=tipografia.fuente_piel(titulo=True))
         # Ficha de prueba nueva (un panel de una línea y otro de dos; el texto va encima del que toque)
         self.prueba = Entity(parent=self, position=(*POS_PRUEBA, -0.02), enabled=False)
-        self._paneles_prueba = {n: panel_tinta(self.prueba, uc.ANCHO_FICHA_PRUEBA, alto, tono=estilo.COLOR_TARJETA)
+        self._paneles_prueba = {n: panel_piel(self.prueba, uc.ANCHO_FICHA_PRUEBA, alto, tono=estilo.COLOR_TARJETA)
                                 for n, alto in uc.ALTO_FICHA_PRUEBA.items()}
         self.prueba_txt = Text("", parent=self.prueba, origin=(0, 0), z=-0.01, scale=escala_fuente(uc.TAM["prueba"]),
-                               font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+                               font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
         self._ficha = uc.FichaPruebas()
         self._texto_prueba = None
         self.valor = 0

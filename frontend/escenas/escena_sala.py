@@ -100,7 +100,7 @@ class EscenaSala(Escena):
         self.panel = panel_piel(self.raiz, ANCHO_PANEL, ALTO_PANEL, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
         anadir_filo(self.panel, ANCHO_PANEL, ALTO_PANEL, estilo.RADIO_PANEL_PX)
         self.titulo = crear_texto(self.raiz, "Sala de espera", -ANCHO_PANEL / 2 + 0.05, 0.43, 30,
-                                  font=tipografia.FUENTE_TITULO)
+                                  font=tipografia.fuente_piel(titulo=True))
         self.t_estado = crear_texto(self.raiz, " ", -0.20, 0.43, 20, estilo.ACENTO_SECUNDARIO,
                                     origen=(-0.5, 0))
         crear_texto(self.raiz, "Elige tu rol (clic en una tarjeta libre)", -0.80, 0.37, 18, estilo.COLOR_TEXTO_TENUE)
@@ -154,7 +154,7 @@ class EscenaSala(Escena):
         self.btn_iniciar = boton_piel_primario("Iniciar partida", al_clic=self.iniciar, ancho=0.56, alto=a_unidades(52),
                                                tamano_fuente_px=22, parent=self.raiz, position=(0.52, -0.425, -0.003))
         self.foco = FocoOnline(self._controles_activos, al_escape=self.salir, parent=self)
-        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra, velo, flecha del foco y
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva negrita, velo, flecha del foco y
         # entrada desde la derecha. None = la sala de siempre.
         self.piel = ui_botw_b.vestir(self.raiz, titulos=(self.titulo,), foco=self.foco, piezas=(self.raiz,), velo=True)
 

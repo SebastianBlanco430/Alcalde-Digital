@@ -50,7 +50,7 @@ def crear_vinetas(vinetas, al_terminar, segundos=None, guardia=None, rotulos=Non
     from ursina import Circle, Entity, Text, color
 
     from frontend import diseno_adaptable, estilo, tipografia
-    from frontend.componentes import BotonPrimario, BotonSecundario, a_unidades, destruir_arbol, escala_fuente, panel_tinta, rgb
+    from frontend.componentes import a_unidades, destruir_arbol, escala_fuente, panel_tinta, rgb, boton_piel_primario, boton_piel_secundario
 
     vinetas = list(vinetas)
     datos = rotulos or {}
@@ -87,10 +87,10 @@ def crear_vinetas(vinetas, al_terminar, segundos=None, guardia=None, rotulos=Non
             self.paso = Text("", parent=self, origin=(0.5, 0), position=(ANCHO_VINETA / 2 - 0.04, y_cartela + 0.045, -0.01),
                              scale=escala_fuente(14), color=rgb((96, 92, 84)))
             y_botones = -0.5 + 0.055
-            self.boton_saltar = BotonSecundario(datos.get("saltar", "Saltar"), al_clic=self.saltar, ancho=0.24, alto=a_unidades(44),
+            self.boton_saltar = boton_piel_secundario(datos.get("saltar", "Saltar"), al_clic=self.saltar, ancho=0.24, alto=a_unidades(44),
                                                 tamano_fuente_px=18, parent=self,
                                                 position=(-ANCHO_VINETA / 2 + 0.12, y_botones, -0.02))
-            self.boton_seguir = BotonPrimario(datos.get("continuar", "Continuar"), al_clic=self.siguiente, ancho=0.28,
+            self.boton_seguir = boton_piel_primario(datos.get("continuar", "Continuar"), al_clic=self.siguiente, ancho=0.28,
                                               alto=a_unidades(44), tamano_fuente_px=18, parent=self,
                                               position=(ANCHO_VINETA / 2 - 0.14, y_botones, -0.02))
             self.negro = Entity(parent=self, model="quad", scale=(4.0, 2.0), z=-0.05, color=color.rgba(0, 0, 0, 0))

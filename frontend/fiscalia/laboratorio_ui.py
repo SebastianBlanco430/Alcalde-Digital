@@ -6,7 +6,7 @@
 from ursina import Entity, Text, destroy
 
 from frontend import estilo, tipografia
-from frontend.componentes import a_unidades, destruir_arbol, escala_fuente, panel_tinta, rgb
+from frontend.componentes import a_unidades, destruir_arbol, escala_fuente, panel_tinta, rgb, panel_piel
 from frontend.fiscalia import ui_calculos as uc
 from frontend.fiscalia.rueda import ajustar, ancho_real, palomita
 
@@ -21,15 +21,15 @@ class ChipTerminal(Entity):
 
     def __init__(self, **opciones):
         super().__init__(**opciones)
-        self.panel = panel_tinta(self, ANCHO_CHIP, ALTO_CHIP, tono=estilo.COLOR_PANEL, radio_px=estilo.RADIO_TARJETA_PX)
+        self.panel = panel_piel(self, ANCHO_CHIP, ALTO_CHIP, tono=estilo.COLOR_PANEL, radio_px=estilo.RADIO_TARJETA_PX)
         x0 = -ANCHO_CHIP / 2 + 0.022
         self.nombre = Text("", parent=self, origin=(-0.5, 0), position=(x0, 0.033, -0.01),
-                           scale=escala_fuente(uc.TAM["chip_titulo"]), font=tipografia.FUENTE_TITULO,
+                           scale=escala_fuente(uc.TAM["chip_titulo"]), font=tipografia.fuente_piel(titulo=True),
                            color=rgb(estilo.COLOR_TEXTO))
         self.prueba = Text("", parent=self, origin=(-0.5, 0), position=(x0, -0.003, -0.01),
                            scale=escala_fuente(uc.TAM["chip"]), color=rgb(estilo.COLOR_TEXTO_TENUE))
         self.estado = Text("", parent=self, origin=(-0.5, 0), position=(x0, -0.038, -0.01),
-                           scale=escala_fuente(uc.TAM["chip"]), font=tipografia.FUENTE_TITULO,
+                           scale=escala_fuente(uc.TAM["chip"]), font=tipografia.fuente_piel(titulo=True),
                            color=rgb(estilo.COLOR_TEXTO_TENUE))
         self.marca = palomita(self, 0.026, position=(x0 + 0.012, -0.038, -0.01), enabled=False)
         self._x0 = x0
@@ -52,7 +52,7 @@ class LaboratorioUI(Entity):
         super().__init__(**opciones)
         self.titulo = Text("Terminales del laboratorio", parent=self, origin=(-0.5, 0),
                            position=(X_CHIPS - ANCHO_CHIP / 2, Y_PRIMER_CHIP + ALTO_CHIP / 2 + 0.03, -0.01),
-                           scale=escala_fuente(uc.TAM["chip_titulo"]), font=tipografia.FUENTE_TITULO,
+                           scale=escala_fuente(uc.TAM["chip_titulo"]), font=tipografia.fuente_piel(titulo=True),
                            color=rgb(estilo.COLOR_ACENTO))
         self.chips = [ChipTerminal(parent=self, position=(X_CHIPS, Y_PRIMER_CHIP - i * PASO_CHIP, 0)) for i in range(2)]
         self.aviso = None
@@ -67,20 +67,20 @@ class LaboratorioUI(Entity):
         self._aviso_actual = texto
         if not texto:
             return
-        medida = Text("", parent=self, scale=escala_fuente(uc.TAM["aviso"]), font=tipografia.FUENTE_TITULO)
+        medida = Text("", parent=self, scale=escala_fuente(uc.TAM["aviso"]), font=tipografia.fuente_piel(titulo=True))
         ajustar(medida, texto, 0.62, uc.TAM["aviso"])
         ancho_txt, escala, cadena = ancho_real(medida), medida.scale, medida.text
         destroy(medida)
         tecla = a_unidades(30)
         ancho = ancho_txt + tecla + 0.065
-        self.aviso = panel_tinta(self, ancho, 0.062, tono=estilo.COLOR_PANEL, position=(*POS_AVISO, -0.01))
+        self.aviso = panel_piel(self, ancho, 0.062, tono=estilo.COLOR_PANEL, position=(*POS_AVISO, -0.01))
         x_tecla = -ancho / 2 + 0.02 + tecla / 2
         caja = panel_tinta(self.aviso, tecla, tecla, estilo.PAPEL, estilo.RADIO_CHIP_PX, borde_px=2,
                            position=(x_tecla, 0, -0.01))
         Text("E", parent=caja, origin=(0, 0), position=(0, a_unidades(1), -0.01), scale=escala_fuente(17),
              font=tipografia.FUENTE_TITULO, color=rgb(estilo.TINTA))
         self.aviso_txt = Text(cadena, parent=self.aviso, origin=(-0.5, 0), position=(x_tecla + tecla / 2 + 0.018, 0, -0.01),
-                              scale=escala, font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+                              scale=escala, font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
 
     def mostrar(self, parkours, cerca=None, puerta=False):
         parkours = tuple(parkours or ())[:2]

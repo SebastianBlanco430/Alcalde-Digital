@@ -28,8 +28,8 @@ DURACION_PRESIONADO_S = 0.06
 DURACION_ENTRADA_S = 0.28             # un panel o una opción que aparece (fundido + deslizamiento)
 DESLIZAMIENTO_ENTRADA_PX = 18         # desde dónde entra (a la derecha)
 DESPLAZAMIENTO_FOCO_PX = 6            # la opción con foco se corre a la izquierda, como en el menú
-ESCALA_HOVER = 1.03                   # más contenido que el «cómic» (1,04)
-ESCALA_PRESIONADO = 0.97
+ESCALA_HOVER = 1.04                   # la de componentes.ESCALA_HOVER, que es la que usan los botones BOTW
+ESCALA_PRESIONADO = 0.96              # la de componentes.ESCALA_PRESIONADO
 CONTRASTE_MINIMO = 4.5                # WCAG AA para texto normal
 
 # Equivalencias de la paleta de siempre a la BOTW. Solo colores de interfaz: los de lugares, roles y retratos son

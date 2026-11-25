@@ -57,7 +57,7 @@ class PanelResultadoGrafo(Entity):
 
         self.titulo = Text("Resultado de la misión", parent=self.contenedor, origin=(0, 0),
                            position=(0, 0.418, -0.01), scale=escala_fuente(30),
-                           font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+                           font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
         self.subtitulo = Text("", parent=self.contenedor, origin=(0, 0), position=(0, 0.372, -0.01),
                               scale=escala_fuente(15), color=rgb(estilo.COLOR_TEXTO_TENUE))
         self._fuente_texto = self.subtitulo.font
@@ -80,7 +80,7 @@ class PanelResultadoGrafo(Entity):
                           position=(0.19, -0.41, -0.01), scale=escala_fuente(13),
                           color=rgb(estilo.COLOR_TEXTO_TENUE))
         self._dinamico = Entity(parent=self.contenedor, z=-0.01)
-        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): los títulos en cursiva con sombra plana de tinta (el velo y
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): los títulos en cursiva negrita (el velo y
         # el «pop» de este panel ya son suyos). None = el panel de siempre.
         self.piel = ui_botw_b.vestir(self.contenedor, titulos=(self.titulo, self.titulo_resumen,
                                                                 self.titulo_indicadores))
@@ -158,10 +158,10 @@ class PanelResultadoGrafo(Entity):
         x0, ancho = self.X_COLUMNA, self.ANCHO_COLUMNA
         self.titulo_resumen = Text("Resumen", parent=self.contenedor, origin=(-0.5, 0),
                                    position=(x0, 0.305, -0.01), scale=escala_fuente(15),
-                                   font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+                                   font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
         self.titulo_indicadores = Text("Cambio en los indicadores", parent=self.contenedor,
                                        origin=(-0.5, 0), position=(x0, 0.0, -0.01),
-                                       scale=escala_fuente(15), font=tipografia.FUENTE_TITULO,
+                                       scale=escala_fuente(15), font=tipografia.fuente_piel(titulo=True),
                                        color=rgb(estilo.COLOR_TEXTO))
         self.filas_indicadores = {}
         for i, nombre in enumerate(("convivencia", "confianza", "desinformacion")):
@@ -176,7 +176,7 @@ class PanelResultadoGrafo(Entity):
                  color=rgb(estilo.COLOR_TEXTO))
             delta = Text("", parent=self.contenedor, origin=(0.5, 0),
                          position=(x0 + ancho - 0.14, y, -0.01), scale=escala_fuente(24),
-                         font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO_TENUE))
+                         font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO_TENUE))
             ahora = Text("", parent=self.contenedor, origin=(0.5, 0),
                          position=(x0 + ancho - 0.012, y, -0.01), scale=escala_fuente(13),
                          color=rgb(estilo.COLOR_TEXTO_TENUE))
@@ -302,7 +302,7 @@ class PanelResultadoGrafo(Entity):
                               color=rgb(estilo.TINTA), z=0.0002)
             relleno = Entity(parent=cont, model="circle", scale=d, color=rgb(calc.COLOR_SIN_RECIBIR))
             letra = Text(nombre[0], parent=cont, origin=(0, 0), position=(0, 0, -0.001),
-                         scale=escala_fuente(22 if d > 0.07 else 19), font=tipografia.FUENTE_TITULO,
+                         scale=escala_fuente(22 if d > 0.07 else 19), font=tipografia.fuente_piel(titulo=True),
                          color=rgb(estilo.COLOR_TEXTO_TENUE))
             self._etiqueta_de_nombre(nombre, px, py, d, normalizadas[nombre])
             insignia = self._insignia_veces(cont, d, estado["veces"].get(nombre, 0), nombre)
@@ -341,7 +341,7 @@ class PanelResultadoGrafo(Entity):
         Entity(parent=insignia, model=modelo_redondeado(ancho, 0.024, 6), scale=(ancho, 0.024),
                color=rgb(estilo.TINTA))
         Text(f"×{veces}", parent=insignia, origin=(0, 0), position=(0, 0, -0.001),
-             scale=escala_fuente(11), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+             scale=escala_fuente(11), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
         return insignia
 
     # Líneas «Etiqueta: valor» de la columna derecha.
@@ -355,7 +355,7 @@ class PanelResultadoGrafo(Entity):
                  scale=escala_fuente(14), color=rgb(estilo.COLOR_TEXTO_TENUE))
             x_valor = x0 + 0.012 + self._medir(etiqueta, 14) + 0.016
             texto = Text(valor, parent=self._dinamico, origin=(-0.5, 0), position=(x_valor, y, -0.001),
-                         scale=escala_fuente(14), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+                         scale=escala_fuente(14), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
             self._ajustar(texto, 14, x0 + ancho - 0.01 - x_valor, negrita=True)
 
     # Cambios con signo y color; si hay valores finales, «ahora N».

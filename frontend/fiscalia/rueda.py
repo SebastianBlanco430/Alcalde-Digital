@@ -14,7 +14,7 @@ import math
 from ursina import Entity, Mesh, Text, color, mouse
 
 from frontend import diseno_adaptable, estilo, tipografia
-from frontend.componentes import escala_fuente, modelo_redondeado, panel_tinta, rgb
+from frontend.componentes import escala_fuente, modelo_redondeado, rgb, panel_piel
 from frontend.fiscalia import rueda_calculos as rc
 from frontend.fiscalia import ui_calculos as uc
 
@@ -109,9 +109,9 @@ class Hueco(Entity):
         self.zona = Entity(parent=self, model="quad", scale=(ancho, alto), color=color.clear, collider="box", z=0.02)
         self.silueta = Entity(parent=self, model=modelo_redondeado(ancho, alto, estilo.RADIO_TARJETA_PX),
                               scale=(ancho, alto), color=color.rgba32(*estilo.PAPEL, 26), z=0.01)
-        self.panel = panel_tinta(self, ancho, alto, tono=TONO_LIBRE, radio_px=estilo.RADIO_TARJETA_PX)
+        self.panel = panel_piel(self, ancho, alto, tono=TONO_LIBRE, radio_px=estilo.RADIO_TARJETA_PX)
         self.numero = Text(str(indice + 1), parent=self.panel, origin=(0, 0), position=(-ancho / 2 + 0.02, 0, -0.01),
-                           scale=escala_fuente(uc.TAM["numero"]), font=tipografia.FUENTE_TITULO,
+                           scale=escala_fuente(uc.TAM["numero"]), font=tipografia.fuente_piel(titulo=True),
                            color=rgb(estilo.COLOR_TEXTO_TENUE))
         self.candado = candado(self.panel, 0.034, position=(-ancho / 2 + 0.03, 0.002, -0.01), enabled=False)
         self._contenido()
@@ -123,7 +123,7 @@ class Hueco(Entity):
 
     def _contenido(self):
         self.texto = Text("", parent=self.panel, origin=(0, 0), position=(0.012, 0, -0.01),
-                          scale=escala_fuente(uc.TAM["etiqueta"]), font=tipografia.FUENTE_TITULO,
+                          scale=escala_fuente(uc.TAM["etiqueta"]), font=tipografia.fuente_piel(titulo=True),
                           color=rgb(estilo.COLOR_TEXTO))
 
     def fijar(self, opcion, estado, etiqueta_usada=""):
@@ -203,7 +203,7 @@ class Rueda(Entity):
                             color=color.rgba32(*estilo.TINTA, 170), z=0.003)
         self.anillo = Entity(parent=self, model=malla([]), color=rgb(estilo.PAPEL), double_sided=True, z=0.001)
         self.segundos = Text("", parent=self, origin=(0, 0), z=-0.01, scale=escala_fuente(uc.TAM["reloj"]),
-                             font=tipografia.FUENTE_TITULO, color=rgb(estilo.PAPEL))
+                             font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.PAPEL))
         self.punto = Entity(parent=self, model=modelo_redondeado(0.022, 0.022, 7), scale=(0.022, 0.022),
                             color=rgb(estilo.PAPEL), z=-0.005)
         self._k_reloj = -1

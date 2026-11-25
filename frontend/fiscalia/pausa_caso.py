@@ -8,7 +8,7 @@
 from ursina import Entity, Text, color
 
 from frontend import estilo, tipografia
-from frontend.componentes import BotonPeligro, BotonPrimario, BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb
+from frontend.componentes import BotonPeligro, BotonPrimario, a_unidades, escala_fuente, rgb, boton_piel_primario, boton_piel_secundario, panel_piel
 from frontend.fiscalia import ui_calculos as uc
 from frontend.fiscalia.rueda import ajustar
 
@@ -73,9 +73,9 @@ class Confirmacion(Entity):
         # `aviso` (pendientes-a, O10): línea extra en ámbar entre el texto y los botones; el panel crece para ella
         extra = 0.10 if aviso else 0.0
         ancho, alto = 0.86, 0.36 + extra
-        panel_tinta(self, ancho, alto, tono=estilo.COLOR_PANEL)
+        panel_piel(self, ancho, alto, tono=estilo.COLOR_PANEL)
         self.titulo = Text("", parent=self, origin=(0, 0), position=(0, 0.115 + extra / 2, -0.01),
-                           scale=escala_fuente(uc.TAM["modal_titulo"]), font=tipografia.FUENTE_TITULO,
+                           scale=escala_fuente(uc.TAM["modal_titulo"]), font=tipografia.fuente_piel(titulo=True),
                            color=rgb(estilo.COLOR_TEXTO))
         ajustar(self.titulo, titulo, ancho - 0.08, uc.TAM["modal_titulo"])
         self.texto = Text("", parent=self, origin=(0, 0), position=(0, 0.035 + extra / 2, -0.01),
@@ -84,12 +84,12 @@ class Confirmacion(Entity):
         self.aviso = None
         if aviso:
             self.aviso = Text("", parent=self, origin=(0, 0), position=(0, -0.025, -0.01),
-                              scale=escala_fuente(uc.TAM["modal_texto"]), font=tipografia.FUENTE_TITULO,
+                              scale=escala_fuente(uc.TAM["modal_texto"]), font=tipografia.fuente_piel(titulo=True),
                               color=rgb(estilo.ESTADO_AVISO))
             ajustar(self.aviso, aviso, ancho - 0.08, uc.TAM["modal_texto"], max_lineas=2)
         y_botones = -0.095 - extra / 2
         clase_si = BotonPeligro if peligro else BotonPrimario
-        self.boton_no = BotonSecundario(no, al_clic=lambda: self.responder(False), ancho=0.34, alto=ALTO_BOTON,
+        self.boton_no = boton_piel_secundario(no, al_clic=lambda: self.responder(False), ancho=0.34, alto=ALTO_BOTON,
                                         tamano_fuente_px=uc.TAM["boton"], parent=self, position=(-0.19, y_botones, -0.01))
         self.boton_si = clase_si(si, al_clic=lambda: self.responder(True), ancho=0.34, alto=ALTO_BOTON,
                                  tamano_fuente_px=uc.TAM["boton"], parent=self, position=(0.19, y_botones, -0.01))
@@ -131,17 +131,17 @@ class PausaCaso(Entity):
         Entity(parent=self, model="quad", color=color.rgba32(*estilo.TINTA, 175), scale=(4, 4), z=0.03,
                collider="box")
         ancho, alto = 0.62, 0.42
-        panel_tinta(self, ancho, alto, tono=estilo.COLOR_PANEL, z=0.01)
+        panel_piel(self, ancho, alto, tono=estilo.COLOR_PANEL, z=0.01)
         Text("Caso en pausa", parent=self, origin=(0, 0), position=(0, 0.14, -0.01),
-             scale=escala_fuente(uc.TAM["modal_titulo"] + 6), font=tipografia.FUENTE_TITULO,
+             scale=escala_fuente(uc.TAM["modal_titulo"] + 6), font=tipografia.fuente_piel(titulo=True),
              color=rgb(estilo.COLOR_TEXTO))
-        self.boton_seguir = BotonPrimario("Seguir", al_clic=self.seguir, ancho=0.42, alto=ALTO_BOTON,
+        self.boton_seguir = boton_piel_primario("Seguir", al_clic=self.seguir, ancho=0.42, alto=ALTO_BOTON,
                                           tamano_fuente_px=uc.TAM["boton"] + 2, parent=self, position=(0, 0.035, -0.01))
-        self.boton_abandonar = BotonSecundario("Abandonar caso", al_clic=self.pedir_abandonar, ancho=0.42,
+        self.boton_abandonar = boton_piel_secundario("Abandonar caso", al_clic=self.pedir_abandonar, ancho=0.42,
                                                alto=ALTO_BOTON, tamano_fuente_px=uc.TAM["boton"], parent=self,
                                                position=(0, -0.075, -0.01))
         Text("Esc para seguir", parent=self, origin=(0, 0), position=(0, -0.165, -0.01),
-             scale=escala_fuente(15), color=rgb(estilo.COLOR_TEXTO_TENUE))
+             scale=escala_fuente(16), color=rgb(estilo.COLOR_TEXTO_TENUE))
         self.foco = _Foco((self.boton_seguir, self.boton_abandonar), 0)
         self.confirmacion = None
 

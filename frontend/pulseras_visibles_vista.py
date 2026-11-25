@@ -18,7 +18,7 @@ def crear(escena, textura, chip_reloj):
 
     from backend.logica import ajustes as modelo_ajustes
     from frontend import diseno_adaptable, estilo
-    from frontend.componentes import panel_tinta, rgb
+    from frontend.componentes import panel_piel, rgb
 
     indicadores = mcal.INDICADORES_HUD[:2]
     ancho = hec.ancho_mini_pulseras(len(indicadores))
@@ -57,7 +57,7 @@ def crear(escena, textura, chip_reloj):
 
         def __init__(self):
             self.chip = Entity(parent=escena.hud, enabled=False)
-            self.chip.fondo = panel_tinta(self.chip, ancho, hec.ALTO_CHIP, tono=estilo.COLOR_FONDO,
+            self.chip.fondo = panel_piel(self.chip, ancho, hec.ALTO_CHIP, tono=estilo.COLOR_FONDO,
                                           radio_px=estilo.RADIO_CHIP_PX, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
             self.minis = [Mini(self.chip, ind, xc, xf)
                           for ind, (xc, xf) in zip(indicadores, hec.piezas_mini_pulseras(len(indicadores)))]

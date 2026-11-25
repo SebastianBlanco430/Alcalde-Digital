@@ -303,7 +303,7 @@ def _crear_vigia(escena_mundo, conexion):
 
     from frontend import diseno_adaptable, estilo, tipografia
     from frontend import hud_esquinas_calculos as hec
-    from frontend.componentes import escala_fuente, panel_tinta, rgb
+    from frontend.componentes import escala_fuente, panel_piel, rgb
     from frontend.hud import AvisoGenerico
     from frontend.panel_final_semana import PanelFinalSemana
 
@@ -318,10 +318,10 @@ def _crear_vigia(escena_mundo, conexion):
 
         def __init__(self, escena):
             self.chip_entidad = Entity(parent=escena.hud)
-            self.chip_entidad.fondo = panel_tinta(self.chip_entidad, ANCHO_CHIP, ALTO_CHIP, tono=estilo.COLOR_FONDO,
+            self.chip_entidad.fondo = panel_piel(self.chip_entidad, ANCHO_CHIP, ALTO_CHIP, tono=estilo.COLOR_FONDO,
                                                   radio_px=estilo.RADIO_CHIP_PX, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
             self.texto = Text("", parent=self.chip_entidad, origin=(0, 0), position=(0.02, 0.004, -0.01),
-                              scale=escala_fuente(17), color=rgb(estilo.COLOR_TEXTO), font=tipografia.FUENTE_TITULO)
+                              scale=escala_fuente(17), color=rgb(estilo.COLOR_TEXTO), font=tipografia.fuente_piel(titulo=True))
             x_icono = -ANCHO_CHIP / 2 + 0.032
             self.disco = Entity(parent=self.chip_entidad, model="circle", scale=0.026, position=(x_icono, 0.004, -0.01),
                                 color=rgb(estilo.ESTADO_AVISO))

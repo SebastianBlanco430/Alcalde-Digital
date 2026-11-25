@@ -211,7 +211,7 @@ class MenuTrabajo(Entity):
         # Panel alto para los trabajos con explicación previa (entregas en moto): se crea la primera vez que hace falta.
         self.panel_largo = None
         self.titulo = Text("", parent=self, origin=(0, 0), scale=escala_fuente(26),
-                           color=rgb(estilo.COLOR_ACENTO), font=tipografia.FUENTE_TITULO)
+                           color=rgb(estilo.COLOR_ACENTO), font=tipografia.fuente_piel(titulo=True))
         self.detalle = Text("", parent=self, origin=(0, 0), scale=escala_fuente(17), color=rgb(estilo.COLOR_TEXTO))
         self.cansancio = Text("", parent=self, origin=(0, 0), scale=escala_fuente(15),
                               color=rgb(estilo.COLOR_TEXTO_TENUE))

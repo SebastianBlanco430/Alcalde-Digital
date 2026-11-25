@@ -36,7 +36,7 @@ def sin_ruta_activo():
 
 
 def _texto(padre, cadena, px, tono, pos, origen=(0, 0), negrita=False):
-    opciones = {"font": tipografia.FUENTE_TITULO} if negrita else {}
+    opciones = {"font": tipografia.fuente_piel(titulo=True)} if negrita else {}
     return Text(cadena, parent=padre, origin=origen, position=(pos[0], pos[1], -0.01),
                 scale=escala_fuente(px), color=rgb(tono), **opciones)
 
@@ -194,7 +194,7 @@ class HudParkour(Entity):
             y = -0.02 - 0.034 * i
             quad(self.leyenda, x0 + 0.012, y - 0.0, 0.026, 0.02, e["borde"], 1.0, 0.012)
             quad(self.leyenda, x0 + 0.012, y - 0.0, 0.016, 0.011, e["acento"] if clave != "fija" else e["panel"], 1.0, 0.01)
-            _texto(self.leyenda, e["nombre"], 13, estilo.COLOR_TEXTO_TENUE, (x0 + 0.04, y), origen=(-0.5, 0))
+            _texto(self.leyenda, e["nombre"], 16, estilo.COLOR_TEXTO_TENUE, (x0 + 0.04, y), origen=(-0.5, 0))
         diseno_adaptable.anclar(self.leyenda, "izquierda")
 
     # Leyenda de los tipos de la sesión E presentes en el nivel (y de la purga), bajo la de siempre.
@@ -220,7 +220,7 @@ class HudParkour(Entity):
                    color=color.rgb32(*borde))
             Entity(parent=self.leyenda_extra, model="quad", position=(x0 + 0.012, y, 0.01), scale=(0.016, 0.011),
                    color=color.rgb32(*acento))
-            _texto(self.leyenda_extra, nombre, 13, estilo.COLOR_TEXTO_TENUE, (x0 + 0.04, y), origen=(-0.5, 0))
+            _texto(self.leyenda_extra, nombre, 16, estilo.COLOR_TEXTO_TENUE, (x0 + 0.04, y), origen=(-0.5, 0))
         diseno_adaptable.anclar(self.leyenda_extra, "izquierda")
 
     def destello(self, tono, alfa=0.38, duracion=0.45):
@@ -283,7 +283,7 @@ class HudParkour(Entity):
         panel = panel_piel(self, 0.9, 0.78)
         panel.z = -0.5
         titulo = _texto(panel, "¡Nivel completado!", 32, estilo.COLOR_ACENTO, (0, 0.32), negrita=True)
-        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra de tinta y entrada del panel.
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva negrita y entrada del panel.
         ui_botw_b.vestir(panel, titulos=(titulo,), piezas=(panel,))
         lineas = [
             f"Tiempo: {pk.formatear_tiempo(resultado['tiempo_s'])}      Caídas: {resultado['caidas']}",

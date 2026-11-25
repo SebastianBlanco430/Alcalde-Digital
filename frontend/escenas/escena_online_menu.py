@@ -50,7 +50,7 @@ class EscenaOnlineMenu(Escena):
         diseno_adaptable.ajustar_escala(self.raiz)
         self.panel = panel_piel(self.raiz, ANCHO_PANEL, ALTO_PANEL, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
         anadir_filo(self.panel, ANCHO_PANEL, ALTO_PANEL, estilo.RADIO_PANEL_PX)
-        self.titulo = crear_texto(self.raiz, "En línea", 0, 0.375, 38, origen=(0, 0), font=tipografia.FUENTE_TITULO)
+        self.titulo = crear_texto(self.raiz, "En línea", 0, 0.375, 38, origen=(0, 0), font=tipografia.fuente_piel(titulo=True))
         self.paginas = {}
         self.controles = {}
         self._construir_principal()
@@ -58,7 +58,7 @@ class EscenaOnlineMenu(Escena):
         self._construir_unirse()
         self._construir_conectando()
         self.foco = FocoOnline(self._controles_activos, al_escape=self.atras, parent=self)
-        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra, velo, flecha del foco y
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva negrita, velo, flecha del foco y
         # entrada desde la derecha. None = el menú en línea de siempre.
         self.piel = ui_botw_b.vestir(self.raiz, titulos=(self.titulo,), foco=self.foco, piezas=(self.raiz,), velo=True)
         self._construido = True
@@ -98,7 +98,7 @@ class EscenaOnlineMenu(Escena):
 
     def _construir_crear(self):
         g = self._grupo(PAGINA_CREAR)
-        crear_texto(g, "Crear sala", -ANCHO_PANEL / 2 + 0.05, 0.31, 24, estilo.ACENTO_PRIMARIO, font=tipografia.FUENTE_TITULO)
+        crear_texto(g, "Crear sala", -ANCHO_PANEL / 2 + 0.05, 0.31, 24, estilo.ACENTO_PRIMARIO, font=tipografia.fuente_piel(titulo=True))
         self.c_alias = self._fila_campo(g, "Alias", 0.235, calc_campo.TIPO_ALIAS, marcador="Tu nombre en la sala",
                                         al_cambiar=lambda _t: self._validar_crear())
         crear_texto(g, "Dónde abrirla", X_ETIQUETA, 0.14, 21)
@@ -127,7 +127,7 @@ class EscenaOnlineMenu(Escena):
     def _construir_unirse(self):
         g = self._grupo(PAGINA_UNIRSE)
         crear_texto(g, "Unirse a una sala", -ANCHO_PANEL / 2 + 0.05, 0.31, 24, estilo.ACENTO_PRIMARIO,
-                    font=tipografia.FUENTE_TITULO)
+                    font=tipografia.fuente_piel(titulo=True))
         self.u_alias = self._fila_campo(g, "Alias", 0.215, calc_campo.TIPO_ALIAS, marcador="Tu nombre en la sala",
                                         al_cambiar=lambda _t: self._validar_unirse())
         self.u_destino = self._fila_campo(g, "IP:puerto", 0.105, calc_campo.TIPO_HOST, marcador="192.168.1.5:7777",
@@ -151,7 +151,7 @@ class EscenaOnlineMenu(Escena):
 
     def _construir_conectando(self):
         g = self._grupo(PAGINA_CONECTANDO)
-        self.k_texto = crear_texto(g, "Conectando…", 0, 0.08, 28, origen=(0, 0), font=tipografia.FUENTE_TITULO)
+        self.k_texto = crear_texto(g, "Conectando…", 0, 0.08, 28, origen=(0, 0), font=tipografia.fuente_piel(titulo=True))
         self.k_detalle = crear_texto(g, " ", 0, -0.02, 19, estilo.COLOR_TEXTO_TENUE, origen=(0, 0.5))
         self.k_cancelar = self._boton(g, "Cancelar", self.cancelar_conexion, 0, -0.2)
         self.controles[PAGINA_CONECTANDO] = [self.k_cancelar]

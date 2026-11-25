@@ -117,10 +117,10 @@ class ControladorParkour:
         Entity(parent=self.grande, model="circle", scale=0.17, color=_rgba(estilo.TINTA), z=0.001)
         self.grande.cara = Entity(parent=self.grande, model="circle", scale=0.15)
         self.grande.texto = Text("", parent=self.grande, origin=(0, 0.5), position=(0, -0.1, -0.001),
-                                 scale=escala_fuente(20), font=tipografia.FUENTE_TITULO, color=_rgba(estilo.COLOR_ACENTO))
+                                 scale=escala_fuente(20), font=tipografia.fuente_piel(titulo=True), color=_rgba(estilo.COLOR_ACENTO))
         self.grande.letra = Text("", parent=self.grande, origin=(0, 0), z=-0.002, scale=escala_fuente(40),
                                  font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA))
-        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): el nombre de la medalla en cursiva con sombra de tinta.
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): el nombre de la medalla en cursiva negrita.
         ui_botw_b.vestir(self.grande, titulos=(self.grande.texto,))
         self._t_grande = None
         self._alcanzable = None

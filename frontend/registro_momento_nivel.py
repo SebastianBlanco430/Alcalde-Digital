@@ -21,7 +21,7 @@ def _crear_controlador(escena_mundo):
     from backend.logica import momento_nivel
     from frontend import diseno_adaptable, estilo, tipografia
     from frontend import momento_nivel_calculos as mn
-    from frontend.componentes import escala_fuente, panel_tinta, rgb
+    from frontend.componentes import escala_fuente, panel_piel, rgb
 
     textos = momento_nivel.cargar_titulares()
 
@@ -38,12 +38,12 @@ def _crear_controlador(escena_mundo):
             padre = getattr(self.escena, "hud", None) or self.escena
             r = mn.rect_titular(round(diseno_adaptable.aspecto() * 720), 720)
             caja = Entity(parent=padre, position=(0, r.centro[1], -0.05))
-            caja.fondo = panel_tinta(caja, mn.ANCHO_TITULAR, mn.ALTO_TITULAR, tono=estilo.COLOR_FONDO,
+            caja.fondo = panel_piel(caja, mn.ANCHO_TITULAR, mn.ALTO_TITULAR, tono=estilo.COLOR_FONDO,
                                      radio_px=estilo.RADIO_CHIP_PX, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
             caja.franja = Entity(parent=caja, model="quad", scale=(0.012, mn.ALTO_TITULAR - 0.014),
                                  position=(-mn.ANCHO_TITULAR / 2 + 0.016, 0, -0.01))
             caja.texto = Text("", parent=caja, origin=(0, 0), position=(0.012, 0.002, -0.01),
-                              scale=escala_fuente(mn.PX_TITULAR), color=rgb(estilo.COLOR_TEXTO), font=tipografia.FUENTE_TITULO)
+                              scale=escala_fuente(mn.PX_TITULAR), color=rgb(estilo.COLOR_TEXTO), font=tipografia.fuente_piel(titulo=True))
             caja.setTransparency(TransparencyAttrib.MAlpha)
             caja.enabled = False
             self.titular = caja

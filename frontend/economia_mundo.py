@@ -19,7 +19,7 @@ from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 from backend.logica.perfil_economia import perfil_de
 from frontend import (
     diseno_adaptable, economia_config as cfg, estilo, hud_esquinas_calculos, inventario_calculos as calc, tipografia)
-from frontend.componentes import a_unidades, escala_fuente, panel_tinta, rgb
+from frontend.componentes import a_unidades, escala_fuente, panel_piel, rgb
 from frontend.inventario_calculos import ControlInventario
 from frontend.inventario_ui import PanelInventario
 
@@ -317,10 +317,10 @@ class IntegracionEconomia(Entity):
 
     def _crear_chip(self):
         self.chip = Entity(parent=self.escena.hud)
-        self.chip.fondo = panel_tinta(self.chip, ANCHO_CHIP, ALTO_CHIP, tono=estilo.COLOR_FONDO, radio_px=estilo.RADIO_CHIP_PX,
+        self.chip.fondo = panel_piel(self.chip, ANCHO_CHIP, ALTO_CHIP, tono=estilo.COLOR_FONDO, radio_px=estilo.RADIO_CHIP_PX,
                                       borde_px=estilo.GROSOR_BORDE_DENSO_PX)
         self.chip.texto = Text("", parent=self.chip, origin=(0, 0), position=(0, 0, -0.01), scale=escala_fuente(17),
-                               color=rgb(estilo.COLOR_TEXTO), font=tipografia.FUENTE_TITULO)
+                               color=rgb(estilo.COLOR_TEXTO), font=tipografia.fuente_piel(titulo=True))
         self.chip.position = (-diseno_adaptable.aspecto() / 2 + MARGEN + ANCHO_CHIP / 2, -0.5 + MARGEN + ALTO_CHIP / 2)
         if hud_esquinas_calculos.activo():       # mapa de esquinas (M3.1): base de la pila de abajo a la izquierda
             self.chip.position = hud_esquinas_calculos.centro_chip_pila(diseno_adaptable.aspecto(), 0, ANCHO_CHIP, ALTO_CHIP)

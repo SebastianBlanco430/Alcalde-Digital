@@ -343,7 +343,7 @@ class VigiaEntregas(Entity):
         self._turno = None
         self._pago = 0
         self.flotante = Text("", parent=self, origin=(0, 0), position=(0, 0.18, -0.3), scale=escala_fuente(40),
-                             font=tipografia.FUENTE_TITULO, color=_rgba(DORADO), enabled=False)
+                             font=tipografia.fuente_piel(titulo=True), color=_rgba(DORADO), enabled=False)
         self._t_flotante = None
         self._saludos = []            # [npc, globo, t]
         self._estela = []

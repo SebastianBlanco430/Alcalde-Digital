@@ -4,14 +4,14 @@
 # deban estar en el mundo, avisos. La raíz cuelga de camera.ui (no de la escena): no la escala el marco del PC.
 #
 #   capa = CapaPantalla(); capa.ayuda("Flechas: ...")
-#   capa.boton("Linterna", al_clic, (x, y))  -> BotonPrimario de siempre (hover y clic del mouse real)
+#   capa.boton("Linterna", al_clic, (x, y))  -> boton_piel_primario (hover y clic del mouse real)
 #   capa.texto("...", px=18, posicion=(x, y))
 #   capa.destruir()
 
 from ursina import Entity, camera, color
 
 from frontend import estilo
-from frontend.componentes import BotonPrimario, a_unidades, destruir_arbol, rgb
+from frontend.componentes import a_unidades, destruir_arbol, rgb, boton_piel_primario
 from frontend.minijuegos import ui as ui_2d
 
 PX_AYUDA = 17
@@ -47,7 +47,7 @@ class CapaPantalla(Entity):
         return ui_2d.texto(self, texto, px, ancho, tono or estilo.COLOR_TEXTO, posicion)
 
     def boton(self, texto, al_clic, posicion=(0, 0), ancho=0.26, alto=0.07):
-        return BotonPrimario(texto, al_clic=al_clic, ancho=ancho, alto=alto, parent=self,
+        return boton_piel_primario(texto, al_clic=al_clic, ancho=ancho, alto=alto, parent=self,
                              position=(posicion[0], posicion[1], -0.01), tamano_fuente_px=20)
 
     def avanzar(self, dt):

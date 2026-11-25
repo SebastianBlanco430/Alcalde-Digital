@@ -2,8 +2,9 @@
 # El menú de inicio ya tiene el aspecto de Zelda BOTW (frontend/menu_botw.py); la persona A rediseña la base compartida
 # (estilo.py, componentes.py) y aquí se ajusta la COMPOSICIÓN de las pantallas de B (trabajos, parkour, paneles de final
 # y de la semana, propagación, grafo, red social y todo el multijugador en línea) con las mismas reglas: títulos en
-# cursiva con sombra plana de tinta, velo violeta detrás del contenido, la flecha amarilla junto al control enfocado y
-# entrada escalonada (sin movimiento con «reducir movimiento»). La parte visual está en frontend/ui_botw_b.py.
+# cursiva negrita (sin sombra, como los de A), velo violeta detrás del contenido, la flecha amarilla de los botones de A
+# junto al control enfocado y la entrada del kit de A (sin movimiento con «reducir movimiento»). La parte visual está en
+# frontend/ui_botw_b.py.
 #
 # Colores y medidas: NO se inventan. Primero los que publique A en frontend/ui_botw_calculos.py (si existe); si no, los
 # del menú BOTW (menu_botw_calculos: TINTA, VELO, AMARILLO, BLANCO) y los de estilo.py. Solo es propio lo que no existe
@@ -15,7 +16,7 @@
 #   activa()                  ¿piel BOTW?
 #   paleta()                  {"tinta", "velo", "amarillo", "blanco", "texto", "tenue"} (RGB 0-255)
 #   u(px)                     píxeles a 720p -> unidades de camera.ui
-#   entrada(t, indice, reducido)  (alfa, desplazamiento x) de la pieza `indice` de una pantalla que entra
+#   entrada(t, indice, reducido)  (alfa, desplazamiento x) de una pieza que entra (la del kit de A, sin escalón)
 #   x_flecha(x_izq, ancho_flecha) x del centro de la flecha a la izquierda de un control
 
 import os
@@ -27,13 +28,12 @@ UI_BOTW = True
 _NO = ("0", "false", "no", "off")
 _SI = ("1", "true", "si", "sí", "on")
 
-# Composición propia (no existe en estilo ni en el menú): sombra de los títulos de panel, alfa del velo detrás de un
-# panel y separación de la flecha del control enfocado, en px a 720p.
-SOMBRA_TITULO_PX = 2
+# Composición propia (no existe en estilo ni en el menú): alfa del velo detrás de un panel.
 ALFA_VELO_PANEL = 0.55
-SEPARACION_FLECHA_PX = 10
-# La de la opción seleccionada del menú BOTW
-FUENTE_TITULO = "AtkinsonHyperlegible-BoldItalic.ttf"
+# Hueco entre la flecha y el control enfocado, en px a 720p: los 8 px a 600p de componentes.BotonBotw
+# (SEPARACION_FLECHA_PX), para que la flecha de B quede igual que la de los botones de A.
+ALTO_REF_A_PX = 600                  # referencia de componentes.a_unidades (los px del kit de A)
+SEPARACION_FLECHA_PX = 8 * 720 / ALTO_REF_A_PX
 
 
 def activa():
@@ -86,12 +86,16 @@ def u(px):
 
 
 def entrada(t, indice, reducido=False):
-    """(alfa, desplazamiento x en UI) de la pieza `indice`: la misma entrada escalonada de las opciones del menú."""
-    return menu.entrada_opcion(t, indice, reducido)
+    """(alfa, desplazamiento x en UI) de la pieza `indice`: la entrada del kit de A (ui_botw_calculos.entrada: 0,28 s,
+    desde 18 px a la derecha a 600 px de referencia), sin retraso ni escalón, igual que en sus pantallas."""
+    from frontend import ui_botw_calculos as a
+    alfa, px = a.entrada(max(0.0, t), reducido)
+    return alfa, u(px * menu.ALTO_REF_PX / ALTO_REF_A_PX) if px else 0.0
 
 
 def entrada_terminada(t, n, reducido=False):
-    return menu.entrada_terminada(t, n, reducido)
+    from frontend import ui_botw_calculos as a
+    return reducido or t >= a.DURACION_ENTRADA_S
 
 
 def x_flecha(x_izq, ancho_flecha):

@@ -36,7 +36,7 @@ class PanelFinalSemana(Entity):
         self.panel = panel_piel(self, self.ANCHO, self.ALTO, tono=estilo.COLOR_FONDO)
         arriba = self.ALTO / 2
         self.titulo = Text("", parent=self, origin=(0, 0), position=(0, arriba - 0.07, -0.001),
-                           scale=escala_fuente(self.PX_TITULO), color=rgb(estilo.COLOR_TEXTO), font=tipografia.FUENTE_TITULO)
+                           scale=escala_fuente(self.PX_TITULO), color=rgb(estilo.COLOR_TEXTO), font=tipografia.fuente_piel(titulo=True))
         self.subtitulo = Text("", parent=self, origin=(0, 0), position=(0, arriba - 0.122, -0.001),
                               scale=escala_fuente(self.PX_SUBTITULO), color=rgb(estilo.COLOR_TEXTO_TENUE))
         self.texto = Text("", parent=self, origin=(-0.5, 0.5), position=(-self.ANCHO / 2 + self.MARGEN, self.Y_TEXTO, -0.001),
@@ -56,7 +56,7 @@ class PanelFinalSemana(Entity):
         self.boton_menu = boton_piel_primario("Volver al menú", al_clic=al_menu, ancho=0.36, alto=a_unidades(56),
                                               parent=self, position=(0, -self.ALTO / 2 + 0.07, -0.001))
         self.contenido = None
-        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra de tinta, velo detrás del panel
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva negrita, velo detrás del panel
         # y entrada desde la derecha al mostrarse. None = el panel de siempre.
         self.piel = ui_botw_b.vestir(self, titulos=(self.titulo,), piezas=(self,), velo=True)
         self.enabled = False

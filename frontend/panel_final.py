@@ -60,7 +60,7 @@ class PanelFinal(Entity):
         self.boton_menu = boton_piel_primario("Volver al menú", al_clic=al_menu, ancho=0.36, alto=a_unidades(56),
                                               parent=self, position=(0, -alto / 2 + (0.07 if pulido.activo() else 0.075), -0.001))
         self.contenido = None
-        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra de tinta, velo detrás del panel
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva negrita, velo detrás del panel
         # y entrada desde la derecha al mostrarse. None = el panel de siempre.
         self.piel = ui_botw_b.vestir(self, titulos=(self.titulo,), piezas=(self,), velo=True)
         self.enabled = False

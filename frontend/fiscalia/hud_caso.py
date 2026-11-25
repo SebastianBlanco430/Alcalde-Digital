@@ -26,7 +26,7 @@ from ursina import Entity, Text, camera, held_keys, mouse, time, window
 
 from frontend import banderas_visuales as bv
 from frontend import estilo, tipografia
-from frontend.componentes import escala_fuente, panel_tinta, rgb
+from frontend.componentes import escala_fuente, rgb, panel_piel
 from frontend.fiscalia import rueda_calculos as rc
 from frontend.fiscalia import ui_calculos as uc
 
@@ -575,7 +575,7 @@ class HudCaso(Entity):
             pass
         try:
             self.enabled = True
-            fondo = panel_tinta(self, 1.3, 0.34, tono=estilo.COLOR_PANEL, position=(0, -0.3, -0.01))
+            fondo = panel_piel(self, 1.3, 0.34, tono=estilo.COLOR_PANEL, position=(0, -0.3, -0.01))
             self._plano = Text("", parent=fondo, origin=(0, 0), z=-0.01, scale=escala_fuente(19),
                                font=tipografia.FUENTE_TEXTO, color=rgb(estilo.COLOR_TEXTO))
         except Exception as error_plano:          # noqa: BLE001

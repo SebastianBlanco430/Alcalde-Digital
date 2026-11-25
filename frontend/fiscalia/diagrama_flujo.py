@@ -9,7 +9,7 @@
 from ursina import Entity, Mesh, Text, color
 
 from frontend import estilo, tipografia
-from frontend.componentes import BotonPrimario, a_unidades, escala_fuente, modelo_redondeado, panel_tinta, rgb
+from frontend.componentes import a_unidades, escala_fuente, modelo_redondeado, rgb, boton_piel_primario, panel_piel
 from frontend.fiscalia import diagrama_flujo_calculos as dc
 from frontend.fiscalia import ui_calculos as uc
 from frontend.fiscalia.rueda import ajustar
@@ -53,17 +53,17 @@ class PantallaFinal(Entity):
     def _tarjeta(self, vista, solidez, umbrales, titulo_caso):
         ancho, alto = 1.06, 0.70
         t = self.tarjeta
-        panel_tinta(t, ancho, alto, tono=estilo.COLOR_PANEL, position=(0, 0.0, 0.01))
+        panel_piel(t, ancho, alto, tono=estilo.COLOR_PANEL, position=(0, 0.0, 0.01))
         cab = Text("", parent=t, origin=(0, 0), position=(0, 0.30, -0.01), scale=escala_fuente(16),
                    color=rgb(estilo.COLOR_TEXTO_TENUE))
         ajustar(cab, f"Caso cerrado · {titulo_caso}" if titulo_caso else "Caso cerrado", ancho - 0.1, 16)
         nombre, tono = uc.nombre_resultado(getattr(vista, "resultado", None))
-        sello = panel_tinta(t, 0.22, 0.05, tono=tono, radio_px=estilo.RADIO_CHIP_PX, sombra=False,
+        sello = panel_piel(t, 0.22, 0.05, tono=tono, radio_px=estilo.RADIO_CHIP_PX, sombra=False,
                             position=(0, 0.245, -0.005))
         Text(nombre.upper(), parent=sello, origin=(0, 0), z=-0.01, scale=escala_fuente(uc.TAM["resultado"]),
-             font=tipografia.FUENTE_TITULO, color=rgb(estilo.tono_legible(estilo.TINTA, tono)))
+             font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.tono_legible(estilo.TINTA, tono)))
         self.titulo = Text("", parent=t, origin=(0, 0), position=(0, 0.17, -0.01), scale=escala_fuente(uc.TAM["titulo"]),
-                           font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+                           font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
         ajustar(self.titulo, getattr(vista, "titulo", "") or "Final", ancho - 0.1, uc.TAM["titulo"])
         self.texto = Text("", parent=t, origin=(0, 0.5), position=(0, 0.115, -0.01),
                           scale=escala_fuente(uc.TAM["texto_final"]), color=rgb(estilo.COLOR_TEXTO))
@@ -72,7 +72,7 @@ class PantallaFinal(Entity):
         # Solidez final con su barra y las marcas de los umbrales.
         y_barra, ancho_barra = -0.175, 0.56
         Text(f"Solidez final {int(solidez)} %", parent=t, origin=(0, 0), position=(0, -0.135, -0.01),
-             scale=escala_fuente(uc.TAM["porcentaje"]), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+             scale=escala_fuente(uc.TAM["porcentaje"]), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
         Entity(parent=t, model=modelo_redondeado(ancho_barra, 0.018, 4), scale=(ancho_barra, 0.018),
                position=(0, y_barra, -0.004), color=rgb(estilo.COLOR_BARRA_FONDO))
         lleno = max(0.001, ancho_barra * max(0, min(100, solidez)) / 100)
@@ -81,7 +81,7 @@ class PantallaFinal(Entity):
         for x, _, _ in uc.marcas_umbrales(umbrales, ancho_barra):
             Entity(parent=t, model="quad", scale=(0.004, 0.03), position=(-ancho_barra / 2 + x, y_barra, -0.008),
                    color=rgb(estilo.PAPEL))
-        self.boton_ver = BotonPrimario("Ver el recorrido", al_clic=self._pulsar, ancho=0.44, alto=ALTO_BOTON,
+        self.boton_ver = boton_piel_primario("Ver el recorrido", al_clic=self._pulsar, ancho=0.44, alto=ALTO_BOTON,
                                        tamano_fuente_px=uc.TAM["boton"], parent=t, position=(0, -0.265, -0.01))
         self.boton_ver.fijar_foco(True)
 
@@ -90,7 +90,7 @@ class PantallaFinal(Entity):
     def _diagrama(self, d, id_final, semiancho):
         raiz = self.diagrama
         Text("Recorrido del caso", parent=raiz, origin=(0, 0), position=(0, 0.44, -0.01),
-             scale=escala_fuente(uc.TAM["diagrama_titulo"]), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+             scale=escala_fuente(uc.TAM["diagrama_titulo"]), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
         self.porcentaje = Text(uc.texto_porcentaje(d.vistos, d.total), parent=raiz, origin=(0, 0),
                                position=(0, 0.385, -0.01), scale=escala_fuente(uc.TAM["porcentaje"]),
                                color=rgb(estilo.COLOR_ACENTO))
@@ -121,11 +121,11 @@ class PantallaFinal(Entity):
                 tono = TONO_TIPO.get(n.tipo, TONO_VISTO)
         else:
             tono = TONO_NO_VISTO
-        caja = panel_tinta(raiz, w, h, tono=tono, radio_px=estilo.RADIO_CHIP_PX, sombra=visto,
+        caja = panel_piel(raiz, w, h, tono=tono, radio_px=estilo.RADIO_CHIP_PX, sombra=visto,
                            borde_px=3 if actual else 2, position=(x, y, 0))
         if actual:
             caja.borde.color = rgb(estilo.COLOR_ACENTO)
-        txt = Text("", parent=caja, origin=(0, 0), z=-0.01, scale=escala_fuente(px), font=tipografia.FUENTE_TITULO,
+        txt = Text("", parent=caja, origin=(0, 0), z=-0.01, scale=escala_fuente(px), font=tipografia.fuente_piel(titulo=True),
                    color=rgb(estilo.COLOR_TEXTO))
         txt.line_height = 1.05
         if visto:
@@ -145,7 +145,7 @@ class PantallaFinal(Entity):
             self.fase = "diagrama"
             self.tarjeta.enabled = False
             self.diagrama.enabled = True
-            self.boton_salir = BotonPrimario("Salir de la Fiscalía", al_clic=self._pulsar, ancho=0.46, alto=ALTO_BOTON,
+            self.boton_salir = boton_piel_primario("Salir de la Fiscalía", al_clic=self._pulsar, ancho=0.46, alto=ALTO_BOTON,
                                              tamano_fuente_px=uc.TAM["boton"], parent=self.diagrama,
                                              position=(0, -0.425, -0.01))
             self.boton_salir.fijar_foco(True)

@@ -132,10 +132,18 @@ Los colores incrustados de una pantalla pasan por `ui.tono(...)`. Los que no tie
     (`efectos_ui`), campos de texto (`campo_texto`) y el interior de los controles de Ajustes (flechas del selector,
     interruptor «Activado/Desactivado»).
   - Capturas antes/después de todas: `capturas_claude/botw_antes_despues/` (ver su `LEEME.txt`).
-- De otros dueños, sin tocar: la franja «Confianza de Ciudad Nova» (`registro_momento_nivel`/`momento_nivel_*`), el
-  panel final de la semana (`panel_final*`; su botón «Volver al menú» sí sale con la piel porque lo crea `hud.py`), la
-  Fiscalía (`frontend/fiscalia/`, sin dueño asignado), el menú y la sala en línea, y las pantallas de trabajos,
-  parkour, finales y red social (persona B), que se pasan con este mismo kit.
+- Persona B, con este mismo kit (`panel_piel`, `boton_piel_*`, `fuente_piel`) y `frontend/ui_botw_b.py` (`vestir`):
+  menú y sala en línea, error de red, trabajos, parkour, paneles finales y de la semana, propagación, grafo y red
+  social. `vestir` usa la flecha de `componentes.BotonBotw` (misma textura, alto y hueco), títulos sin sombra y la
+  entrada de `ui_botw_calculos.entrada`; solo añade el velo violeta detrás de las pantallas completas, como el de la
+  pausa.
+- Pasadas después para que no quede nada con el estilo «cómic»: la Fiscalía (`frontend/fiscalia/`), los chips del HUD
+  de economía, entregas, pulseras, hábitos, manillas, reloj y la franja «Confianza de Ciudad Nova»
+  (`registro_momento_nivel`), los botones de la capa de pantalla de los minijuegos 3D y los de la cinemática final.
+- Siguen igual a propósito, porque son decorado y no interfaz: viñetas y bocadillos de papel de las cinemáticas, el
+  logo, las teclas dibujadas (pausa y laboratorio), los carteles 3D del mundo y las pantallas simuladas dentro del
+  mundo (monitor, antesala del parkour, ordenador de trabajos). El menú de inicio clásico (`escena_inicio`) es el
+  respaldo de `ALCALDE_MENU_BOTW=0`.
 
 ## Cómo probar
 - `ALCALDE_UI_BOTW=0` frente a sin variable: misma partida, dos pieles. Con `0`, todo idéntico a antes.
