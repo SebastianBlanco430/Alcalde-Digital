@@ -7,7 +7,7 @@ from ursina import Entity
 
 from frontend import diseno_adaptable, estilo, tipografia, ui_botw_b
 from frontend import online_lobby_calculos as lobby
-from frontend.componentes import BotonPrimario, BotonSecundario, a_unidades, panel_tinta, rgb
+from frontend.componentes import boton_piel_primario, boton_piel_secundario, a_unidades, panel_piel, rgb
 from frontend.escenas.escena_base import Escena
 from frontend.fondo_menu import FocoTeclado, FondoMenu, anadir_filo
 from frontend.online_ui import crear_texto, fijar, texto_envuelto
@@ -26,17 +26,17 @@ class EscenaErrorRed(Escena):
         self.fondo = FondoMenu(parent=self)
         self.raiz = Entity(parent=self)
         diseno_adaptable.ajustar_escala(self.raiz)
-        self.panel = panel_tinta(self.raiz, ANCHO_PANEL, ALTO_PANEL, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
+        self.panel = panel_piel(self.raiz, ANCHO_PANEL, ALTO_PANEL, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
         anadir_filo(self.panel, ANCHO_PANEL, ALTO_PANEL, estilo.RADIO_PANEL_PX)
         self.franja = Entity(parent=self.raiz, model="quad", color=rgb(estilo.ESTADO_ERROR),
                              scale=(ANCHO_PANEL - 0.06, 0.008), position=(0, 0.17, -0.004))
         self.t_titulo = crear_texto(self.raiz, "Error", 0, 0.225, 32, origen=(0, 0), font=tipografia.FUENTE_TITULO)
         self.t_texto = crear_texto(self.raiz, " ", -ANCHO_PANEL / 2 + 0.07, 0.11, 21, estilo.COLOR_TEXTO, origen=(-0.5, 0.5))
         self.t_codigo = crear_texto(self.raiz, " ", -ANCHO_PANEL / 2 + 0.07, -0.13, 15, estilo.COLOR_TEXTO_TENUE)
-        self.btn_reintentar = BotonPrimario("Reintentar", al_clic=self.reintentar, ancho=0.36, alto=a_unidades(54),
-                                            tamano_fuente_px=24, parent=self.raiz, position=(0.22, -0.22, -0.003))
-        self.btn_menu = BotonSecundario("Volver al menú", al_clic=self.volver, ancho=0.40, alto=a_unidades(54),
-                                        tamano_fuente_px=22, parent=self.raiz, position=(-0.22, -0.22, -0.003))
+        self.btn_reintentar = boton_piel_primario("Reintentar", al_clic=self.reintentar, ancho=0.36, alto=a_unidades(54),
+                                                  tamano_fuente_px=24, parent=self.raiz, position=(0.22, -0.22, -0.003))
+        self.btn_menu = boton_piel_secundario("Volver al menú", al_clic=self.volver, ancho=0.40, alto=a_unidades(54),
+                                              tamano_fuente_px=22, parent=self.raiz, position=(-0.22, -0.22, -0.003))
         self.foco = FocoTeclado(lambda: [self.btn_menu, self.btn_reintentar], parent=self)
         # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra, velo, flecha del foco y
         # entrada desde la derecha. None = la pantalla de siempre.

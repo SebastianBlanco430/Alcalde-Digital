@@ -16,7 +16,7 @@ from ursina import Entity, color
 
 from backend.logica import taller_ritmo as tr
 from frontend import estilo
-from frontend.componentes import destruir_arbol, panel_tinta, rgb
+from frontend.componentes import destruir_arbol, panel_piel, rgb
 from frontend.trabajo_constantes import NOMBRE_DIRECCION
 from frontend.trabajo_dibujos import Capa, _caja, _seguro, _texto, dibujar_flecha
 
@@ -364,7 +364,7 @@ class JuegoTaller:
 
     def _construir_cartel(self):
         r = self.raiz
-        cartel = panel_tinta(r, ANCHO_CARTEL, ALTO_CARTEL, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX,
+        cartel = panel_piel(r, ANCHO_CARTEL, ALTO_CARTEL, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX,
                              position=(X_CARTEL, Y_CARTEL), z=-0.005)
         izq = -ANCHO_CARTEL / 2 + 0.02
         _texto(cartel, "FABRICANDO", 12, estilo.COLOR_TEXTO_TENUE, (izq, 0.095), (-0.5, 0), z=-0.01)
@@ -394,7 +394,7 @@ class JuegoTaller:
     # -- Notas --
 
     def _tile(self, direccion, tono, tinta):
-        tile = panel_tinta(self.capa_notas, LADO_NOTA, LADO_NOTA, tono=tono, radio_px=estilo.RADIO_TARJETA_PX,
+        tile = panel_piel(self.capa_notas, LADO_NOTA, LADO_NOTA, tono=tono, radio_px=estilo.RADIO_TARJETA_PX,
                            borde_px=estilo.GROSOR_BORDE_DENSO_PX, z=0)
         dibujar_flecha(tile, direccion, tinta, LADO_NOTA * 0.8)
         return tile

@@ -17,7 +17,7 @@ from ursina import Entity, Text, color
 from frontend import estilo, grafo_social_vista as vista, hud_calculos, iconos, tipografia, ui_botw_b
 from frontend import resultado_grafo_calculos as calc
 from frontend.componentes import (
-    BotonPrimario, a_unidades, destruir_arbol, escala_fuente, modelo_redondeado, panel_tinta, rgb,
+    boton_piel_primario, a_unidades, destruir_arbol, escala_fuente, modelo_redondeado, panel_piel, rgb,
 )
 from frontend.texto import envolver_texto
 
@@ -53,7 +53,7 @@ class PanelResultadoGrafo(Entity):
                            color=color.rgba32(*estilo.TINTA, self.ALFA_VELO), z=-0.05)
         # Contenedor que hace el «pop»; todo lo del panel cuelga de él.
         self.contenedor = Entity(parent=self, z=-0.06)
-        self.panel = panel_tinta(self.contenedor, self.ANCHO, self.ALTO, tono=estilo.COLOR_PANEL)
+        self.panel = panel_piel(self.contenedor, self.ANCHO, self.ALTO, tono=estilo.COLOR_PANEL)
 
         self.titulo = Text("Resultado de la misión", parent=self.contenedor, origin=(0, 0),
                            position=(0, 0.418, -0.01), scale=escala_fuente(30),
@@ -64,7 +64,7 @@ class PanelResultadoGrafo(Entity):
         self._fuente_titulo = self.titulo.font
 
         x, y, ancho, alto = self.TARJETA_GRAFO
-        self.tarjeta = panel_tinta(self.contenedor, ancho, alto, tono=estilo.COLOR_FONDO,
+        self.tarjeta = panel_piel(self.contenedor, ancho, alto, tono=estilo.COLOR_FONDO,
                                    radio_px=estilo.RADIO_TARJETA_PX, sombra=False,
                                    position=(x, y, -0.005), borde_px=2)
         self.etiqueta_grafo = Text("Red social de Civitas", parent=self.contenedor, origin=(-0.5, 0),
@@ -73,9 +73,9 @@ class PanelResultadoGrafo(Entity):
         self._construir_leyenda()
         self._construir_indicadores()
 
-        self.boton = BotonPrimario("Continuar", al_clic=self.continuar, ancho=0.30, alto=0.075,
-                                   parent=self.contenedor, position=(0, -0.41, -0.01),
-                                   tamano_fuente_px=22)
+        self.boton = boton_piel_primario("Continuar", al_clic=self.continuar, ancho=0.30, alto=0.075,
+                                         parent=self.contenedor, position=(0, -0.41, -0.01),
+                                         tamano_fuente_px=22)
         self.pista = Text("Enter o Espacio", parent=self.contenedor, origin=(-0.5, 0),
                           position=(0.19, -0.41, -0.01), scale=escala_fuente(13),
                           color=rgb(estilo.COLOR_TEXTO_TENUE))

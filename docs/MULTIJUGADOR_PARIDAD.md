@@ -129,6 +129,10 @@ deja como está (28 misiones por semana repartidas entre los jugadores).
   (sombra de títulos, alfa del velo, separación de la flecha).
 - `frontend/ui_botw_b.py` (visual): `vestir(raiz, titulos, foco, piezas, velo)`, con guardián (si algo falla, la
   pantalla queda como estaba y se avisa una vez) y «reducir movimiento» (sin entrada ni vaivén de la flecha).
+- Paneles y botones con las piezas de la piel de A (`componentes.panel_piel` y `boton_piel_primario/secundario/
+  peligro`, misma firma que `panel_tinta` y los `Boton*`): con la piel encendida dibujan el velo violeta con filo claro
+  y los botones en cursiva con su flecha; apagada, exactamente los de siempre. La flecha propia de `ui_botw_b` solo
+  señala los controles que no son botones de la piel (tarjetas de rol, selectores, campos), así nunca salen dos.
 - Pantallas vestidas: sala, menú en línea, error de red y cierre del HUD en línea; panel final, panel final de la
   semana, resultado del grafo y panel de propagación; intro y resultado de los trabajos (taller y mostrador); cartel de la
   medalla y panel «¡Nivel completado!» del parkour. Los widgets compartidos (botones, paneles de tinta) toman el aspecto nuevo cuando A suba su

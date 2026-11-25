@@ -98,7 +98,7 @@ def crear_controlador(escena, conexion):
     from ursina.shaders import unlit_shader
 
     from frontend import diseno_adaptable, estilo, reloj_calculos as rc, tipografia
-    from frontend.componentes import escala_fuente, panel_tinta, rgb
+    from frontend.componentes import escala_fuente, panel_piel, rgb
     from frontend.contorno_calculos import inflar_escala, realzar_color
 
     textos = etapas_final.cargar_textos()
@@ -120,7 +120,7 @@ def crear_controlador(escena, conexion):
                 y_fondo = -(alto_fondo - ALTO_MEDIDOR) / 2
             # Estilo único (M3.3, ALCALDE_PANEL_UNICO): la franja es una «tarjeta» (radio 10, borde denso).
             radio = panel_unico_calculos.estilo_de("franja").radio_px if panel_unico_calculos.activo() else estilo.RADIO_CHIP_PX
-            self.fondo = panel_tinta(self, ANCHO_MEDIDOR, alto_fondo, tono=estilo.COLOR_FONDO, radio_px=radio,
+            self.fondo = panel_piel(self, ANCHO_MEDIDOR, alto_fondo, tono=estilo.COLOR_FONDO, radio_px=radio,
                                      borde_px=estilo.GROSOR_BORDE_DENSO_PX, position=(0, y_fondo, 0))
             izquierda = -ANCHO_BARRA / 2
             self.titulo = Text(textos["medidor"]["titulo"], parent=self, origin=(-0.5, 0), position=(izquierda, 0.026, -0.01),
@@ -191,7 +191,7 @@ def crear_controlador(escena, conexion):
                        color=rgb(estilo.COLOR_BARRA_FONDO))
             else:
                 self.position = (0, -ALTO_MEDIDOR / 2 - SEPARACION_DESINFO - ALTO_DESINFO / 2)
-                self.fondo = panel_tinta(self, ANCHO_MEDIDOR, ALTO_DESINFO, tono=estilo.COLOR_FONDO,
+                self.fondo = panel_piel(self, ANCHO_MEDIDOR, ALTO_DESINFO, tono=estilo.COLOR_FONDO,
                                          radio_px=estilo.RADIO_CHIP_PX, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
             try:
                 from backend.logica import manillas as mdl

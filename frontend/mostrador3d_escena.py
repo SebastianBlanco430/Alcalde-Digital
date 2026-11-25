@@ -24,7 +24,7 @@ from frontend import diseno_adaptable, estilo
 from frontend import mostrador3d_calculos as mc
 from frontend import mostrador3d_fondos as mf
 from frontend import mostrador3d_productos as mp
-from frontend.componentes import BotonPrimario, BotonSecundario, destruir_arbol, escala_fuente, panel_tinta, rgb
+from frontend.componentes import boton_piel_primario, boton_piel_secundario, destruir_arbol, escala_fuente, panel_piel, rgb
 from frontend.mostrador3d_caja import Caja
 from frontend.props_mundo import caja, prisma
 from frontend.taller3d_escena import devolver_fondo, esconder_fondo
@@ -251,7 +251,7 @@ class JuegoMostrador:
     def _construir_cartel(self):
         """Cartel 2D a la derecha: cliente, pedido, lo entregado, total, pago y el cambio que llevas."""
         ancho, alto = ANCHO_CARTEL, 0.4
-        c = self.cartel = panel_tinta(self.raiz, ancho, alto, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX,
+        c = self.cartel = panel_piel(self.raiz, ancho, alto, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX,
                                       position=(0.39, -0.03), z=-0.005)
         izq = -ancho / 2 + 0.02
         self.t_cliente = _texto(c, "", 12, estilo.COLOR_TEXTO_TENUE, (izq, 0.175), (-0.5, 0), z=-0.01)
@@ -261,10 +261,10 @@ class JuegoMostrador:
         self.t_paga = _texto(c, "", 16, estilo.COLOR_TEXTO, (izq, 0.025), (-0.5, 0), negrita=True, z=-0.01)
         self.t_cambio = _texto(c, "", 18, estilo.COLOR_ACENTO, (izq, -0.015), (-0.5, 0), negrita=True, z=-0.01)
         self.t_aviso = _texto(c, "", 14, estilo.COLOR_TEXTO, (0, -0.045), negrita=True, z=-0.01)
-        self.boton_dar = BotonPrimario("Dar cambio (Enter)", al_clic=self._dar_cambio, ancho=0.3, alto=0.055,
-                                       tamano_fuente_px=17, parent=c, position=(0, -0.095, -0.02))
-        self.boton_quitar = BotonSecundario("Quitar el último (Retroceso)", al_clic=lambda: self._quitar(-1), ancho=0.3,
-                                            alto=0.045, tamano_fuente_px=13, parent=c, position=(0, -0.147, -0.02))
+        self.boton_dar = boton_piel_primario("Dar cambio (Enter)", al_clic=self._dar_cambio, ancho=0.3, alto=0.055,
+                                             tamano_fuente_px=17, parent=c, position=(0, -0.095, -0.02))
+        self.boton_quitar = boton_piel_secundario("Quitar el último (Retroceso)", al_clic=lambda: self._quitar(-1), ancho=0.3,
+                                                  alto=0.045, tamano_fuente_px=13, parent=c, position=(0, -0.147, -0.02))
         mirar = "Mirar: clic derecho y mueve el ratón (o flechas), C centra.  " if self._mirada_libre else ""
         ayuda = _texto(c, mirar + "Productos: clic o 1-4.  Cambio: clic en la caja.  Esc: salir", 11, estilo.COLOR_TEXTO_TENUE,
                        (0, -0.178), z=-0.01)

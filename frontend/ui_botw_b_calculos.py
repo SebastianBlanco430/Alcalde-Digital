@@ -55,11 +55,22 @@ def _de_a():
         return None
 
 
+# La paleta BOTW que publicó la persona A en estilo.py (constantes BOTW_*, docs/ESTILO_BOTW.md); si en este árbol aún
+# no está, las del menú de inicio (menu_botw_calculos) y las de siempre de estilo.py.
+_DE_ESTILO = {"tinta": "BOTW_TINTA", "velo": "BOTW_VELO", "amarillo": "BOTW_ACENTO", "blanco": "BOTW_TEXTO",
+              "texto": "BOTW_TEXTO", "tenue": "BOTW_TEXTO_TENUE"}
+
+
 def paleta():
-    """Colores de la piel: los de A si los publicó (mismos nombres), si no los del menú BOTW y de estilo.py."""
+    """Colores de la piel: los BOTW_* de estilo.py (de A), o los nombres de ui_botw_calculos si los publicara, o los del
+    menú BOTW y de estilo.py."""
     a = _de_a()
     base = {"tinta": menu.TINTA, "velo": menu.VELO, "amarillo": menu.AMARILLO, "blanco": menu.BLANCO,
             "texto": estilo.COLOR_TEXTO, "tenue": estilo.COLOR_TEXTO_TENUE}
+    for clave, nombre in _DE_ESTILO.items():
+        valor = getattr(estilo, nombre, None)
+        if isinstance(valor, tuple) and len(valor) >= 3:
+            base[clave] = tuple(valor[:3])
     nombres = {"tinta": "TINTA", "velo": "VELO", "amarillo": "AMARILLO", "blanco": "BLANCO", "texto": "COLOR_TEXTO",
                "tenue": "COLOR_TEXTO_TENUE"}
     if a is not None:

@@ -21,8 +21,8 @@ from ursina import Button, Entity, Mesh, Text, color, time
 from backend.logica.perfil_economia import FATIGA_MAX, perfil_de
 from backend.logica.trabajos import ATENDER, BARRA, ENTREGAS, MENSAJE_AGOTADO, RITMO, SECUENCIA, TurnoTrabajo
 from frontend import diseno_adaptable, estilo, tipografia, ui_botw_b
-from frontend.componentes import (BotonPrimario, BotonSecundario, destruir_arbol, escala_fuente, modelo_redondeado,
-                                  panel_tinta, rgb)
+from frontend.componentes import (boton_piel_primario, boton_piel_secundario, destruir_arbol, escala_fuente, modelo_redondeado,
+                                  panel_piel, rgb)
 from frontend.escenas.escena_base import Escena
 from frontend.trabajo_constantes import ANCHO_BARRA, JUGANDO, NOMBRE_DIRECCION, ROTACION_FLECHA
 from frontend.trabajo_dibujos import (CAMISAS, ICONOS, PELO, PIEL, Capa, _triangulo, dibujar_cliente, dibujar_flecha,  # noqa: F401
@@ -71,7 +71,7 @@ class EscenaTrabajo(Escena):
         self._fondo = Entity(parent=self, model="quad", color=rgb(estilo.COLOR_FONDO), scale=(6, 3), z=1)
         self.raiz = Entity(parent=self)
         diseno_adaptable.ajustar_escala(self.raiz)
-        self.marco = panel_tinta(self.raiz, ANCHO, ALTO, z=-0.02)
+        self.marco = panel_piel(self.raiz, ANCHO, ALTO, z=-0.02)
         self.estatico = Entity(parent=self.raiz, z=-0.03)
         self.juego = Entity(parent=self.raiz, z=-0.04)
         self.superpuesto = Entity(parent=self.raiz, z=-0.08)
@@ -332,7 +332,7 @@ class EscenaTrabajo(Escena):
         for hijo in list(s.children):
             destruir_arbol(hijo)
         self._velo(s)
-        panel = panel_tinta(s, 0.9, 0.5, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX, z=0)
+        panel = panel_piel(s, 0.9, 0.5, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX, z=0)
         _texto(panel, "Tu turno", 15, estilo.COLOR_TEXTO_TENUE, (0, 0.205), z=-0.01)
         titulo = _texto(panel, t.nombre, 28, estilo.COLOR_ACENTO, (0, 0.155), negrita=True, z=-0.01)
         # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título con sombra de tinta y el panel entra desde la derecha.
@@ -355,8 +355,8 @@ class EscenaTrabajo(Escena):
             extra += f" (ahora {perfil.fatiga}/{FATIGA_MAX})"
         e = _texto(panel, extra, 14, estilo.COLOR_TEXTO_TENUE, (0, -0.075), z=-0.01)
         diseno_adaptable.ajustar_texto(e, 0.84, escala_min=0.6)
-        BotonPrimario("Empezar (Espacio)", al_clic=self.empezar, ancho=0.46, alto=0.075, tamano_fuente_px=22,
-                      parent=panel, position=(0, -0.17, -0.02))
+        boton_piel_primario("Empezar (Espacio)", al_clic=self.empezar, ancho=0.46, alto=0.075, tamano_fuente_px=22,
+                            parent=panel, position=(0, -0.17, -0.02))
 
     def _mostrar_resultado(self):
         if self.fase == RESULTADO:
@@ -373,7 +373,7 @@ class EscenaTrabajo(Escena):
         for hijo in list(s.children):
             destruir_arbol(hijo)
         self._velo(s)
-        panel = panel_tinta(s, 0.9, 0.66, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX, z=0)
+        panel = panel_piel(s, 0.9, 0.66, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX, z=0)
         titulo = _texto(panel, "TURNO TERMINADO", 28, estilo.COLOR_ACENTO, (0, 0.265), negrita=True, z=-0.01)
         # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título con sombra de tinta y el panel entra desde la derecha.
         ui_botw_b.vestir(panel, titulos=(titulo,), piezas=(panel,))
@@ -407,8 +407,8 @@ class EscenaTrabajo(Escena):
         if despues >= FATIGA_MAX:
             aviso = _texto(panel, MENSAJE_AGOTADO, 17, ROJO_TEXTO, (0, -0.115), negrita=True, z=-0.01)
             diseno_adaptable.ajustar_texto(aviso, 0.84, escala_min=0.6)
-        self._boton_continuar = BotonPrimario("Continuar (Enter)", al_clic=self.continuar, ancho=0.46, alto=0.075,
-                                              tamano_fuente_px=22, parent=panel, position=(0, -0.24, -0.02))
+        self._boton_continuar = boton_piel_primario("Continuar (Enter)", al_clic=self.continuar, ancho=0.46, alto=0.075,
+                                                    tamano_fuente_px=22, parent=panel, position=(0, -0.24, -0.02))
 
     # Taller 3D: la pieza terminada, en 3D y girando, a los dos lados del título. False = no es una pieza del taller 3D
     # (o falló al construirse): entonces se dibujan las dos piezas 2D de siempre.
@@ -598,7 +598,7 @@ class EscenaTrabajo(Escena):
         d = self.juego
         _cliente_x, y_cli = -0.4, 0.045
         dibujar_cliente(d, self._n_pedido, (_cliente_x, y_cli), 1.0)
-        burbuja = panel_tinta(d, 0.72, 0.19, tono=estilo.PAPEL, radio_px=estilo.RADIO_TARJETA_PX, z=-0.004,
+        burbuja = panel_piel(d, 0.72, 0.19, tono=estilo.PAPEL, radio_px=estilo.RADIO_TARJETA_PX, z=-0.004,
                               position=(0.17, 0.085))
         _texto(burbuja, "El cliente pide", 13, estilo.TINTA, (0, 0.06), z=-0.01)
         pedido = _texto(burbuja, t.pedido_texto(), 32, estilo.TINTA, (0, 0.008), negrita=True, z=-0.01)
@@ -618,7 +618,7 @@ class EscenaTrabajo(Escena):
         tono = estilo.COLOR_TARJETA
         if flash:
             tono = estilo.COLOR_BARRA_ALTO if getattr(self, "_tiles_flash", True) else estilo.ESTADO_ERROR
-        tile = panel_tinta(d, 0.21, 0.16, tono=tono, radio_px=estilo.RADIO_TARJETA_PX, z=-0.004,
+        tile = panel_piel(d, 0.21, 0.16, tono=tono, radio_px=estilo.RADIO_TARJETA_PX, z=-0.004,
                            position=pos, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
         dibujar_icono(tile, producto, (0, 0.022), 0.09)
         n = _texto(tile, producto.capitalize(), 16, estilo.COLOR_TEXTO, (0, -0.058), negrita=True, z=-0.012)
@@ -658,7 +658,7 @@ class EscenaTrabajo(Escena):
             else:
                 tono, tinta = estilo.COLOR_TARJETA, estilo.PAPEL
             pos = (x0 + i * (lado + hueco), 0.07 + (0.012 if actual else 0))
-            tile = panel_tinta(d, lado, lado, tono=tono, radio_px=estilo.RADIO_TARJETA_PX, z=-0.004, position=pos,
+            tile = panel_piel(d, lado, lado, tono=tono, radio_px=estilo.RADIO_TARJETA_PX, z=-0.004, position=pos,
                                borde_px=estilo.GROSOR_BORDE_PX if actual else estilo.GROSOR_BORDE_DENSO_PX)
             dibujar_flecha(tile, direccion, tinta, lado * 0.8)
             if hecho and not error:
@@ -668,8 +668,8 @@ class EscenaTrabajo(Escena):
                    (0, -0.045), negrita=True, z=-0.004)
         for i, (direccion, texto) in enumerate((("izquierda", "Izquierda"), ("abajo", "Abajo"), ("arriba", "Arriba"),
                                                 ("derecha", "Derecha"))):
-            BotonSecundario(texto, al_clic=lambda dr=direccion: self.accion(dr), ancho=0.2, alto=0.07,
-                            tamano_fuente_px=18, parent=d, position=(-0.33 + 0.22 * i, -0.17, -0.004))
+            boton_piel_secundario(texto, al_clic=lambda dr=direccion: self.accion(dr), ancho=0.2, alto=0.07,
+                                  tamano_fuente_px=18, parent=d, position=(-0.33 + 0.22 * i, -0.17, -0.004))
 
     # -- BARRA --
 
@@ -712,5 +712,5 @@ class EscenaTrabajo(Escena):
         b["fantasma"] = Entity(parent=d, model="quad", color=rgb(estilo.PAPEL), scale=(0.01, 0.1), enabled=False)
         _texto(d, "ZONA = donde hay que parar la marca amarilla", 14, estilo.COLOR_TEXTO_TENUE, (0, -0.045),
                z=-0.004)
-        BotonPrimario("DETENER (Espacio)", al_clic=lambda: self.accion(None), ancho=0.5, alto=0.09,
-                      tamano_fuente_px=24, parent=d, position=(0, -0.16, -0.004))
+        boton_piel_primario("DETENER (Espacio)", al_clic=lambda: self.accion(None), ancho=0.5, alto=0.09,
+                            tamano_fuente_px=24, parent=d, position=(0, -0.16, -0.004))

@@ -8,7 +8,7 @@ from ursina import Entity, Text
 
 from frontend import diseno_adaptable, estilo
 from frontend.campo_texto import CampoTexto
-from frontend.componentes import BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb
+from frontend.componentes import boton_piel_secundario, a_unidades, escala_fuente, panel_piel, rgb
 from frontend.fondo_menu import FocoTeclado
 from frontend.texto import envolver_texto
 
@@ -54,13 +54,13 @@ class SelectorSimple(Entity):
         self._al_cambiar = al_cambiar
         self._habilitado = True
         flecha = 0.075
-        self.izq = BotonSecundario("‹", al_clic=lambda: self.ajustar(-1), ancho=flecha, alto=a_unidades(44),
-                                   tamano_fuente_px=26, parent=self, position=(-ancho / 2 + flecha / 2, 0, -0.003))
-        self.der = BotonSecundario("›", al_clic=lambda: self.ajustar(1), ancho=flecha, alto=a_unidades(44),
-                                   tamano_fuente_px=26, parent=self, position=(ancho / 2 - flecha / 2, 0, -0.003))
+        self.izq = boton_piel_secundario("‹", al_clic=lambda: self.ajustar(-1), ancho=flecha, alto=a_unidades(44),
+                                         tamano_fuente_px=26, parent=self, position=(-ancho / 2 + flecha / 2, 0, -0.003))
+        self.der = boton_piel_secundario("›", al_clic=lambda: self.ajustar(1), ancho=flecha, alto=a_unidades(44),
+                                         tamano_fuente_px=26, parent=self, position=(ancho / 2 - flecha / 2, 0, -0.003))
         centro = ancho - 2 * flecha - 0.03
         self.ancho_centro = centro
-        self.panel = panel_tinta(self, centro, a_unidades(44), estilo.COLOR_TARJETA, estilo.RADIO_CHIP_PX,
+        self.panel = panel_piel(self, centro, a_unidades(44), estilo.COLOR_TARJETA, estilo.RADIO_CHIP_PX,
                                  sombra=False, borde_px=2, position=(0, 0, -0.002))
         self.texto = crear_texto(self.panel, "-", 0, 0, 20, origen=(0, 0), z=-0.003)
         self._foco = False

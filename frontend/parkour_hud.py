@@ -10,7 +10,7 @@ from backend.logica import parkour_calculos as pk
 from frontend import diseno_adaptable, estilo, materiales as mat, minimapa_calculos as mm, parkour_minimapa, tipografia
 from frontend import parkour_visual_calculos as pvc
 from frontend import ui_botw_b
-from frontend.componentes import BotonPrimario, BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb
+from frontend.componentes import boton_piel_primario, boton_piel_secundario, a_unidades, escala_fuente, panel_piel, rgb
 
 DURACION_AVISO = 2.2
 DURACION_AVISO_PURGA = 1.4
@@ -59,7 +59,7 @@ class PlanoAlturas(Entity):
     def __init__(self, padre):
         super().__init__(parent=padre)
         x = diseno_adaptable.aspecto() / 2 - MARGEN - LADO_PLANO / 2
-        self.caja = panel_tinta(self, LADO_PLANO, LADO_PLANO, sombra=False, position=(x, 0.5 - MARGEN - LADO_PLANO / 2))
+        self.caja = panel_piel(self, LADO_PLANO, LADO_PLANO, sombra=False, position=(x, 0.5 - MARGEN - LADO_PLANO / 2))
         # «Alturas» con su pastilla oscura: sin ella no se leía encima de las plataformas claras.
         Entity(parent=self.caja, model="quad", position=(0, -LADO_PLANO / 2 - 0.018, 0.005), scale=(0.1, 0.03),
                color=color.rgba(6 / 255, 8 / 255, 20 / 255, 0.7))
@@ -262,16 +262,16 @@ class HudParkour(Entity):
     # -- Paneles --
 
     def _panel_pausa(self):
-        panel = panel_tinta(self, 0.62, 0.52)
+        panel = panel_piel(self, 0.62, 0.52)
         panel.z = -0.5
         _texto(panel, "Pausa", 30, estilo.COLOR_TEXTO, (0, 0.18), negrita=True)
         self._nota_pausa = _texto(panel, TEXTOS_SALIDA[False][0], 15, estilo.COLOR_TEXTO_TENUE, (0, 0.11))
-        BotonPrimario("Continuar", al_clic=lambda: self.al_continuar and self.al_continuar(), parent=panel,
-                      position=(0, 0.03, -0.01), ancho=a_unidades(260))
-        BotonSecundario("Reiniciar el nivel", al_clic=lambda: self.al_reiniciar and self.al_reiniciar(), parent=panel,
-                        position=(0, -0.08, -0.01), ancho=a_unidades(260))
-        self._boton_salir = BotonSecundario(TEXTOS_SALIDA[False][1], al_clic=lambda: self.al_salir and self.al_salir(),
-                                            parent=panel, position=(0, -0.19, -0.01), ancho=a_unidades(260))
+        boton_piel_primario("Continuar", al_clic=lambda: self.al_continuar and self.al_continuar(), parent=panel,
+                            position=(0, 0.03, -0.01), ancho=a_unidades(260))
+        boton_piel_secundario("Reiniciar el nivel", al_clic=lambda: self.al_reiniciar and self.al_reiniciar(), parent=panel,
+                              position=(0, -0.08, -0.01), ancho=a_unidades(260))
+        self._boton_salir = boton_piel_secundario(TEXTOS_SALIDA[False][1], al_clic=lambda: self.al_salir and self.al_salir(),
+                                                  parent=panel, position=(0, -0.19, -0.01), ancho=a_unidades(260))
         panel.enabled = False
         diseno_adaptable.ajustar_escala(panel)
         return panel
@@ -280,7 +280,7 @@ class HudParkour(Entity):
     # no hay GameState (el nivel se juega sin consecuencias).
     def mostrar_resultado(self, resultado, nueva_evidencia, con_estado, hay_recompensa):
         self.ocultar_resultado()
-        panel = panel_tinta(self, 0.9, 0.78)
+        panel = panel_piel(self, 0.9, 0.78)
         panel.z = -0.5
         titulo = _texto(panel, "¡Nivel completado!", 32, estilo.COLOR_ACENTO, (0, 0.32), negrita=True)
         # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra de tinta y entrada del panel.
@@ -314,10 +314,10 @@ class HudParkour(Entity):
         # resultado v2 los largos van a 15 px
         _texto(panel, mensaje, 15 if pk.resultado_v2_activo() and len(mensaje) > 60 else 17, tono, (0, y_mensaje))
         # con destino de retorno propio (laboratorio de la Fiscalía) el botón no promete «el mundo»
-        BotonPrimario("Volver" if getattr(self, "_hay_retorno", False) else "Volver al mundo", al_clic=lambda: self.al_salir and self.al_salir(), parent=panel,
-                      position=(-0.2, -0.27, -0.01), ancho=a_unidades(230))
-        BotonSecundario("Reintentar", al_clic=lambda: self.al_reiniciar and self.al_reiniciar(), parent=panel,
-                        position=(0.2, -0.27, -0.01), ancho=a_unidades(230))
+        boton_piel_primario("Volver" if getattr(self, "_hay_retorno", False) else "Volver al mundo", al_clic=lambda: self.al_salir and self.al_salir(), parent=panel,
+                            position=(-0.2, -0.27, -0.01), ancho=a_unidades(230))
+        boton_piel_secundario("Reintentar", al_clic=lambda: self.al_reiniciar and self.al_reiniciar(), parent=panel,
+                              position=(0.2, -0.27, -0.01), ancho=a_unidades(230))
         diseno_adaptable.ajustar_escala(panel)
         self.resultado = panel
 

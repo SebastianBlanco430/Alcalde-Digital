@@ -29,7 +29,7 @@ from backend.logica.comercios import RADIO_COMERCIO, ancla_de, resolver_ancla
 from backend.logica.perfil_economia import FATIGA_MAX
 from backend.logica.trabajos import MENSAJE_AGOTADO, puede_trabajar
 from frontend import economia_config as cfg, estilo, tipografia, trabajo_lado_calculos, trabajo_npc_calculos
-from frontend.componentes import BotonPrimario, BotonSecundario, escala_fuente, panel_tinta, rgb
+from frontend.componentes import boton_piel_primario, boton_piel_secundario, escala_fuente, panel_piel, rgb
 
 PRIORIDAD = 6
 DESPLAZAMIENTO_TIENDA = 2.8        # m al lado de la tienda
@@ -207,7 +207,7 @@ class MenuTrabajo(Entity):
         self.puesto = None
         self.jugador = None
         self._edad = 0
-        self.panel = panel_tinta(self, ANCHO_MENU, ALTO_MENU, z=-0.01)
+        self.panel = panel_piel(self, ANCHO_MENU, ALTO_MENU, z=-0.01)
         # Panel alto para los trabajos con explicación previa (entregas en moto): se crea la primera vez que hace falta.
         self.panel_largo = None
         self.titulo = Text("", parent=self, origin=(0, 0), scale=escala_fuente(26),
@@ -217,16 +217,16 @@ class MenuTrabajo(Entity):
                               color=rgb(estilo.COLOR_TEXTO_TENUE))
         self.explicacion = Text("", parent=self, origin=(-0.5, 0.5), scale=escala_fuente(15),
                                 color=rgb(estilo.COLOR_TEXTO), enabled=False)
-        self.boton_trabajar = BotonPrimario("Trabajar (Enter)", al_clic=self.aceptar, ancho=0.33, alto=0.07,
-                                            tamano_fuente_px=20, parent=self)
-        self.boton_cancelar = BotonSecundario("Cancelar (Esc)", al_clic=self.cerrar, ancho=0.3, alto=0.07,
-                                              tamano_fuente_px=20, parent=self)
+        self.boton_trabajar = boton_piel_primario("Trabajar (Enter)", al_clic=self.aceptar, ancho=0.33, alto=0.07,
+                                                  tamano_fuente_px=20, parent=self)
+        self.boton_cancelar = boton_piel_secundario("Cancelar (Esc)", al_clic=self.cerrar, ancho=0.3, alto=0.07,
+                                                    tamano_fuente_px=20, parent=self)
         self._colocar(False)
 
     # Coloca los textos y botones en el panel corto (de siempre) o en el alto con la explicación.
     def _colocar(self, largo):
         if largo and self.panel_largo is None:
-            self.panel_largo = panel_tinta(self, ANCHO_MENU_LARGO, ALTO_MENU_LARGO, z=-0.01)
+            self.panel_largo = panel_piel(self, ANCHO_MENU_LARGO, ALTO_MENU_LARGO, z=-0.01)
         self.panel.enabled = not largo
         if self.panel_largo is not None:
             self.panel_largo.enabled = largo

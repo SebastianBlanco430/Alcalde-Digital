@@ -17,7 +17,7 @@ from backend.logica.roles import ORDEN_ROLES
 from frontend import diseno_adaptable, estilo, tipografia, ui_botw_b
 from frontend import online_lobby_calculos as lobby
 from frontend.campo_texto import copiar_al_portapapeles
-from frontend.componentes import BotonPrimario, BotonSecundario, a_unidades, panel_tinta, rgb
+from frontend.componentes import boton_piel_primario, boton_piel_secundario, a_unidades, panel_piel, rgb
 from frontend.escenas.escena_base import Escena
 from frontend.escenas.escena_seleccion_rol import ANCHO_TARJETA, TarjetaRol
 from frontend.fondo_menu import FondoMenu, anadir_filo
@@ -45,7 +45,7 @@ class FilaJugador(Entity):
 
     def __init__(self, indice, **kw):
         super().__init__(**kw)
-        self.panel = panel_tinta(self, ANCHO_TABLA, ALTO_FILA - 0.010, estilo.COLOR_TARJETA, estilo.RADIO_CHIP_PX,
+        self.panel = panel_piel(self, ANCHO_TABLA, ALTO_FILA - 0.010, estilo.COLOR_TARJETA, estilo.RADIO_CHIP_PX,
                                  sombra=False, borde_px=2, position=(0, 0, 0))
         self.t_alias = crear_texto(self, " ", X_COL["alias"], 0.011, 20, z=-0.01)
         self.t_sub = crear_texto(self, " ", X_COL["alias"], -0.017, 16, estilo.COLOR_TEXTO_TENUE, z=-0.01)
@@ -97,7 +97,7 @@ class EscenaSala(Escena):
         self.fondo = FondoMenu(velo=140, parent=self)
         self.raiz = Entity(parent=self)
         diseno_adaptable.ajustar_escala(self.raiz)
-        self.panel = panel_tinta(self.raiz, ANCHO_PANEL, ALTO_PANEL, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
+        self.panel = panel_piel(self.raiz, ANCHO_PANEL, ALTO_PANEL, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
         anadir_filo(self.panel, ANCHO_PANEL, ALTO_PANEL, estilo.RADIO_PANEL_PX)
         self.titulo = crear_texto(self.raiz, "Sala de espera", -ANCHO_PANEL / 2 + 0.05, 0.43, 30,
                                   font=tipografia.FUENTE_TITULO)
@@ -123,36 +123,36 @@ class EscenaSala(Escena):
 
         # Columna derecha: cómo entrar (solo el anfitrión) + aviso de cifrado
         self.caja_codigo = Entity(parent=self.raiz)
-        panel_tinta(self.caja_codigo, 0.74, 0.31, estilo.COLOR_TARJETA, estilo.RADIO_TARJETA_PX, sombra=False,
+        panel_piel(self.caja_codigo, 0.74, 0.31, estilo.COLOR_TARJETA, estilo.RADIO_TARJETA_PX, sombra=False,
                     borde_px=2, position=(X_DER, 0.205, 0))
         xi = X_DER - 0.34
         crear_texto(self.caja_codigo, "Cómo entrar", xi, 0.335, 16, estilo.COLOR_TEXTO_TENUE)
         self.t_destino = crear_texto(self.caja_codigo, " ", xi, 0.295, 22)
         self.t_codigo = crear_texto(self.caja_codigo, " ", xi, 0.245, 22, estilo.ACENTO_PRIMARIO)
-        self.btn_ver = BotonSecundario("Mostrar código", al_clic=self.alternar_codigo, ancho=0.34,
-                                       alto=a_unidades(38), tamano_fuente_px=17, parent=self.caja_codigo,
-                                       position=(X_DER - 0.18, 0.17, -0.003))
-        self.btn_copiar = BotonSecundario("Copiar", al_clic=self.copiar_acceso, ancho=0.34, alto=a_unidades(38),
-                                          tamano_fuente_px=17, parent=self.caja_codigo,
-                                          position=(X_DER + 0.18, 0.17, -0.003))
+        self.btn_ver = boton_piel_secundario("Mostrar código", al_clic=self.alternar_codigo, ancho=0.34,
+                                             alto=a_unidades(38), tamano_fuente_px=17, parent=self.caja_codigo,
+                                             position=(X_DER - 0.18, 0.17, -0.003))
+        self.btn_copiar = boton_piel_secundario("Copiar", al_clic=self.copiar_acceso, ancho=0.34, alto=a_unidades(38),
+                                                tamano_fuente_px=17, parent=self.caja_codigo,
+                                                position=(X_DER + 0.18, 0.17, -0.003))
         self.t_copiado = crear_texto(self.caja_codigo, " ", xi, 0.115, 16, estilo.ESTADO_EXITO)
         self.t_cifrado = crear_texto(self.raiz, " ", X_DER - 0.37, 0.04, 16, estilo.ESTADO_AVISO, origen=(-0.5, 0.5))
         texto_envuelto(self.t_cifrado, "Aviso: " + lobby.AVISO_SIN_CIFRAR, 0.74, 16, max_lineas=2)
         self.t_cifrado.origin = (-0.5, 0.5)
-        self.btn_ayuda = BotonSecundario("Ayuda: cortafuegos de macOS", al_clic=self.alternar_ayuda, ancho=0.44,
-                                         alto=a_unidades(34), tamano_fuente_px=16, parent=self.raiz,
-                                         position=(0.60, 0.395, -0.003))
+        self.btn_ayuda = boton_piel_secundario("Ayuda: cortafuegos de macOS", al_clic=self.alternar_ayuda, ancho=0.44,
+                                               alto=a_unidades(34), tamano_fuente_px=16, parent=self.raiz,
+                                               position=(0.60, 0.395, -0.003))
         # La ayuda se abre como un cuadro sobre la tabla (no empuja nada)
         self.caja_ayuda = Entity(parent=self.raiz, enabled=False, z=-0.02)
-        panel_tinta(self.caja_ayuda, 1.5, 0.17, estilo.COLOR_PANEL, estilo.RADIO_TARJETA_PX, position=(0, -0.145, 0))
+        panel_piel(self.caja_ayuda, 1.5, 0.17, estilo.COLOR_PANEL, estilo.RADIO_TARJETA_PX, position=(0, -0.145, 0))
         self.t_ayuda = crear_texto(self.caja_ayuda, " ", -0.70, -0.085, 18, estilo.COLOR_TEXTO, origen=(-0.5, 0.5))
         self.t_aviso = crear_texto(self.raiz, " ", -0.80, -0.365, 17, estilo.ESTADO_AVISO)
-        self.btn_salir = BotonSecundario("Salir de la sala", al_clic=self.salir, ancho=0.40, alto=a_unidades(52),
-                                         tamano_fuente_px=20, parent=self.raiz, position=(-0.55, -0.425, -0.003))
-        self.btn_listo = BotonSecundario("Estoy listo", al_clic=self.alternar_listo, ancho=0.40, alto=a_unidades(52),
-                                         tamano_fuente_px=22, parent=self.raiz, position=(0.0, -0.425, -0.003))
-        self.btn_iniciar = BotonPrimario("Iniciar partida", al_clic=self.iniciar, ancho=0.56, alto=a_unidades(52),
-                                         tamano_fuente_px=22, parent=self.raiz, position=(0.52, -0.425, -0.003))
+        self.btn_salir = boton_piel_secundario("Salir de la sala", al_clic=self.salir, ancho=0.40, alto=a_unidades(52),
+                                               tamano_fuente_px=20, parent=self.raiz, position=(-0.55, -0.425, -0.003))
+        self.btn_listo = boton_piel_secundario("Estoy listo", al_clic=self.alternar_listo, ancho=0.40, alto=a_unidades(52),
+                                               tamano_fuente_px=22, parent=self.raiz, position=(0.0, -0.425, -0.003))
+        self.btn_iniciar = boton_piel_primario("Iniciar partida", al_clic=self.iniciar, ancho=0.56, alto=a_unidades(52),
+                                               tamano_fuente_px=22, parent=self.raiz, position=(0.52, -0.425, -0.003))
         self.foco = FocoOnline(self._controles_activos, al_escape=self.salir, parent=self)
         # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra, velo, flecha del foco y
         # entrada desde la derecha. None = la sala de siempre.

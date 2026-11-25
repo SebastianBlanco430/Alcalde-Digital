@@ -127,7 +127,10 @@ class FlechaFoco(Entity):
 
     def colocar(self, t):
         control = self.foco.enfocado() if self.foco is not None else None
-        visible = (control is not None and getattr(self.foco, "visible", True) and control.enabled
+        # Los botones de la piel de A (componentes.BotonBotw*, vía boton_piel_*) ya dibujan su flecha con el foco: aquí
+        # solo se señalan los controles propios (tarjetas de rol, selectores, campos).
+        propia = type(control).__name__.startswith("BotonBotw")
+        visible = (control is not None and not propia and getattr(self.foco, "visible", True) and control.enabled
                    and getattr(control, "parent", None) is not None)
         if not visible:
             self.visible = False

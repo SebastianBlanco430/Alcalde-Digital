@@ -11,7 +11,7 @@
 from ursina import Entity, Text
 
 from frontend import diseno_adaptable, estilo, reloj_calculos as rc, tipografia, ui_botw_b
-from frontend.componentes import BarraIndicador, BotonPrimario, a_unidades, escala_fuente, panel_tinta, rgb
+from frontend.componentes import BarraIndicador, boton_piel_primario, a_unidades, escala_fuente, panel_piel, rgb
 from frontend.hud import _medidor
 from frontend.texto import envolver_texto
 
@@ -33,7 +33,7 @@ class PanelFinalSemana(Entity):
     def __init__(self, al_menu, **opciones):
         super().__init__(**opciones)
         self.z = -0.5                         # por delante del resto del HUD
-        self.panel = panel_tinta(self, self.ANCHO, self.ALTO, tono=estilo.COLOR_FONDO)
+        self.panel = panel_piel(self, self.ANCHO, self.ALTO, tono=estilo.COLOR_FONDO)
         arriba = self.ALTO / 2
         self.titulo = Text("", parent=self, origin=(0, 0), position=(0, arriba - 0.07, -0.001),
                            scale=escala_fuente(self.PX_TITULO), color=rgb(estilo.COLOR_TEXTO), font=tipografia.FUENTE_TITULO)
@@ -53,8 +53,8 @@ class PanelFinalSemana(Entity):
         self.resumen = Text("", parent=self, origin=(0, 0.5), position=(0, self.Y_RESUMEN, -0.001),
                             scale=escala_fuente(self.PX_RESUMEN), color=rgb(estilo.COLOR_TEXTO_TENUE))
         self.resumen.line_height = self.LINEA
-        self.boton_menu = BotonPrimario("Volver al menú", al_clic=al_menu, ancho=0.36, alto=a_unidades(56),
-                                        parent=self, position=(0, -self.ALTO / 2 + 0.07, -0.001))
+        self.boton_menu = boton_piel_primario("Volver al menú", al_clic=al_menu, ancho=0.36, alto=a_unidades(56),
+                                              parent=self, position=(0, -self.ALTO / 2 + 0.07, -0.001))
         self.contenido = None
         # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra de tinta, velo detrás del panel
         # y entrada desde la derecha al mostrarse. None = el panel de siempre.

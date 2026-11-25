@@ -11,7 +11,7 @@ from ursina import Entity, Text
 
 from frontend import estilo, ui_botw_b
 from frontend import veredicto_calculos as vc
-from frontend.componentes import BarraIndicador, BotonPrimario, a_unidades, escala_fuente, panel_tinta, rgb
+from frontend.componentes import BarraIndicador, boton_piel_primario, a_unidades, escala_fuente, panel_piel, rgb
 from frontend.hud import _medidor
 from frontend.texto import envolver_texto
 
@@ -37,7 +37,7 @@ class PanelFinal(Entity):
             alto, y_barras, y_resumen = pulido.PANEL_FINAL_ALTO, pulido.PANEL_FINAL_Y_BARRAS, pulido.PANEL_FINAL_Y_RESUMEN
         else:
             alto, y_barras, y_resumen = self.ALTO, -0.045, -0.175
-        self.panel = panel_tinta(self, self.ANCHO, alto, tono=estilo.COLOR_FONDO)
+        self.panel = panel_piel(self, self.ANCHO, alto, tono=estilo.COLOR_FONDO)
         arriba = alto / 2
         self.titulo = Text("", parent=self, origin=(0, 0), position=(0, arriba - 0.075, -0.001),
                            scale=escala_fuente(self.PX_TITULO), color=rgb(estilo.COLOR_TEXTO))
@@ -57,8 +57,8 @@ class PanelFinal(Entity):
         self.resumen = Text("", parent=self, origin=(0, 0.5), position=(0, y_resumen, -0.001),
                             scale=escala_fuente(self.PX_RESUMEN), color=rgb(estilo.COLOR_TEXTO_TENUE))
         self.resumen.line_height = self.LINEA
-        self.boton_menu = BotonPrimario("Volver al menú", al_clic=al_menu, ancho=0.36, alto=a_unidades(56),
-                                        parent=self, position=(0, -alto / 2 + (0.07 if pulido.activo() else 0.075), -0.001))
+        self.boton_menu = boton_piel_primario("Volver al menú", al_clic=al_menu, ancho=0.36, alto=a_unidades(56),
+                                              parent=self, position=(0, -alto / 2 + (0.07 if pulido.activo() else 0.075), -0.001))
         self.contenido = None
         # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra de tinta, velo detrás del panel
         # y entrada desde la derecha al mostrarse. None = el panel de siempre.

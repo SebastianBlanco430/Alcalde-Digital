@@ -14,7 +14,7 @@ from ursina import Entity, Text, color
 from frontend import estilo, ui_botw_b
 from frontend import online_lobby_calculos as lobby
 from frontend import online_mundo_calculos as omc
-from frontend.componentes import BotonPrimario, a_unidades, escala_fuente, modelo_redondeado, panel_tinta, rgb
+from frontend.componentes import boton_piel_primario, a_unidades, escala_fuente, modelo_redondeado, panel_piel, rgb
 from frontend.hud import MARGEN, AvisoGenerico, _fondo, _medidor, _seguro
 
 Y_AVISO = 0.5 - MARGEN - 0.115          # centro del aviso superior (bajo la pastilla de ping)
@@ -95,7 +95,7 @@ class HudOnline(Entity):
         self.cierre = Entity(parent=self, position=(0, 0, -0.05), enabled=False)
         self.cierre_fondo = Entity(parent=self.cierre, model="quad", color=color.rgba32(8, 9, 16, 190),
                                    scale=(4, 2), z=0.01)
-        self.cierre_panel = panel_tinta(self.cierre, 0.90, 0.46, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
+        self.cierre_panel = panel_piel(self.cierre, 0.90, 0.46, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
         Entity(parent=self.cierre, model="quad", color=rgb(estilo.ESTADO_ERROR), scale=(0.84, 0.008),
                position=(0, 0.14, -0.002))
         self.cierre_titulo = Text("Conexión perdida", parent=self.cierre, origin=(0, 0), position=(0, 0.095, -0.003),
@@ -103,8 +103,8 @@ class HudOnline(Entity):
         self.cierre_texto = Text(" ", parent=self.cierre, origin=(0, 0.5), position=(0, 0.04, -0.003),
                                  scale=escala_fuente(19), color=rgb(estilo.COLOR_TEXTO))
         self.cierre_texto.line_height = 1.25
-        self.cierre_boton = BotonPrimario("Volver al menú", al_clic=self._volver, ancho=0.40, alto=a_unidades(54),
-                                          tamano_fuente_px=22, parent=self.cierre, position=(0, -0.15, -0.004))
+        self.cierre_boton = boton_piel_primario("Volver al menú", al_clic=self._volver, ancho=0.40, alto=a_unidades(54),
+                                                tamano_fuente_px=22, parent=self.cierre, position=(0, -0.15, -0.004))
         # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): el título del cierre en cursiva con sombra de tinta.
         ui_botw_b.vestir(self.cierre, titulos=(self.cierre_titulo,))
 

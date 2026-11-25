@@ -19,7 +19,7 @@ from frontend import campo_texto_calculos as calc_campo
 from frontend import diseno_adaptable, estilo, tipografia, ui_botw_b
 from frontend import online_lobby_calculos as lobby
 from frontend.campo_texto import CampoTexto
-from frontend.componentes import BotonPrimario, BotonSecundario, a_unidades, panel_tinta, rgb
+from frontend.componentes import boton_piel_primario, boton_piel_secundario, a_unidades, panel_piel, rgb
 from frontend.escenas.escena_base import Escena
 from frontend.fondo_menu import FondoMenu, anadir_filo
 from frontend.online_ui import FocoOnline, SelectorSimple, crear_texto, fijar, texto_envuelto
@@ -48,7 +48,7 @@ class EscenaOnlineMenu(Escena):
         self.fondo = FondoMenu(parent=self)
         self.raiz = Entity(parent=self)
         diseno_adaptable.ajustar_escala(self.raiz)
-        self.panel = panel_tinta(self.raiz, ANCHO_PANEL, ALTO_PANEL, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
+        self.panel = panel_piel(self.raiz, ANCHO_PANEL, ALTO_PANEL, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
         anadir_filo(self.panel, ANCHO_PANEL, ALTO_PANEL, estilo.RADIO_PANEL_PX)
         self.titulo = crear_texto(self.raiz, "En línea", 0, 0.375, 38, origen=(0, 0), font=tipografia.FUENTE_TITULO)
         self.paginas = {}
@@ -71,7 +71,7 @@ class EscenaOnlineMenu(Escena):
         return g
 
     def _boton(self, g, texto, accion, x, y, ancho=0.40, primario=False, px=22):
-        clase = BotonPrimario if primario else BotonSecundario
+        clase = boton_piel_primario if primario else boton_piel_secundario
         return clase(texto, al_clic=accion, ancho=ancho, alto=a_unidades(52), tamano_fuente_px=px + (2 if primario else 0),
                      parent=g, position=(x, y, -0.003))
 

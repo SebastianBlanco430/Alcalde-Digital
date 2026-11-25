@@ -23,8 +23,8 @@ from frontend import estilo, tipografia
 from frontend import red_social_calculos as calc
 from frontend import red_social_iconos as ico
 from frontend.componentes import (
-    BarraIndicador, BotonPeligro, BotonPrimario, a_unidades, escala_fuente, modelo_redondeado,
-    medidas_tinta, panel_tinta, rgb,
+    BarraIndicador, boton_piel_peligro, boton_piel_primario, a_unidades, escala_fuente, modelo_redondeado,
+    medidas_tinta, panel_piel, rgb,
 )
 from frontend.panel_propagacion import PanelPropagacion
 from frontend.texto import envolver_texto
@@ -186,7 +186,7 @@ class Aviso(Entity):
     def __init__(self, medidor, **opciones):
         super().__init__(enabled=False, **opciones)
         self._medidor = medidor
-        self.panel = panel_tinta(self, 0.3, 0.06, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX)
+        self.panel = panel_piel(self, 0.3, 0.06, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX)
         self.icono = Entity(parent=self, model="quad", scale=0.034, z=-0.01)
         self.texto = Text("", parent=self, origin=(-0.5, 0), scale=escala_fuente(19), font=tipografia.FUENTE_TITULO,
                           color=rgb(estilo.COLOR_TEXTO), position=(0, 0, -0.01))
@@ -226,7 +226,7 @@ class TarjetaPost(Entity):
         w = self.ANCHO
         x0 = -w / 2 + self.PAD
         self.x0 = x0
-        self.panel = panel_tinta(self, w, 0.6, tono=estilo.COLOR_PANEL, radio_px=estilo.RADIO_TARJETA_PX,
+        self.panel = panel_piel(self, w, 0.6, tono=estilo.COLOR_PANEL, radio_px=estilo.RADIO_TARJETA_PX,
                                  position=(0, 0, 0.1))
         # Cabecera.
         self.avatar = Avatar(self.LADO_AVATAR, parent=self, z=-0.01)
@@ -240,7 +240,7 @@ class TarjetaPost(Entity):
         self.cuerpo.line_height = LINEA_CUERPO
         # Vista previa: imagen o enlace.
         self.imagen = Entity(parent=self, model="quad", z=-0.01, enabled=False)
-        self.enlace = panel_tinta(self, w - 2 * self.PAD, self.ALTO_ENLACE, tono=estilo.COLOR_FONDO,
+        self.enlace = panel_piel(self, w - 2 * self.PAD, self.ALTO_ENLACE, tono=estilo.COLOR_FONDO,
                                   radio_px=estilo.RADIO_CHIP_PX, sombra=False, borde_px=2, z=-0.005)
         self.enlace.enabled = False
         self.enlace_miniatura = Entity(parent=self.enlace, model="quad", z=-0.01)
@@ -250,12 +250,12 @@ class TarjetaPost(Entity):
         self.enlace_titulo.line_height = 1.2
         # Carta de misión: chip en la cabecera y caja con la pista (ocultos salvo en esa carta).
         ancho_chip = medidor.ancho(TEXTO_CHIP_MISION, PX_META, True) + 0.04
-        self.chip_mision = panel_tinta(self, ancho_chip, 0.042, tono=estilo.COLOR_ACENTO, radio_px=estilo.RADIO_CHIP_PX,
+        self.chip_mision = panel_piel(self, ancho_chip, 0.042, tono=estilo.COLOR_ACENTO, radio_px=estilo.RADIO_CHIP_PX,
                                        sombra=False, borde_px=2, z=-0.012)
         self.chip_mision.ancho = ancho_chip
         _texto(self.chip_mision, TEXTO_CHIP_MISION, PX_META, (0, 0), estilo.COLOR_ACENTO_TEXTO, origen=(0, 0), negrita=True)
         self.chip_mision.enabled = False
-        self.caja_pista = panel_tinta(self, w - 2 * self.PAD, 0.1, tono=estilo.COLOR_FONDO,
+        self.caja_pista = panel_piel(self, w - 2 * self.PAD, 0.1, tono=estilo.COLOR_FONDO,
                                       radio_px=estilo.RADIO_CHIP_PX, sombra=False, borde_px=2, z=-0.005)
         self.caja_pista.enabled = False
         self.pista_titulo = _texto(self.caja_pista, TEXTO_TITULO_PISTA, PX_META, (0, 0), estilo.COLOR_ACENTO, negrita=True)
@@ -273,10 +273,10 @@ class TarjetaPost(Entity):
             "guardar": AccionPost("guardar", con_cuenta=False, parent=self, z=-0.01),
         }
         # Decisión: los dos botones de siempre (misma API que antes).
-        self.boton_compartir = BotonPrimario("Compartir", al_clic=al_compartir, ancho=0.36, alto=self.ALTO_BOTON,
-                                             parent=self, z=-0.02, tamano_fuente_px=22)
-        self.boton_reportar = BotonPeligro("Reportar", al_clic=al_reportar, ancho=0.30, alto=self.ALTO_BOTON,
-                                           parent=self, z=-0.02, tamano_fuente_px=22)
+        self.boton_compartir = boton_piel_primario("Compartir", al_clic=al_compartir, ancho=0.36, alto=self.ALTO_BOTON,
+                                                   parent=self, z=-0.02, tamano_fuente_px=22)
+        self.boton_reportar = boton_piel_peligro("Reportar", al_clic=al_reportar, ancho=0.30, alto=self.ALTO_BOTON,
+                                                 parent=self, z=-0.02, tamano_fuente_px=22)
         self.boton_reportar.text_entity.font = tipografia.FUENTE_TITULO
         for boton, nombre, tono in ((self.boton_compartir, "republicar", estilo.COLOR_ACENTO_TEXTO),
                                     (self.boton_reportar, "bandera", (250, 244, 228))):
@@ -509,7 +509,7 @@ class VistaRedSocial(Entity):
         # Aviso emergente y sello de misión completada.
         self.aviso = Aviso(self.medidor, parent=self, position=(CX_FEED, -0.455, -0.2))
         self.sello = Entity(parent=self, position=(CX_FEED, -0.02, -0.25), rotation_z=-3, enabled=False)
-        self.sello.panel = panel_tinta(self.sello, 0.62, 0.1, tono=(60, 170, 100), radio_px=estilo.RADIO_PANEL_PX)
+        self.sello.panel = panel_piel(self.sello, 0.62, 0.1, tono=(60, 170, 100), radio_px=estilo.RADIO_PANEL_PX)
         self.sello.texto = Text("", parent=self.sello, origin=(0, 0), position=(0, 0, -0.01),
                                 scale=escala_fuente(34), font=tipografia.FUENTE_TITULO,
                                 color=rgb((250, 244, 228)))
@@ -553,9 +553,9 @@ class VistaRedSocial(Entity):
         # Punto rojo de avisos sobre la campana.
         Entity(parent=self, model="circle", scale=0.016, color=rgb(COLOR_ROJO), position=(X_NAV + 0.056 + 0.016, y - 2 * 0.088 + 0.018, 0.05))
         # Botón «Publicar» (decorativo: avisa que hay que decidir sobre la publicación).
-        self.boton_publicar = BotonPrimario("Publicar", al_clic=self._clic_publicar, ancho=ANCHO_NAV - 0.1, alto=0.07,
-                                            parent=self, position=(X_NAV + ANCHO_NAV / 2 - 0.005, y - 5 * 0.088 - 0.01, 0.1),
-                                            tamano_fuente_px=22)
+        self.boton_publicar = boton_piel_primario("Publicar", al_clic=self._clic_publicar, ancho=ANCHO_NAV - 0.1, alto=0.07,
+                                                  parent=self, position=(X_NAV + ANCHO_NAV / 2 - 0.005, y - 5 * 0.088 - 0.01, 0.1),
+                                                  tamano_fuente_px=22)
         # Perfil del jugador (abajo).
         self.avatar_jugador = Avatar(0.058, parent=self, position=(X_NAV + 0.056 + 0.01, -0.43, 0.1))
         self.nombre_jugador = _texto(self, "", 18, (X_NAV + 0.056 + 0.05, -0.415), estilo.COLOR_TEXTO, negrita=True, z=0.1)
@@ -568,7 +568,7 @@ class VistaRedSocial(Entity):
         _rect(self, 0.085, 0.007, estilo.ACENTO_PRIMARIO, (X_FEED_IZQ + 0.06 + 0.0425, y - 0.03), radio_px=2, z=0.09)
         _texto(self, "Siguiendo", 20, (X_FEED_IZQ + 0.22, y), COLOR_TENUE, z=0.1)
         # Píldora de misión (a la derecha).
-        self.pildora = panel_tinta(self, 0.4, 0.05, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_CHIP_PX,
+        self.pildora = panel_piel(self, 0.4, 0.05, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_CHIP_PX,
                                    sombra=False, borde_px=2, position=(X_FEED_DER - 0.25, y, 0.1))
         self.texto_mision = Text("", parent=self.pildora, origin=(0, 0), position=(0, 0, -0.01),
                                  scale=escala_fuente(18), color=rgb(estilo.COLOR_ACENTO))
@@ -581,7 +581,7 @@ class VistaRedSocial(Entity):
         # Tendencias.
         alto_t = 0.27
         y_t = Y_BASE_BARRA - 0.02 - alto_t / 2
-        panel_tinta(self, w, alto_t, tono=estilo.COLOR_PANEL, radio_px=estilo.RADIO_TARJETA_PX,
+        panel_piel(self, w, alto_t, tono=estilo.COLOR_PANEL, radio_px=estilo.RADIO_TARJETA_PX,
                     position=(CX_DER, y_t, 0.2))
         _texto(self, "Tendencias para ti", 20, (x_izq + 0.022, y_t + alto_t / 2 - 0.035), estilo.COLOR_TEXTO, negrita=True, z=0.1)
         self.tendencias = []
@@ -597,7 +597,7 @@ class VistaRedSocial(Entity):
         y_slot = y_borde - alto_slot / 2
         # --- Alcance ---
         self.slot_alcance = Entity(parent=self)
-        panel_tinta(self.slot_alcance, w, alto_slot, tono=estilo.COLOR_FONDO, radio_px=estilo.RADIO_TARJETA_PX,
+        panel_piel(self.slot_alcance, w, alto_slot, tono=estilo.COLOR_FONDO, radio_px=estilo.RADIO_TARJETA_PX,
                     position=(CX_DER, y_slot, 0.2))
         self.panel_propagacion = PanelPropagacion(parent=self, position=(CX_DER, y_slot, 0.1))
         self.slot_alcance.enabled = False
@@ -605,7 +605,7 @@ class VistaRedSocial(Entity):
         self.slot_seguir = Entity(parent=self)
         alto_s = 0.3
         y_s = y_borde - alto_s / 2
-        panel_tinta(self.slot_seguir, w, alto_s, tono=estilo.COLOR_PANEL, radio_px=estilo.RADIO_TARJETA_PX,
+        panel_piel(self.slot_seguir, w, alto_s, tono=estilo.COLOR_PANEL, radio_px=estilo.RADIO_TARJETA_PX,
                     position=(CX_DER, y_s, 0.2))
         _texto(self.slot_seguir, "A quién seguir", 20, (x_izq + 0.022, y_s + alto_s / 2 - 0.035), estilo.COLOR_TEXTO,
                negrita=True, z=0.1)
@@ -621,7 +621,7 @@ class VistaRedSocial(Entity):
             self.seguir.append((avatar, nombre, insignia, handle))
         alto_c = 0.2
         y_c = y_s - alto_s / 2 - 0.02 - alto_c / 2
-        panel_tinta(self.slot_seguir, w, alto_c, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX,
+        panel_piel(self.slot_seguir, w, alto_c, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX,
                     position=(CX_DER, y_c, 0.2))
         _texto(self.slot_seguir, "Consejo de Civitas", 19, (x_izq + 0.022, y_c + alto_c / 2 - 0.035), estilo.ACENTO_PRIMARIO,
                negrita=True, z=0.1)

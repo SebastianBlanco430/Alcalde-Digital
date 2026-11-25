@@ -15,7 +15,7 @@ from backend.datos import parkour_loader
 from backend.logica import enlace_parkour_extra as extra
 from frontend import banderas_visuales as bv
 from frontend import estilo
-from frontend.componentes import BotonSecundario, escala_fuente, rgb
+from frontend.componentes import boton_piel_secundario, escala_fuente, rgb
 
 PARKOUR_SEGUNDO = True
 VARIABLE = "ALCALDE_PARKOUR_SEGUNDO"
@@ -51,7 +51,7 @@ class SegundoBotonParkour(Entity):
         self.escena = escena
         self.enlace = None
         self.estado = extra.DISPONIBLE
-        self.boton = BotonSecundario("", al_clic=self.abrir, ancho=ANCHO, alto=ALTO, parent=self)
+        self.boton = boton_piel_secundario("", al_clic=self.abrir, ancho=ANCHO, alto=ALTO, parent=self)
         self.boton.position = (*POSICION, 0)
         self.etiqueta = Text("", parent=self, origin=(-0.5, 0), position=(POSICION[0] - ANCHO / 2 + 0.02, POSICION[1], -0.02),
                              scale=escala_fuente(15), color=rgb(estilo.COLOR_BOTON_TEXTO))

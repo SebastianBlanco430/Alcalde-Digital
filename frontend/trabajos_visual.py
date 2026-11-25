@@ -20,7 +20,7 @@ from ursina import Entity, Text, camera, color, scene, time
 from frontend import banderas_visuales as bv
 from frontend import estilo, tipografia
 from frontend import trabajos_visual_calculos as calc
-from frontend.componentes import destruir_arbol, escala_fuente, panel_tinta
+from frontend.componentes import destruir_arbol, escala_fuente, panel_piel
 
 TRABAJOS_VISUAL = True
 VARIABLE = "ALCALDE_TRABAJOS_VISUAL"
@@ -77,9 +77,9 @@ class DecoracionTrabajo:
     def _construir_secuencia(self):
         self.sq_fondo = Entity(parent=self.fondo, enabled=False)
         self.sq_frente = Entity(parent=self.frente, enabled=False)
-        self.monitor = panel_tinta(self.sq_fondo, 0.9, 0.19, tono=(40, 42, 50), radio_px=10, sombra=False, borde_px=2,
+        self.monitor = panel_piel(self.sq_fondo, 0.9, 0.19, tono=(40, 42, 50), radio_px=10, sombra=False, borde_px=2,
                                    position=(0, 0.08, 0))
-        self.pantalla = panel_tinta(self.sq_fondo, 0.86, 0.16, tono=(16, 24, 48), radio_px=6, sombra=False, borde_px=0,
+        self.pantalla = panel_piel(self.sq_fondo, 0.86, 0.16, tono=(16, 24, 48), radio_px=6, sombra=False, borde_px=0,
                                     position=(0, 0.08, -0.001))
         self.led = Entity(parent=self.sq_fondo, model="circle", scale=0.012, color=_rgba(VERDE_OK), position=(0, 0, -0.002))
         self.azul = Entity(parent=self.sq_frente, enabled=False)
