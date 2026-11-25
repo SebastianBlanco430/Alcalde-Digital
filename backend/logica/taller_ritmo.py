@@ -59,10 +59,14 @@ def llegadas(duracion):
 class TurnoRitmo:
 
     # trabajo: Trabajo (opciones = direcciones). piezas: repertorio (backend/datos/piezas_taller.py).
-    def __init__(self, trabajo, semilla=0, piezas=None):
+    # velocidad: multiplica la rapidez con que las notas cruzan el carril (1 = VIAJE_S de siempre; el taller 3D pasa
+    # 1,2 con ALCALDE_TALLER3D_VELOCIDAD). Solo cambia el viaje: el ritmo de llegadas y la ventana son los mismos.
+    def __init__(self, trabajo, semilla=0, piezas=None, velocidad=1.0):
         if piezas is None:
             from backend.datos.piezas_taller import PIEZAS_TALLER
             piezas = PIEZAS_TALLER
+        valida = isinstance(velocidad, (int, float)) and not isinstance(velocidad, bool) and math.isfinite(velocidad)
+        self.viaje_s = VIAJE_S / velocidad if valida and velocidad > 0 else VIAJE_S
         self.trabajo = trabajo
         self._rng = random.Random(semilla)
         self.pieza = self._rng.choice(tuple(piezas))
@@ -112,7 +116,7 @@ class TurnoRitmo:
 
     # Posición en el carril de una nota: 1 = acaba de aparecer, 0 = en el recuadro, < 0 = ya lo pasó.
     def posicion(self, nota):
-        return (nota.llegada - self._t) / VIAJE_S
+        return (nota.llegada - self._t) / self.viaje_s
 
     # Notas pendientes que se ven en el carril, con su posición: [(nota, posicion)].
     def notas_en_carril(self):

@@ -412,6 +412,13 @@ def hornear_clips(modelo_np, rol):
             clips.append((nombre, [ac.pose_salto(etapa, m)]))
         for gesto, nombre in CLIPS_GESTO.items():
             clips.append((nombre, [ac.pose_gesto(gesto, m)]))
+        # Sentado en un banco (frontend/bancos_sentados.py; ALCALDE_BANCOS_SENTADOS=0 no lo hornea)
+        from frontend import bancos_sentados_calculos as bsc
+        if bsc.activo():
+            clips.append((bsc.CLIP, [bsc.pose_sentado(k / FOTOGRAMAS, m) for k in range(FOTOGRAMAS)]))
+        # Charlando de pie en un corro de la plaza (ALCALDE_BANCOS_CORROS=0 no lo hornea)
+        if bsc.corros_activos():
+            clips.append((bsc.CLIP_CHARLA, [bsc.pose_charla(k / FOTOGRAMAS, m) for k in range(FOTOGRAMAS)]))
         for nombre, poses in clips:
             banco = _construir_clip(esq, nombre, poses)
             personaje.attachNewNode(AnimBundleNode("rig", banco))

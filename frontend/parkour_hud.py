@@ -2,6 +2,8 @@
 # panel de pausa y panel de resultado. Solo muestra datos; las reglas viven en backend/logica/parkour_calculos.py.
 # Todo se entiende con texto (no solo con color). Anclado con diseno_adaptable para que quepa en cualquier aspecto.
 
+import os
+
 from ursina import Entity, Text, camera, color
 
 from backend.logica import parkour_calculos as pk
@@ -17,6 +19,19 @@ Y_AVISO, ALTO_PASTILLA_AVISO, PX_AVISO = 0.333, 0.046, 21
 Y_PURGA = 0.345              # cuenta atrás de la purga: arriba a la izquierda, bajo «Caídas»
 AYUDA = "WASD mover   Espacio saltar (otra vez en el aire: doble salto)   R volver al checkpoint   Esc pausa"
 MARGEN = 0.03
+# ALCALDE_PARKOUR_SIN_RUTA (encendida): el panel de resultado ya no enseña la ruta óptima (Dijkstra) ni el bloque de
+# pk.textos_ruta_dijkstra. Solo se quita la PRESENTACIÓN: parkour_calculos la sigue calculando y el loader la usa para
+# validar niveles. ALCALDE_PARKOUR_SIN_RUTA=0 vuelve a mostrarla como antes.
+PARKOUR_SIN_RUTA = True
+
+
+def sin_ruta_activo():
+    valor = os.environ.get("ALCALDE_PARKOUR_SIN_RUTA", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(PARKOUR_SIN_RUTA)
 
 
 def _texto(padre, cadena, px, tono, pos, origen=(0, 0), negrita=False):
@@ -275,7 +290,9 @@ class HudParkour(Entity):
         for i, linea in enumerate(lineas):
             _texto(panel, linea, 20, estilo.COLOR_TEXTO, (0, 0.20 - 0.07 * i))
         y_mensaje = -0.10
-        if pk.resultado_v2_activo():
+        if sin_ruta_activo():
+            pass
+        elif pk.resultado_v2_activo():
             y_mensaje = self._bloque_ruta_v2(panel, resultado)
         else:
             optima = " > ".join(resultado["ruta_optima"])
