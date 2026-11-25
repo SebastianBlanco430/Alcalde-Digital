@@ -1,7 +1,8 @@
 {
-  "_nota": "Mostrador 3D (frontend/mostrador3d_escena.py, ALCALDE_MOSTRADOR3D): productos, precios y decorado de cada puesto ATENDER. Los 4 productos van en el MISMO orden que las opciones del trabajo (teclas 1-4, backend/datos/trabajos_semilla.py). Precios en centavos de real, múltiplos de 5 (la moneda más pequeña es de R$ 0,05). forma = cómo se dibuja (frontend/mostrador3d_productos.py). color = RGB 0-255. fondo = lo que se ve detrás del cliente (frontend/mostrador3d_fondos.py: mercado, panaderia, supermercado o bar).",
+  "_nota": "Mostrador 3D (frontend/mostrador3d_escena.py, ALCALDE_MOSTRADOR3D): productos, precios y decorado de cada puesto ATENDER. Los 4 productos van en el MISMO orden que las opciones del trabajo (teclas 1-4, backend/datos/trabajos_semilla.py). Precios en centavos de real, múltiplos de 5 (la moneda más pequeña es de R$ 0,05). forma = cómo se dibuja (frontend/mostrador3d_productos.py). color = RGB 0-255. fondo = lo que se ve detrás del cliente (frontend/mostrador3d_fondos.py: mercado, panaderia, supermercado o bar). mirada_libre = si el jugador puede girar la cabeza (clic derecho, flechas); false = cámara fija.",
   "panaderia": {
     "fondo": "panaderia",
+    "mirada_libre": false,
     "nombre": "Panadería",
     "toldo": [214, 120, 64],
     "mostrador": [196, 150, 98],
@@ -14,6 +15,7 @@
   },
   "supermercado": {
     "fondo": "supermercado",
+    "mirada_libre": false,
     "nombre": "Supermercado",
     "toldo": [52, 120, 196],
     "mostrador": [176, 180, 188],
@@ -26,6 +28,7 @@
   },
   "feirante": {
     "fondo": "mercado",
+    "mirada_libre": true,
     "nombre": "Feria",
     "toldo": [60, 150, 90],
     "mostrador": [150, 104, 64],
@@ -38,6 +41,7 @@
   },
   "bar": {
     "fondo": "bar",
+    "mirada_libre": true,
     "nombre": "Bar",
     "toldo": [196, 56, 60],
     "mostrador": [120, 82, 54],

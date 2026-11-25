@@ -489,15 +489,16 @@ class EscenaTrabajo(Escena):
 
     # -- RITMO --
 
-    # Opciones del TurnoRitmo: con el taller 3D (frontend/taller3d_calculos.py, ALCALDE_TALLER3D) sus piezas y la
-    # velocidad de las flechas (ALCALDE_TALLER3D_VELOCIDAD); con la bandera apagada, las de siempre.
+    # Opciones del TurnoRitmo: con el taller 3D (frontend/taller3d_calculos.py, ALCALDE_TALLER3D) sus piezas, la
+    # velocidad y la cadencia de las flechas (ALCALDE_TALLER3D_VELOCIDAD / _CADENCIA); con la bandera apagada, las de siempre.
     @staticmethod
     def _opciones_taller():
         from frontend import taller3d_calculos
         if not taller3d_calculos.activo():
             return {}
         from backend.datos.piezas_taller import PIEZAS_TALLER_3D
-        return {"piezas": PIEZAS_TALLER_3D, "velocidad": taller3d_calculos.velocidad_flechas()}
+        return {"piezas": PIEZAS_TALLER_3D, "velocidad": taller3d_calculos.velocidad_flechas(),
+                "cadencia": taller3d_calculos.cadencia_flechas()}
 
     def _crear_vista_taller(self):
         if hasattr(self.turno.pieza, "tono"):

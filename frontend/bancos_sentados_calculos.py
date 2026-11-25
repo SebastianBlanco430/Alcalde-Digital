@@ -34,7 +34,7 @@ VELOCIDAD_CLIP = 0.22
 # altura de la cadera sentada respecto a la de pie (asiento a ~0,5 m)
 FRACCION_CADERA = 0.6
 # el tobillo va esta fracción del muslo por delante de la cadera (rodilla a ~90 grados)
-ADELANTE_PIE = 0.92
+ADELANTE_PIE = 1.2
 # grados de la pelvis hacia atrás (negativo = recostado)
 RECOSTADO = -6.0
 # grados que se mueve el pecho al respirar
@@ -44,7 +44,7 @@ MIRADA = 14.0
 # m del centro del banco a cada sitio (banco de ~1,8 m)
 LADO = 0.38
 # m hacia el respaldo desde el centro del asiento (negativo: hacia el borde, las rodillas salen de la tabla)
-ATRAS = -0.04
+ATRAS = -0.08
 # Brazos (hombro adelante, abducción, codo, abducción): mano apoyada sobre el muslo.
 BRAZO_REPOSO = (24.0, 10.0, 70.0, 6.0)
 

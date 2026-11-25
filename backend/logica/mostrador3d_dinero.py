@@ -11,10 +11,9 @@ MONEDAS = (100, 50, 25, 10, 5)
 # de mayor a menor
 DENOMINACIONES = BILLETES + MONEDAS
 RUTA_LOCALES = Path(__file__).resolve().parent.parent / "datos" / "mostrador3d_locales.json"
-# el cliente paga justo (cambio 0)
-PROB_EXACTO = 0.15
-# paga billete + los centavos, para que el cambio salga en reales enteros
-PROB_REDONDEA = 0.3
+# paga billete + los centavos, para que el cambio salga en reales enteros (el resto, solo con el billete). Nunca paga
+# justo: la gracia del mostrador es dar el cambio, así que siempre hay cambio que devolver.
+PROB_REDONDEA = 0.35
 
 
 def es_billete(valor):
@@ -51,19 +50,18 @@ def total_pedido(pedido, precios):
 
 
 def pago_cliente(total, azar):
-    """Billetes y monedas con que paga el cliente un `total` (centavos): justo, el billete justo por encima o ese
-    billete más los centavos sueltos (así el cambio sale redondo, como hace mucha gente). `azar`: random.Random."""
+    """Billetes y monedas con que paga el cliente un `total` (centavos): el billete justo por encima del total o ese
+    billete más los centavos sueltos (así el cambio sale redondo, como hace mucha gente). Siempre paga de más: hay
+    cambio que dar. `azar`: random.Random."""
     if total <= 0:
         return []
     tirada = azar.random()
-    if tirada < PROB_EXACTO:
-        return descomponer(total)
     billete = next((b for b in reversed(BILLETES) if b > total), None)
     # más de R$ 200: billetes de 200 hasta cubrirlo
     if billete is None:
         return [BILLETES[0]] * (total // BILLETES[0] + 1)
     sueltos = total % 100
-    if tirada < PROB_EXACTO + PROB_REDONDEA and sueltos:
+    if tirada < PROB_REDONDEA and sueltos:
         return [billete] + descomponer(sueltos)
     return [billete]
 

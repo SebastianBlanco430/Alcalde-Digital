@@ -7,6 +7,8 @@
 #   TALLER3D            / ALCALDE_TALLER3D=0             el taller 2D de antes (frontend/taller_vista.JuegoTaller)
 #   TALLER3D_VELOCIDAD  / ALCALDE_TALLER3D_VELOCIDAD=1.0 rapidez de las flechas del taller 3D (1,2 = un 20 % más
 #                                                        rápidas: cruzan el carril en 2,5 s en vez de 3,0 s)
+#   TALLER3D_CADENCIA   / ALCALDE_TALLER3D_CADENCIA=1.0  cuán seguidas llegan las flechas (1,4 = un 40 % más juntas:
+#                                                        de 1,5-1,05 s entre flechas a 1,07-0,75 s)
 
 import math
 import os
@@ -16,6 +18,7 @@ from backend.logica.azar_fijo import azar_de
 TALLER3D = True
 TALLER3D_VELOCIDAD = 1.2
 VELOCIDAD_MIN, VELOCIDAD_MAX = 0.5, 2.5
+TALLER3D_CADENCIA = 1.4
 
 # Calidad (0..1) a partir de la cual la pieza sale sin ninguna deformación, y desde la que empieza a brillar.
 CALIDAD_PRISTINA = 0.9
@@ -45,16 +48,26 @@ def activo():
     return _bandera("ALCALDE_TALLER3D", TALLER3D)
 
 
-def velocidad_flechas():
-    """Multiplicador de la rapidez de las flechas (TurnoRitmo(velocidad=...)). Un valor raro cae a la constante."""
-    texto = os.environ.get("ALCALDE_TALLER3D_VELOCIDAD", "").strip().replace(",", ".")
+def _numero(nombre, constante):
+    """Número de la variable de entorno `nombre` (acepta coma decimal), acotado; un valor raro cae a la constante."""
+    texto = os.environ.get(nombre, "").strip().replace(",", ".")
     try:
-        valor = float(texto) if texto else TALLER3D_VELOCIDAD
+        valor = float(texto) if texto else constante
     except ValueError:
-        valor = TALLER3D_VELOCIDAD
+        valor = constante
     if not math.isfinite(valor):
-        valor = TALLER3D_VELOCIDAD
+        valor = constante
     return max(VELOCIDAD_MIN, min(VELOCIDAD_MAX, valor))
+
+
+def velocidad_flechas():
+    """Multiplicador de la rapidez de las flechas (TurnoRitmo(velocidad=...))."""
+    return _numero("ALCALDE_TALLER3D_VELOCIDAD", TALLER3D_VELOCIDAD)
+
+
+def cadencia_flechas():
+    """Cuán seguidas llegan las flechas (TurnoRitmo(cadencia=...))."""
+    return _numero("ALCALDE_TALLER3D_CADENCIA", TALLER3D_CADENCIA)
 
 
 # -- Calidad -> aspecto --

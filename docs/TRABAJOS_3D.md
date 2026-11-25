@@ -11,6 +11,7 @@ fatiga}`; el mostrador añade las opcionales `cambios_mal` y `convivencia`.
 |---|---|---|---|
 | `ALCALDE_TALLER3D` | 1 | Taller de Beto en 3D | `frontend/taller3d_calculos.py` |
 | `ALCALDE_TALLER3D_VELOCIDAD` | 1.2 | Rapidez de las flechas del taller 3D (1.2 = cruzan en 2,5 s en vez de 3,0 s; acota 0,5-2,5) | `frontend/taller3d_calculos.py` |
+| `ALCALDE_TALLER3D_CADENCIA` | 1.4 | Cuán seguidas llegan las flechas del taller 3D (1.4 = de 1,5-1,05 s entre flechas a 1,07-0,75 s) | `frontend/taller3d_calculos.py` |
 | `ALCALDE_MOSTRADOR3D` | 1 | Mostrador 3D en primera persona en los 4 trabajos ATENDER | `frontend/mostrador3d_escena.py` |
 | `ALCALDE_PARKOUR_SIN_RUTA` | 1 | El panel final del parkour no enseña la ruta Dijkstra | `frontend/parkour_hud.py` |
 | `ALCALDE_BANCOS_SENTADOS` | 1 | NPC de Blender sentados en los bancos (en vez de figuras de bloques) | `frontend/bancos_sentados_calculos.py` |
@@ -30,13 +31,14 @@ fatiga}`; el mostrador añade las opcionales `cambios_mal` y `convivencia`.
   una abolladura por golpe malo, óxido), con grados intermedios. Curva del martillazo.
 - `backend/datos/piezas_taller.py` — `PIEZAS_TALLER_3D`: 21 entradas (8 piezas con 2-3 materiales) elegidas con la
   semilla del turno. `PIEZAS_TALLER` (2D) no cambia.
-- `backend/logica/taller_ritmo.py` — `TurnoRitmo(..., velocidad=1.0)`: solo acorta el viaje de las notas; llegadas,
-  ventana y pago (pago_max x calidad) iguales.
+- `backend/logica/taller_ritmo.py` — `TurnoRitmo(..., velocidad=1.0, cadencia=1.0)`: `velocidad` acorta el viaje de las
+  notas y `cadencia` las junta; ventana y pago (pago_max x calidad) iguales. El turno del taller dura 30 s
+  (`backend/datos/trabajos_semilla.py`, antes 60).
 
 ## Mostrador 3D (motor ATENDER: panadería, supermercado, feria, bar)
 
 - `backend/logica/mostrador3d_dinero.py` — reales en centavos: billetes R$ 2-200, monedas R$ 0,05-1, pago del cliente
-  (justo, billete superior o billete + centavos), cambio y validación. Puro y probado.
+  (billete superior o billete + centavos: NUNCA paga justo, siempre hay cambio que dar), cambio y validación. Puro y probado.
 - `backend/logica/mostrador3d_turno.py` — `TurnoMostrador`: LLEGANDO -> PEDIDO -> CAMBIO -> SALIENDO por cliente.
   Meta de 2,5 s por acción (como el ATENDER de siempre); cada cambio mal dado = error y `cambios_mal`.
 - `backend/datos/mostrador3d_locales.json` — productos (en el orden de las teclas 1-4), precios, forma, colores y toldo de
@@ -44,6 +46,10 @@ fatiga}`; el mostrador añade las opcionales `cambios_mal` y `convivencia`.
 - `frontend/mostrador3d_escena.py` — primera persona detrás del puesto, calle del mercado de fondo, 4 cajones con
   letrero de precio, repisa, cliente NPC (3 que se turnan) con globo; enojado = sacudida + globo rojo. Cartel 2D con
   pedido, total, pago y cambio; botones «Dar cambio» y «Quitar».
+- `frontend/mostrador3d_calculos.py` — mirada libre en primera persona: clic derecho + ratón (o flechas) gira la cabeza
+  (topes: 75 grados a los lados, -40/+30 arriba/abajo), C la vuelve al cliente; el clic izquierdo sigue para productos y dinero.
+  Los interiores están cerrados (pared detrás del jugador) y el cielo es una caja: no hay vacío al girar.
+  Solo en la feria y el bar (`mirada_libre` en el JSON); en la panadería y el supermercado la cámara es fija.
 - `frontend/mostrador3d_fondos.py` — un fondo por local (clave `fondo` del JSON): calle de la feria (exterior, con toldo),
   panadería (vitrina, canastas, pizarra con los precios del local, luz cálida), supermercado (góndolas, carteles de
   pasillo, otra caja, fluorescentes) y bar (mesas de plástico, cajas de cerveza, tele con el partido, guirnalda, portón
@@ -55,6 +61,10 @@ fatiga}`; el mostrador añade las opcionales `cambios_mal` y `convivencia`.
 - `frontend/mostrador3d_convivencia.py` — cada cambio mal dado baja 1 la convivencia (tope 3 por turno) con
   `EstadoPartida.aplicar_deltas` de la sesión del mundo; solo en partida local. Lo engancha
   `frontend/trabajo_mundo.conectar()` y lo aplica la escena (controlador), no la vista.
+
+Tutorial del taller (`frontend/tutorial_mision_trabajo.py`, 2D): la animación avanza con el juego (las flechas ya resueltas
+se encogen o caen y se borran; antes se quedaban en el carril y se solapaban), el cuerpo del trabajador acompaña el
+martillazo y respira (`taller_vista.JuegoTaller`), y las flechas van tan rápidas como en el turno de verdad.
 
 ## Parkour sin ruta
 
@@ -68,7 +78,8 @@ No había geometría de ruta en el mundo del parkour; las rutas del minimapa del
 - Ahora: `frontend/bancos_sentados.py` crea 6 NPC de Blender (`npc_hombre_01..03`, `npc_mujer_01..02`, aspecto de
   peatón determinista) en la MISMA piscina `ciudad_viva.Grupo` (reparto, fundido y cantidad de siempre), sin colisión,
   sin mochila, con el clip `HumSentado`: pose de sentado propia (`frontend/bancos_sentados_calculos.pose_sentado`:
-  cadera baja, rodillas a 90 grados por IK, manos en los muslos, respira y mira alrededor) que
+  cadera baja, pies por delante de las rodillas para que la espinilla baje por fuera del asiento (antes cruzaba el
+  canto de la tabla), manos en los muslos, respira y mira alrededor) que
   `frontend/animacion_humana.hornear_clips` hornea solo con la bandera encendida. Si algo falla, vuelven las figuras.
 - Coste medido (`scripts/medir_fps.py`, 15 s): 63,9 FPS de media con NPC sentados frente a 66,3 sin ellos.
 

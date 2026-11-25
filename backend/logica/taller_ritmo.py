@@ -45,14 +45,15 @@ def etiqueta_calidad(calidad):
     return NIVELES_CALIDAD[-1][1]
 
 
-# Momentos de llegada de las notas en un turno de `duracion` s.
-def llegadas(duracion):
+# Momentos de llegada de las notas en un turno de `duracion` s. `cadencia` > 1 las junta (los intervalos se dividen por
+# ella; 1 = los de siempre).
+def llegadas(duracion, cadencia=1.0):
     tiempos, t = [], PRIMERA_LLEGADA_S
     fin = duracion - MARGEN_FINAL_S
     while t <= fin:
         tiempos.append(t)
         avance = min(1.0, t / max(duracion, 1e-6))
-        t += INTERVALO_INICIAL_S + (INTERVALO_FINAL_S - INTERVALO_INICIAL_S) * avance
+        t += (INTERVALO_INICIAL_S + (INTERVALO_FINAL_S - INTERVALO_INICIAL_S) * avance) / cadencia
     return tiempos
 
 
@@ -60,20 +61,23 @@ class TurnoRitmo:
 
     # trabajo: Trabajo (opciones = direcciones). piezas: repertorio (backend/datos/piezas_taller.py).
     # velocidad: multiplica la rapidez con que las notas cruzan el carril (1 = VIAJE_S de siempre; el taller 3D pasa
-    # 1,2 con ALCALDE_TALLER3D_VELOCIDAD). Solo cambia el viaje: el ritmo de llegadas y la ventana son los mismos.
-    def __init__(self, trabajo, semilla=0, piezas=None, velocidad=1.0):
+    # 1,2 con ALCALDE_TALLER3D_VELOCIDAD). cadencia: junta las llegadas (1 = las de siempre; el taller 3D pasa 1,4 con
+    # ALCALDE_TALLER3D_CADENCIA). La ventana del recuadro no cambia.
+    def __init__(self, trabajo, semilla=0, piezas=None, velocidad=1.0, cadencia=1.0):
         if piezas is None:
             from backend.datos.piezas_taller import PIEZAS_TALLER
             piezas = PIEZAS_TALLER
         valida = isinstance(velocidad, (int, float)) and not isinstance(velocidad, bool) and math.isfinite(velocidad)
         self.viaje_s = VIAJE_S / velocidad if valida and velocidad > 0 else VIAJE_S
+        valida = isinstance(cadencia, (int, float)) and not isinstance(cadencia, bool) and math.isfinite(cadencia)
+        cadencia = cadencia if valida and cadencia > 0 else 1.0
         self.trabajo = trabajo
         self._rng = random.Random(semilla)
         self.pieza = self._rng.choice(tuple(piezas))
         self._t = 0.0
         self.notas = []
         anterior = None
-        for i, llegada in enumerate(llegadas(trabajo.duracion_s)):
+        for i, llegada in enumerate(llegadas(trabajo.duracion_s, cadencia)):
             # Nunca tres iguales seguidas: se lee mejor el cambio.
             opciones = [d for d in trabajo.opciones if d != anterior] if self._rng.random() < 0.75 else list(
                 trabajo.opciones)

@@ -14,13 +14,14 @@
 import math
 import os
 
-from ursina import Entity, Text, color, scene
+from ursina import Entity, Text, color, held_keys, mouse, scene
 from ursina.lights import AmbientLight, DirectionalLight
 from ursina.shaders import lit_with_shadows_shader, unlit_shader
 
 from backend.logica import mostrador3d_dinero as dinero
 from backend.logica import mostrador3d_turno as mt
 from frontend import diseno_adaptable, estilo
+from frontend import mostrador3d_calculos as mc
 from frontend import mostrador3d_fondos as mf
 from frontend import mostrador3d_productos as mp
 from frontend.componentes import BotonPrimario, BotonSecundario, destruir_arbol, escala_fuente, panel_tinta, rgb
@@ -93,10 +94,7 @@ def texto_globo(turno):
     if turno.estado == mt.PEDIDO:
         return f"Quiero {turno.pedido_texto()}", estilo.PAPEL
     if turno.estado == mt.CAMBIO:
-        pagado = turno.pagado()
-        if sum(pagado) == turno.total():
-            return f"Te pago justo: {dinero.formatear(sum(pagado))}", estilo.PAPEL
-        return f"Te pago con {dinero.formatear(sum(pagado))}", estilo.PAPEL
+        return f"Te pago con {dinero.formatear(sum(turno.pagado()))}", estilo.PAPEL
     if turno.estado == mt.SALIENDO and turno.reaccion == "enojado":
         return "¡Me diste mal el cambio!", ROJO_GLOBO
     if turno.estado == mt.SALIENDO and turno.reaccion == "contento":
@@ -197,7 +195,9 @@ class JuegoMostrador:
         raiz = self.set = Entity(parent=scene, name="set_mostrador3d")
         fondo = mf.nombre_fondo(local)
         cielo, luz_ambiente, luz_sol = mf.luz(fondo)
-        Entity(parent=raiz, model="quad", color=rgb(cielo), scale=(80, 30), position=(0, 8, 24), shader=unlit_shader)
+        # cielo: una caja que envuelve todo el set (vista por dentro), así no hay vacío al girar la cabeza
+        Entity(parent=raiz, model="cube", color=rgb(cielo), scale=(90, 60, 90), position=(0, 10, 6), shader=unlit_shader,
+               double_sided=True)
         silenciar(Entity(parent=raiz, model=_set_local(local).mesh(), shader=lit_with_shadows_shader))
         mf.carteles(raiz, fondo, local)
         _repisa(raiz, local)
@@ -217,6 +217,11 @@ class JuegoMostrador:
         self._texto_globo = Text(parent=self.globo, text="", scale=ESCALA_GLOBO, origin=(0, 0), color=rgb(estilo.TINTA))
         self._camara = CamaraMinijuego()
         self._camara.tomar(TOMA)
+        # mirada libre en primera persona (mostrador3d_calculos): desvío (giro, cabeceo) respecto a TOMA. Solo en los
+        # locales con "mirada_libre" (feria, bar); en la panadería y el súper la cámara queda fija, como antes.
+        self._mirada_libre = bool(self.turno.local.get("mirada_libre", True))
+        self._desvio = (0.0, 0.0)
+        self._centrando = False
         self._construir_cartel()
 
     def _cajon(self, raiz, i, producto):
@@ -260,7 +265,8 @@ class JuegoMostrador:
                                        tamano_fuente_px=17, parent=c, position=(0, -0.095, -0.02))
         self.boton_quitar = BotonSecundario("Quitar el último (Retroceso)", al_clic=lambda: self._quitar(-1), ancho=0.3,
                                             alto=0.045, tamano_fuente_px=13, parent=c, position=(0, -0.147, -0.02))
-        ayuda = _texto(c, "Productos: clic o 1-4.  Cambio: clic en la caja.  Esc: salir", 11, estilo.COLOR_TEXTO_TENUE,
+        mirar = "Mirar: clic derecho y mueve el ratón (o flechas), C centra.  " if self._mirada_libre else ""
+        ayuda = _texto(c, mirar + "Productos: clic o 1-4.  Cambio: clic en la caja.  Esc: salir", 11, estilo.COLOR_TEXTO_TENUE,
                        (0, -0.178), z=-0.01)
         diseno_adaptable.ajustar_texto(ayuda, ancho - 0.03, escala_min=0.6)
 
@@ -276,6 +282,9 @@ class JuegoMostrador:
             return True
         if key == "backspace":
             self._quitar(-1)
+            return True
+        if key == "c" and self._mirada_libre:
+            self._centrando = True
             return True
         return False
 
@@ -376,8 +385,24 @@ class JuegoMostrador:
                    position=origen)
         self._vuelos.append([e, origen, destino, 0.0])
 
+    def _mirar(self, dt):
+        """Gira la cabeza: botón derecho + ratón, o flechas; C la vuelve al cliente. Clic izquierdo sigue libre."""
+        if not self._mirada_libre:
+            return
+        teclas = (held_keys["right arrow"] - held_keys["left arrow"], held_keys["up arrow"] - held_keys["down arrow"])
+        raton = (mouse.velocity[0], mouse.velocity[1]) if held_keys["right mouse"] else (0.0, 0.0)
+        if any(teclas) or any(raton):
+            self._centrando = False
+        if self._centrando:
+            self._desvio = mc.centrar(self._desvio, dt)
+        else:
+            self._desvio = mc.mover(self._desvio, raton, teclas, dt)
+        if self._camara is not None:
+            self._camara.poner(mc.toma_con_desvio(TOMA, self._desvio))
+
     def animar(self, dt):
         self._t += dt
+        self._mirar(dt)
         npc = self._cliente_actual
         if npc is not None:
             x, z, rumbo, velocidad, temblor = pose_cliente(self.turno.estado, self.turno.tiempo_en_estado(),

@@ -36,6 +36,8 @@ PIEZA = (-0.055, -0.012)            # centro de la pieza sobre el yunque
 LADO_PIEZA = 0.085
 LARGO_BRAZO, LARGO_MANGO = 0.075, 0.085
 ANGULO_ARRIBA, ANGULO_GOLPE, ANGULO_TORCIDO = -128.0, -86.0, -62.0
+# Cuánto se inclina el cuerpo hacia la pieza (x, y) con el martillo abajo.
+INCLINA_CUERPO = (0.012, -0.008)
 # Animación del martillazo (s): bajar, quedarse, volver arriba.
 T_BAJAR, T_QUIETO, T_SUBIR = 0.07, 0.09, 0.22
 DURACION_CHISPAS, N_CHISPAS = 0.38, 7
@@ -322,8 +324,10 @@ class JuegoTaller:
                                                    y + math.cos(math.radians(rot)) * 0.045))
         c.elipse(NEGRO_GOMA, 0.11, 0.11, (0.1, 0.1))
         c.elipse(FONDO_TALLER, 0.07, 0.07, (0.1, 0.1))
-        # Personaje (detrás del banco), con el aspecto de su rol.
-        dibujar_trabajador(Capa(r, z=-0.006), self.rol, X_PERSONAJE)
+        # Personaje (detrás del banco), con el aspecto de su rol, en su propio contenedor: así el cuerpo (y el brazo, que
+        # cuelga de él) acompaña el martillazo y respira en reposo (animar).
+        self.cuerpo = Entity(parent=r, z=-0.006)
+        dibujar_trabajador(Capa(self.cuerpo, z=0), self.rol, X_PERSONAJE)
         # Banco y yunque (delante del personaje).
         b = Capa(r, z=-0.012)
         b.rect(MADERA, 0.66, 0.024, (-0.13, -0.106))
@@ -334,7 +338,7 @@ class JuegoTaller:
         b.rect(HIERRO_CLARO, 0.15, 0.022, (yx, yy - 0.011))
         b.forma("triangulo", HIERRO_CLARO, (0.022, 0.05), (yx + 0.098, yy - 0.011), rot=90)
         # Brazo del martillo: pivote en el hombro; el brazo cuelga hacia -y, luego mano, mango y cabeza.
-        self.brazo = Entity(parent=r, position=(HOMBRO[0], HOMBRO[1], -0.02))
+        self.brazo = Entity(parent=self.cuerpo, position=(HOMBRO[0], HOMBRO[1], -0.014))
         a = Capa(self.brazo, z=0)
         asp = self.aspecto
         a.rect(asp["manga"], 0.042, LARGO_BRAZO * 0.55, (0, -LARGO_BRAZO * 0.275))
@@ -490,6 +494,12 @@ class JuegoTaller:
         else:
             angulo = ANGULO_ARRIBA + 4 * math.sin(self._t * 3.0)
         self.brazo.rotation_z = angulo
+        # El cuerpo acompaña: se inclina hacia la pieza al bajar el martillo, respira en reposo y da un respingo con el
+        # golpe torcido.
+        bajada = max(0.0, min(1.0, (angulo - ANGULO_ARRIBA) / (ANGULO_GOLPE - ANGULO_ARRIBA)))
+        respira = 0.0025 * math.sin(self._t * 2.2)
+        temblor = 0.004 * math.sin(self._t * 60) if self._rojo > 0 else 0.0
+        self.cuerpo.position = (INCLINA_CUERPO[0] * bajada + temblor, INCLINA_CUERPO[1] * bajada + respira, self.cuerpo.z)
         # Respingo de la pieza y tinte rojo tras un fallo.
         self._respingo = max(0.0, self._respingo - dt)
         self.capa_pieza.scale = 1 + 0.12 * (self._respingo / DURACION_RESPINGO)

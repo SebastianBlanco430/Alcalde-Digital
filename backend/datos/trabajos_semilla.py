@@ -14,8 +14,9 @@ CATALOGO_TRABAJOS = {t.id: t for t in (
             ("mango", "banana", "tomate", "yuca")),
     Trabajo("bar", "Atender el bar", ATENDER, 75, 13, 21, 20,
             ("agua", "café", "refresco", "salgado")),
-    # Ritmo (backend/logica/taller_ritmo.py): se paga solo por la calidad de la pieza, de R$ 0 a 25.
-    Trabajo("taller", "Ayudante de taller", RITMO, 60, 0, 25, 30, _FLECHAS),
+    # Ritmo (backend/logica/taller_ritmo.py): se paga solo por la calidad de la pieza, de R$ 0 a 25. Turno de 30 s
+    # (antes 60): corto e intenso, con las flechas más seguidas en el taller 3D.
+    Trabajo("taller", "Ayudante de taller", RITMO, 30, 0, 25, 30, _FLECHAS),
     Trabajo("lan_house", "Soporte en la lan house", SECUENCIA, 60, 12, 19, 15, _FLECHAS),
     Trabajo("lanchonete", "Cocinar en la lanchonete", BARRA, 60, 12, 20, 25),
     # Se juega en el mundo, en moto (backend/logica/entregas.py): 150 s es solo el tope; el límite sale de la ruta.

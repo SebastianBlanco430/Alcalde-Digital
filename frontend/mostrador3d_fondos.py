@@ -20,6 +20,8 @@ TOLDOS = ((214, 70, 60), (60, 140, 200), (236, 190, 60), (70, 160, 100), (200, 1
 CASAS = ((232, 196, 150), (196, 120, 96), (120, 170, 200), (236, 220, 120), (160, 200, 150), (214, 150, 120))
 # Sala de los interiores (m): de pared a pared en x, de la cara del mostrador a la pared del fondo en z, alto del techo.
 X_SALA, Z_FONDO, ALTO_SALA = 5.0, 5.6, 3.0
+# pared de detrás del jugador (la sala queda cerrada aunque gire la cabeza: mirada libre del mostrador)
+Z_ATRAS = -2.6
 # Pizarra de la panadería y tele del bar, en la pared del fondo (centro, m)
 PIZARRA = (-3.3, 1.62, Z_FONDO - 0.07)
 TELE = (-3.5, 1.85, Z_FONDO - 0.07)
@@ -113,11 +115,11 @@ def _cerro(m, z0, filas=3):
 def _sala(m, suelo_a, suelo_b, pared_baja, pared_alta, techo=(236, 232, 224), lado=0.5, hueco=None):
     """Suelo de baldosas en damero, paredes (zócalo de azulejos + pintura) y techo sobre todo, también sobre el puesto.
     hueco: (x0, x1, alto) abierto en la pared del fondo (puerta, portón), por donde se ve la calle."""
-    n_x, n_z = int(2 * X_SALA / lado), int((Z_FONDO - 0.4) / lado)
+    n_x, n_z = int(2 * X_SALA / lado), int((Z_FONDO - Z_ATRAS) / lado) + 1
     for i in range(n_x):
         for j in range(n_z):
             tono = suelo_a if (i + j) % 2 == 0 else suelo_b
-            m.agregar(caja(), (-X_SALA + (i + 0.5) * lado, -0.02, 0.4 + (j + 0.5) * lado), (lado, 0.04, lado), 0, tono,
+            m.agregar(caja(), (-X_SALA + (i + 0.5) * lado, -0.02, Z_ATRAS + (j + 0.5) * lado), (lado, 0.04, lado), 0, tono,
                       (1, 1))
     # pared del fondo (con el hueco, si lo hay) y paredes laterales
     tramos = [(-X_SALA, X_SALA)] if hueco is None else [(-X_SALA, hueco[0]), (hueco[1], X_SALA)]
@@ -131,14 +133,19 @@ def _sala(m, suelo_a, suelo_b, pared_baja, pared_alta, techo=(236, 232, 224), la
         m.agregar(caja(), ((x0 + x1) / 2, alto + (ALTO_SALA - alto) / 2, Z_FONDO), (x1 - x0, ALTO_SALA - alto, 0.1), 0,
                   pared_alta, (0.95, 1.05))
     for lado_x in (-1, 1):
-        m.agregar(caja(), (lado_x * X_SALA, ALTO_SALA / 2, (Z_FONDO - 1.6) / 2), (0.1, ALTO_SALA, Z_FONDO + 1.6), 0,
+        m.agregar(caja(), (lado_x * X_SALA, ALTO_SALA / 2, (Z_FONDO + Z_ATRAS) / 2), (0.1, ALTO_SALA, Z_FONDO - Z_ATRAS), 0,
                   pared_alta, (0.85, 1.05))
-        m.agregar(caja(), (lado_x * (X_SALA - 0.06), 0.65, (Z_FONDO - 1.6) / 2), (0.02, 1.3, Z_FONDO + 1.6), 0,
+        m.agregar(caja(), (lado_x * (X_SALA - 0.06), 0.65, (Z_FONDO + Z_ATRAS) / 2), (0.02, 1.3, Z_FONDO - Z_ATRAS), 0,
                   pared_baja, (0.9, 1.05))
     # juntas de los azulejos del zócalo (pared del fondo)
     for k in range(1, 4):
         m.agregar(caja(), (0, 0.325 * k, Z_FONDO - 0.055), (2 * X_SALA, 0.012, 0.01), 0, (235, 235, 235), (1, 1))
-    m.agregar(caja(), (0, ALTO_SALA + 0.05, (Z_FONDO - 1.6) / 2), (2 * X_SALA, 0.1, Z_FONDO + 1.6), 0, techo, (1, 1))
+    # pared de detrás del jugador (zócalo + pintura) y techo sobre toda la sala
+    m.agregar(caja(), (0, 0.65, Z_ATRAS), (2 * X_SALA, 1.3, 0.1), 0, pared_baja, (0.9, 1.05))
+    m.agregar(caja(), (0, 1.3 + (ALTO_SALA - 1.3) / 2, Z_ATRAS), (2 * X_SALA, ALTO_SALA - 1.3, 0.1), 0, pared_alta,
+              (0.95, 1.05))
+    m.agregar(caja(), (0, ALTO_SALA + 0.05, (Z_FONDO + Z_ATRAS) / 2), (2 * X_SALA, 0.1, Z_FONDO - Z_ATRAS), 0, techo,
+              (1, 1))
 
 
 # -- Panadería --

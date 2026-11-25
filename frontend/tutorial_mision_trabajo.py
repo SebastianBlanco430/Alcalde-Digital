@@ -23,6 +23,15 @@ SEMILLA_DEMO = 7
 LLEGADA_LENTA_S = (3.0, 6.5)           # «2 flechas lentas»: segundos desde el inicio del turno de práctica
 
 
+def _ritmo_flechas():
+    """Las flechas de la demo del taller van tan rápidas y tan seguidas como en el turno de verdad
+    (ALCALDE_TALLER3D_VELOCIDAD y ALCALDE_TALLER3D_CADENCIA); con el taller 3D apagado, como siempre."""
+    from frontend import taller3d_calculos
+    if not taller3d_calculos.activo():
+        return {}
+    return {"velocidad": taller3d_calculos.velocidad_flechas(), "cadencia": taller3d_calculos.cadencia_flechas()}
+
+
 class AdaptadorTrabajo:
 
     def __init__(self, id_, guion, contexto=None):
@@ -49,7 +58,8 @@ class AdaptadorTrabajo:
         demo = dataclasses.replace(self.real, duracion_s=1000.0, pago_base=0, pago_max=0, fatiga=0)
         escena._limpiar()
         escena.jugador, escena.trabajo, escena._al_terminar = None, demo, None
-        escena.turno = TurnoRitmo(demo, SEMILLA_DEMO) if demo.motor == RITMO else TurnoTrabajo(demo, SEMILLA_DEMO)
+        escena.turno = (TurnoRitmo(demo, SEMILLA_DEMO, **_ritmo_flechas()) if demo.motor == RITMO
+                        else TurnoTrabajo(demo, SEMILLA_DEMO))
         escena._n_pedido, escena._feedback = 0, ("", True, 0.0)
         self._preparar_turno(escena.turno)
         escena._construir_estatico()
@@ -149,6 +159,11 @@ class AdaptadorTrabajo:
         escena = self.escena
         escena.turno.avanzar(dt)
         escena._refrescar()
+        # la animación de la vista (martillazo, flechas que se encogen o caen y se borran) avanza con el juego; sin esto
+        # las flechas ya resueltas se quedaban congeladas en el carril y se solapaban con las siguientes
+        animar = getattr(escena._vista, "animar", None)
+        if animar is not None:
+            animar(dt)
 
     def avanzar_visual(self, vista, dt):
         """En la práctica de ritmo: si una nota se pasó, llega otra (el jugador no se queda sin intentos)."""
