@@ -77,7 +77,7 @@ def _separador(padre, rotulo, y):
     for lado in (-1, 1):
         Entity(parent=padre, model="quad", color=tono, scale=(largo, a_unidades(1.5)),
                position=(lado * (HUECO_ROTULO + largo) / 2, y, -0.001))
-    Text(rotulo.upper(), parent=padre, origin=(0, 0), position=(0, y, -0.001), scale=escala_fuente(14),
+    Text(rotulo.upper(), parent=padre, origin=(0, 0), position=(0, y, -0.001), scale=escala_fuente(16),
          font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO_TENUE))
 
 

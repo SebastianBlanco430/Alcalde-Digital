@@ -120,13 +120,26 @@ ANCHO_EM_ESTIMADO = 0.55
 
 # Text de varias líneas con origen arriba-izquierda, envuelto a `ancho`. Devuelve
 # (texto, alto) con el alto estimado en unidades de camera.ui.
-def _texto_envuelto(padre, cadena, ancho, px, rgb_texto, posicion):
+# `max_lineas`: si el texto ocupa más, se corta y la última línea acaba en «...» (None = sin límite).
+def _texto_envuelto(padre, cadena, ancho, px, rgb_texto, posicion, max_lineas=None):
     texto = Text("", parent=padre, origin=(-0.5, 0.5), position=posicion,
                  scale=escala_fuente(px), color=rgb(rgb_texto))
     texto.line_height = 1.25
-    lineas = envolver_texto(_seguro(cadena), _medidor(texto), ancho) or [""]
+    medir = _medidor(texto)
+    lineas = envolver_texto(_seguro(cadena), medir, ancho) or [""]
+    if max_lineas is not None and len(lineas) > max(1, max_lineas):
+        lineas = lineas[:max(1, max_lineas)]
+        ultima = lineas[-1]
+        while ultima and medir(ultima + "...") > ancho:
+            ultima = ultima[:-1]
+        lineas[-1] = ultima.rstrip() + "..."
     texto.text = "\n".join(lineas)
     return texto, len(lineas) * a_unidades(px) * texto.line_height
+
+
+# Alto de una línea de `px` en _texto_envuelto (line_height 1.25).
+def _alto_linea(px):
+    return a_unidades(px) * 1.25
 
 
 def _fondo(padre, ancho, alto, tono, radio_px=8, **opciones):
@@ -231,6 +244,12 @@ def _en_silencio(texto, mision):
         return False
     mensaje = hud_calculos.glosar_texto(getattr(mision, "mensaje", "") or "")
     return bool(mensaje) and mensaje in texto and radio_calculos.en_silencio(hora)
+
+
+# Lado (unidades de camera.ui) del sello de la capa `capa`.
+def _lado_sello(capa):
+    from frontend import sello_tradicion_calculos as stc
+    return a_unidades(stc.estilo_de_capa(capa)[0])
 
 
 # Pone el sello de la capa `capa` en un bloque de `ancho` x `alto` centrado en 0 (banner, toast o fila del panel).
@@ -574,18 +593,30 @@ class TelefonoUI(Entity):
              scale=escala_fuente(16), color=rgb(estilo.COLOR_TEXTO_TENUE))
 
         limite_inferior = -alto / 2 + 0.034      # deja sitio a la ayuda de la base
-        for fila in vista.filas:                 # los más recientes primero
+        for indice, fila in enumerate(vista.filas):      # los más recientes primero
+            capa = _capa_sello(fila.texto, self._obtener_mision())
+            # Con sello, el texto le deja su sitio a la derecha (si no, el sello tapa el final de la línea).
+            ancho_cuerpo = ancho_texto - 0.016 - (_lado_sello(capa) + 0.008 if capa is not None else 0.0)
             cuerpo, alto_texto = _texto_envuelto(
-                self.panel, fila.texto, ancho_texto - 0.016, 16, estilo.COLOR_TEXTO,
+                self.panel, fila.texto, ancho_cuerpo, 16, estilo.COLOR_TEXTO,
                 (izquierda + 0.008, y - 0.007, -0.002))
             alto_fila = alto_texto + 0.014
+            if y - alto_fila < limite_inferior and indice == 0:
+                # Con misión activa (título, destino y casilla) el último mensaje casi nunca cabía entero y la lista
+                # quedaba vacía, sin el mensaje ni su sello: el más reciente se muestra siempre, recortado con «...».
+                cabe = int((y - limite_inferior - 0.014) // _alto_linea(16))
+                if cabe >= 1:
+                    destruir_arbol(cuerpo)
+                    cuerpo, alto_texto = _texto_envuelto(
+                        self.panel, fila.texto, ancho_cuerpo, 16, estilo.COLOR_TEXTO,
+                        (izquierda + 0.008, y - 0.007, -0.002), max_lineas=cabe)
+                    alto_fila = alto_texto + 0.014
             if y - alto_fila < limite_inferior:   # no cabe: se omiten los más antiguos
                 destruir_arbol(cuerpo)
                 break
             tono = COLOR_RESALTADO if fila.resaltado else _tono(estilo.COLOR_TARJETA)
             _fondo(self.panel, ancho_texto, alto_fila, rgb(tono), 6,
                    position=(0, y - alto_fila / 2, -0.001))
-            capa = _capa_sello(fila.texto, self._obtener_mision())
             if capa is not None:                 # sello de la Tradición en el mensaje (hilo conductor)
                 fila_sello = Entity(parent=self.panel, position=(0, y - alto_fila / 2, 0))
                 _poner_sello(fila_sello, capa, ancho_texto, alto_fila)
