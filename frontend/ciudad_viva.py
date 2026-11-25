@@ -1068,8 +1068,20 @@ def crear_controlador(escena, atmosfera=True, capas=True, color_salud=False):
                                                               _coloca_guirnalda, _fija_guirnalda))
             self.grupos["apagado"] = ("apagados", Grupo(raiz, "apagado", lambda: mesh_capuchon(0), 18, s["apagados"], 70,
                                                         _coloca_uniforme, _fija_uniforme))
-            variantes("sentados", "bancos", lambda v: (lambda: mesh_sentados(v)), 3, 3, s["bancos"], 45)
-            variantes("corro", "corros", lambda v: (lambda: mesh_corro(v)), 2, 2, s["corros"], 60)
+            # Bancos ocupados: NPC de Blender sentados (frontend/bancos_sentados.py, ALCALDE_BANCOS_SENTADOS); sin ellos
+            # (bandera apagada o fallo), las figuras de bloques de siempre.
+            from frontend import bancos_sentados
+            sentados = bancos_sentados.crear_grupo(raiz, s["bancos"], 45)
+            if sentados is not None:
+                self.grupos["sentados_npc"] = ("bancos", sentados)
+            else:
+                variantes("sentados", "bancos", lambda v: (lambda: mesh_sentados(v)), 3, 3, s["bancos"], 45)
+            # Corros: NPC de Blender charlando (frontend/bancos_sentados.py, ALCALDE_BANCOS_CORROS); sin ellos, los de bloques.
+            corros = bancos_sentados.crear_grupo_corros(raiz, s["corros"], 60)
+            if corros is not None:
+                self.grupos["corros_npc"] = ("corros", corros)
+            else:
+                variantes("corro", "corros", lambda v: (lambda: mesh_corro(v)), 2, 2, s["corros"], 60)
             if self.con_etapas:
                 self._crear_capas_etapa(mundo, s, variantes)
 

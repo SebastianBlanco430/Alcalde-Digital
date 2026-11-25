@@ -14,6 +14,7 @@
 
 import math
 import random
+import sys
 
 from ursina import Button, Entity, Mesh, Text, color, time
 
@@ -67,7 +68,7 @@ class EscenaTrabajo(Escena):
     def __init__(self, **opciones):
         super().__init__(**opciones)
         # Fondo propio: tapa lo que quede detrás y no depende del color de la ventana.
-        Entity(parent=self, model="quad", color=rgb(estilo.COLOR_FONDO), scale=(6, 3), z=1)
+        self._fondo = Entity(parent=self, model="quad", color=rgb(estilo.COLOR_FONDO), scale=(6, 3), z=1)
         self.raiz = Entity(parent=self)
         diseno_adaptable.ajustar_escala(self.raiz)
         self.marco = panel_tinta(self.raiz, ANCHO, ALTO, z=-0.02)
@@ -100,11 +101,12 @@ class EscenaTrabajo(Escena):
         self._limpiar()
         self.jugador, self.trabajo, self._al_terminar = jugador, trabajo, al_terminar
         semilla = random.randrange(1 << 30) if semilla is None else semilla
+        self._semilla = semilla
         if trabajo.motor == RITMO:
             from backend.logica.taller_ritmo import TurnoRitmo
-            self.turno = TurnoRitmo(trabajo, semilla)
+            self.turno = TurnoRitmo(trabajo, semilla, **self._opciones_taller())
         else:
-            self.turno = TurnoTrabajo(trabajo, semilla)
+            self.turno = self._turno_mostrador(trabajo, semilla) or TurnoTrabajo(trabajo, semilla)
         self._cerrado = False
         self._resultado = None
         self._n_pedido = 0
@@ -150,7 +152,7 @@ class EscenaTrabajo(Escena):
             for hijo in list(padre.children):
                 destruir_arbol(hijo)
         self._tiles, self._flash, self._barra, self._cliente = [], {}, {}, None
-        self._vista = None
+        self._soltar_vista()
         self._firma_juego = None
         self.fase = None
 
@@ -201,6 +203,10 @@ class EscenaTrabajo(Escena):
                 self.continuar()
                 return True
             return False
+        # Mostrador 3D: sus teclas (1-4, Enter, Retroceso) las maneja su vista.
+        entrada_vista = getattr(self._vista, "entrada", None)
+        if entrada_vista is not None and entrada_vista(key):
+            return True
         motor = self.trabajo.motor
         if motor == ATENDER and key in TECLAS_PRODUCTO:
             return self.accion(TECLAS_PRODUCTO[key])
@@ -307,10 +313,16 @@ class EscenaTrabajo(Escena):
         self._t_rend = _texto(d, "", 14, estilo.COLOR_TEXTO_TENUE, (der, 0.222), (0.5, 0))
         _linea(d, ANCHO - 0.08, (0, 0.185))
         self._t_feedback = _texto(d, "", 20, estilo.COLOR_TEXTO, (0, -0.292), negrita=True)
-        _linea(d, ANCHO - 0.08, (0, -0.32))
-        ti = _texto(d, INSTRUCCIONES[t.motor], 15, estilo.COLOR_TEXTO, (0, -0.352))
+        linea_pie = _linea(d, ANCHO - 0.08, (0, -0.32))
+        ti = _texto(d, self._instrucciones(), 15, estilo.COLOR_TEXTO, (0, -0.352))
         diseno_adaptable.ajustar_texto(ti, ANCHO - 0.1, escala_min=0.6, max_lineas=2)
-        _texto(d, "Esc: abandonar el turno (sin paga)", 12, estilo.COLOR_TEXTO_TENUE, (0, -0.405))
+        esc = _texto(d, "Esc: abandonar el turno (sin paga)", 12, estilo.COLOR_TEXTO_TENUE, (0, -0.405))
+        # el mostrador 3D esconde el pie (deja ver la caja) y pone su ayuda en su cartel
+        self._pie = [linea_pie, ti, esc]
+
+    # Instrucciones del turno: las del turno si las trae (mostrador 3D), si no las del motor.
+    def _instrucciones(self):
+        return getattr(self.turno, "instrucciones", None) or INSTRUCCIONES[self.trabajo.motor]
 
     # -- Intro y resultado --
 
@@ -323,7 +335,7 @@ class EscenaTrabajo(Escena):
         panel = panel_tinta(s, 0.9, 0.5, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX, z=0)
         _texto(panel, "Tu turno", 15, estilo.COLOR_TEXTO_TENUE, (0, 0.205), z=-0.01)
         _texto(panel, t.nombre, 28, estilo.COLOR_ACENTO, (0, 0.155), negrita=True, z=-0.01)
-        texto = INSTRUCCIONES[t.motor] + (" " + TEMAS[t.id] if t.id in TEMAS else "")
+        texto = self._instrucciones() + (" " + TEMAS[t.id] if t.id in TEMAS else "")
         if t.motor == RITMO:
             # Taller: líneas cortas a tamaño fijo (el ajuste automático encogía el párrafo hasta que no se leía).
             _texto(panel, f"Hoy fabricas: {self.turno.pieza.nombre}", 22, estilo.COLOR_TEXTO, (0, 0.085), negrita=True,
@@ -354,7 +366,7 @@ class EscenaTrabajo(Escena):
         for hijo in list(self.juego.children):
             destruir_arbol(hijo)
         self._tiles, self._barra, self._cliente, self._firma_juego = [], {}, None, None
-        self._vista = None
+        self._soltar_vista()
         s = self.superpuesto
         for hijo in list(s.children):
             destruir_arbol(hijo)
@@ -367,12 +379,17 @@ class EscenaTrabajo(Escena):
             calidad = r["calidad"]
             _texto(panel, f"{r['pieza']}: calidad {round(calidad * 100)} % ({etiqueta_calidad(calidad)})", 16,
                    estilo.COLOR_TEXTO_TENUE, (0, 0.215), z=-0.01)
-            dibujar_pieza(panel, self.turno.pieza.id, (-0.36, 0.25), 0.1, 1.0, r["errores"], fondo=estilo.COLOR_TARJETA,
-                          z=-0.01)
-            dibujar_pieza(panel, self.turno.pieza.id, (0.36, 0.25), 0.1, 1.0, r["errores"], fondo=estilo.COLOR_TARJETA,
-                          z=-0.01)
+            if not self._pieza_3d_en_panel(panel, calidad, r["errores"]):
+                dibujar_pieza(panel, self.turno.pieza.id, (-0.36, 0.25), 0.1, 1.0, r["errores"],
+                              fondo=estilo.COLOR_TARJETA, z=-0.01)
+                dibujar_pieza(panel, self.turno.pieza.id, (0.36, 0.25), 0.1, 1.0, r["errores"],
+                              fondo=estilo.COLOR_TARJETA, z=-0.01)
         else:
-            _texto(panel, self._valoracion(r["rendimiento"]), 16, estilo.COLOR_TEXTO_TENUE, (0, 0.215), z=-0.01)
+            valoracion = self._valoracion(r["rendimiento"])
+            # mostrador 3D: cambios mal dados y lo que costó en convivencia
+            if r.get("cambios_mal"):
+                valoracion += f" · {r['cambios_mal']} cambio(s) mal dado(s): convivencia {r.get('convivencia', 0)}"
+            _texto(panel, valoracion, 16, estilo.COLOR_TEXTO_TENUE, (0, 0.215), z=-0.01)
         _texto(panel, f"Aciertos: {r['aciertos']}", 20, estilo.COLOR_TEXTO, (-0.2, 0.15), negrita=True, z=-0.01)
         _texto(panel, f"Errores: {r['errores']}", 20, estilo.COLOR_TEXTO, (0.2, 0.15), negrita=True, z=-0.01)
         _linea(panel, 0.78, (0, 0.105), z=-0.01)
@@ -388,6 +405,20 @@ class EscenaTrabajo(Escena):
             diseno_adaptable.ajustar_texto(aviso, 0.84, escala_min=0.6)
         self._boton_continuar = BotonPrimario("Continuar (Enter)", al_clic=self.continuar, ancho=0.46, alto=0.075,
                                               tamano_fuente_px=22, parent=panel, position=(0, -0.24, -0.02))
+
+    # Taller 3D: la pieza terminada, en 3D y girando, a los dos lados del título. False = no es una pieza del taller 3D
+    # (o falló al construirse): entonces se dibujan las dos piezas 2D de siempre.
+    def _pieza_3d_en_panel(self, panel, calidad, errores):
+        if not hasattr(self.turno.pieza, "tono"):
+            return False
+        try:
+            from frontend.taller3d_escena import pieza_en_panel
+            for x in (-0.36, 0.36):
+                pieza_en_panel(panel, self.turno.pieza, calidad, errores, (x, 0.25))
+            return True
+        except Exception as error:               # noqa: BLE001
+            print(f"[trabajo] pieza 3D del resultado no disponible ({error})", file=sys.stderr)
+            return False
 
     # Velo translúcido sobre el juego, para que el panel de intro/resultado se lea limpio.
     @staticmethod
@@ -447,15 +478,46 @@ class EscenaTrabajo(Escena):
         for hijo in list(self.juego.children):
             destruir_arbol(hijo)
         self._tiles, self._barra, self._cliente = [], {}, None
+        self._soltar_vista()
+
+    # Suelta la vista del taller. La 3D tiene set, luces y cámara fuera de self.juego: se cierran con cerrar_3d().
+    def _soltar_vista(self):
+        cerrar = getattr(self._vista, "cerrar_3d", None)
+        if cerrar is not None:
+            cerrar()
         self._vista = None
 
     # -- RITMO --
 
+    # Opciones del TurnoRitmo: con el taller 3D (frontend/taller3d_calculos.py, ALCALDE_TALLER3D) sus piezas y la
+    # velocidad de las flechas (ALCALDE_TALLER3D_VELOCIDAD); con la bandera apagada, las de siempre.
+    @staticmethod
+    def _opciones_taller():
+        from frontend import taller3d_calculos
+        if not taller3d_calculos.activo():
+            return {}
+        from backend.datos.piezas_taller import PIEZAS_TALLER_3D
+        return {"piezas": PIEZAS_TALLER_3D, "velocidad": taller3d_calculos.velocidad_flechas()}
+
+    def _crear_vista_taller(self):
+        if hasattr(self.turno.pieza, "tono"):
+            try:
+                from frontend.taller3d_escena import JuegoTaller3D
+                return JuegoTaller3D(self.juego, self.turno, self.jugador, escena=self)
+            # sin 3D: el taller 2D con la misma partida
+            except Exception as error:           # noqa: BLE001
+                print(f"[trabajo] taller 3D no disponible ({error}); se usa el 2D", file=sys.stderr)
+                self._vaciar_juego()
+                # turno nuevo con las piezas 2D (aún no se ha jugado ninguna nota): el dibujo 2D conoce sus ids
+                from backend.logica.taller_ritmo import TurnoRitmo
+                self.turno = TurnoRitmo(self.trabajo, self._semilla)
+        from frontend.taller_vista import JuegoTaller
+        return JuegoTaller(self.juego, self.turno, self.jugador)
+
     def _juego_ritmo(self):
         if self._vista is None:
-            from frontend.taller_vista import JuegoTaller
             self._vaciar_juego()
-            self._vista = JuegoTaller(self.juego, self.turno, self.jugador)
+            self._vista = self._crear_vista_taller()
         aviso = self._vista.eventos(self.turno.sacar_eventos())
         if aviso is not None:
             self._decir(*aviso)
@@ -463,7 +525,63 @@ class EscenaTrabajo(Escena):
 
     # -- ATENDER --
 
+    # Mostrador 3D (frontend/mostrador3d_escena.py, ALCALDE_MOSTRADOR3D) para los trabajos ATENDER con local en
+    # backend/datos/mostrador3d_locales.json. None = el ATENDER 2D de siempre.
+    @staticmethod
+    def _turno_mostrador(trabajo, semilla):
+        if trabajo.motor != ATENDER:
+            return None
+        try:
+            from frontend import mostrador3d_escena
+            if not mostrador3d_escena.activo():
+                return None
+            from backend.logica import mostrador3d_dinero
+            from backend.logica.mostrador3d_turno import TurnoMostrador
+            local = mostrador3d_dinero.cargar_locales().get(trabajo.id)
+            return None if local is None else TurnoMostrador(trabajo, local, semilla)
+        except Exception as error:               # noqa: BLE001
+            print(f"[trabajo] mostrador 3D no disponible ({error}); se usa el 2D", file=sys.stderr)
+            return None
+
+    def _juego_mostrador(self):
+        if self._vista is None:
+            self._vaciar_juego()
+            try:
+                from frontend.mostrador3d_escena import JuegoMostrador
+                self._vista = JuegoMostrador(self.juego, self.turno, self.jugador, escena=self,
+                                             al_accion=self.accion_mostrador)
+            except Exception as error:           # noqa: BLE001
+                # sin 3D: el ATENDER 2D de siempre con un turno nuevo (aún no se había atendido a nadie)
+                print(f"[trabajo] mostrador 3D no disponible ({error}); se usa el 2D", file=sys.stderr)
+                self._vaciar_juego()
+                self.turno = TurnoTrabajo(self.trabajo, self._semilla)
+                return self._juego_atender()
+        eventos = self.turno.sacar_eventos()
+        aviso = self._vista.eventos(eventos, self._castigar_convivencia(eventos))
+        if aviso is not None:
+            self._decir(*aviso)
+        self._vista.refrescar()
+
+    # Acciones del mostrador 3D sobre su turno: la vista las pide y la escena (controlador) las aplica.
+    def accion_mostrador(self, nombre, *args):
+        if self.fase != JUGANDO or nombre not in ("entregar", "agregar", "quitar", "dar_cambio"):
+            return False
+        return getattr(self.turno, nombre)(*args)
+
+    # Cambio mal dado: baja la convivencia de la partida (frontend/mostrador3d_convivencia.py; solo local, con tope por
+    # turno ya contado por el TurnoMostrador). True si se aplicó.
+    @staticmethod
+    def _castigar_convivencia(eventos):
+        castigos = sum(1 for tipo, _ in eventos if tipo == "castigo")
+        if not castigos:
+            return False
+        from backend.logica.mostrador3d_turno import CASTIGO_CONVIVENCIA
+        from frontend import mostrador3d_convivencia
+        return mostrador3d_convivencia.castigar(castigos * CASTIGO_CONVIVENCIA)
+
     def _juego_atender(self):
+        if hasattr(self.turno, "entregar"):
+            return self._juego_mostrador()
         t = self.turno
         entregado = t.entregado()
         firma = (self._n_pedido, tuple(sorted(entregado.items())), tuple(sorted(self._flash)),

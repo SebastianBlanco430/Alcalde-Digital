@@ -432,3 +432,6 @@ def conectar(economia, iniciar):
             return False
         return pedir_turno(economia, menu, puesto, jugador)
     economia.al_trabajar = al_trabajar
+    # Mostrador 3D (ALCALDE_MOSTRADOR3D): el cambio mal dado baja la convivencia de ESTA partida (solo local).
+    from frontend import mostrador3d_convivencia
+    mostrador3d_convivencia.enganchar(getattr(economia, "escena", None))

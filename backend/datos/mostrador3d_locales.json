@@ -1,0 +1,51 @@
+{
+  "_nota": "Mostrador 3D (frontend/mostrador3d_escena.py, ALCALDE_MOSTRADOR3D): productos, precios y decorado de cada puesto ATENDER. Los 4 productos van en el MISMO orden que las opciones del trabajo (teclas 1-4, backend/datos/trabajos_semilla.py). Precios en centavos de real, múltiplos de 5 (la moneda más pequeña es de R$ 0,05). forma = cómo se dibuja (frontend/mostrador3d_productos.py). color = RGB 0-255. fondo = lo que se ve detrás del cliente (frontend/mostrador3d_fondos.py: mercado, panaderia, supermercado o bar).",
+  "panaderia": {
+    "fondo": "panaderia",
+    "nombre": "Panadería",
+    "toldo": [214, 120, 64],
+    "mostrador": [196, 150, 98],
+    "productos": [
+      {"nombre": "pan", "precio": 75, "forma": "pan", "color": [214, 160, 84]},
+      {"nombre": "café", "precio": 350, "forma": "taza", "color": [96, 60, 40]},
+      {"nombre": "bollo", "precio": 250, "forma": "bollo", "color": [226, 178, 104]},
+      {"nombre": "leche", "precio": 590, "forma": "carton", "color": [236, 238, 242]}
+    ]
+  },
+  "supermercado": {
+    "fondo": "supermercado",
+    "nombre": "Supermercado",
+    "toldo": [52, 120, 196],
+    "mostrador": [176, 180, 188],
+    "productos": [
+      {"nombre": "arroz", "precio": 2490, "forma": "bolsa", "color": [240, 236, 220]},
+      {"nombre": "feijão", "precio": 845, "forma": "bolsa", "color": [120, 64, 48]},
+      {"nombre": "leche", "precio": 590, "forma": "carton", "color": [236, 238, 242]},
+      {"nombre": "jabón", "precio": 335, "forma": "caja", "color": [120, 200, 220]}
+    ]
+  },
+  "feirante": {
+    "fondo": "mercado",
+    "nombre": "Feria",
+    "toldo": [60, 150, 90],
+    "mostrador": [150, 104, 64],
+    "productos": [
+      {"nombre": "mango", "precio": 250, "forma": "fruta", "color": [236, 140, 52]},
+      {"nombre": "banana", "precio": 480, "forma": "banana", "color": [244, 214, 70]},
+      {"nombre": "tomate", "precio": 115, "forma": "fruta", "color": [214, 52, 44]},
+      {"nombre": "yuca", "precio": 360, "forma": "raiz", "color": [150, 100, 62]}
+    ]
+  },
+  "bar": {
+    "fondo": "bar",
+    "nombre": "Bar",
+    "toldo": [196, 56, 60],
+    "mostrador": [120, 82, 54],
+    "productos": [
+      {"nombre": "agua", "precio": 250, "forma": "botella", "color": [120, 190, 230]},
+      {"nombre": "café", "precio": 300, "forma": "taza", "color": [96, 60, 40]},
+      {"nombre": "refresco", "precio": 550, "forma": "lata", "color": [200, 40, 44]},
+      {"nombre": "salgado", "precio": 675, "forma": "coxinha", "color": [214, 150, 70]}
+    ]
+  }
+}
