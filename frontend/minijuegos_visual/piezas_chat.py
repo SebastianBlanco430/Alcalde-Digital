@@ -1,5 +1,7 @@
 # Piezas visuales del «Chat del barrio» (Ursina): globo con cola, avatar circular, reloj de presión, botón-sello, sombra plana.
 # Cálculo en chat_piezas_calculos.py (puro).
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import json
 import math
@@ -89,9 +91,9 @@ class RelojPresion(Entity):
         Entity(parent=self, model="circle", scale=diametro, color=rgba(estilo.PAPEL), z=0.002)
         self._sector = Entity(parent=self, z=-0.001)
         self.numero = Text("", parent=self, origin=(0, 0), position=(0, 0.006, -0.004), scale=escala_fuente(36),
-                           font=tipografia.FUENTE_TITULO, color=rgba(estilo.TINTA))
+                           font=tipografia.fuente_piel(titulo=True), color=rgba(estilo.TINTA))
         self.unidad = Text("seg", parent=self, origin=(0, 0), position=(0, -diametro * 0.30, -0.004),
-                           scale=escala_fuente(15), font=tipografia.FUENTE_TITULO, color=rgba(estilo.TINTA))
+                           scale=escala_fuente(15), font=tipografia.fuente_piel(titulo=True), color=rgba(estilo.TINTA))
         self._ultimo = None
         self._ultimo_segundos = None
 
@@ -145,9 +147,9 @@ class TelefonoPapel(Entity):
         y = cy + alto / 2 - self.BARRA / 2
         x_izq, x_der = cx - ancho / 2 + 0.03, cx + ancho / 2 - 0.03
         Text("Civitas", parent=self, origin=(-0.5, 0), position=(x_izq, y, 0.0), scale=escala_fuente(13),
-             font=tipografia.FUENTE_TITULO, color=rgba(estilo.TINTA))
+             font=tipografia.fuente_piel(titulo=True), color=rgba(estilo.TINTA))
         Text(pc_hora(minutos), parent=self, origin=(0.5, 0), position=(x_der - 0.06, y, 0.0), scale=escala_fuente(13),
-             font=tipografia.FUENTE_TITULO, color=rgba(estilo.TINTA))
+             font=tipografia.fuente_piel(titulo=True), color=rgba(estilo.TINTA))
         ui.rect(self, 0.046, 0.02, estilo.TINTA, (x_der - 0.022, y), z=-0.001, radio_px=3)
         ui.rect(self, 0.04, 0.014, (88, 190, 120), (x_der - 0.022, y), z=-0.002, radio_px=2)
 
@@ -167,7 +169,7 @@ def boton_sello(parent, texto, ancho, alto, centro, tono=None, z=0.0):
     ui.rect(raiz, ancho + 0.006, alto + 0.006, estilo.TINTA, (0, 0), z=0.002, radio_px=9)
     ui.rect(raiz, ancho, alto, tono or estilo.COLOR_ACENTO, (0, 0), z=0.001, radio_px=8)
     Text(texto, parent=raiz, origin=(0, 0), position=(0, 0, -0.002), scale=escala_fuente(16),
-         font=tipografia.FUENTE_TITULO, color=rgba(estilo.TINTA))
+         font=tipografia.fuente_piel(titulo=True), color=rgba(estilo.TINTA))
     return raiz
 
 
@@ -215,7 +217,7 @@ class GloboRespuesta(ui.Tarjeta):
         Entity(parent=self, model="circle", color=rgba(estilo.TINTA), position=(cx, cy, -0.01), scale=0.046)
         Entity(parent=self, model="circle", color=rgba(estilo.COLOR_ACENTO), position=(cx, cy, -0.011), scale=0.04)
         Text(str(numero), parent=self, origin=(0, 0), position=(cx, cy, -0.012), scale=escala_fuente(15),
-             font=tipografia.FUENTE_TITULO, color=rgba(estilo.TINTA))
+             font=tipografia.fuente_piel(titulo=True), color=rgba(estilo.TINTA))
         self._pintar()
 
     def _pintar(self):

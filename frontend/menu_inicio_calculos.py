@@ -63,3 +63,61 @@ class Confirmacion:
 def necesita_confirmar_nueva(hay_guardado):
     """«Partida nueva» solo pregunta si hay una partida guardada que se perdería."""
     return bool(hay_guardado)
+
+
+# -- Submenú «Multijugador» (docs/MENU_MULTIJUGADOR.md) --
+# BANDERA: ALCALDE_MENU_MULTIJUGADOR (encendida por defecto). «Empezar» / «Partida nueva» va directo a elegir rol con 1
+# jugador; «Multijugador» (siempre a la vista) abre «Local por turnos» (2, 3 o 4 jugadores en el mismo computador) y
+# «En línea» (solo con ONLINE). Esc / B vuelve un nivel. =0 deja el menú de siempre: «En línea» y la pregunta
+# «¿Cuántos jugadores?» en la selección de rol.
+
+import os
+
+MENU_MULTIJUGADOR = True
+VARIABLE_MULTIJUGADOR = "ALCALDE_MENU_MULTIJUGADOR"
+_APAGADO = ("0", "false", "no", "off")
+_ENCENDIDO = ("1", "true", "si", "sí", "on")
+
+PRINCIPAL, MULTIJUGADOR, LOCAL = "principal", "multijugador", "local"
+LOCAL_TURNOS, EN_LINEA, ATRAS = "local_turnos", "en_linea", "atras"
+TEXTO_MULTIJUGADOR = "Multijugador"
+CANTIDADES_LOCALES = (2, 3, 4)
+TITULOS = {MULTIJUGADOR: "Multijugador", LOCAL: "Local por turnos"}
+
+
+def multijugador_activo(entorno=None):
+    """¿Submenú «Multijugador»? ALCALDE_MENU_MULTIJUGADOR manda sobre MENU_MULTIJUGADOR."""
+    valor = (os.environ if entorno is None else entorno).get(VARIABLE_MULTIJUGADOR, "").strip().lower()
+    if valor in _APAGADO:
+        return False
+    if valor in _ENCENDIDO:
+        return True
+    return bool(MENU_MULTIJUGADOR)
+
+
+def id_cantidad(n):
+    return f"jugadores_{n}"
+
+
+def opciones_de(nivel, hay_online):
+    """(id, texto) de cada opción de un submenú, en orden; «Atrás» siempre al final. PRINCIPAL no tiene: es el menú de
+    siempre de la escena."""
+    if nivel == MULTIJUGADOR:
+        ids = [(LOCAL_TURNOS, "Local por turnos")] + ([(EN_LINEA, "En línea")] if hay_online else [])
+        return ids + [(ATRAS, "Atrás")]
+    if nivel == LOCAL:
+        return [(id_cantidad(n), f"{n} jugadores") for n in CANTIDADES_LOCALES] + [(ATRAS, "Atrás")]
+    return []
+
+
+def nivel_anterior(nivel):
+    """Adónde vuelve Esc / «Atrás»: de «Local por turnos» a «Multijugador» y de ahí al menú principal."""
+    return MULTIJUGADOR if nivel == LOCAL else PRINCIPAL
+
+
+def cantidad_inicial(jugadores, activo, maximo):
+    """Jugadores con los que arranca la selección de rol: los que pide el menú (1..maximo); sin pedir, 1 con el submenú
+    activo o 0 («¿Cuántos jugadores?», como siempre) sin él."""
+    if isinstance(jugadores, int) and not isinstance(jugadores, bool) and 1 <= jugadores <= maximo:
+        return jugadores
+    return 1 if activo else 0

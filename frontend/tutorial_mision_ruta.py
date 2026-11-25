@@ -12,7 +12,22 @@
 #   - entregas_mundo.EntregasMundo.iniciar: justo antes de empezar el turno, cuando ya hay pedidos; al terminar el tutorial el turno
 #     empieza como siempre (su tiempo y su moto no se tocan antes).
 
+from types import SimpleNamespace
+
 _estado = {}          # id(escena) -> {"tutorial": TutorialMision|None}
+
+# Lo que esta vista necesita del controlador (frontend/registro_tutorial_mision.py) se lo da él con conectar(): una vista no
+# importa controladores (contrato MVC, R3 de tests/test_arquitectura_mvc.py). Sin conectar no se abre ningún tutorial.
+_CONTROL = {}
+
+
+def conectar(**funciones):
+    _CONTROL.update(funciones)
+
+
+def _controlador():
+    """Las funciones conectadas (toca, abrir_si_toca...) o None si el controlador aún no las puso."""
+    return SimpleNamespace(**_CONTROL) if "toca" in _CONTROL else None
 
 
 def _tomar(escena):
@@ -42,8 +57,8 @@ def abrir(escena, id_, contexto, al_cerrar=None, forzar_ver=False):
     try:
         from ursina import camera
 
-        from frontend import registro_tutorial_mision as rtm
-        if not rtm.toca(id_, forzar_ver):
+        rtm = _controlador()
+        if rtm is None or not rtm.toca(id_, forzar_ver):
             return False
         estado = _tomar(escena)
         if estado["tutorial"] is not None and not estado["tutorial"].cerrado:

@@ -2,6 +2,8 @@
 # borde de tinta, cinta adhesiva, chinchetas, sellos de goma, resaltador, polaroids, chips, ovillos y aros de rotulador.
 # La geometría sale de frontend/minijuegos_visual/papel_calculos.py. Cada función devuelve un Entity contenedor; sus
 # hijos usan coordenadas locales.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Mesh, Text, camera, color
 
@@ -43,7 +45,7 @@ def _poligono(puntos):
 def _texto(parent, texto, pos, tam, tono, fuente=None, z=-0.003):
     try:
         return Text(str(texto), parent=parent, origin=(0, 0), position=(pos[0], pos[1], z), scale=tam / Text.size,
-                    font=fuente or tipografia.FUENTE_TITULO, color=_rgba(tono))
+                    font=fuente or tipografia.fuente_piel(titulo=True), color=_rgba(tono))
     except Exception:
         return None
 

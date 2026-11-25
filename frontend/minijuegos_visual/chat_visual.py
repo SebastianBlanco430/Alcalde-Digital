@@ -15,6 +15,8 @@
 # APAGADO: ALCALDE_CHAT_VISUAL=0 (o CHAT_VISUAL = False): la vista de siempre con la capa común.
 # REDUCIR MOVIMIENTO: sin vibración, la viñeta más suave y el final aparece sin animación.
 # GUARDIÁN: un fallo de la vista nueva avisa una vez por stderr, esconde lo añadido y deja el chat de siempre.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import math
 
@@ -128,7 +130,7 @@ class ChatVisual(CapaVisual, MinijuegoChat):
         ui.rect(self.vista, pw, alto_cab, estilo.COLOR_ACENTO, (px_, y_cab), z=0.005, radio_px=8)
         pz.avatar(self.vista, "Grupo", 3, (pant_izq + 0.05, y_cab), 0.052, z=-0.001)
         Text("Chat del barrio", parent=self.vista, origin=(-0.5, 0), position=(pant_izq + 0.095, y_cab + 0.012, -0.003),
-             scale=escala_fuente(17), font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA, 1))
+             scale=escala_fuente(17), font=tipografia.fuente_piel(titulo=True), color=_rgba(estilo.TINTA, 1))
         Text("3 en línea", parent=self.vista, origin=(-0.5, 0), position=(pant_izq + 0.095, y_cab - 0.014, -0.003),
              scale=escala_fuente(13), color=_rgba(estilo.TINTA, 1))
         self.y_burb_abajo = pant_abajo + RESERVA_ABAJO + 0.01
@@ -144,7 +146,7 @@ class ChatVisual(CapaVisual, MinijuegoChat):
         ui.rect(self.alarma, 0.2 + a_unidades(6), 0.058 + a_unidades(6), estilo.TINTA, (0, 0), z=0.002, radio_px=8)
         ui.rect(self.alarma, 0.2, 0.058, estilo.PAPEL, (0, 0), z=0.001, radio_px=6)
         Text("¡Rápido!", parent=self.alarma, origin=(0, 0), position=(0, 0, -0.002), scale=escala_fuente(19),
-             font=tipografia.FUENTE_TITULO, color=_rgba(ROJO_TEXTO, 1))
+             font=tipografia.fuente_piel(titulo=True), color=_rgba(ROJO_TEXTO, 1))
         # Franja inferior del móvil: «escribiendo…» del grupo.
         y_franja = pant_abajo + RESERVA_ABAJO / 2 + 0.004
         self.escribiendo_txt = Text("", parent=self.vista, origin=(-0.5, 0), position=(pant_izq + 0.03, y_franja, -0.008),
@@ -281,7 +283,7 @@ class ChatVisual(CapaVisual, MinijuegoChat):
                 else:
                     Text(calc.nombre_corto(quien), parent=self.burbujas, origin=(-0.5, 0),
                          position=(cx - ancho / 2 + 0.014, y + alto / 2 - 0.017, -0.01), scale=escala_fuente(12),
-                         font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA, 1))
+                         font=tipografia.fuente_piel(titulo=True), color=_rgba(estilo.TINTA, 1))
                     self._texto_globo(lineas, px, cx - ancho / 2 + 0.014, y + alto / 2 - 0.03, estilo.TINTA)
             elif tipo == "tu":
                 cx = x_der - ancho / 2
@@ -448,7 +450,7 @@ class ChatVisual(CapaVisual, MinijuegoChat):
             Text("Tu amigo", parent=self.final, origin=(0, 0), position=(cx, cy - 0.062, -0.002), scale=escala_fuente(15),
                  color=_rgba(estilo.TINTA, 1))
             self._gracias = Text("¡Gracias por no pasar mis datos!", parent=self.final, origin=(0, 0),
-                                 position=(cx, cy + 0.11, -0.002), scale=escala_fuente(18), font=tipografia.FUENTE_TITULO,
+                                 position=(cx, cy + 0.11, -0.002), scale=escala_fuente(18), font=tipografia.fuente_piel(titulo=True),
                                  color=_rgba(estilo.TINTA, 1))
         else:
             self._ruta = [(cx + x * ancho, cy + y * alto) for x, y in calc.ruta_dato()]
@@ -464,23 +466,23 @@ class ChatVisual(CapaVisual, MinijuegoChat):
             Entity(parent=self.final, model="circle", color=_rgba(estilo.TINTA, 1), position=(fx_, fy, 0.001), scale=0.07)
             Entity(parent=self.final, model="circle", color=_rgba(ROJO, 1), position=(fx_, fy, 0), scale=0.064)
             Text("?", parent=self.final, origin=(0, 0), position=(fx_, fy, -0.002), scale=escala_fuente(26),
-                 font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA, 1))
+                 font=tipografia.fuente_piel(titulo=True), color=_rgba(estilo.TINTA, 1))
             Text("Perfil desconocido", parent=self.final, origin=(0, 0), position=(fx_ - 0.06, fy - 0.058, -0.002),
-                 scale=escala_fuente(14), font=tipografia.FUENTE_TITULO, color=_rgba(ROJO_TEXTO, 1))
+                 scale=escala_fuente(14), font=tipografia.fuente_piel(titulo=True), color=_rgba(ROJO_TEXTO, 1))
             Text("\n".join(ui.lineas_de("El dato salió del grupo y ya no sabes quién lo tiene.", 14, ancho - 0.05)), parent=self.final,
                  origin=(0, 0), position=(cx, cy + alto / 2 - 0.085, -0.002), scale=escala_fuente(14),
                  color=_rgba(estilo.TINTA, 1))
             sx, sy = self._ruta[0]
             pz.avatar(self.final, "Tú (ciudadano)", 0, (sx, sy), 0.06, z=-0.001)
             Text("Tú", parent=self.final, origin=(0, 0), position=(sx, sy - 0.05, -0.002), scale=escala_fuente(14),
-                 font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA, 1))
+                 font=tipografia.fuente_piel(titulo=True), color=_rgba(estilo.TINTA, 1))
             # La ficha termina justo encima del perfil desconocido (no lo tapa).
             self._ruta_chip = self._ruta[:-1] + [(fx_ - 0.04, fy + 0.055)]
             self._chip = Entity(parent=self.final, position=(sx, sy + 0.06, -0.01))
             ui.rect(self._chip, 0.11 + a_unidades(6), 0.034 + a_unidades(6), estilo.TINTA, (0, 0), z=0.002, radio_px=6)
             ui.rect(self._chip, 0.11, 0.034, ROJO, (0, 0), z=0.001, radio_px=5)
             Text("el dato", parent=self._chip, origin=(0, 0), z=-0.002, scale=escala_fuente(13),
-                 font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA, 1))
+                 font=tipografia.fuente_piel(titulo=True), color=_rgba(estilo.TINTA, 1))
         resumen = pc.resumen_final(self.partida.respuestas)
         if resumen:
             Text("\n".join(ui.lineas_de(resumen, 13, ancho - 0.04)), parent=self.final, origin=(0, 0),

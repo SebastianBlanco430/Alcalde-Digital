@@ -17,6 +17,8 @@
 #   .texto  (ya saneado, tal cual se ve)   .valor  (versión final para enviar)   .fijar_texto(t)
 #   .activar() / .desactivar() / .activo     .marcar_error(bool)     .pegar() / .copiar()
 #   .fijar_oculto(bool)                      .fijar_habilitado(bool)
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Text, color, destroy
 from ursina.prefabs.input_field import InputField
@@ -24,6 +26,7 @@ from ursina.prefabs.input_field import InputField
 from frontend import campo_texto_calculos as calc
 from frontend import estilo
 from frontend.componentes import a_unidades, escala_fuente, panel_tinta, rgb
+from frontend.componentes import panel_piel
 
 ALTO_CAMPO = a_unidades(44)
 TECLAS_PEGAR = ("control+v", "ctrl+v", "meta-v", "meta+v", "command+v", "control-v", "shift+insert")
@@ -66,8 +69,8 @@ class CampoTexto(Entity):
         self._activo_previo = False
         self._previo = ""
 
-        self.panel = panel_tinta(self, ancho, alto, estilo.COLOR_TARJETA, estilo.RADIO_CHIP_PX, sombra=False,
-                                 borde_px=2)
+        self.panel = panel_piel(self, ancho, alto, estilo.COLOR_TARJETA, estilo.RADIO_CHIP_PX, sombra=False,
+                                borde_px=2)
         self.entrada = InputField(parent=self, position=(0, 0, Z_CAMPO), scale=(ancho, alto),
                                   character_limit=self.limite, active=False)
         # El InputField pinta su propio fondo: aquí lo hace el panel de tinta.

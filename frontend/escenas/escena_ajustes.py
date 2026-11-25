@@ -21,6 +21,8 @@
 #   registrar_prueba_sonido(callback)       (opcional) muestra un botón «Probar sonido» en Audio.
 #
 # Bandera reversible: AJUSTES (backend.logica.ajustes) = False oculta los botones «Ajustes» de los menús.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW, =0 o la fila «Estilo de interfaz» de la pestaña Estilo la apagan): panel de
+# velo violeta con filo claro, pestañas y botones del menú de inicio, títulos en cursiva y barra de foco amarilla.
 
 from ursina import Entity, Text, Vec3, camera, color, mouse
 
@@ -29,9 +31,10 @@ from frontend import ajustes_calculos as calc
 from frontend import daltonismo_calculos as dalt
 from frontend import diseno_adaptable, estilo, tipografia
 from frontend.componentes import (
-    BotonPrimario, BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb,
+    BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb,
 )
 from frontend.escenas.escena_base import Escena
+from frontend.componentes import BotonBotwSecundario, boton_piel, boton_piel_secundario, panel_piel, piel_botw
 from frontend.fondo_menu import FondoMenu, anadir_filo
 
 AJUSTES_ESCENA = "ajustes"            # nombre con que main.py registra la escena en el gestor
@@ -82,9 +85,20 @@ def registrar_prueba_sonido(callback):
 # --- Controles ---
 
 def _texto(padre, contenido, x, y, px, tono=estilo.COLOR_TEXTO, origen=(-0.5, 0), titulo=False):
-    opciones = {"font": tipografia.FUENTE_TITULO} if titulo else {}
+    opciones = {"font": tipografia.fuente_piel(titulo=True)} if titulo else {}
     return Text(contenido, parent=padre, origin=origen, position=(x, y, Z_TEXTO), scale=escala_fuente(px),
                 color=rgb(tono), **opciones)
+
+
+# Tono de estilo.py con su equivalente BOTW si la piel está puesta.
+def _tono(tono):
+    from frontend import ui_botw_calculos
+    return ui_botw_calculos.tono(tono)
+
+
+# Barra de la fila con foco: cian de siempre o el amarillo del foco BOTW.
+def _color_barra_foco():
+    return estilo.BOTW_ACENTO if piel_botw() else estilo.ACENTO_SECUNDARIO
 
 
 # ¿El ratón está encima del control? (los botones usan `hovered`; los demás, su zona sensible)
@@ -99,9 +113,9 @@ class Fila(Entity):
     def __init__(self, etiqueta, y, alto=ALTO_FILA, **opciones):
         super().__init__(position=(0, y, 0), **opciones)
         self.alto = alto
-        self.resalte = Entity(parent=self, model="quad", color=rgb(estilo.COLOR_SUPERFICIE_ALTA),
+        self.resalte = Entity(parent=self, model="quad", color=rgb(_tono(estilo.COLOR_SUPERFICIE_ALTA)),
                               scale=(ANCHO_PANEL - 0.12, alto - 0.012), z=0.002, enabled=False)
-        self.barra = Entity(parent=self.resalte, model="quad", color=rgb(estilo.ACENTO_SECUNDARIO),
+        self.barra = Entity(parent=self.resalte, model="quad", color=rgb(_color_barra_foco()),
                             scale=(0.006 / (ANCHO_PANEL - 0.12), 1), x=-0.5, z=-0.01)
         self.etiqueta = _texto(self, etiqueta, X_ETIQUETA, 0, 22) if etiqueta else None
 
@@ -222,14 +236,14 @@ class Selector(Entity):
         ancho_centro = ANCHO_CONTROL - 2 * ancho_flecha - 0.03
         x_izq = X_CONTROL - ANCHO_CONTROL / 2 + ancho_flecha / 2
         x_der = X_CONTROL + ANCHO_CONTROL / 2 - ancho_flecha / 2
-        self.flecha_izq = BotonSecundario("‹", al_clic=lambda: self.ajustar(-1), ancho=ancho_flecha,
-                                          alto=a_unidades(46), tamano_fuente_px=26, parent=self,
-                                          position=(x_izq, 0, -0.003))
-        self.flecha_der = BotonSecundario("›", al_clic=lambda: self.ajustar(1), ancho=ancho_flecha,
-                                          alto=a_unidades(46), tamano_fuente_px=26, parent=self,
-                                          position=(x_der, 0, -0.003))
-        self.centro = panel_tinta(self, ancho_centro, a_unidades(46), estilo.COLOR_TARJETA, 6, sombra=False,
-                                  borde_px=2, position=(X_CONTROL, 0, -0.002))
+        self.flecha_izq = boton_piel_secundario("‹", al_clic=lambda: self.ajustar(-1), ancho=ancho_flecha,
+                                                alto=a_unidades(46), tamano_fuente_px=26, parent=self,
+                                                position=(x_izq, 0, -0.003))
+        self.flecha_der = boton_piel_secundario("›", al_clic=lambda: self.ajustar(1), ancho=ancho_flecha,
+                                                alto=a_unidades(46), tamano_fuente_px=26, parent=self,
+                                                position=(x_der, 0, -0.003))
+        self.centro = panel_piel(self, ancho_centro, a_unidades(46), estilo.COLOR_TARJETA, 6, sombra=False,
+                                 borde_px=2, position=(X_CONTROL, 0, -0.002))
         self.ancho_centro = ancho_centro
         self.texto = Text("-", parent=self.centro, origin=(0, 0), position=(0, 0, -0.001),
                           scale=escala_fuente(21), color=rgb(estilo.COLOR_TEXTO))
@@ -294,7 +308,8 @@ class Selector(Entity):
 
 
 # Interruptor Sí/No como botón (un clic o Intro lo alterna).
-class Interruptor(BotonSecundario):
+# Con la piel BOTW el interruptor es un botón del menú de inicio; sin ella, el secundario de siempre.
+class Interruptor(BotonBotwSecundario if piel_botw() else BotonSecundario):
 
     def __init__(self, fila, valor, al_cambiar, **opciones):
         self._valor = bool(valor)
@@ -424,8 +439,8 @@ class Seccion(Entity):
     # Botón suelto en su propia fila (acción propia de la sección).
     def anadir_boton(self, etiqueta, texto, accion):
         fila = self._nueva_fila(etiqueta)
-        boton = BotonSecundario(texto, al_clic=accion, ancho=0.34, alto=a_unidades(46), tamano_fuente_px=21,
-                                parent=fila, position=(X_CONTROL - ANCHO_CONTROL / 2 + 0.17, 0, -0.003))
+        boton = boton_piel_secundario(texto, al_clic=accion, ancho=0.34, alto=a_unidades(46), tamano_fuente_px=21,
+                                      parent=fila, position=(X_CONTROL - ANCHO_CONTROL / 2 + 0.17, 0, -0.003))
         original = boton.fijar_foco
 
         def con_fila(valor, original=original, fila=fila):
@@ -523,21 +538,22 @@ class PantallaAjustes(Entity):
 
         self.raiz = Entity(parent=self)
         diseno_adaptable.ajustar_escala(self.raiz)
-        self.panel = panel_tinta(self.raiz, ANCHO_PANEL, ALTO_PANEL, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
-        anadir_filo(self.panel, ANCHO_PANEL, ALTO_PANEL, estilo.RADIO_PANEL_PX)
+        self.panel = panel_piel(self.raiz, ANCHO_PANEL, ALTO_PANEL, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
+        if not piel_botw():          # el panel BOTW ya trae su filo claro
+            anadir_filo(self.panel, ANCHO_PANEL, ALTO_PANEL, estilo.RADIO_PANEL_PX)
         self.titulo = _texto(self.raiz, "Ajustes", 0, 0.385, 38, estilo.COLOR_TEXTO, origen=(0, 0), titulo=True)
         self.nota = _texto(self.raiz, "", X_NOTA, -0.385, 17, estilo.COLOR_TEXTO_TENUE, origen=(0, 0))
         self._fijar_nota("Atrás descarta los cambios sin guardar.")
 
         alto_boton = a_unidades(52)
-        self.boton_restablecer = BotonSecundario(
-            "Restablecer", al_clic=self.restablecer, ancho=0.34, alto=alto_boton, tamano_fuente_px=22,
+        self.boton_restablecer = boton_piel(
+            "Restablecer", "secundario", al_clic=self.restablecer, ancho=0.34, alto=alto_boton, tamano_fuente_px=22,
             parent=self.raiz, position=(-0.45, -0.385, -0.003))
-        self.boton_atras = BotonSecundario(
-            "Atrás", al_clic=self.atras, ancho=0.30, alto=alto_boton, tamano_fuente_px=22,
+        self.boton_atras = boton_piel(
+            "Atrás", "secundario", al_clic=self.atras, ancho=0.30, alto=alto_boton, tamano_fuente_px=22,
             parent=self.raiz, position=(0.20, -0.385, -0.003))
-        self.boton_guardar = BotonPrimario(
-            "Guardar", al_clic=self.guardar_y_cerrar, ancho=0.30, alto=alto_boton, tamano_fuente_px=24,
+        self.boton_guardar = boton_piel(
+            "Guardar", "primario", al_clic=self.guardar_y_cerrar, ancho=0.30, alto=alto_boton, tamano_fuente_px=24,
             parent=self.raiz, position=(0.52, -0.385, -0.003))
         self.botones_pie = [self.boton_restablecer, self.boton_atras, self.boton_guardar]
         _pantallas_vivas.append(self)
@@ -557,8 +573,8 @@ class PantallaAjustes(Entity):
         from frontend import ajustes_calculos
         anchos, xs = ajustes_calculos.anchos_pestanas(nombres, ANCHO_PANEL - 0.08, separacion=0.02, maximo=0.34)
         for i, nombre in enumerate(nombres):
-            boton = BotonSecundario(
-                nombre, al_clic=lambda n=nombre: self.mostrar_seccion(n), ancho=anchos[i],
+            boton = boton_piel(
+                nombre, "secundario", al_clic=lambda n=nombre: self.mostrar_seccion(n), ancho=anchos[i],
                 alto=a_unidades(44), tamano_fuente_px=20, parent=self.raiz,
                 position=(xs[i], 0.295, -0.003))
             self.pestanas.append(boton)
@@ -605,7 +621,8 @@ class PantallaAjustes(Entity):
         if seccion is None:
             return
         for clave, control in seccion.controles.items():
-            valor = getattr(self.gestor.actual, clave, None)
+            # las claves extra (p. ej. «ui_botw», «reducir_movimiento») viven en `extras`
+            valor = getattr(self.gestor.actual, clave, self.gestor.actual.extras.get(clave))
             if isinstance(control, Deslizador):
                 control.fijar_valor(valor)
             elif isinstance(control, Interruptor):
@@ -621,8 +638,8 @@ class PantallaAjustes(Entity):
     def _marcar_pestanas(self):
         for boton, nombre in zip(self.pestanas, self.secciones):
             activa = self.secciones[nombre] is self.seccion_actual
-            boton.color = rgb(estilo.ACENTO_PRIMARIO if activa else estilo.COLOR_BOTON)
-            boton.text_color = rgb(estilo.COLOR_ACENTO_TEXTO if activa else estilo.COLOR_BOTON_TEXTO)
+            boton.color = rgb(estilo.ACENTO_PRIMARIO if activa else _tono(estilo.COLOR_BOTON))
+            boton.text_color = rgb(estilo.COLOR_ACENTO_TEXTO if activa else _tono(estilo.COLOR_BOTON_TEXTO))
 
     def restablecer(self):
         self.gestor.restablecer()

@@ -14,6 +14,10 @@
 # frontend/radio_calculos.py. Bandera: ALCALDE_HILO_RADIO (ver radio_guion). Si la animación falla, queda la viñeta.
 #
 #   crear_emision(escena_mundo, vinetas, al_terminar, al_poner=None) -> entidad (.terminada, .saltar())
+#
+# RADIO 3D (docs/RADIO_3D.md, ALCALDE_RADIO3D encendida por defecto): si el mundo tiene la torre de la radio, la emisión es
+# la de frontend/radio3d_escena.py (la cámara orbita la antena; mismo contrato). Con =0, sin torre o si la 3D falla al
+# empezar, sale esta animación 2D tal cual.
 
 import math
 import sys
@@ -35,6 +39,10 @@ def crear_emision(escena_mundo, vinetas, al_terminar, al_poner=None):
         if getattr(escena_mundo, "en_pausa", False):
             escena_mundo.alternar_pausa(False)
 
+    emision_3d = _emision_3d(escena_mundo, vinetas, al_terminar, al_poner, guardia)
+    if emision_3d is not None:
+        return emision_3d
+
     # La radio la dibuja RadioAnimada: las viñetas no llevan la figura fija.
     propias = [dict(v, figuras=[f for f in v.get("figuras", []) if f.get("tipo") != "radio"]) for v in vinetas]
     entidad = crear_vinetas(propias, al_terminar, segundos=None, guardia=guardia, rotulos=ROTULOS, al_poner=al_poner,
@@ -46,6 +54,18 @@ def crear_emision(escena_mundo, vinetas, al_terminar, al_poner=None):
         for v, original in zip(propias, vinetas):
             v["figuras"] = list(original.get("figuras", []))
     return entidad
+
+
+# La emisión en 3D (frontend/radio3d_escena.py) o None si no toca o falla al empezar (entonces, la 2D de siempre).
+def _emision_3d(escena_mundo, vinetas, al_terminar, al_poner, guardia):
+    try:
+        from frontend import radio3d_escena
+        if not radio3d_escena.disponible(escena_mundo):
+            return None
+        return radio3d_escena.EmisionRadio3D(escena_mundo, vinetas, al_terminar, al_poner=al_poner, guardia=guardia)
+    except Exception as error:                  # noqa: BLE001  sin 3D: la radio animada en 2D
+        print(f"[radio] emisión 3D omitida ({type(error).__name__}: {error})", file=sys.stderr)
+        return None
 
 
 def _malla_arco(desde, hasta, grosor=0.1, n=14):
@@ -162,7 +182,7 @@ def _clase():
             self._quad(self.letrero, estilo.ESTADO_ERROR, 0, 0, 0.19, 0.05, borde=True)
             self.punto = self._disco(self.letrero, estilo.PAPEL, -0.068, 0, 0.018, z=-0.001)
             Text("AO VIVO", parent=self.letrero, origin=(-0.5, 0), position=(-0.05, 0.001, -0.001),
-                 scale=escala_fuente(15), color=rgb(estilo.PAPEL))
+                 scale=escala_fuente(16), color=rgb(estilo.PAPEL))
 
         def _crear_ondas(self):
             self.ondas = []

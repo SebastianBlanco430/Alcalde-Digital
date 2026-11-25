@@ -39,10 +39,16 @@ class EscenaInicio(Escena):
     ANCHO_BOTON = a_unidades(260)
     ALTO_BOTON = a_unidades(60)
 
-    def __init__(self, al_comenzar, al_salir=None, al_ajustes=None, al_online=None, **opciones):
+    def __init__(self, al_comenzar, al_salir=None, al_ajustes=None, al_online=None, al_local=None, **opciones):
         super().__init__(**opciones)
         self._al_comenzar = al_comenzar
         self._salir_del_juego = al_salir
+        # Submenú «Multijugador» (ALCALDE_MENU_MULTIJUGADOR): `al_local(n)` lleva a elegir rol con n jugadores por
+        # turnos; «En línea» queda dentro y solo si main.py pasa `al_online`.
+        self._al_online = al_online
+        self._al_local = al_local
+        self._nivel = mic.PRINCIPAL
+        self.con_multijugador = mic.multijugador_activo() and (al_local is not None or al_online is not None)
         self.confirmacion = mic.Confirmacion()
         self.fondo = FondoMenu(parent=self)
         self.wordmark = crear_wordmark(self, position=(0, self.Y_TITULO))
@@ -64,9 +70,10 @@ class EscenaInicio(Escena):
         # Con «En línea» hay un botón más: se compacta la columna (alto y paso menores) para que Salir quepa. Con
         # «Modo feria» y «En línea» a la vez, más compacta aún.
         con_feria = modo_feria.menu_activo()
-        alto_b = self.ALTO_BOTON if al_online is None and not con_feria else a_unidades(50)
-        paso = a_unidades(80) if al_online is None and not con_feria else a_unidades(62)
-        if con_feria and al_online is not None:
+        con_online = al_online is not None or self.con_multijugador
+        alto_b = self.ALTO_BOTON if not con_online and not con_feria else a_unidades(50)
+        paso = a_unidades(80) if not con_online and not con_feria else a_unidades(62)
+        if con_feria and con_online:
             alto_b, paso = a_unidades(44), a_unidades(54)
         self.boton_comenzar = BotonPrimario(
             "Empezar", al_clic=self._clic_comenzar, ancho=self.ANCHO_BOTON, alto=alto_b,
@@ -91,10 +98,13 @@ class EscenaInicio(Escena):
             )
             y_salir = y_salir - paso
         # Botón «En línea» (opcional: solo si main.py pasa `al_online`, es decir con ONLINE=True): va tras Empezar.
+        # Con el submenú, este mismo botón se llama «Multijugador», sale siempre y abre el submenú.
         self.boton_online = None
-        if al_online is not None:
+        if al_online is not None or self.con_multijugador:
+            texto, al_clic = ("En línea", al_online) if not self.con_multijugador else (
+                mic.TEXTO_MULTIJUGADOR, lambda: self._ir_a_nivel(mic.MULTIJUGADOR))
             self.boton_online = BotonSecundario(
-                "En línea", al_clic=al_online, ancho=self.ANCHO_BOTON, alto=alto_b,
+                texto, al_clic=al_clic, ancho=self.ANCHO_BOTON, alto=alto_b,
                 tamano_fuente_px=24, parent=self, position=(0, y_salir),
             )
             y_salir = y_salir - paso
@@ -122,6 +132,7 @@ class EscenaInicio(Escena):
         self._al_continuar = None
         self._resumen_guardado = None
         self._crear_confirmacion(alto_b)
+        self._crear_submenus(alto_b, paso)
         self.botw = None
         if mbc.activo():
             from frontend import menu_botw
@@ -157,7 +168,80 @@ class EscenaInicio(Escena):
                                            escala_min=0.8, max_lineas=1)
         self.boton_comenzar.x = self.X_PAREJA if hay else 0
         self.boton_comenzar.text = "Partida nueva" if hay else "Empezar"
-        self.botones = ((self.boton_continuar,) + self._botones_base) if hay else self._botones_base
+        # Dentro de un submenú la lista de controles es la suya: el menú principal se recompone al volver.
+        if self._nivel == mic.PRINCIPAL:
+            self.botones = ((self.boton_continuar,) + self._botones_base) if hay else self._botones_base
+        self._aplicar_nivel()
+
+    # -- Submenú «Multijugador» (ALCALDE_MENU_MULTIJUGADOR, docs/MENU_MULTIJUGADOR.md) --
+
+    # Un botón por opción de cada submenú (menu_inicio_calculos.opciones_de). En el menú de siempre se ven en una placa
+    # sobre un velo, como la confirmación; con la piel BOTW (frontend/menu_botw.py) se dibujan como sus opciones.
+    def _crear_submenus(self, alto_b, paso):
+        self._submenus = {}
+        self.botones_submenu = ()
+        if not self.con_multijugador:
+            return
+        self.velo_sub = Entity(parent=self, model="quad", scale=(4, 2), color=color.rgba(0, 0, 0, 0.55), z=-0.2,
+                               collider="box", enabled=False)
+        filas = max(len(mic.opciones_de(n, self._al_online is not None)) for n in (mic.MULTIJUGADOR, mic.LOCAL))
+        alto_placa = a_unidades(90) + filas * paso
+        y_titulo = alto_placa / 2 - a_unidades(40)
+        self.placa_sub = panel_tinta(self, self.ANCHO_BOTON + a_unidades(80), alto_placa, estilo.COLOR_PANEL,
+                                     position=(0, 0, -0.21), enabled=False)
+        self.texto_sub = Text("", parent=self.placa_sub, origin=(0, 0), position=(0, y_titulo, -0.01),
+                              scale=escala_fuente(26), color=rgb(estilo.COLOR_TEXTO))
+        acciones = {mic.LOCAL_TURNOS: lambda: self._ir_a_nivel(mic.LOCAL), mic.EN_LINEA: self._al_online,
+                    mic.ATRAS: self._volver_nivel}
+        for n in mic.CANTIDADES_LOCALES:
+            acciones[mic.id_cantidad(n)] = lambda n=n: self._clic_local(n)
+        for nivel in (mic.MULTIJUGADOR, mic.LOCAL):
+            botones = []
+            for i, (id_opcion, texto) in enumerate(mic.opciones_de(nivel, self._al_online is not None)):
+                clase = BotonSecundario if id_opcion == mic.ATRAS else BotonPrimario
+                botones.append(clase(texto, al_clic=acciones[id_opcion], ancho=self.ANCHO_BOTON, alto=alto_b,
+                                     tamano_fuente_px=24, parent=self, enabled=False,
+                                     position=(0, y_titulo - a_unidades(60) - i * paso, -0.22)))
+            self._submenus[nivel] = tuple(botones)
+        self.botones_submenu = self._submenus[mic.MULTIJUGADOR] + self._submenus[mic.LOCAL]
+
+    def _ir_a_nivel(self, nivel):
+        self._nivel = nivel
+        if nivel == mic.PRINCIPAL:
+            self._refrescar_continuar()
+        else:
+            self.botones = self._submenus[nivel]
+            self._aplicar_nivel()
+        self.foco.reiniciar()
+
+    def _volver_nivel(self):
+        self._ir_a_nivel(mic.nivel_anterior(self._nivel))
+
+    # Muestra los botones del nivel actual. La placa solo se ve en el menú de siempre: con la piel BOTW los botones
+    # cuelgan de su contenedor oculto y las opciones dibujadas siguen a `self.botones`.
+    def _aplicar_nivel(self):
+        if not self._submenus:
+            return
+        clasico = self.boton_salir.parent is self
+        actuales = self._submenus.get(self._nivel, ())
+        for boton in self.botones_submenu:
+            boton.enabled = boton in actuales
+        self.velo_sub.enabled = self.placa_sub.enabled = bool(actuales) and clasico
+        self.texto_sub.text = mic.TITULOS.get(self._nivel, "")
+
+    # «2 / 3 / 4 jugadores»: partida nueva por turnos (pisa el guardado: pide confirmación como «Partida nueva»).
+    def _clic_local(self, n):
+        if self._al_local is None:
+            return
+        empezar = lambda: self._empezar_local(n)     # noqa: E731
+        if mic.necesita_confirmar_nueva(self.boton_continuar.enabled):
+            self._pedir(mic.NUEVA, empezar)
+        else:
+            empezar()
+
+    def _empezar_local(self, n):
+        modo_feria.encender(False)
+        self._al_local(n)
 
     # -- Confirmaciones (EST-011 «Salir», BUG-005 «Partida nueva» con guardado): foco en «No», Esc/B = No --
 
@@ -234,6 +318,8 @@ class EscenaInicio(Escena):
     def input(self, key):
         if self.confirmacion.tecla(key):
             self._cerrar_confirmacion()
+        elif key in mic.TECLAS_NO and self._nivel != mic.PRINCIPAL:
+            self._volver_nivel()
 
     def update(self):
         if self.confirmacion.abierta:
@@ -246,6 +332,7 @@ class EscenaInicio(Escena):
 
     def al_entrar(self, **datos):
         self._cerrar_confirmacion()
+        self._nivel = mic.PRINCIPAL
         self._refrescar_continuar()
         self.foco.reiniciar()
         self.fondo.t = 0.0

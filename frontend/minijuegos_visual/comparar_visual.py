@@ -10,6 +10,8 @@
 # Se conservan las tarjetas de la vista base (lógica, foco, clic y etiquetas); solo se recolocan sobre las hojas y se
 # esconde su fondo. No cambia la partida ni el resultado. APAGADO: ALCALDE_COMPARAR_VISUAL=0. GUARDIÁN: un fallo deshace
 # lo añadido y deja la vista de siempre.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Mesh, Text, color, destroy
 
@@ -143,7 +145,7 @@ def _aro(parent, pos, rx, ry):
 def _txt_num(parent, cadena, pos):
     """Número del selector central (14 px, tinta)."""
     return Text(cadena, parent=parent, origin=(0, 0), position=(pos[0], pos[1], -0.004), scale=escala_fuente(14),
-                font=tipografia.FUENTE_TITULO, color=_rgba(TINTA))
+                font=tipografia.fuente_piel(titulo=True), color=_rgba(TINTA))
 
 
 def _trazo(parent, puntos):

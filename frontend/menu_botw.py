@@ -315,8 +315,10 @@ class MenuBotw(Entity):
     def _botones_posibles(self):
         e = self.escena
         # «Modo feria» (hilo conductor, docs/MODO_FERIA.md) va tras «Partida nueva»; sin él (bandera), como siempre.
+        # Los del submenú «Multijugador» (docs/MENU_MULTIJUGADOR.md) también son opciones: se ven cuando la escena los
+        # pone en `botones`.
         return [b for b in (e.boton_continuar, e.boton_comenzar, getattr(e, "boton_feria", None), e.boton_online,
-                            e.boton_ajustes, e.boton_salir) if b is not None]
+                            e.boton_ajustes, e.boton_salir, *getattr(e, "botones_submenu", ())) if b is not None]
 
     def montar(self):
         e = self.escena

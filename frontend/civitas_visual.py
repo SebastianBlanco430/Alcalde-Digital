@@ -10,6 +10,8 @@
 # registro_habitos.py. El reloj de la vista lo da ControlHabitos.avanzar() (vista.chip() cada frame).
 # APAGADO: ALCALDE_CIVITAS_VISUAL=0. REDUCIR MOVIMIENTO: el feed no se desliza; trazos y monedas sin animación.
 # GUARDIÁN: un fallo avisa una vez por stderr, esconde lo añadido, devuelve el panel a su sitio y la bandeja sigue igual.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import datetime
 
@@ -19,7 +21,8 @@ from frontend import banderas_visuales as bv
 from frontend import civitas_visual_calculos as calc
 from frontend import diseno_adaptable, estilo, tipografia
 from frontend import rectificar_visual_calculos as rcalc
-from frontend.componentes import escala_fuente, panel_tinta, rgb
+from frontend.componentes import escala_fuente, rgb
+from frontend.componentes import panel_piel
 
 CIVITAS_VISUAL = True
 VARIABLE = "ALCALDE_CIVITAS_VISUAL"
@@ -56,8 +59,8 @@ class TelefonoCivitas(Entity):
         from frontend.telefono_marco import MarcoTelefono
         self.z = -0.075
         self.marco = MarcoTelefono(ANCHO_TEL, ALTO_TEL, (0, 0), parent=self)
-        self.pantalla = panel_tinta(self, ANCHO_TEL, ALTO_TEL, tono=(26, 29, 40), radio_px=12, sombra=False, borde_px=0,
-                                    position=(0, 0, 0.004))
+        self.pantalla = panel_piel(self, ANCHO_TEL, ALTO_TEL, tono=(26, 29, 40), radio_px=12, sombra=False, borde_px=0,
+                                   position=(0, 0, 0.004))
         self.modo = None
         self._construir_notificacion()
         self._construir_foto()
@@ -69,16 +72,16 @@ class TelefonoCivitas(Entity):
     def _construir_notificacion(self):
         self.notificacion = Entity(parent=self, enabled=False)
         self.reloj = Text("", parent=self.notificacion, origin=(0, 0), position=(0, 0.25, -0.01), scale=escala_fuente(46),
-                          font=tipografia.FUENTE_TITULO, color=_rgba(estilo.COLOR_TEXTO))
+                          font=tipografia.fuente_piel(titulo=True), color=_rgba(estilo.COLOR_TEXTO))
         self.fecha = Text("", parent=self.notificacion, origin=(0, 0), position=(0, 0.19, -0.01), scale=escala_fuente(13),
                           color=_rgba(estilo.COLOR_TEXTO_TENUE))
-        tarjeta = panel_tinta(self.notificacion, ANCHO_TEL - 0.04, 0.3, tono=(236, 238, 244), radio_px=10, sombra=False,
-                              borde_px=0, position=(0, -0.02, -0.005))
+        tarjeta = panel_piel(self.notificacion, ANCHO_TEL - 0.04, 0.3, tono=(236, 238, 244), radio_px=10, sombra=False,
+                             borde_px=0, position=(0, -0.02, -0.005))
         x0 = -ANCHO_TEL / 2 + 0.035
         self.app = Text("CIVITAS · Mensaje · ahora", parent=self.notificacion, origin=(-0.5, 0.5), position=(x0, 0.115, -0.01),
-                        scale=escala_fuente(11), font=tipografia.FUENTE_TITULO, color=_rgba((90, 90, 110)))
+                        scale=escala_fuente(11), font=tipografia.fuente_piel(titulo=True), color=_rgba((90, 90, 110)))
         self.remitente = Text("", parent=self.notificacion, origin=(-0.5, 0.5), position=(x0, 0.09, -0.01),
-                              scale=escala_fuente(12), font=tipografia.FUENTE_TITULO, color=_rgba((25, 25, 35)))
+                              scale=escala_fuente(12), font=tipografia.fuente_piel(titulo=True), color=_rgba((25, 25, 35)))
         self.mensaje = Text("", parent=self.notificacion, origin=(-0.5, 0.5), position=(x0, 0.055, -0.01),
                             scale=escala_fuente(12), color=_rgba((30, 30, 40)))
         self.tarjeta_notif = tarjeta
@@ -96,7 +99,7 @@ class TelefonoCivitas(Entity):
     def _construir_foto(self):
         self.foto = Entity(parent=self, enabled=False)
         Text("Tu foto para Civitas", parent=self.foto, origin=(0, 0), position=(0, 0.3, -0.01), scale=escala_fuente(14),
-             font=tipografia.FUENTE_TITULO, color=_rgba(estilo.COLOR_ACENTO))
+             font=tipografia.fuente_piel(titulo=True), color=_rgba(estilo.COLOR_ACENTO))
         lienzo = Entity(parent=self.foto, position=(0, 0.08, -0.004))
         Entity(parent=lienzo, model="quad", scale=(0.34, 0.34), color=_rgba((130, 196, 236)))
         Entity(parent=lienzo, model="quad", scale=(0.34, 0.11), y=-0.115, z=-0.001, color=_rgba((110, 168, 110)))
@@ -107,12 +110,12 @@ class TelefonoCivitas(Entity):
         self.zonas = []
         for _ in range(len(calc.ZONAS_FOTO)):
             zona = Entity(parent=lienzo, z=-0.01, enabled=False)
-            zona.fondo = panel_tinta(zona, 0.15, 0.045, tono=(30, 30, 40), radio_px=6, sombra=False, borde_px=0)
+            zona.fondo = panel_piel(zona, 0.15, 0.045, tono=(30, 30, 40), radio_px=6, sombra=False, borde_px=0)
             zona.texto = Text("", parent=zona, origin=(0, 0), z=-0.002, scale=escala_fuente(9), color=_rgba((250, 250, 250)))
             zona.pegatina = Entity(parent=zona, z=-0.004, enabled=False)
             Entity(parent=zona.pegatina, model="quad", scale=(0.165, 0.058), rotation_z=-4, color=_rgba(AMARILLO_PEGATINA))
             Text("TAPADO", parent=zona.pegatina, origin=(0, 0), z=-0.001, scale=escala_fuente(9),
-                 font=tipografia.FUENTE_TITULO, color=_rgba((40, 30, 10)))
+                 font=tipografia.fuente_piel(titulo=True), color=_rgba((40, 30, 10)))
             self.zonas.append(zona)
         self.lupa = Entity(parent=lienzo, z=-0.02, enabled=False)
         Entity(parent=self.lupa, model="circle", scale=0.11, color=_rgba((70, 50, 30)))
@@ -142,7 +145,7 @@ class TelefonoCivitas(Entity):
         self.feed_tarjetas = []
         for i in range(3):
             t = Entity(parent=self.feed, z=-0.004)
-            panel_tinta(t, ANCHO_TEL - 0.04, 0.2, tono=(40, 44, 58), radio_px=8, sombra=False, borde_px=0)
+            panel_piel(t, ANCHO_TEL - 0.04, 0.2, tono=(40, 44, 58), radio_px=8, sombra=False, borde_px=0)
             t.texto = Text("", parent=t, origin=(-0.5, 0.5), position=(-ANCHO_TEL / 2 + 0.04, 0.08, -0.01),
                            scale=escala_fuente(12), color=_rgba(estilo.COLOR_TEXTO))
             self.feed_tarjetas.append(t)
@@ -301,7 +304,7 @@ class VistaCivitas:
             moneda.update = self._cancelar_fuera_del_mundo          # BUG-002 (ver abajo)
             Entity(parent=moneda, model="circle", scale=0.04, color=_rgba((150, 110, 20)))
             Entity(parent=moneda, model="circle", scale=0.033, color=_rgba(DORADO), z=-0.001)
-            Text("R$", parent=moneda, origin=(0, 0), z=-0.002, scale=escala_fuente(9), font=tipografia.FUENTE_TITULO,
+            Text("R$", parent=moneda, origin=(0, 0), z=-0.002, scale=escala_fuente(9), font=tipografia.fuente_piel(titulo=True),
                  color=_rgba((90, 60, 10)))
             self._monedas.append(moneda)
         self._n_monedas = n
@@ -374,7 +377,7 @@ class VistaCivitas:
             from frontend import iconos
             self.robada = Entity(parent=camera.ui, z=-0.4)
             self.robada.update = self._cancelar_fuera_del_mundo
-            panel_tinta(self.robada, 0.6, 0.32, tono=(60, 30, 36), radio_px=10)
+            panel_piel(self.robada, 0.6, 0.32, tono=(60, 30, 36), radio_px=10)
             yo = Entity(parent=self.robada, model="quad", scale=0.1, position=(-0.2, -0.03, -0.01))
             try:
                 rol = self._escena.flujo.jugador_activo().rol

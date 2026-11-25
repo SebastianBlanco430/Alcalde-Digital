@@ -13,6 +13,8 @@
 # APAGADO: ALCALDE_EFECTOS_UI=0 (o EFECTOS_UI = False). Lo consulta quien crea la capa (frontend/minijuegos_visual).
 # REDUCIR MOVIMIENTO (Ajustes › Movimiento o ALCALDE_REDUCIR_MOVIMIENTO=1): sin rebotes, temblores, destellos ni partículas.
 # GUARDIÁN: si sincronizar() falla, avisa una vez por stderr, devuelve las tarjetas a su tamaño y sitio y se apaga.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Mesh, Text, color
 
@@ -78,7 +80,7 @@ class EfectosUI(Entity):
         self._particulas = [self._nuevo_item(Entity(parent=self, model="quad", scale=0.011, enabled=False))
                             for _ in range(N_PARTICULAS)]
         self._destellos = [self._nuevo_item(Entity(parent=self, model="quad", enabled=False)) for _ in range(N_DESTELLOS)]
-        self.rotulo_racha = Text("", parent=self, origin=(0, 0), scale=escala_fuente(30), font=tipografia.FUENTE_TITULO,
+        self.rotulo_racha = Text("", parent=self, origin=(0, 0), scale=escala_fuente(30), font=tipografia.fuente_piel(titulo=True),
                                  color=_rgba(DORADO, 1), position=(0.845, 0.335, -0.01), enabled=False)
         self._t_racha = None
         self.sello_e = None
@@ -294,7 +296,7 @@ class EfectosUI(Entity):
             self._sello_fondo = Entity(parent=self.sello_e, model=modelo_redondeado(0.32, 0.074, 8), scale=(0.32, 0.074),
                                        z=-0.001)
             self._sello_txt = Text("", parent=self.sello_e, origin=(0, 0), scale=escala_fuente(34), z=-0.002,
-                                   font=tipografia.FUENTE_TITULO)
+                                   font=tipografia.fuente_piel(titulo=True))
         self.sello_e.position = (posicion[0], posicion[1], -0.05)
         self.sello_e.rotation_z = -9
         self._sello_txt.text = texto
@@ -355,7 +357,7 @@ class EfectosUI(Entity):
         if self.roto:
             return
         if self.medalla_e is None:
-            self.medalla_e = Text("", parent=self, origin=(0.5, 0), scale=escala_fuente(17), font=tipografia.FUENTE_TITULO,
+            self.medalla_e = Text("", parent=self, origin=(0.5, 0), scale=escala_fuente(17), font=tipografia.fuente_piel(titulo=True),
                                   color=_rgba(DORADO, 1))
         self.medalla_e.text = texto
         self.medalla_e.position = (posicion[0], posicion[1], -0.04)

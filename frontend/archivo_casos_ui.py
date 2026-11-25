@@ -7,12 +7,15 @@
 # El texto SIEMPRE acompaña al color (la categoría va escrita; los deltas llevan signo). Se diseña a 16:9 (x en
 # [-0.89, 0.89]) y se encoge si la ventana es más estrecha (diseno_adaptable.ajustar_escala).
 # `ControlArchivoCasos` es el Entity que oye las teclas (J abre/cierra; el resto solo con el panel abierto).
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Text, camera, color
 
 from backend.logica import archivo_casos as logica
 from frontend import diseno_adaptable, estilo, tipografia
-from frontend.componentes import BotonSecundario, escala_fuente, panel_tinta, rgb
+from frontend.componentes import escala_fuente, rgb
+from frontend.componentes import boton_piel_secundario, panel_piel
 
 FILAS = 8
 ALTO_FILA = 0.083
@@ -32,7 +35,7 @@ TECLAS_FILTRO = {"caso": "C", "tipo": "T", "actor": "F"}
 
 
 def _texto(padre, cadena="", px=15, origen=(0, 0), pos=(0, 0), tono=estilo.COLOR_TEXTO, negrita=False, z=-0.02):
-    extra = {"font": tipografia.FUENTE_TITULO} if negrita else {}
+    extra = {"font": tipografia.fuente_piel(titulo=True)} if negrita else {}
     return Text(cadena, parent=padre, origin=origen, position=(pos[0], pos[1], z), scale=escala_fuente(px),
                 color=rgb(tono), **extra)
 
@@ -58,13 +61,13 @@ class ArchivoCasosUI(Entity):
     # -- Construcción --
 
     def _construir_izquierda(self):
-        self.panel = panel_tinta(self, ANCHO_IZQ, ALTO_PANEL, tono=estilo.COLOR_FONDO, position=(CENTRO_IZQ, 0, 0))
+        self.panel = panel_piel(self, ANCHO_IZQ, ALTO_PANEL, tono=estilo.COLOR_FONDO, position=(CENTRO_IZQ, 0, 0))
         self.titulo = _texto(self, self.textos["titulo"], 22, origen=(-0.5, 0), pos=(X_FILAS, 0.425), negrita=True,
                              tono=estilo.COLOR_ACENTO)
         self._filtros = {}
         for i, cual in enumerate(("caso", "tipo", "actor")):
             x = -0.675 + i * 0.4
-            boton = BotonSecundario("", al_clic=None, ancho=0.385, alto=0.05, parent=self)
+            boton = boton_piel_secundario("", al_clic=None, ancho=0.385, alto=0.05, parent=self)
             boton.position = (x, 0.365, 0)
             etiqueta = _texto(self, "", 14, origen=(-0.5, 0), pos=(x - 0.18, 0.365), tono=estilo.COLOR_BOTON_TEXTO)
             self._filtros[cual] = (boton, etiqueta)
@@ -90,7 +93,7 @@ class ArchivoCasosUI(Entity):
         self.vacio = _texto(self, self.textos["vacio"], 16, pos=(CENTRO_IZQ, 0.0), tono=estilo.COLOR_TEXTO_TENUE)
 
     def _construir_derecha(self):
-        self.panel_der = panel_tinta(self, ANCHO_DER, ALTO_PANEL, tono=estilo.COLOR_PANEL, position=(CENTRO_DER, 0, 0))
+        self.panel_der = panel_piel(self, ANCHO_DER, ALTO_PANEL, tono=estilo.COLOR_PANEL, position=(CENTRO_DER, 0, 0))
         x = CENTRO_DER - ANCHO_DER / 2 + 0.02
         secciones = self.textos["secciones"]
         self._laterales = {}

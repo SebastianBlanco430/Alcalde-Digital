@@ -6,6 +6,8 @@
 # Se maneja con teclado (flechas, Tab, Enter/Espacio, Esc) y con ratón (clic y cursor encima).
 #
 # Sin números de indicadores a la vista: aquí solo se pintan palabras, barras sin cifra y marcas.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import re
 
@@ -31,7 +33,7 @@ _medidores = {}
 
 def _medidor(negrita=False):
     if negrita not in _medidores:
-        fuente = tipografia.FUENTE_TITULO if negrita else tipografia.FUENTE_TEXTO
+        fuente = tipografia.fuente_piel(titulo=True) if negrita else tipografia.FUENTE_TEXTO
         _medidores[negrita] = Text("", enabled=False, font=fuente)
     return _medidores[negrita]
 
@@ -70,7 +72,7 @@ def texto(parent, cadena, px=18, ancho=None, tono=None, posicion=(0, 0), origen=
     lineas = lineas_de(cadena, px, ancho, negrita, maximo) if ancho else cadena.split("\n")
     entidad = Text("\n".join(lineas), parent=parent, origin=(0, 0.5) if centrado else origen,
                    position=(posicion[0], posicion[1], Z_TEXTO), scale=escala_fuente(px),
-                   color=rgb(tono or estilo.COLOR_TEXTO), font=tipografia.FUENTE_TITULO if negrita else tipografia.FUENTE_TEXTO)
+                   color=rgb(tono or estilo.COLOR_TEXTO), font=tipografia.fuente_piel(titulo=True) if negrita else tipografia.FUENTE_TEXTO)
     entidad.line_height = LINEA
     entidad.n_lineas = len(lineas)
     entidad.alto = alto_de(len(lineas), px)
@@ -202,7 +204,7 @@ class Boton(Entity):
         self.fondo = rect(self, ancho, alto, estilo.COLOR_ACENTO if primario else estilo.COLOR_BOTON, z=0.003, radio_px=8)
         self.texto = Text(etiqueta, parent=self, origin=(0, 0), position=(0, 0, Z_TEXTO), scale=escala_fuente(px),
                           color=rgb(estilo.COLOR_ACENTO_TEXTO if primario else estilo.COLOR_BOTON_TEXTO),
-                          font=tipografia.FUENTE_TITULO)
+                          font=tipografia.fuente_piel(titulo=True))
         self.golpe = Entity(parent=self, model="quad", scale=(ancho, alto), collider="box", color=color.rgba(0, 0, 0, 0), z=-0.03)
         self.golpe.on_click = self._clic
         self.golpe.on_mouse_enter = self._entra

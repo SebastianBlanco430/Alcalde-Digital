@@ -11,6 +11,8 @@
 # Sin pantalla activa (tests, scripts que no llaman a iniciar, bandera apagada) `avance` no hace nada.
 # Cálculo del progreso, pesos y recalibrado: frontend/pantalla_carga_calculos.py.
 # BANDERA: ALCALDE_PANTALLA_CARGA=0 -> no se crea nada ni se dibuja ningún cuadro extra (el arranque de antes).
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW, =0 o Ajustes › Estilo la apagan): fondo violeta, título en cursiva y barra
+# amarilla del menú de inicio.
 
 import os
 import sys
@@ -91,8 +93,9 @@ class PantallaCarga:
 
     def __init__(self, progreso):
         from ursina import Entity, Text, camera
-        from frontend import estilo, tipografia
+        from frontend import estilo, tipografia, ui_botw_calculos
         from frontend.componentes import escala_fuente, rgb
+        tono = ui_botw_calculos.tono
 
         self.progreso = progreso
         self._limitador = calc.Limitador()
@@ -102,10 +105,10 @@ class PantallaCarga:
         self.segundos_dibujando = 0.0
         # Delante de cualquier otra UI que se cree mientras tanto (z menor = más cerca en camera.ui).
         self.raiz = Entity(parent=camera.ui, z=-0.9, add_to_scene_entities=False)
-        Entity(parent=self.raiz, model="quad", scale=(8, 2), z=0.02, color=rgb(estilo.COLOR_FONDO),
+        Entity(parent=self.raiz, model="quad", scale=(8, 2), z=0.02, color=rgb(tono(estilo.COLOR_FONDO)),
                add_to_scene_entities=False)
         try:
-            self.titulo = Text("Alcalde Digital", font=tipografia.FUENTE_TITULO, parent=self.raiz, origin=(0, 0),
+            self.titulo = Text("Alcalde Digital", font=tipografia.fuente_piel(titulo=True), parent=self.raiz, origin=(0, 0),
                                y=0.09, scale=escala_fuente(54), color=rgb(estilo.COLOR_TEXTO),
                                add_to_scene_entities=False)
         except Exception:           # noqa: BLE001  sin la fuente de títulos, la de texto
@@ -113,9 +116,9 @@ class PantallaCarga:
                                color=rgb(estilo.COLOR_TEXTO), add_to_scene_entities=False)
         y_barra = -0.03
         Entity(parent=self.raiz, model="quad", scale=(self.ANCHO_BARRA, self.ALTO_BARRA), y=y_barra, z=0.01,
-               color=rgb(estilo.COLOR_BARRA_FONDO), add_to_scene_entities=False)
+               color=rgb(tono(estilo.COLOR_BARRA_FONDO)), add_to_scene_entities=False)
         self.relleno = Entity(parent=self.raiz, model="quad", origin=(-0.5, 0), x=-self.ANCHO_BARRA / 2, y=y_barra,
-                              scale=(0.001, self.ALTO_BARRA), color=rgb(estilo.COLOR_ACENTO),
+                              scale=(0.001, self.ALTO_BARRA), color=rgb(tono(estilo.COLOR_ACENTO)),
                               add_to_scene_entities=False)
         self.estado = Text(progreso.texto, parent=self.raiz, origin=(-0.5, 0), x=-self.ANCHO_BARRA / 2,
                            y=y_barra - 0.045, z=-0.01, scale=escala_fuente(20), color=rgb(estilo.COLOR_TEXTO_TENUE),

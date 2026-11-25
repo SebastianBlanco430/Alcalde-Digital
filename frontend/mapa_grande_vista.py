@@ -24,12 +24,20 @@ from backend.datos.nombres_visibles import nombre_visible
 from backend.logica import ajustes as modelo_ajustes
 from frontend import (
     diseno_adaptable, estilo, hud_calculos, mapa_grande_calculos as calc, minimapa_calculos as mm, tipografia)
+from frontend import ui_botw_calculos
 from frontend.componentes import a_unidades, destruir_arbol, escala_fuente, rgb
 from frontend.hud import COLOR_DESTINO, COLOR_RUTA, Minimapa, _fondo, _medidor, _seguro
 
 COLOR_CALLE = (196, 200, 214)
 COLOR_CALLE_BORDE = estilo.TINTA
 COLOR_CHIP = color.rgba32(12, 14, 24, 205)
+# Piel BOTW (docs/ESTILO_BOTW.md, ALCALDE_UI_BOTW): fondo y chips de los nombres en el velo violeta del menú.
+COLOR_CHIP_BOTW = color.rgba32(*estilo.BOTW_VELO, 205)
+COLOR_FONDO_BOTW = color.rgba32(*estilo.BOTW_FONDO, 255)
+
+
+def _color_chip():
+    return COLOR_CHIP_BOTW if ui_botw_calculos.activo() else COLOR_CHIP
 PX_ETIQUETA = 14
 FLECHA = [(0, 0.5, 0), (-0.42, -0.5, 0), (0, -0.22, 0), (0.42, -0.5, 0)]      # punta arriba, centrada en el origen
 
@@ -172,7 +180,8 @@ class MapaGrandeVista(Entity):
         escala = encaje[0]
         mapa = self._mapa
 
-        _fondo(raiz, aspecto - 0.04, 0.96, color.rgba32(12, 14, 24, 255), 14, z=0.01)
+        fondo = COLOR_FONDO_BOTW if ui_botw_calculos.activo() else color.rgba32(12, 14, 24, 255)
+        _fondo(raiz, aspecto - 0.04, 0.96, fondo, 14, z=0.01)
         con_foto = self._poner_foto(mapa_raiz, encaje)
         if not con_foto:
             xs, zs, colores, triangulos = self._tabla_terreno()
@@ -226,10 +235,10 @@ class MapaGrandeVista(Entity):
             # Sobre la foto cada nombre lleva SU fondo (hijo del texto): acompaña al zoom y al giro, que ocultan los chips del mapa.
             fuente = escala_fuente(PX_ETIQUETA)
             for lugar, (w, h) in zip(lugares, tamanos):
-                Entity(parent=textos[lugar], model="quad", color=COLOR_CHIP, scale=(w / fuente, h / fuente), z=0.0005 / fuente)
+                Entity(parent=textos[lugar], model="quad", color=_color_chip(), scale=(w / fuente, h / fuente), z=0.0005 / fuente)
             self._chips_ent = None
         else:
-            self._chips_ent = Entity(parent=mapa_raiz, z=-0.005, color=COLOR_CHIP, model=Minimapa._malla_de_cuadrilateros(chips))
+            self._chips_ent = Entity(parent=mapa_raiz, z=-0.005, color=_color_chip(), model=Minimapa._malla_de_cuadrilateros(chips))
         self.etiquetas = textos
 
         # encabezado y leyenda

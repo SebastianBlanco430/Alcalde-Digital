@@ -20,6 +20,8 @@
 #
 # Lo que no depende de Ursina (VistaTelefono, la capa de teclas y cómo se arma cada pantalla) se prueba sin ventana con
 # una «ui» falsa (tests/test_telefono_grande.py). La ui de verdad la crea _crear_ui().
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import sys
 import time
@@ -603,7 +605,8 @@ def _instalar_carrusel(escena):
         from ursina import Entity
 
         from frontend import menu_pausa
-        from frontend.componentes import BotonSecundario, a_unidades
+        from frontend.componentes import a_unidades
+        from frontend.componentes import boton_piel_secundario
         from frontend.tarjeta_aviso import TarjetaAviso
 
         estado = Carrusel(orden_carrusel(at.cargar_explicaciones()))
@@ -645,8 +648,8 @@ def _instalar_carrusel(escena):
         escena.registrar_bloqueador(tarjeta.abierta, tarjeta.ocultar)
         posicion = (escena.menu_pausa.posicion_extra(1) if hasattr(escena.menu_pausa, "posicion_extra")  # VIS-005
                     else (menu_pausa.ANCHO / 2 + 0.04 + 0.15, 0.12, -0.001))
-        boton = BotonSecundario("Avisos de Civitas", al_clic=abrir, ancho=0.30, alto=a_unidades(50),
-                                tamano_fuente_px=20, parent=escena.menu_pausa, position=posicion)
+        boton = boton_piel_secundario("Avisos de Civitas", al_clic=abrir, ancho=0.30, alto=a_unidades(50),
+                                      tamano_fuente_px=20, parent=escena.menu_pausa, position=posicion)
         return {"tarjeta": tarjeta, "boton": boton, "teclas": teclas, "estado": estado, "abrir": abrir}
     except Exception as error:
         _aviso(f"botón «Avisos de Civitas» no instalado ({type(error).__name__}: {error})")

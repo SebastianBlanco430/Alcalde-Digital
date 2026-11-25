@@ -9,6 +9,8 @@
 #   - al llegar al origen, la última nota de la cadena se ilumina con un sello «FUENTE».
 # No cambia la partida ni el resultado (hereda y llama a super(); la capa común va delante en el MRO).
 # APAGADO: ALCALDE_RASTREAR_VISUAL=0. GUARDIÁN: un fallo al montar esconde el tablero y vuelve a la vista de siempre.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import random
 
@@ -68,7 +70,7 @@ def _rgba(tono, alfa=1.0):
 
 def _txt(parent, cadena, px, tono=TINTA, pos=(0, 0), origen=(0, 0), negrita=True, z=-0.004):
     return Text(str(cadena), parent=parent, origin=origen, position=(pos[0], pos[1], z), scale=escala_fuente(px),
-                font=tipografia.FUENTE_TITULO if negrita else tipografia.FUENTE_TEXTO, color=_rgba(tono))
+                font=tipografia.fuente_piel(titulo=True) if negrita else tipografia.FUENTE_TEXTO, color=_rgba(tono))
 
 
 # -- Piezas de papel (de piezas_papel si está; si no, mínimas locales) --

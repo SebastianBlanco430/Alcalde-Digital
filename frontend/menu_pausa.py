@@ -4,15 +4,18 @@
 # Visual (T9): velo de tinta, panel con borde de tinta (más un filo claro para que se vea sobre
 # el velo), botón primario («Reanudar») y secundarios, y una guía de teclas. Teclado: flechas o
 # Tab mueven el foco, Enter activa (Escape lo gestiona EscenaMundo).
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW, =0 o Ajustes › Estilo de interfaz «Clásico» la apagan): panel de velo
+# violeta con filo claro, botones del menú de inicio (amarillo con flecha en el foco) y títulos en cursiva.
 
 from panda3d.core import ClockObject
 from ursina import Entity, Text, camera, color, time
 
 from frontend import estilo, tipografia, vehiculo_calculos
-from frontend import menu_inicio_calculos as mic
+from frontend import menu_inicio_calculos as mic, ui_botw_calculos
 from frontend.componentes import (
-    BotonPrimario, BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb,
+    a_unidades, escala_fuente, panel_tinta, rgb,
 )
+from frontend.componentes import boton_piel, panel_piel, piel_botw
 from frontend.fondo_menu import FocoTeclado, anadir_filo
 
 ANCHO, ALTO = 1.22, 0.70        # VIS-005/006: más ancho para 3 columnas de teclas y la fila de ayuda (antes 0.74)
@@ -71,39 +74,43 @@ def _tecla(padre, texto, x, y, ancho):
 class MenuPausa(Entity):
 
     # con_ajustes: añade el botón «Ajustes» (por defecto, el de la bandera AJUSTES); False = menú de siempre.
-    def __init__(self, al_reanudar, al_menu, al_salir, con_ajustes=None, **opciones):
+    # `fabrica_ajustes(**opciones)` crea la pantalla de Ajustes; la pone la escena (una vista no importa escenas: contrato
+    # MVC, R3). Sin ella no hay botón «Ajustes».
+    def __init__(self, al_reanudar, al_menu, al_salir, con_ajustes=None, fabrica_ajustes=None, **opciones):
         opciones.setdefault("parent", camera.ui)
         super().__init__(z=Z_FRENTE, enabled=False, **opciones)
+        self._fabrica_ajustes = fabrica_ajustes
         if con_ajustes is None:
             from backend.logica.ajustes import AJUSTES
-            con_ajustes = AJUSTES
+            con_ajustes = AJUSTES and fabrica_ajustes is not None
         self.con_ajustes = bool(con_ajustes)
         alto, ys_botones, self._y_extra, y0 = _medidas(4 if self.con_ajustes else 3, len(TECLAS))
-        self.velo = Entity(parent=self, model="quad", color=color.rgba32(*estilo.TINTA, ALFA_VELO),
+        self.velo = Entity(parent=self, model="quad", color=color.rgba32(*ui_botw_calculos.tono(estilo.TINTA), ALFA_VELO),
                            scale=(4, 4), z=0.01)
-        self.panel = panel_tinta(self, ANCHO, alto, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
-        anadir_filo(self.panel, ANCHO, alto, estilo.RADIO_PANEL_PX)
+        self.panel = panel_piel(self, ANCHO, alto, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
+        if not piel_botw():          # el panel BOTW ya trae su filo claro
+            anadir_filo(self.panel, ANCHO, alto, estilo.RADIO_PANEL_PX)
         self.texto_titulo = Text(
             "Pausa", parent=self, origin=(0, 0), position=(0, alto / 2 - 0.075, -0.001),
-            scale=escala_fuente(40), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+            scale=escala_fuente(40), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
 
         # Posiciones de los botones: 3 de siempre, o 4 (con «Ajustes» tras «Reanudar»).
         ys = tuple(ys_botones) if self.con_ajustes else (ys_botones[0], ys_botones[1], None, ys_botones[2])
-        self.boton_reanudar = BotonPrimario(
-            "Reanudar", al_clic=al_reanudar, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=24,
+        self.boton_reanudar = boton_piel(
+            "Reanudar", "primario", al_clic=al_reanudar, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=24,
             parent=self, position=(0, ys[0], -0.001))
         self.boton_ajustes = None
         if self.con_ajustes:
-            self.boton_ajustes = BotonSecundario(
-                "Ajustes", al_clic=self.abrir_ajustes, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=22,
+            self.boton_ajustes = boton_piel(
+                "Ajustes", "secundario", al_clic=self.abrir_ajustes, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=22,
                 parent=self, position=(0, ys[1], -0.001))
-        self.boton_menu = BotonSecundario(
-            "Volver al menú", al_clic=al_menu, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=22,
+        self.boton_menu = boton_piel(
+            "Volver al menú", "secundario", al_clic=al_menu, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=22,
             parent=self, position=(0, ys[2] if self.con_ajustes else ys[1], -0.001))
         self._salir_del_juego = al_salir
         self.confirmacion = mic.Confirmacion()          # EST-011: «Salir» pregunta («No» con el foco; Esc = No)
-        self.boton_salir = BotonSecundario(
-            "Salir", al_clic=self._pedir_salir, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=22,
+        self.boton_salir = boton_piel(
+            "Salir", "secundario", al_clic=self._pedir_salir, ancho=ANCHO_BOTON, alto=ALTO_BOTON, tamano_fuente_px=22,
             parent=self, position=(0, ys[3], -0.001))
         self.botones = (self.boton_reanudar, self.boton_menu, self.boton_salir)
         if self.con_ajustes:
@@ -148,16 +155,17 @@ class MenuPausa(Entity):
     def _crear_confirmacion(self):
         self.velo_confirmar = Entity(parent=self, model="quad", color=color.rgba32(*estilo.TINTA, 150),
                                      scale=(4, 4), z=-0.02, collider="box", enabled=False)
-        self.dialogo = panel_tinta(self, 0.7, 0.26, estilo.COLOR_PANEL, position=(0, 0, -0.03), enabled=False)
-        anadir_filo(self.dialogo, 0.7, 0.26, estilo.RADIO_PANEL_PX)
+        self.dialogo = panel_piel(self, 0.7, 0.26, estilo.COLOR_PANEL, position=(0, 0, -0.03), enabled=False)
+        if not piel_botw():
+            anadir_filo(self.dialogo, 0.7, 0.26, estilo.RADIO_PANEL_PX)
         self.texto_dialogo = Text(mic.SALIR[0], parent=self.dialogo, origin=(0, 0), position=(0, 0.05, -0.01),
                                   scale=escala_fuente(24), color=rgb(estilo.COLOR_TEXTO))
-        self.boton_no = BotonPrimario(mic.TEXTO_NO, al_clic=lambda: self._responder(False), ancho=0.26,
-                                      alto=ALTO_BOTON, tamano_fuente_px=22, parent=self.dialogo,
-                                      position=(-0.15, -0.055, -0.01))
-        self.boton_si = BotonSecundario(mic.SALIR[1], al_clic=lambda: self._responder(True), ancho=0.26,
-                                        alto=ALTO_BOTON, tamano_fuente_px=22, parent=self.dialogo,
-                                        position=(0.15, -0.055, -0.01))
+        self.boton_no = boton_piel(mic.TEXTO_NO, "primario", al_clic=lambda: self._responder(False), ancho=0.26,
+                                   alto=ALTO_BOTON, tamano_fuente_px=22, parent=self.dialogo,
+                                   position=(-0.15, -0.055, -0.01))
+        self.boton_si = boton_piel(mic.SALIR[1], "secundario", al_clic=lambda: self._responder(True), ancho=0.26,
+                                   alto=ALTO_BOTON, tamano_fuente_px=22, parent=self.dialogo,
+                                   position=(0.15, -0.055, -0.01))
         self._botones_menu = None
 
     def _pedir_salir(self):
@@ -201,15 +209,16 @@ class MenuPausa(Entity):
 
     # «Ajustes»: superpone la pantalla de ajustes (se crea la primera vez) y esconde lo demás del menú.
     def abrir_ajustes(self):
-        from frontend.escenas.escena_ajustes import PantallaAjustes
         if self.pantalla_ajustes is None:
-            self.pantalla_ajustes = PantallaAjustes(al_cerrar=lambda guardado: self.cerrar_ajustes(), parent=self,
-                                                    z=-0.5)
+            if self._fabrica_ajustes is None:
+                return
+            self.pantalla_ajustes = self._fabrica_ajustes(al_cerrar=lambda guardado: self.cerrar_ajustes(), parent=self,
+                                                          z=-0.5)
         self._ocultos_por_ajustes = [e for e in self.children
                                      if e is not self.velo and e is not self.pantalla_ajustes and e.enabled]
         for entidad in self._ocultos_por_ajustes:
             entidad.enabled = False
-        self.velo.color = color.rgba32(*estilo.TINTA, ALFA_VELO_AJUSTES)
+        self.velo.color = color.rgba32(*ui_botw_calculos.tono(estilo.TINTA), ALFA_VELO_AJUSTES)
         self.pantalla_ajustes.abrir()
 
     # ¿Escape pertenece a «Ajustes»? True si está abierta o se cerró en este mismo frame con ese Escape (el controlador
@@ -229,7 +238,7 @@ class MenuPausa(Entity):
         for entidad in self._ocultos_por_ajustes:
             entidad.enabled = True
         self._ocultos_por_ajustes = []
-        self.velo.color = color.rgba32(*estilo.TINTA, ALFA_VELO)
+        self.velo.color = color.rgba32(*ui_botw_calculos.tono(estilo.TINTA), ALFA_VELO)
         foco = getattr(self, "foco", None)
         if foco is not None:
             foco.reiniciar()

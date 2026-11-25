@@ -11,13 +11,16 @@
 # Entra envolviendo la vista del panel (conexion.dilemas_ui.vista), sin tocar registro_dilemas.py. El reloj de la vista
 # lo da ControlDilemas.avanzar(), que llama a vista.chip() cada frame.
 # APAGADO: ALCALDE_DILEMAS_VISUAL=0. GUARDIÁN: un fallo avisa una vez por stderr, esconde lo añadido y el panel sigue igual.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Text, camera, color, time
 
 from frontend import banderas_visuales as bv
 from frontend import diseno_adaptable, estilo, tipografia
 from frontend import dilemas_visual_calculos as calc
-from frontend.componentes import escala_fuente, panel_tinta, rgb
+from frontend.componentes import escala_fuente, rgb
+from frontend.componentes import panel_piel
 
 DILEMAS_VISUAL = True
 VARIABLE = "ALCALDE_DILEMAS_VISUAL"
@@ -51,27 +54,27 @@ class VistaDilemaVisual:
         self._nubes = []
         for boton in panel.botones:
             nube = Entity(parent=self.burbujas, position=(boton.x, boton.y, 0.004))
-            nube.fondo = panel_tinta(nube, 1.22, 0.092, tono=CREMA, radio_px=40, sombra=False, borde_px=2)
+            nube.fondo = panel_piel(nube, 1.22, 0.092, tono=CREMA, radio_px=40, sombra=False, borde_px=2)
             nube.puntitos = [Entity(parent=self.burbujas, model="circle", color=_rgba(CREMA), z=0.003) for _ in range(3)]
             self._nubes.append(nube)
         # «Mañana…»: la escena del cómic CONGELADA (en gris) + lo elegido + un gran «?».
         self.manana = Entity(parent=panel.marco, position=(0, -0.2, -0.03), enabled=False)
-        panel_tinta(self.manana, 0.7, 0.3, tono=(70, 70, 76), radio_px=10)
+        panel_piel(self.manana, 0.7, 0.3, tono=(70, 70, 76), radio_px=10)
         _mini_escena(self.manana, -0.2, 0.03, gris=True)
         self.manana_titulo = Text("", parent=self.manana, origin=(-0.5, 0.5), position=(-0.32, 0.135, -0.01),
                                   scale=escala_fuente(13), color=_rgba((200, 200, 205)))
         Text("?", parent=self.manana, origin=(0, 0), position=(0.25, 0.0, -0.01), scale=escala_fuente(80),
-             font=tipografia.FUENTE_TITULO, color=_rgba(estilo.COLOR_ACENTO))
+             font=tipografia.fuente_piel(titulo=True), color=_rgba(estilo.COLOR_ACENTO))
         self.manana_texto = Text("", parent=self.manana, origin=(-0.5, 0.5), position=(-0.05, 0.06, -0.01),
-                                 scale=escala_fuente(15), font=tipografia.FUENTE_TITULO, color=_rgba(estilo.COLOR_TEXTO))
+                                 scale=escala_fuente(15), font=tipografia.fuente_piel(titulo=True), color=_rgba(estilo.COLOR_TEXTO))
         # Al día siguiente: la misma escena en miniatura, ya a color, junto a lo que elegiste.
         self.ayer = Entity(parent=camera.ui, z=-0.4, enabled=False)
-        panel_tinta(self.ayer, 0.66, 0.22, tono=(70, 70, 76), radio_px=10)
+        panel_piel(self.ayer, 0.66, 0.22, tono=(70, 70, 76), radio_px=10)
         _mini_escena(self.ayer, -0.21, 0.0, gris=False)
         self.ayer_texto = Text("", parent=self.ayer, origin=(-0.5, 0.5), position=(-0.08, 0.07, -0.01),
                                scale=escala_fuente(13), color=_rgba(estilo.COLOR_TEXTO))
         Text("!", parent=self.ayer, origin=(0, 0), position=(0.28, 0.0, -0.01), scale=escala_fuente(50),
-             font=tipografia.FUENTE_TITULO, color=_rgba(estilo.COLOR_ACENTO))
+             font=tipografia.fuente_piel(titulo=True), color=_rgba(estilo.COLOR_ACENTO))
         # BUG-002: la tarjeta vive en camera.ui pero su reloj (_frame) lo da un vigía del HUD del mundo; si se sale del
         # mundo antes de que caduque, ella misma se cancela (no queda congelada sobre el interior, el minijuego o el menú).
         self.ayer.update = self._cancelar_fuera_del_mundo
@@ -138,6 +141,7 @@ class VistaDilemaVisual:
         if cine is not None:
             try:
                 from frontend.componentes import destruir_arbol
+                from frontend.componentes import panel_piel
                 destruir_arbol(cine)
             except Exception:            # noqa: BLE001
                 pass

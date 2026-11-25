@@ -16,13 +16,16 @@
 # APAGADO: ALCALDE_RECTIFICAR_VISUAL=0 (o RECTIFICAR_VISUAL = False). GUARDIÁN: si algo falla, avisa una vez por stderr,
 # esconde el teléfono, devuelve el panel a su sitio y la bandeja sigue como siempre.
 # REDUCIR MOVIMIENTO: la corrección aparece entera, sin giros en las copias.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Text, color, camera, time
 
 from frontend import banderas_visuales as bv
 from frontend import diseno_adaptable, estilo, tipografia
 from frontend import rectificar_visual_calculos as calc
-from frontend.componentes import escala_fuente, panel_tinta, rgb
+from frontend.componentes import escala_fuente, rgb
+from frontend.componentes import panel_piel
 
 RECTIFICAR_VISUAL = True
 VARIABLE = "ALCALDE_RECTIFICAR_VISUAL"
@@ -72,32 +75,32 @@ class PublicacionViva(Entity):
         from frontend.telefono_marco import MarcoTelefono
         self.z = -0.075
         self.telefono = MarcoTelefono(ANCHO_TEL, ALTO_TEL, (0, 0), parent=self)
-        self.fondo = panel_tinta(self, ANCHO_TEL, ALTO_TEL, tono=(26, 29, 40), radio_px=12, sombra=False, borde_px=0,
-                                 position=(0, 0, 0.004))
+        self.fondo = panel_piel(self, ANCHO_TEL, ALTO_TEL, tono=(26, 29, 40), radio_px=12, sombra=False, borde_px=0,
+                                position=(0, 0, 0.004))
         x0 = -ANCHO_TEL / 2 + 0.025
         self.rotulo = Text("", parent=self, origin=(-0.5, 0.5), position=(x0, ALTO_TEL / 2 - 0.045, -0.01),
-                           scale=escala_fuente(13), color=rgb(estilo.COLOR_ACENTO), font=tipografia.FUENTE_TITULO)
+                           scale=escala_fuente(13), color=rgb(estilo.COLOR_ACENTO), font=tipografia.fuente_piel(titulo=True))
         # Tarjeta de la publicación (y su versión «captura» con borde rojo).
         self.tarjeta = Entity(parent=self, y=0.235)
-        self.borde_captura = panel_tinta(self.tarjeta, ANCHO_TEL - 0.02, 0.18, tono=ROJO, radio_px=8, sombra=False,
-                                         borde_px=0, position=(0, 0, 0.002))
-        self.cuerpo_tarjeta = panel_tinta(self.tarjeta, ANCHO_TEL - 0.03, 0.17, tono=estilo.COLOR_TARJETA, radio_px=8,
-                                          sombra=False, borde_px=0, position=(0, 0, 0.001))
+        self.borde_captura = panel_piel(self.tarjeta, ANCHO_TEL - 0.02, 0.18, tono=ROJO, radio_px=8, sombra=False,
+                                        borde_px=0, position=(0, 0, 0.002))
+        self.cuerpo_tarjeta = panel_piel(self.tarjeta, ANCHO_TEL - 0.03, 0.17, tono=estilo.COLOR_TARJETA, radio_px=8,
+                                         sombra=False, borde_px=0, position=(0, 0, 0.001))
         self.autor = Text("", parent=self.tarjeta, origin=(-0.5, 0.5), position=(x0, 0.075, -0.01),
-                          scale=escala_fuente(12), color=rgb(estilo.COLOR_TEXTO_TENUE), font=tipografia.FUENTE_TITULO)
+                          scale=escala_fuente(12), color=rgb(estilo.COLOR_TEXTO_TENUE), font=tipografia.fuente_piel(titulo=True))
         self.texto = Text("", parent=self.tarjeta, origin=(-0.5, 0.5), position=(x0, 0.048, -0.01),
                           scale=escala_fuente(14), color=rgb(estilo.COLOR_TEXTO))
         self.contadores = Text("", parent=self, origin=(-0.5, 0.5), position=(x0, 0.13, -0.01),
                                scale=escala_fuente(12), color=rgb(estilo.COLOR_TEXTO_TENUE))
         self.correccion = Text("", parent=self, origin=(-0.5, 0.5), position=(x0, 0.075, -0.01),
-                               scale=escala_fuente(13), color=rgb(VERDE), font=tipografia.FUENTE_TITULO)
+                               scale=escala_fuente(13), color=rgb(VERDE), font=tipografia.fuente_piel(titulo=True))
         self.comentarios = []
         for i in range(N_COMENTARIOS):
             caja = Entity(parent=self, position=(0, -0.06 - i * 0.075, 0))
-            panel_tinta(caja, ANCHO_TEL - 0.04, 0.066, tono=(40, 44, 58), radio_px=6, sombra=False, borde_px=0,
-                        position=(0, 0, 0.002))
+            panel_piel(caja, ANCHO_TEL - 0.04, 0.066, tono=(40, 44, 58), radio_px=6, sombra=False, borde_px=0,
+                       position=(0, 0, 0.002))
             caja.nombre = Text("", parent=caja, origin=(-0.5, 0.5), position=(x0 + 0.01, 0.026, -0.01),
-                               scale=escala_fuente(11), color=rgb(estilo.COLOR_ACENTO), font=tipografia.FUENTE_TITULO)
+                               scale=escala_fuente(11), color=rgb(estilo.COLOR_ACENTO), font=tipografia.fuente_piel(titulo=True))
             caja.texto = Text("", parent=caja, origin=(-0.5, 0.5), position=(x0 + 0.01, 0.005, -0.01),
                               scale=escala_fuente(11), color=rgb(estilo.COLOR_TEXTO))
             self.comentarios.append(caja)
@@ -200,7 +203,7 @@ class PublicacionViva(Entity):
             for _ in range(calc.COPIAS_MAX):
                 # Delante del panel de la bandeja (z -0.06), en zonas sin texto (ver calc.posiciones_copias).
                 copia = Entity(parent=self.parent, z=-0.085, enabled=False)
-                panel_tinta(copia, 0.30, 0.12, tono=estilo.COLOR_TARJETA, radio_px=8)
+                panel_piel(copia, 0.30, 0.12, tono=estilo.COLOR_TARJETA, radio_px=8)
                 copia.texto = Text("", parent=copia, origin=(-0.5, 0.5), position=(-0.13, 0.045, -0.002),
                                    scale=escala_fuente(11), color=rgb(estilo.COLOR_TEXTO))
                 self.copias.append(copia)

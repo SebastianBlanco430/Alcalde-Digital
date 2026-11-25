@@ -16,6 +16,8 @@
 # terminar el recorrido del HUD con las viñetas «foco» de siempre, una oración por viñeta (los textos del guion). Escape
 # salta todo. Si la cinemática no se puede crear o falla a mitad, se abren las viñetas de antes y se avisa por stderr.
 # Las viñetas de backend/datos/tutorial_vinetas.json siguen en el botón «Cómo se juega» de la pausa.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import json
 import os
@@ -174,6 +176,11 @@ def _entidades_de(elemento, escena, conexion):
 def registrar(gestor, conexion, escena_mundo):
     if not activo():
         return None
+    try:                                    # el HUD pregunta por aquí si lo están señalando (sin importar este módulo)
+        from frontend import hud
+        hud.fijar_consulta_senalando(senalando_hud)
+    except Exception as error:              # noqa: BLE001
+        _aviso(f"consulta del HUD no puesta ({type(error).__name__}: {error})")
     try:
         datos = cargar_datos()
     except (OSError, ValueError) as error:
@@ -189,7 +196,8 @@ def registrar(gestor, conexion, escena_mundo):
 def _instalar(conexion, escena, datos):
     from ursina import Entity
 
-    from frontend.componentes import BotonSecundario, a_unidades, destruir_arbol
+    from frontend.componentes import a_unidades, destruir_arbol
+    from frontend.componentes import boton_piel_secundario, panel_piel
 
     basura = []                                 # secuencias ya terminadas, por destruir
 
@@ -316,8 +324,8 @@ def _instalar(conexion, escena, datos):
         from frontend import menu_pausa
         posicion = (escena.menu_pausa.posicion_extra(0) if hasattr(escena.menu_pausa, "posicion_extra")  # VIS-005
                     else (menu_pausa.ANCHO / 2 + 0.04 + 0.15, 0.19, -0.001))
-        boton = BotonSecundario(TEXTO_BOTON_PAUSA, al_clic=ver_de_nuevo, ancho=0.30, alto=a_unidades(50), tamano_fuente_px=20,
-                                parent=escena.menu_pausa, position=posicion)
+        boton = boton_piel_secundario(TEXTO_BOTON_PAUSA, al_clic=ver_de_nuevo, ancho=0.30, alto=a_unidades(50), tamano_fuente_px=20,
+                                      parent=escena.menu_pausa, position=posicion)
     except Exception as error:
         boton = None
         _aviso(f"botón de la pausa no instalado ({type(error).__name__}: {error})")
@@ -360,23 +368,24 @@ def _crear_selector(menu, entradas, acciones, al_volver):
     from ursina import Entity, Text, color
 
     from frontend import estilo, tipografia
-    from frontend.componentes import BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb
+    from frontend.componentes import a_unidades, escala_fuente, rgb
+    from frontend.componentes import boton_piel_secundario, panel_piel
     from frontend.fondo_menu import anadir_filo
 
     ancho, paso = 0.62, 0.085
     alto = 0.14 + paso * (len(entradas) + 1)
     raiz = Entity(parent=menu, z=-0.04, enabled=False)
     Entity(parent=raiz, model="quad", color=color.rgba32(*estilo.TINTA, 150), scale=(4, 4), z=0.01, collider="box")
-    panel = panel_tinta(raiz, ancho, alto, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX, position=(0, 0, -0.001))
+    panel = panel_piel(raiz, ancho, alto, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX, position=(0, 0, -0.001))
     anadir_filo(panel, ancho, alto, estilo.RADIO_PANEL_PX)
     Text(TEXTO_BOTON_PAUSA, parent=raiz, origin=(0, 0), position=(0, alto / 2 - 0.055, -0.01),
-         scale=escala_fuente(28), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+         scale=escala_fuente(28), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
     y = alto / 2 - 0.125
     raiz.botones = []
     for id_, texto in list(entradas) + [("volver", TEXTO_VOLVER)]:
         accion = acciones.get(id_, al_volver)
-        b = BotonSecundario(texto, al_clic=accion, ancho=ancho - 0.08, alto=a_unidades(50), tamano_fuente_px=20,
-                            parent=raiz, position=(0, y, -0.01))
+        b = boton_piel_secundario(texto, al_clic=accion, ancho=ancho - 0.08, alto=a_unidades(50), tamano_fuente_px=20,
+                                  parent=raiz, position=(0, y, -0.01))
         raiz.botones.append(b)
         y -= paso
     return raiz

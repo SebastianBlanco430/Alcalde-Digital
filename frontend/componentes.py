@@ -17,6 +17,7 @@ from ursina.models.procedural.quad import Quad
 from backend.datos.nombres_visibles import glosar_texto
 from frontend import diseno_adaptable_calculos as calc_adaptable
 from frontend import estilo, tipografia
+from frontend import ui_botw_calculos
 from frontend.texto import envolver_texto
 
 # Bandera reversible: los botones de tinta encogen (y si no basta recortan con «…») el texto que no cabe.
@@ -485,3 +486,215 @@ class BotonPeligro(BotonTinta):
 def _curva_salida():
     from ursina import curve
     return curve.out_quad
+
+
+# ---------------------------------------------------------------------------
+# Piel BOTW (docs/ESTILO_BOTW.md, ALCALDE_UI_BOTW). Todo lo de abajo es AÑADIDO:
+# panel_tinta, BotonTinta y sus variantes no cambian (las pantallas que no se
+# pasan a la piel se ven igual). Los colores son las constantes BOTW_* de
+# estilo y la bandera y las equivalencias están en ui_botw_calculos.
+#   panel_botw    velo translúcido con filo claro y sombra suave (mismos hijos que panel_tinta).
+#   panel_piel    panel_botw con la piel encendida y panel_tinta sin ella (misma firma que panel_tinta).
+#   BotonBotwPrimario / BotonBotwSecundario / BotonBotwPeligro  botones en cursiva con flecha amarilla al
+#                 tener foco o el ratón encima (misma API que BotonPrimario).
+#   boton_piel    el botón BOTW o el de tinta según la bandera.
+#   flecha_botw   la flecha amarilla del menú de inicio, para listas propias.
+# ---------------------------------------------------------------------------
+
+# Variantes de botón con la piel (claves nuevas: las de siempre no cambian).
+ESTILOS_BOTON["botw_primario"] = dict(ui_botw_calculos.ESTILOS_BOTON["primario"])
+ESTILOS_BOTON["botw_secundario"] = dict(ui_botw_calculos.ESTILOS_BOTON["secundario"])
+ESTILOS_BOTON["botw_peligro"] = dict(ui_botw_calculos.ESTILOS_BOTON["peligro"])
+
+# Radios de la tinta a los de la piel (6 chip, 10 tarjeta, 14 panel -> 4, 6, 8).
+RADIOS_BOTW = {estilo.RADIO_CHIP_PX: estilo.BOTW_RADIO_CHIP_PX, estilo.RADIO_TARJETA_PX: estilo.BOTW_RADIO_TARJETA_PX,
+               estilo.RADIO_PANEL_PX: estilo.BOTW_RADIO_PANEL_PX}
+FLECHA_BOTW_PX = (26, 18)             # la flecha del menú de inicio (SVG 26 x 18)
+_TEXTURA_FLECHA = None
+
+
+# ¿Piel BOTW? (frontend/ui_botw_calculos.py: variable de entorno > ajuste guardado > por defecto encendida).
+def piel_botw():
+    return ui_botw_calculos.activo()
+
+
+# Medidas (unidades de camera.ui) del filo y la sombra de la piel.
+def medidas_botw(filo_px=None):
+    filo = a_unidades(estilo.BOTW_GROSOR_FILO_PX if filo_px is None else filo_px)
+    dx, dy = estilo.BOTW_DESPLAZAMIENTO_SOMBRA_PX
+    return filo, (a_unidades(dx), a_unidades(dy))
+
+
+# Panel de la piel: velo de tinta violeta (translúcido si `tono` es el velo), filo claro y sombra que cae recta.
+# Devuelve el mismo contenedor que panel_tinta (hijos `.sombra` o None, `.borde` y `.fondo`; el contenido va en z = 0).
+# `alfa` (0-255) fuerza la opacidad del fondo; por defecto, BOTW_ALFA_VELO con el velo y opaco con cualquier otro tono.
+def panel_botw(padre, ancho, alto, tono=None, radio_px=estilo.BOTW_RADIO_PANEL_PX, sombra=True, filo_px=None,
+               alfa=None, **opciones):
+    tono = estilo.BOTW_VELO if tono is None else tuple(tono)
+    if alfa is None:
+        alfa = estilo.BOTW_ALFA_VELO if tono == estilo.BOTW_VELO else 255
+    filo, (sx, sy) = medidas_botw(filo_px)
+    radio_filo = radio_px + estilo.BOTW_GROSOR_FILO_PX
+    contenedor = Entity(parent=padre, **opciones)
+    contenedor.sombra = None
+    if sombra:
+        contenedor.sombra = _capa(contenedor, ancho + 2 * filo, alto + 2 * filo, radio_filo,
+                                  color.rgba32(*estilo.BOTW_TINTA, estilo.BOTW_ALFA_SOMBRA), 0.005, (sx, sy))
+    contenedor.borde = _capa(contenedor, ancho + 2 * filo, alto + 2 * filo, radio_filo,
+                             color.rgba32(*estilo.BOTW_FILO, estilo.BOTW_ALFA_FILO), 0.004)
+    contenedor.fondo = _capa(contenedor, ancho, alto, radio_px, color.rgba32(*tono, int(alfa)), 0.003)
+    return contenedor
+
+
+# Igual que panel_tinta (misma firma), pero con la piel encendida dibuja panel_botw con los colores y radios
+# equivalentes: COLOR_PANEL (o sin tono) pasa al velo translúcido; los demás, a su BOTW_* (ui_botw_calculos.tono).
+def panel_piel(padre, ancho, alto, tono=None, radio_px=estilo.RADIO_PANEL_PX, sombra=True, borde_px=None,
+               **opciones):
+    if not piel_botw():
+        return panel_tinta(padre, ancho, alto, tono, radio_px, sombra, borde_px, **opciones)
+    if tono is None or tuple(tono) == estilo.COLOR_PANEL:
+        tono_botw = estilo.BOTW_VELO
+    else:
+        tono_botw = ui_botw_calculos.tono(tono, True)
+    # borde 0 = sin filo (como en panel_tinta); si no, el filo fino de la piel, nunca más grueso que el pedido
+    filo = None if borde_px is None else (0 if borde_px <= 0 else max(1, min(borde_px, estilo.BOTW_GROSOR_FILO_PX)))
+    return panel_botw(padre, ancho, alto, tono_botw, RADIOS_BOTW.get(radio_px, radio_px), sombra, filo, **opciones)
+
+
+# Textura de la flecha del menú (punta a la izquierda, amarilla con borde de tinta), dibujada con PIL una sola vez: la
+# fuente no trae flechas.
+def textura_flecha_botw(escala=4):
+    global _TEXTURA_FLECHA
+    if _TEXTURA_FLECHA is None:
+        from PIL import Image, ImageDraw
+        from ursina import Texture
+        s = escala
+        img = Image.new("RGBA", (FLECHA_BOTW_PX[0] * s, FLECHA_BOTW_PX[1] * s), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        tinta, amarillo = (*estilo.BOTW_TINTA, 255), (*estilo.BOTW_ACENTO, 255)
+        punta = [(2 * s, 9 * s), (18 * s, 2 * s), (15 * s, 9 * s), (18 * s, 16 * s)]
+        d.polygon(punta, fill=amarillo)
+        d.line(punta + [punta[0]], fill=tinta, width=int(2.5 * s), joint="curve")
+        d.line([(16 * s, 9 * s), (25 * s, 9 * s)], fill=amarillo, width=int(3 * s))
+        d.ellipse((23.5 * s, 7.5 * s, 26.5 * s, 10.5 * s), fill=amarillo)
+        _TEXTURA_FLECHA = Texture(img)
+        _TEXTURA_FLECHA.filtering = "mipmap"
+    return _TEXTURA_FLECHA
+
+
+# Flecha amarilla de la piel (`alto` en unidades de camera.ui; el ancho sale de la proporción 26 x 18).
+def flecha_botw(padre, alto=a_unidades(15), **opciones):
+    ancho = alto * FLECHA_BOTW_PX[0] / FLECHA_BOTW_PX[1]
+    return Entity(parent=padre, model="quad", texture=textura_flecha_botw(), scale=(ancho, alto), **opciones)
+
+
+# Botón de la piel: misma API que BotonTinta (accion, fijar_habilitado, fijar_foco, encajar_texto...). Cambia el
+# dibujo: radio menor, filo claro en vez de borde de tinta, sombra que cae recta, letra en cursiva (negrita en el
+# primario), anillo de foco amarillo y la flecha del menú a la izquierda mientras tiene foco o el ratón encima.
+class BotonBotw(BotonTinta):
+
+    VARIANTE = "botw_secundario"
+    SEPARACION_FLECHA_PX = 8
+    ALTO_FLECHA_PX = 20
+
+    def __init__(self, texto, al_clic=None, ancho=a_unidades(220), alto=a_unidades(56),
+                 habilitado=True, tamano_fuente_px=22, **opciones):
+        super().__init__(texto, al_clic=al_clic, ancho=ancho, alto=alto, habilitado=habilitado,
+                         tamano_fuente_px=tamano_fuente_px, **opciones)
+        self.radius = a_unidades(estilo.BOTW_RADIO_TARJETA_PX) / alto
+        if self.text_entity is not None:
+            titulo = self.VARIANTE == "botw_primario"
+            self.text_entity.font = tipografia.FUENTE_BOTW_TITULO if titulo else tipografia.FUENTE_BOTW
+        # Las capas de tinta de BotonTinta se rehacen con las medidas de la piel (mismos nombres y profundidades).
+        for capa in (self.foco, self.sombra, self.borde):
+            destruir_arbol(capa)
+        filo, (sx, sy) = medidas_botw()
+        anillo = a_unidades(estilo.BOTW_ALTO_FOCO_PX)
+        rel = (1 + 2 * filo / ancho, 1 + 2 * filo / alto)
+        radio = estilo.BOTW_RADIO_TARJETA_PX + estilo.BOTW_GROSOR_FILO_PX
+        self.foco = _capa(self, ancho + 2 * (filo + anillo), alto + 2 * (filo + anillo),
+                          radio + estilo.BOTW_ALTO_FOCO_PX, rgb(estilo.BOTW_ACENTO), 0.0005)
+        self.foco.scale = (rel[0] + 2 * anillo / ancho, rel[1] + 2 * anillo / alto)
+        self.foco.enabled = False
+        self.sombra = _capa(self, ancho + 2 * filo, alto + 2 * filo, radio,
+                            color.rgba32(*estilo.BOTW_TINTA, estilo.BOTW_ALFA_SOMBRA), 0.002)
+        self.sombra.scale = rel
+        self._sombra_pos = (sx / ancho, sy / alto)
+        self.sombra.position = (*self._sombra_pos, 0.002)
+        self.borde = _capa(self, ancho + 2 * filo, alto + 2 * filo, radio,
+                           color.rgba32(*estilo.BOTW_FILO, estilo.BOTW_ALFA_FILO), 0.001)
+        self.borde.scale = rel
+        # Flecha a la izquierda del botón (hija: su escala es relativa a la del botón).
+        alto_flecha = a_unidades(self.ALTO_FLECHA_PX)
+        ancho_flecha = alto_flecha * FLECHA_BOTW_PX[0] / FLECHA_BOTW_PX[1]
+        hueco = a_unidades(self.SEPARACION_FLECHA_PX)
+        self.flecha = flecha_botw(self, alto=1.0, enabled=False)
+        self.flecha.scale = (ancho_flecha / ancho, alto_flecha / alto)
+        self.flecha.position = (-0.5 - (hueco + ancho_flecha / 2) / ancho, 0, -0.01)
+        self.fijar_habilitado(habilitado)
+
+    def fijar_habilitado(self, valor):
+        super().fijar_habilitado(valor)
+        if not self._habilitado:
+            self.color = rgb(estilo.BOTW_BOTON_DESHABILITADO)
+            self.text_color = rgb(estilo.BOTW_TEXTO_TENUE)
+        self._mostrar_flecha()
+
+    def _mostrar_flecha(self):
+        flecha = getattr(self, "flecha", None)
+        if flecha is not None:
+            flecha.enabled = self._habilitado and (self._foco or bool(self.hovered))
+
+    def fijar_foco(self, valor):
+        super().fijar_foco(valor)
+        self._mostrar_flecha()
+
+    def on_mouse_enter(self):
+        super().on_mouse_enter()
+        self._mostrar_flecha()
+
+    def on_mouse_exit(self):
+        if self.is_empty():
+            return
+        super().on_mouse_exit()
+        self._mostrar_flecha()
+
+
+class BotonBotwPrimario(BotonBotw):
+    VARIANTE = "botw_primario"     # amarillo con texto de tinta: la acción principal
+
+
+class BotonBotwSecundario(BotonBotw):
+    VARIANTE = "botw_secundario"
+
+
+class BotonBotwPeligro(BotonBotw):
+    VARIANTE = "botw_peligro"
+
+
+_BOTONES_PIEL = {
+    "primario": (BotonBotwPrimario, BotonPrimario),
+    "secundario": (BotonBotwSecundario, BotonSecundario),
+    "peligro": (BotonBotwPeligro, BotonPeligro),
+}
+
+
+# Botón de la variante pedida («primario», «secundario» o «peligro»): el de la piel si está encendida, el de tinta si
+# no. Mismos argumentos que BotonPrimario.
+def boton_piel(texto, variante="secundario", **opciones):
+    con_piel, sin_piel = _BOTONES_PIEL[variante]
+    return (con_piel if piel_botw() else sin_piel)(texto, **opciones)
+
+
+# Atajos de boton_piel con los MISMOS argumentos (también posicionales) que BotonPrimario, BotonSecundario y BotonPeligro:
+# para pasar una pantalla a la piel basta cambiar el nombre de la clase por el del atajo.
+def boton_piel_primario(texto, *args, **opciones):
+    return (BotonBotwPrimario if piel_botw() else BotonPrimario)(texto, *args, **opciones)
+
+
+def boton_piel_secundario(texto, *args, **opciones):
+    return (BotonBotwSecundario if piel_botw() else BotonSecundario)(texto, *args, **opciones)
+
+
+def boton_piel_peligro(texto, *args, **opciones):
+    return (BotonBotwPeligro if piel_botw() else BotonPeligro)(texto, *args, **opciones)

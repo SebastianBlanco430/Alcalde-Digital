@@ -13,6 +13,8 @@
 #
 # APAGADO: ALCALDE_CONTRARRELOJ_VISUAL=0 (o CONTRARRELOJ_VISUAL = False): se usa la vista de siempre con la capa común.
 # GUARDIÁN: un fallo del mapa avisa una vez por stderr, lo esconde y devuelve los botones a su sitio.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Text, color
 
@@ -111,7 +113,7 @@ class ContrarrelojVisual(CapaVisual, MinijuegoContrarreloj):
             cx, cy = self._centro_zona(z)
             ex, ey = lad.etiqueta_de_zona(z, cx, cy)
             self.rotulos_zona.append(Text(nombre, parent=self.mapa, origin=(0, 0), position=(ex, ey, 0.0015),
-                                          scale=escala_fuente(PX_ZONA), font=tipografia.FUENTE_TITULO,
+                                          scale=escala_fuente(PX_ZONA), font=tipografia.fuente_piel(titulo=True),
                                           color=_rgba(estilo.TINTA, 1)))
             mancha = pz.Mancha(1.7 * z, parent=self.mapa, position=(cx, cy, lad.Z_MANCHA + 0.0001),
                                scale=0.12, color=_rgba(TONO_VIRAL, ALFA_CONTAGIO), enabled=False)

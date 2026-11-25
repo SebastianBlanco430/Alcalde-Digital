@@ -20,6 +20,7 @@
 
 from frontend import tinta_calculos as _tinta   # T1: fuente única del grosor de tinta
 import math
+import os
 from functools import lru_cache
 from typing import NamedTuple
 
@@ -587,13 +588,28 @@ def colocar_props(mundo):
 CUERPO_PROP = {"arbol": (0.45, None), "arbusto": (0.45, None), "farola": (0.22, None), "caneca": (0.28, None),
                "banco": (0.32, 0.55), "jardinera": (0.38, 0.4), "valla": (0.14, 0.4)}
 LARGO_PROP = {"banco": 1.7, "jardinera": 1.5}     # m a lo largo (la valla usa su `tam`, que es su largo)
+# Cuerpos añadidos después (mismo formato que CUERPO_PROP, que no cambia): el poste del cartel (0,08 m de grosor) se
+# atravesaba; ahora choca con un círculo algo mayor que el poste para que la cámara no lo corte.
+# BANDERA: ALCALDE_COLISION_EXTRA=0 (o COLISION_EXTRA = False) vuelve a dejarlos sin cuerpo.
+CUERPO_PROP_EXTRA = {"cartel": (0.18, None)}
+COLISION_EXTRA = True
+
+
+def colision_extra():
+    valor = os.environ.get("ALCALDE_COLISION_EXTRA", "").strip().lower()
+    if valor in ("0", "false", "no", "off"):
+        return False
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    return bool(COLISION_EXTRA)
 
 
 # Obstáculos (círculos) de una lista de Prop: lo que no se debe atravesar. Puro: se prueba sin ventana.
 def obstaculos_de_props(props):
     obstaculos = []
+    extra = CUERPO_PROP_EXTRA if colision_extra() else {}
     for prop in props:
-        cuerpo = CUERPO_PROP.get(prop.tipo)
+        cuerpo = CUERPO_PROP.get(prop.tipo, extra.get(prop.tipo))
         if cuerpo is None:
             continue
         radio, paso = cuerpo

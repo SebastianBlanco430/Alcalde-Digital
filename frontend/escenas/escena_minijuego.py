@@ -10,6 +10,8 @@
 #
 # Marco de monitor y «caber» en la ventana: igual que EscenaJuego (MarcoPC, ESCALA_JUEGO, diseno_adaptable).
 # Reloj: la misión sigue EN_MINIJUEGO mientras se juega, así que la pausa del reloj de 7 días que ya existe se mantiene.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import logging
 import random
@@ -24,7 +26,8 @@ from backend.logica import consecuencia_graduada
 from backend.logica import minijuegos as mj
 from backend.logica.lote_mision import LoteMision
 from frontend import diseno_adaptable, estilo, tipografia
-from frontend.componentes import BotonPrimario, a_unidades, destruir_arbol, escala_fuente, panel_tinta, rgb
+from frontend.componentes import a_unidades, destruir_arbol, escala_fuente, rgb
+from frontend.componentes import boton_piel_primario, panel_piel
 from frontend.escenas.escena_base import Escena
 from frontend.marco_pc import ESCALA_JUEGO, MarcoPC
 from frontend.minijuegos import clase_de, ui
@@ -532,14 +535,14 @@ class EscenaMinijuego(Escena):
         etiqueta = mc.chip_propina(propina) or mc.chip_por_poco(por_poco)
         if etiqueta:
             marco_mesa.chip(self.banner, etiqueta, x_boton, medidas["alto"] / 2 - a_unidades(17))
-        self.boton = BotonPrimario("Continuar", al_clic=self.continuar, ancho=0.3, alto=0.07, parent=self.banner,
-                                   position=(x_boton, -0.004, -0.01), tamano_fuente_px=22)
+        self.boton = boton_piel_primario("Continuar", al_clic=self.continuar, ancho=0.3, alto=0.07, parent=self.banner,
+                                         position=(x_boton, -0.004, -0.01), tamano_fuente_px=22)
         Text("Enter o Espacio", parent=self.banner, origin=(0, 0), position=(x_boton, -medidas["alto"] / 2 + a_unidades(13), -0.01),
              scale=escala_fuente(17), color=rgb(mc.TEXTO_SUAVE))
 
     def _pintar_banner_simple(self, resultado):
         bien = resultado.bien
-        panel_tinta(self.banner, ANCHO_BANNER, ALTO_BANNER, tono=estilo.COLOR_PANEL, position=(0, Y_BANNER, 0))
+        panel_piel(self.banner, ANCHO_BANNER, ALTO_BANNER, tono=estilo.COLOR_PANEL, position=(0, Y_BANNER, 0))
         titulo = "Verificaste bien" if bien else "Se te escapó algo"
         graduacion = self._graduacion(resultado)
         if graduacion is not None and graduacion.propina > 0:
@@ -554,8 +557,8 @@ class EscenaMinijuego(Escena):
         lineas = [resultado.detalle, f"El rumor era {veredicto}. En {glosar_texto(self.mision.destino)} se veía: {self.mision.pista}"]
         ui.texto(self.banner, "\n".join(lineas), 15, 1.18, estilo.COLOR_TEXTO,
                  (x0, Y_BANNER + ALTO_BANNER / 2 - a_unidades(46)))
-        self.boton = BotonPrimario("Continuar", al_clic=self.continuar, ancho=0.3, alto=0.075, parent=self.banner,
-                                   position=(ANCHO_BANNER / 2 - 0.2, Y_BANNER + 0.01, -0.01), tamano_fuente_px=22)
+        self.boton = boton_piel_primario("Continuar", al_clic=self.continuar, ancho=0.3, alto=0.075, parent=self.banner,
+                                         position=(ANCHO_BANNER / 2 - 0.2, Y_BANNER + 0.01, -0.01), tamano_fuente_px=22)
         Text("Enter o Espacio", parent=self.banner, origin=(0.5, 0), position=(ANCHO_BANNER / 2 - 0.2, Y_BANNER - 0.047, -0.01),
              scale=escala_fuente(17), color=rgb(estilo.COLOR_TEXTO_TENUE))
 

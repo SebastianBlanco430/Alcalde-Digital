@@ -5,12 +5,15 @@
 #
 # Se diseña a 16:9 (x en [-0.89, 0.89]) y se encoge si la ventana es más estrecha (diseno_adaptable.ajustar_escala).
 # Estilo: estilo.py y panel_tinta; texto con la fuente por defecto (Atkinson Hyperlegible, con tildes y ñ).
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Text, camera, color
 
 from frontend import diseno_adaptable, estilo, tipografia
 from frontend import mundo_digital_calculos as calc
-from frontend.componentes import BotonSecundario, escala_fuente, panel_tinta, rgb
+from frontend.componentes import escala_fuente, rgb
+from frontend.componentes import boton_piel_secundario, panel_piel
 
 MAX_FILAS = 9
 MAX_EVIDENCIAS = 8
@@ -31,7 +34,7 @@ ANCHO_ENLACE, ALTO_ENLACE = 0.44, 0.06
 
 
 def _texto(padre, cadena="", px=18, origen=(0, 0), pos=(0, 0), tono=estilo.COLOR_TEXTO, negrita=False, z=-0.02):
-    extra = {"font": tipografia.FUENTE_TITULO} if negrita else {}
+    extra = {"font": tipografia.fuente_piel(titulo=True)} if negrita else {}
     return Text(cadena, parent=padre, origin=origen, position=(pos[0], pos[1], z), scale=escala_fuente(px),
                 color=rgb(tono), **extra)
 
@@ -74,16 +77,16 @@ class InterfazCaso(Entity):
                                          position=(0, Y_BARRA_TIEMPO, -0.01), color=rgb(estilo.ESTADO_INFO))
 
     def _construir_retrato(self):
-        marco = panel_tinta(self, 0.34, 0.34, tono=estilo.COLOR_PANEL, position=(*POS_RETRATO, 0))
+        marco = panel_piel(self, 0.34, 0.34, tono=estilo.COLOR_PANEL, position=(*POS_RETRATO, 0))
         self.retrato = Entity(parent=marco, model="quad", scale=(0.31, 0.31), z=-0.01)
-        placa = panel_tinta(self, 0.34, 0.1, tono=estilo.COLOR_PANEL, position=(POS_RETRATO[0], POS_RETRATO[1] - 0.235, 0))
+        placa = panel_piel(self, 0.34, 0.1, tono=estilo.COLOR_PANEL, position=(POS_RETRATO[0], POS_RETRATO[1] - 0.235, 0))
         self.nombre = _texto(placa, "", 19, pos=(0, 0.02), negrita=True)
         self.rol = _texto(placa, "", 14, pos=(0, -0.022), tono=estilo.COLOR_TEXTO_TENUE)
         self._rol_base = escala_fuente(14)
 
     def _construir_dialogo(self):
-        self.panel_dialogo = panel_tinta(self, ANCHO_DIALOGO, ALTO_DIALOGO, tono=estilo.COLOR_PANEL,
-                                         position=(*POS_DIALOGO, 0))
+        self.panel_dialogo = panel_piel(self, ANCHO_DIALOGO, ALTO_DIALOGO, tono=estilo.COLOR_PANEL,
+                                        position=(*POS_DIALOGO, 0))
         self.dialogo_titulo = _texto(self.panel_dialogo, "", 21, origen=(-0.5, 0.5), pos=(-0.43, 0.165), negrita=True,
                                      tono=estilo.COLOR_ACENTO)
         self._dialogo_base = escala_fuente(20)
@@ -93,11 +96,11 @@ class InterfazCaso(Entity):
         self.mensaje = _texto(self, "", 17, pos=(POS_DIALOGO[0], POS_DIALOGO[1] - ALTO_DIALOGO / 2 - 0.028), negrita=True)
 
     def _construir_opciones(self):
-        self.panel_opciones = panel_tinta(self, ANCHO_OPCIONES, ALTO_OPCIONES, tono=estilo.COLOR_FONDO,
-                                          position=(*POS_OPCIONES, 0))
+        self.panel_opciones = panel_piel(self, ANCHO_OPCIONES, ALTO_OPCIONES, tono=estilo.COLOR_FONDO,
+                                         position=(*POS_OPCIONES, 0))
         self._botones, self._etiquetas = [], []
         for _ in range(MAX_FILAS):
-            boton = BotonSecundario("", al_clic=None, ancho=ANCHO_OPCIONES - 0.04, alto=0.05, parent=self.panel_opciones)
+            boton = boton_piel_secundario("", al_clic=None, ancho=ANCHO_OPCIONES - 0.04, alto=0.05, parent=self.panel_opciones)
             boton.enabled = False
             etiqueta = Text("", parent=self.panel_opciones, origin=(-0.5, 0), scale=escala_fuente(17),
                             color=rgb(estilo.COLOR_BOTON_TEXTO))
@@ -107,13 +110,13 @@ class InterfazCaso(Entity):
         self._etiqueta_base = escala_fuente(17)
 
     def _construir_evidencias(self):
-        self.panel_evidencias = panel_tinta(self, ANCHO_EVIDENCIAS, ALTO_EVIDENCIAS, tono=estilo.COLOR_FONDO,
-                                            position=(*POS_EVIDENCIAS, 0))
+        self.panel_evidencias = panel_piel(self, ANCHO_EVIDENCIAS, ALTO_EVIDENCIAS, tono=estilo.COLOR_FONDO,
+                                           position=(*POS_EVIDENCIAS, 0))
         self.evidencias_titulo = _texto(self.panel_evidencias, "Evidencias", 19, pos=(0, 0.345), negrita=True)
         self._filas_ev, self._etiquetas_ev, self._datos_ev = [], [], []
         for i in range(MAX_EVIDENCIAS):
             y = 0.275 - i * 0.062
-            boton = BotonSecundario("", al_clic=None, ancho=ANCHO_EVIDENCIAS - 0.04, alto=0.052, parent=self.panel_evidencias)
+            boton = boton_piel_secundario("", al_clic=None, ancho=ANCHO_EVIDENCIAS - 0.04, alto=0.052, parent=self.panel_evidencias)
             boton.position = (0, y, 0)
             boton.enabled = False
             etiqueta = Text("", parent=self.panel_evidencias, origin=(-0.5, 0), position=(-0.19, y, -0.02),
@@ -129,7 +132,7 @@ class InterfazCaso(Entity):
 
     # Botón opcional «puerta al parkour»: lo declara el caso en su JSON (backend/logica/enlace_parkour.py).
     def _construir_enlace(self):
-        self.enlace = BotonSecundario("", al_clic=None, ancho=ANCHO_ENLACE, alto=ALTO_ENLACE, parent=self)
+        self.enlace = boton_piel_secundario("", al_clic=None, ancho=ANCHO_ENLACE, alto=ALTO_ENLACE, parent=self)
         self.enlace.position = (*POS_ENLACE, 0)
         self.enlace_etiqueta = Text("", parent=self, origin=(-0.5, 0), position=(POS_ENLACE[0] - ANCHO_ENLACE / 2 + 0.02,
                                     POS_ENLACE[1], -0.02), scale=escala_fuente(15), color=rgb(estilo.COLOR_BOTON_TEXTO))

@@ -12,6 +12,8 @@
 #
 # La lógica va en ControlDilemas (sin ursina; se prueba con escenas falsas, tests/test_registro_dilemas.py).
 # API: conexion.dilemas_ui = ControlDilemas.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import sys
 
@@ -170,7 +172,8 @@ def _crear_vigia(escena_mundo):
     from ursina import Entity, Text, camera, color
 
     from frontend import diseno_adaptable, estilo, tipografia
-    from frontend.componentes import BotonSecundario, escala_fuente, panel_tinta, rgb
+    from frontend.componentes import escala_fuente, rgb
+    from frontend.componentes import boton_piel_secundario, panel_piel
     from frontend import hud_esquinas_calculos as hec
     from frontend.registro_reloj import ALTO_CHIP, MARGEN
 
@@ -185,18 +188,18 @@ def _crear_vigia(escena_mundo):
             super().__init__(enabled=False, **opciones)
             self.z = -0.06
             self.fondo = Entity(parent=self, model="quad", scale=(4, 2), color=color.rgba32(10, 11, 18, 225), z=0.02)
-            self.marco = panel_tinta(self, ANCHO, ALTO, tono=estilo.COLOR_PANEL, position=(0, 0, 0))
+            self.marco = panel_piel(self, ANCHO, ALTO, tono=estilo.COLOR_PANEL, position=(0, 0, 0))
             x0 = -ANCHO / 2 + 0.06
             self.titulo = Text("", parent=self.marco, origin=(-0.5, 0.5), position=(x0, ALTO / 2 - 0.045, -0.02),
-                               scale=escala_fuente(26), color=rgb(estilo.COLOR_ACENTO), font=tipografia.FUENTE_TITULO)
+                               scale=escala_fuente(26), color=rgb(estilo.COLOR_ACENTO), font=tipografia.fuente_piel(titulo=True))
             self._base_situacion = escala_fuente(19)
             self.situacion = Text("", parent=self.marco, origin=(-0.5, 0.5), position=(x0, ALTO / 2 - 0.125, -0.02),
                                   scale=self._base_situacion, color=rgb(estilo.COLOR_TEXTO))
             self.botones, self.pistas = [], []
             for i in range(MAX_OPCIONES):
                 y = 0.04 - i * 0.2
-                boton = BotonSecundario("", al_clic=lambda n=i + 1: control.clic(n), ancho=ANCHO_TEXTO, alto=0.075,
-                                        tamano_fuente_px=20, parent=self.marco)
+                boton = boton_piel_secundario("", al_clic=lambda n=i + 1: control.clic(n), ancho=ANCHO_TEXTO, alto=0.075,
+                                              tamano_fuente_px=20, parent=self.marco)
                 boton.position = (0, y, -0.02)
                 pista = Text("", parent=self.marco, origin=(-0.5, 0.5), position=(x0, y - 0.05, -0.02),
                              scale=escala_fuente(15), color=rgb(estilo.COLOR_TEXTO_TENUE))
@@ -261,10 +264,10 @@ def _crear_vigia(escena_mundo):
             self.panel = PanelDilema(control)
             self.chip_entidad = Entity(parent=escena_mundo.hud, enabled=False)
             ancho = 0.34
-            self.chip_entidad.fondo = panel_tinta(self.chip_entidad, ancho, ALTO_CHIP, tono=estilo.COLOR_FONDO,
-                                                  radio_px=estilo.RADIO_CHIP_PX, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
+            self.chip_entidad.fondo = panel_piel(self.chip_entidad, ancho, ALTO_CHIP, tono=estilo.COLOR_FONDO,
+                                                 radio_px=estilo.RADIO_CHIP_PX, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
             self.chip_texto = Text("", parent=self.chip_entidad, origin=(0, 0), position=(0, 0.004, -0.01),
-                                   scale=escala_fuente(13), color=rgb(estilo.COLOR_ACENTO), font=tipografia.FUENTE_TITULO)
+                                   scale=escala_fuente(13), color=rgb(estilo.COLOR_ACENTO), font=tipografia.fuente_piel(titulo=True))
             apilar = 0.0 if getattr(escena_mundo, "economia", None) is None else ALTO_CHIP + 0.012
             # Sobre el chip del reloj (que va sobre el del dinero).
             self.chip_entidad.position = (-diseno_adaptable.aspecto() / 2 + MARGEN + ancho / 2,

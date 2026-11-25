@@ -9,6 +9,8 @@
 #   - al cerrar: las señales reales llevan sello «TRUCO» verde, las marcas falsas quedan tachadas en gris.
 # No cambia la partida ni el resultado. APAGADO: ALCALDE_SENALES_VISUAL=0. GUARDIÁN: un fallo de lo añadido avisa y lo apaga.
 # REDUCIR MOVIMIENTO: la lupa salta sin deslizarse.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import math
 import re
@@ -123,13 +125,13 @@ def _sello(parent, texto, pos, tono, giro=-6, escala=(0.18, 0.058)):
             pass
     raiz = Entity(parent=parent, position=(pos[0], pos[1], -0.005), rotation_z=giro)
     Entity(parent=raiz, model="quad", scale=escala, color=_rgba(tono, 0.15))
-    Text(texto, parent=raiz, origin=(0, 0), z=-0.001, scale=escala_fuente(16), font=tipografia.FUENTE_TITULO, color=_rgba(tono))
+    Text(texto, parent=raiz, origin=(0, 0), z=-0.001, scale=escala_fuente(16), font=tipografia.fuente_piel(titulo=True), color=_rgba(tono))
     return raiz
 
 
 def _texto(parent, cadena, px, tono, pos, origen=(-0.5, 0.5), z=-0.004):
     return Text(cadena, parent=parent, origin=origen, position=(pos[0], pos[1], z), scale=escala_fuente(px),
-                font=tipografia.FUENTE_TITULO, color=_rgba(tono))
+                font=tipografia.fuente_piel(titulo=True), color=_rgba(tono))
 
 
 class BloqueCaptura(ui.Tarjeta):

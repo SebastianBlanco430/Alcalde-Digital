@@ -58,6 +58,7 @@ from frontend import fusion_materiales, luz_horneada
 from frontend.geometria_mundo import ENTIERRO_BASE, apoyo_de_caja, medidas_losa, medidas_zocalo
 from frontend.muros_contencion import construir_muros
 from frontend.piezas import MASCARA_LUZ, encender_luz, lineas_sueltas, pieza, silenciar
+from frontend.radio_torre_modelo import construir_torre
 from frontend.props_mundo import (
     cinta_con_tono, colocar_props, construir_props_mundo, construir_props_y_contorno, obstaculos_de_props,
 )
@@ -323,6 +324,10 @@ class Ciudad3D(Entity):
         avance("ciudad_sombras")
         # Las banderas se animan: se crean DESPUÉS de silenciar() y las mueve update().
         self.banderas = crear_banderas(mundo.edificios(), self)
+        # Torre de la Rádio Comunitária (ALCALDE_RADIO3D, docs/RADIO_3D.md): junto al edificio de la radio, con su luz roja
+        # que parpadea (por eso va después de silenciar). La emisión en 3D orbita alrededor de ella. None sin bandera o
+        # sin sitio.
+        self.radio_torre = construir_torre(self, mundo)
         if sombras:
             self.luz.shadows = True
             # Con ladera el volumen abarca todo el terreno (si no, lo que queda más abajo que los

@@ -2,12 +2,15 @@
 # sello redondo y panel de resultado de papel. La lógica pura vive en marco_calculos.py. Apagado con ALCALDE_MARCO_VISUAL=0.
 #
 # Cada función es independiente y la llama su dueño dentro de un guardián: si falla, vuelve a lo de siempre.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Text, color
 
 from frontend import banderas_visuales as bv
 from frontend import estilo, tipografia
-from frontend.componentes import a_unidades, escala_fuente, panel_tinta, rgb
+from frontend.componentes import a_unidades, escala_fuente, rgb
+from frontend.componentes import panel_piel
 from frontend.minijuegos import ui
 from frontend.minijuegos.limite_texto import MAX_RUMOR, limitar_texto
 from frontend.minijuegos_visual import marco_calculos as mc
@@ -57,11 +60,11 @@ def cabecera(padre, titulo, rumor, ancho_util, y_titulo=0.49):
     alto = max(ui.alto_de(len(lineas), mc.PX_RUMOR) + a_unidades(14), a_unidades(40))
     tira = Entity(parent=padre, position=(x0 + ancho / 2, y_top - alto / 2, 0),
                   rotation_z=mc.rotacion_tira(bv.reducir_movimiento()))
-    panel_tinta(tira, ancho, alto, tono=mc.PAPEL, radio_px=mc.RADIO_PAPEL_PX)
+    panel_piel(tira, ancho, alto, tono=mc.PAPEL, radio_px=mc.RADIO_PAPEL_PX)
     pestana = Entity(parent=tira, position=(-ancho / 2 + ancho_pestana / 2, 0, -0.002))
     ui.rect(pestana, ancho_pestana, alto, mc.ROJO_PESTANA, z=0.0, radio_px=4)
     Text("RUMOR", parent=pestana, origin=(0, 0), position=(0, 0, ui.Z_TEXTO), scale=escala_fuente(mc.PX_ETIQUETA),
-         color=rgb(mc.PAPEL), font=tipografia.FUENTE_TITULO)
+         color=rgb(mc.PAPEL), font=tipografia.fuente_piel(titulo=True))
     r = ui.texto(tira, cuerpo, mc.PX_RUMOR, ancho_texto, mc.TINTA,
                  (-ancho / 2 + ancho_pestana + margen, alto / 2 - a_unidades(7)), negrita=True)
     return t, r, tira
@@ -85,7 +88,7 @@ def sello(padre, bien, x, y, diametro=0.13):
         _trazo(c, 0, y_marca, diametro * 0.30, g, 45, tono)
         _trazo(c, 0, y_marca, diametro * 0.30, g, -45, tono)
     Text(mc.palabra_sello(bien), parent=c, origin=(0, 0), position=(0, -diametro * 0.26, ui.Z_TEXTO),
-         scale=escala_fuente(16), color=rgb(tono), font=tipografia.FUENTE_TITULO)
+         scale=escala_fuente(16), color=rgb(tono), font=tipografia.fuente_piel(titulo=True))
     return c
 
 
@@ -129,7 +132,7 @@ def panel_resultado(banner, ancho, bien, titulo, detalle, pista, ancho_columna_b
     alto = max(0.15, min(ALTO_PANEL_MAX, h))
     y = Y_PANEL_ABAJO + alto / 2
     banner.y = y
-    panel_tinta(banner, ancho, alto, tono=mc.PAPEL, radio_px=mc.RADIO_PAPEL_PX)
+    panel_piel(banner, ancho, alto, tono=mc.PAPEL, radio_px=mc.RADIO_PAPEL_PX)
     sello(banner, bien, -ancho / 2 + margen + d_sello / 2, 0.0, d_sello)
     yt = alto / 2 - m_vert
     if junto:
@@ -146,7 +149,7 @@ def chip(padre, texto, x, y, px=18):
     ancho = ui.medir(texto, px, True) + a_unidades(22)
     alto = a_unidades(px) * 1.9
     c = Entity(parent=padre, position=(x, y, -0.01))
-    panel_tinta(c, ancho, alto, tono=estilo.COLOR_ACENTO, radio_px=mc.RADIO_PAPEL_PX)
+    panel_piel(c, ancho, alto, tono=estilo.COLOR_ACENTO, radio_px=mc.RADIO_PAPEL_PX)
     Text(texto, parent=c, origin=(0, 0), position=(0, 0, ui.Z_TEXTO), scale=escala_fuente(px),
-         color=rgb(estilo.COLOR_ACENTO_TEXTO), font=tipografia.FUENTE_TITULO)
+         color=rgb(estilo.COLOR_ACENTO_TEXTO), font=tipografia.fuente_piel(titulo=True))
     return ancho

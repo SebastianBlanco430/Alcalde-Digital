@@ -20,6 +20,8 @@
 # GUARDIÁN: si la vista nueva falla al construirse, elegir_interfaz_caso() devuelve InterfazCaso; si falla un modelo, ese
 # personaje sale con su retrato 2D; si falla algo en un frame, avisa una vez por stderr y se apaga lo 3D (queda el retrato).
 # REDUCIR MOVIMIENTO: texto entero de golpe, sin acercamiento de cámara ni parpadeo del fondo de alerta.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import math
 
@@ -30,7 +32,8 @@ from frontend import diseno_adaptable, estilo, tipografia
 from frontend import interrogatorio_vn_calculos as calc
 from frontend import mundo_digital_calculos as mdc
 from frontend.casos_interfaz import InterfazCaso, MAX_FILAS
-from frontend.componentes import BotonSecundario, escala_fuente, panel_tinta, rgb
+from frontend.componentes import escala_fuente, rgb
+from frontend.componentes import boton_piel_secundario, panel_piel
 
 INTERROGATORIO_VN = True
 VARIABLE = "ALCALDE_INTERROGATORIO_VN"
@@ -98,35 +101,35 @@ class InterfazVN(InterfazCaso):
         # Sin marco de retrato: el personaje es 3D. El retrato 2D queda como respaldo (si su modelo no carga).
         self.retrato = Entity(parent=self, model="quad", scale=(0.36, 0.36), position=(X_PERSONAJE_UI, 0.20, 0.01),
                               enabled=False)
-        placa = panel_tinta(self, 0.32, 0.08, tono=estilo.COLOR_PANEL, position=(*POS_PLACA, -0.03))
+        placa = panel_piel(self, 0.32, 0.08, tono=estilo.COLOR_PANEL, position=(*POS_PLACA, -0.03))
         self.nombre = Text("", parent=placa, origin=(0, 0), position=(0, 0.014, -0.02), scale=escala_fuente(18),
-                           font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+                           font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
         self.rol = Text("", parent=placa, origin=(0, 0), position=(0, -0.018, -0.02), scale=escala_fuente(13),
                         color=rgb(estilo.COLOR_TEXTO_TENUE))
         self._rol_base = escala_fuente(13)
 
     def _construir_dialogo(self):
-        self.panel_dialogo = panel_tinta(self, ANCHO_VN, ALTO_DIALOGO_VN, tono=estilo.COLOR_PANEL,
-                                         position=(*POS_DIALOGO_VN, 0))
+        self.panel_dialogo = panel_piel(self, ANCHO_VN, ALTO_DIALOGO_VN, tono=estilo.COLOR_PANEL,
+                                        position=(*POS_DIALOGO_VN, 0))
         x0 = -ANCHO_VN / 2 + 0.03
         self.dialogo_titulo = Text("", parent=self.panel_dialogo, origin=(-0.5, 0.5), position=(x0, 0.075, -0.02),
-                                   scale=escala_fuente(19), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_ACENTO))
+                                   scale=escala_fuente(19), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_ACENTO))
         self._titulo_base = escala_fuente(19)
         self._dialogo_base = escala_fuente(19)
         self.dialogo = Text("", parent=self.panel_dialogo, origin=(-0.5, 0.5), position=(x0, 0.072, -0.02),
                             scale=self._dialogo_base, color=rgb(estilo.COLOR_TEXTO))
         self.mensaje = Text("", parent=self, origin=(-0.5, 0.5), position=(*POS_MENSAJE, -0.04), scale=escala_fuente(17),
-                            font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+                            font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
         self._mensaje_base = escala_fuente(17)
         self._siguiente = Text("»", parent=self.panel_dialogo, origin=(0, 0), position=(ANCHO_VN / 2 - 0.03, -0.065, -0.02),
                                scale=escala_fuente(14), color=rgb(estilo.COLOR_ACENTO), enabled=False)
 
     def _construir_opciones(self):
-        self.panel_opciones = panel_tinta(self, ANCHO_VN, ALTO_OPCIONES_VN, tono=estilo.COLOR_FONDO,
-                                          position=(*POS_OPCIONES_VN, 0))
+        self.panel_opciones = panel_piel(self, ANCHO_VN, ALTO_OPCIONES_VN, tono=estilo.COLOR_FONDO,
+                                         position=(*POS_OPCIONES_VN, 0))
         self._botones, self._etiquetas = [], []
         for _ in range(MAX_FILAS):
-            boton = BotonSecundario("", al_clic=None, ancho=0.5, alto=0.05, parent=self.panel_opciones)
+            boton = boton_piel_secundario("", al_clic=None, ancho=0.5, alto=0.05, parent=self.panel_opciones)
             boton.enabled = False
             etiqueta = Text("", parent=self.panel_opciones, origin=(-0.5, 0), scale=escala_fuente(16),
                             color=rgb(estilo.COLOR_BOTON_TEXTO))
@@ -141,15 +144,15 @@ class InterfazVN(InterfazCaso):
         Entity(parent=self, model="quad", position=(0, -1.0, 0.05), scale=(6, 1.0), color=rgb(estilo.COLOR_FONDO))
         # Carta que vuela, rótulo «¡CONTRADICCIÓN!» y nombres del tablero (el fondo de alerta es el telón 3D del escenario).
         self.carta = Entity(parent=self, z=-0.2, enabled=False)
-        panel_tinta(self.carta, 0.24, 0.15, tono=estilo.COLOR_TARJETA)
+        panel_piel(self.carta, 0.24, 0.15, tono=estilo.COLOR_TARJETA)
         self.carta_txt = Text("", parent=self.carta, origin=(0, 0), z=-0.02, scale=escala_fuente(15),
-                              font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+                              font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
         self.rotulo = Text("¡CONTRADICCIÓN!", parent=self, origin=(0, 0), position=(0.07, 0.18, -0.25),
-                           scale=escala_fuente(46), font=tipografia.FUENTE_TITULO, color=rgb(ROJO), enabled=False)
-        self.nombres_tablero = [Text("", parent=self, origin=(0, 0), scale=escala_fuente(15), font=tipografia.FUENTE_TITULO,
+                           scale=escala_fuente(46), font=tipografia.fuente_piel(titulo=True), color=rgb(ROJO), enabled=False)
+        self.nombres_tablero = [Text("", parent=self, origin=(0, 0), scale=escala_fuente(15), font=tipografia.fuente_piel(titulo=True),
                                      color=rgb(estilo.COLOR_TEXTO), enabled=False) for _ in range(4)]
         self.titulo_tablero = Text("Sospechosos", parent=self, origin=(0, 0), position=(-0.55, 0.415, -0.02),
-                                   scale=escala_fuente(20), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_ACENTO),
+                                   scale=escala_fuente(20), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_ACENTO),
                                    enabled=False)
 
     # -- API de InterfazCaso con la vista nueva --

@@ -6,6 +6,8 @@
 # Qué dice y con qué cara lo decide backend/logica/dialogos.py (Respuesta); aquí solo se dibuja. Avanzar: E, Intro,
 # Espacio o clic; Esc cierra. Una guarda corta ignora la pulsación que abrió la caja (la misma E no salta la primera
 # página). `al_final` se llama UNA vez, al mostrarse la última página (ahí se entrega la ayuda).
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import time
 
@@ -13,7 +15,8 @@ from ursina import Entity, Text
 
 from backend.logica.dialogos import Paginador
 from frontend import diseno_adaptable, dialogo_retratos, estilo, tipografia
-from frontend.componentes import escala_fuente, panel_tinta, rgb
+from frontend.componentes import escala_fuente, rgb
+from frontend.componentes import panel_piel
 
 ANCHO, ALTO = 1.30, 0.34
 POS = (0.0, -0.31)
@@ -30,13 +33,13 @@ class CajaDialogo(Entity):
         opciones.setdefault("enabled", False)
         super().__init__(**opciones)
         self.z = -0.05
-        self.marco = panel_tinta(self, ANCHO, ALTO, tono=estilo.COLOR_PANEL, position=(*POS, 0))
-        retrato_marco = panel_tinta(self.marco, LADO_RETRATO + 0.02, LADO_RETRATO + 0.02, tono=estilo.COLOR_FONDO,
-                                    position=(-ANCHO / 2 + LADO_RETRATO / 2 + 0.03, 0, -0.01))
+        self.marco = panel_piel(self, ANCHO, ALTO, tono=estilo.COLOR_PANEL, position=(*POS, 0))
+        retrato_marco = panel_piel(self.marco, LADO_RETRATO + 0.02, LADO_RETRATO + 0.02, tono=estilo.COLOR_FONDO,
+                                   position=(-ANCHO / 2 + LADO_RETRATO / 2 + 0.03, 0, -0.01))
         self.retrato = Entity(parent=retrato_marco, model="quad", scale=(LADO_RETRATO, LADO_RETRATO), z=-0.01)
         x0 = -ANCHO / 2 + LADO_RETRATO + 0.07
         self.nombre = Text("", parent=self.marco, origin=(-0.5, 0.5), position=(x0, ALTO / 2 - 0.025, -0.02),
-                           scale=escala_fuente(21), color=rgb(estilo.COLOR_ACENTO), font=tipografia.FUENTE_TITULO)
+                           scale=escala_fuente(21), color=rgb(estilo.COLOR_ACENTO), font=tipografia.fuente_piel(titulo=True))
         self.rol = Text("", parent=self.marco, origin=(-0.5, 0.5), position=(x0, ALTO / 2 - 0.065, -0.02),
                         scale=escala_fuente(14), color=rgb(estilo.COLOR_TEXTO_TENUE))
         self._base_texto = escala_fuente(19)

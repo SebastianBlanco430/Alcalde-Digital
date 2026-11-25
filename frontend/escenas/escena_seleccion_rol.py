@@ -10,6 +10,11 @@
 # Confirmación (T-selección): clic/Enter en una tarjeta solo la RESALTA como candidata (anillo amarillo +
 # insignia «Elegido»); el botón «Seleccionar» la confirma. «Cambiar» deshace la última confirmación y
 # «Atrás» vuelve a «¿Cuántos jugadores?». `elegir_rol(rol)` sigue confirmando de inmediato (API previa).
+# Submenú «Multijugador» (ALCALDE_MENU_MULTIJUGADOR, docs/MENU_MULTIJUGADOR.md): el menú dice cuántos juegan
+# (`al_entrar(jugadores=n)`; sin decirlo, 1) y el paso 1 no sale; «Atrás» llama entonces a `al_volver` (el menú).
+# Con =0, el paso 1 de siempre.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from panda3d.core import TextNode
 from ursina import Button, Entity, Text, color, window
@@ -18,9 +23,11 @@ from backend.datos.nombres_visibles import nombre_visible
 from backend.logica.roles import ORDEN_ROLES, ROLES
 from backend.logica.sesion import MAX_JUGADORES
 from frontend import estilo, iconos, tipografia
+from frontend import menu_inicio_calculos as mic
 from frontend.componentes import (
-    BotonPrimario, BotonSecundario, a_unidades, escala_fuente, modelo_redondeado, panel_tinta, rgb,
+    a_unidades, escala_fuente, modelo_redondeado, rgb,
 )
+from frontend.componentes import boton_piel_primario, boton_piel_secundario, panel_piel
 from frontend.escenas.escena_base import Escena
 from frontend.fondo_menu import FocoTeclado, FondoMenu, anadir_filo
 from frontend.texto import envolver_texto
@@ -63,12 +70,12 @@ class TarjetaRol(Entity):
             parent=self, model=modelo_redondeado(w + 2 * (borde + gc), h + 2 * (borde + gc), radio + 10),
             scale=(w + 2 * (borde + gc), h + 2 * (borde + gc)), color=rgb(estilo.ACENTO_PRIMARIO), z=0.0065)
         self.anillo_candidata.enabled = False
-        self.panel = panel_tinta(self, w, h, estilo.COLOR_TARJETA, radio)
+        self.panel = panel_piel(self, w, h, estilo.COLOR_TARJETA, radio)
         anadir_filo(self.panel, w, h, radio)
 
         # Retrato sobre un cuadro del color del rol (la identidad del rol se conserva).
         caja = LADO_RETRATO + 0.02
-        self.caja_retrato = panel_tinta(
+        self.caja_retrato = panel_piel(
             self, caja, caja, info.color, estilo.RADIO_TARJETA_PX, sombra=False,
             position=(0, h / 2 - caja / 2 - 0.03, -0.0005), borde_px=2)
         self.retrato = Entity(
@@ -78,7 +85,7 @@ class TarjetaRol(Entity):
 
         self.texto_nombre = Text(
             info.nombre, parent=self, origin=(0, 0), position=(0, -0.035, -0.001),
-            scale=escala_fuente(28), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO))
+            scale=escala_fuente(28), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
         self._ajustar_ancho(self.texto_nombre, 28, w - 2 * a_unidades(18))
         self.texto_descripcion = Text(
             "", parent=self, origin=(0, 0.5), position=(0, -0.072, -0.001),
@@ -92,12 +99,12 @@ class TarjetaRol(Entity):
         self.texto_lugar.line_height = 1.2
 
         # Insignia «Elegido» (candidata): píldora amarilla con borde de tinta sobre el borde superior.
-        self.insignia = panel_tinta(
+        self.insignia = panel_piel(
             self, 0.17, 0.05, estilo.ACENTO_PRIMARIO, estilo.RADIO_CHIP_PX, sombra=False,
             position=(0, h / 2 + 0.004, -0.004))
         self.texto_insignia = Text(
             "Elegido", parent=self.insignia, origin=(0, 0), position=(0, 0, -0.003),
-            scale=escala_fuente(20), font=tipografia.FUENTE_TITULO, color=rgb(estilo.TINTA))
+            scale=escala_fuente(20), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.TINTA))
         self.insignia.enabled = False
 
         # Zona de ratón transparente sobre toda la tarjeta.
@@ -237,10 +244,12 @@ class EscenaSeleccionRol(Escena):
     ANCHO_SELECCIONAR = a_unidades(360)
     X_LATERAL = 0.62           # centro de «Atrás» (izquierda) y «Cambiar» (derecha)
 
-    def __init__(self, fabrica_sesion, al_comenzar, **opciones):
+    def __init__(self, fabrica_sesion, al_comenzar, al_volver=None, **opciones):
         super().__init__(**opciones)
         self._fabrica_sesion = fabrica_sesion
         self._al_comenzar = al_comenzar
+        self._al_volver = al_volver
+        self._cantidad_fija = 0     # jugadores que pidió el menú (0 = se pregunta aquí, como siempre)
         self.sesion = None
         self.total_jugadores = 0
         self._paso_previo = None
@@ -253,10 +262,10 @@ class EscenaSeleccionRol(Escena):
         dx, dy = a_unidades(3), -a_unidades(3)
         self.sombra_instruccion = Text(
             "", parent=self, origin=(0, 0), position=(dx, self.Y_INSTRUCCION + dy, 0.002),
-            scale=escala_fuente(40), font=tipografia.FUENTE_TITULO, color=rgb(estilo.TINTA))
+            scale=escala_fuente(40), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.TINTA))
         self.texto_instruccion = Text(
             "", parent=self, origin=(0, 0), position=(0, self.Y_INSTRUCCION),
-            scale=escala_fuente(40), font=tipografia.FUENTE_TITULO, color=rgb(estilo.COLOR_TEXTO),
+            scale=escala_fuente(40), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO),
         )
         self.texto_subtitulo = Text(
             "", parent=self, origin=(0, 0), position=(0, self.Y_SUBTITULO),
@@ -272,7 +281,7 @@ class EscenaSeleccionRol(Escena):
         for n in range(1, MAX_JUGADORES + 1):
             x = (n - 2.5) * self.SEPARACION_CANTIDAD
             etiqueta = "1 jugador" if n == 1 else f"{n} jugadores"
-            self.botones_cantidad[n] = BotonSecundario(
+            self.botones_cantidad[n] = boton_piel_secundario(
                 etiqueta, al_clic=lambda n=n: self.elegir_cantidad(n),
                 ancho=self.ANCHO_BOTON_CANTIDAD, alto=self.ALTO_BOTON_CANTIDAD,
                 tamano_fuente_px=24, parent=self.grupo_cantidad, position=(x, self.Y_CANTIDAD),
@@ -291,20 +300,20 @@ class EscenaSeleccionRol(Escena):
             self.botones_rol[rol] = tarjeta
             self.muestras_rol[rol] = tarjeta.retrato   # la muestra de cada rol es su retrato
 
-        self.boton_comenzar = BotonPrimario(
+        self.boton_comenzar = boton_piel_primario(
             "Comenzar", al_clic=self.comenzar, ancho=a_unidades(260), alto=a_unidades(60),
             tamano_fuente_px=26, parent=self, position=(0, self.Y_COMENZAR),
         )
         # «Seleccionar» confirma la candidata; queda deshabilitado mientras no haya ninguna.
-        self.boton_seleccionar = BotonPrimario(
+        self.boton_seleccionar = boton_piel_primario(
             "Seleccionar", al_clic=self.confirmar_candidata, ancho=self.ANCHO_SELECCIONAR,
             alto=a_unidades(60), tamano_fuente_px=26, parent=self, position=(0, self.Y_COMENZAR),
         )
-        self.boton_cambiar = BotonSecundario(
+        self.boton_cambiar = boton_piel_secundario(
             "Cambiar", al_clic=self.deshacer_ultima_eleccion, ancho=a_unidades(170), alto=a_unidades(48),
             tamano_fuente_px=20, parent=self, position=(self.X_LATERAL, self.Y_COMENZAR),
         )
-        self.boton_atras = BotonSecundario(
+        self.boton_atras = boton_piel_secundario(
             "Atrás", al_clic=self.volver_a_cantidad, ancho=a_unidades(170), alto=a_unidades(48),
             tamano_fuente_px=20, parent=self, position=(-self.X_LATERAL, self.Y_COMENZAR),
         )
@@ -335,8 +344,9 @@ class EscenaSeleccionRol(Escena):
 
     # -- Ciclo de vida --
 
-    # Cada vez que se entra se parte de una sesión nueva (y de cero jugadores).
-    def al_entrar(self, **datos):
+    # Cada vez que se entra se parte de una sesión nueva (y de cero jugadores, o de los que pidió el menú).
+    def al_entrar(self, jugadores=None, **datos):
+        self._cantidad_fija = mic.cantidad_inicial(jugadores, mic.multijugador_activo(), MAX_JUGADORES)
         self._reiniciar()
 
     def _reiniciar(self):
@@ -345,6 +355,8 @@ class EscenaSeleccionRol(Escena):
         self._paso_previo = None
         self._candidata = None
         self._elecciones = []
+        if self._cantidad_fija:
+            self.total_jugadores = self._cantidad_fija
         self.refrescar()
 
     # -- Pasos --
@@ -402,9 +414,11 @@ class EscenaSeleccionRol(Escena):
         self._paso_previo = None
         self.refrescar()
 
-    # Vuelve a «¿Cuántos jugadores?» y reinicia la sesión.
+    # Vuelve a «¿Cuántos jugadores?» y reinicia la sesión; si el menú fijó cuántos juegan, vuelve al menú.
     def volver_a_cantidad(self):
-        if self.total_jugadores:
+        if self._cantidad_fija and self._al_volver is not None:
+            self._al_volver()
+        elif self.total_jugadores:
             self._reiniciar()
 
     def todos_eligieron(self):

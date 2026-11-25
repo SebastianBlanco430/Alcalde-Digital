@@ -5,6 +5,8 @@
 #
 # Solo dibuja (no tiene update). batería(f) permite que una pantalla la baje (tiempo de pantalla).
 # Los textos de hora salen de frontend/minijuegos_visual/chat_visual_calculos.hora_texto (puro, con tests).
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import datetime
 
@@ -34,7 +36,7 @@ class MarcoTelefono(Entity):
         y = cy + alto / 2 - 0.016
         x_der = cx + ancho / 2 - 0.012
         self.hora = Text(hora_texto(minutos), parent=self, origin=(0.5, 0), position=(x_der - 0.075, y, -0.03),
-                         scale=escala_fuente(12), font=tipografia.FUENTE_TITULO, color=color.rgba32(*estilo.COLOR_TEXTO, 230))
+                         scale=escala_fuente(12), font=tipografia.fuente_piel(titulo=True), color=color.rgba32(*estilo.COLOR_TEXTO, 230))
         # Batería: contorno + relleno.
         self._bateria_borde = ui.rect(self, 0.04, 0.016, estilo.COLOR_TEXTO_TENUE, (x_der - 0.024, y), z=-0.028, radio_px=3)
         self._bateria = Entity(parent=self, model="quad", origin=(-0.5, 0), color=color.rgba32(88, 214, 141, 255),

@@ -3,11 +3,14 @@
 # detalle, el mensaje de la última acción (rojo si es un rechazo) y el pie «Peso · R$ · I cierra».
 # Toda la lógica vive en frontend/inventario_calculos.py (ControlInventario); aquí solo se dibuja, y solo
 # cuando cambia la firma del contenido. Estilo: estilo.py y componentes.panel_tinta.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Text, color
 
 from frontend import diseno_adaptable, estilo, inventario_calculos as calc, tipografia
-from frontend.componentes import a_unidades, destruir_arbol, escala_fuente, modelo_redondeado, panel_tinta, rgb
+from frontend.componentes import a_unidades, destruir_arbol, escala_fuente, modelo_redondeado, rgb
+from frontend.componentes import panel_piel
 
 ANCHO, ALTO = 1.14, 0.84
 ANCHO_SIL, ALTO_SIL = 0.54, 0.52
@@ -20,7 +23,7 @@ GRIS_FANTASMA = (52, 55, 74)
 
 
 def _texto(padre, cadena, px, tono, pos, origen=(-0.5, 0), negrita=False, z=-0.01):
-    opciones = {"font": tipografia.FUENTE_TITULO} if negrita else {}
+    opciones = {"font": tipografia.fuente_piel(titulo=True)} if negrita else {}
     return Text(cadena.replace("<", "(").replace(">", ")"), parent=padre, origin=origen, position=(pos[0], pos[1], z),
                 scale=escala_fuente(px), color=rgb(tono), **opciones)
 
@@ -38,7 +41,7 @@ class PanelInventario(Entity):
         self.control = control
         self._nombre_fn = nombre_fn or (lambda: "")
         self._firma = None
-        self.marco = panel_tinta(self, ANCHO, ALTO, z=-0.02)
+        self.marco = panel_piel(self, ANCHO, ALTO, z=-0.02)
         self.dinamico = Entity(parent=self, z=-0.03)
         self.z = -0.05
 

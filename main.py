@@ -26,6 +26,7 @@ from backend.logica.sesion import SesionJuego
 from frontend import economia_config, online_config
 from frontend import compat_macos, daltonismo, diseno_adaptable, estilo, medidor_fps, tipografia
 from frontend import gpu_dedicada, rendimiento, suavizado, telemetria
+from frontend import ui_botw_calculos       # piel BOTW de la interfaz (ALCALDE_UI_BOTW)
 from frontend import fuentes_texto      # ALCALDE_FUENTE_CACHE: el model path no crece con cada Text
 from frontend import pantalla_carga         # M7.3: barra de progreso real mientras se construye todo (ALCALDE_PANTALLA_CARGA)
 from frontend import pantalla_completa      # ajuste «Pantalla completa» y F11 por el almacén de ajustes
@@ -179,10 +180,14 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
     # Con ONLINE las escenas del mundo hablan con la conexión «activa» (hot-seat u online); sin ONLINE, con la de siempre.
     activa = [conexion]
     destino = ConexionActiva(activa) if online_config.ONLINE else conexion
+    # Submenú «Multijugador» (ALCALDE_MENU_MULTIJUGADOR, docs/MENU_MULTIJUGADOR.md): «Empezar» elige rol con 1 jugador y
+    # «Local por turnos» con 2, 3 o 4 (mismo hot-seat: la cantidad entra por cambiar_a). «Atrás» de la selección vuelve
+    # al inicio cuando el menú ya fijó cuántos juegan.
     gestor.registrar(INICIO, EscenaInicio(
-        al_comenzar=conexion.ir_a_seleccion, al_salir=application.quit, al_ajustes=al_ajustes, al_online=al_online))
+        al_comenzar=conexion.ir_a_seleccion, al_salir=application.quit, al_ajustes=al_ajustes, al_online=al_online,
+        al_local=lambda n: gestor.cambiar_a(SELECCION_ROL, jugadores=n)))
     gestor.registrar(SELECCION_ROL, EscenaSeleccionRol(
-        fabrica_sesion=crear_sesion, al_comenzar=conexion.comenzar_partida))
+        fabrica_sesion=crear_sesion, al_comenzar=conexion.comenzar_partida, al_volver=lambda: gestor.cambiar_a(INICIO)))
     pantalla_carga.avance("ciudad_base")
     escena_mundo = EscenaMundo(
         al_interactuar=(lambda: destino.interactuar()) if online_config.ONLINE else conexion.interactuar,
@@ -281,6 +286,9 @@ def crear_aplicacion(duracion_transicion=DURACION_TRANSICION, duracion_cinematic
     # development_mode=False oculta el panel de desarrollo, pero en Ursina 8.3.0
     # activaría fullscreen por defecto, así que se pide ventana explícita.
     compat_macos.aplicar()
+    # Piel BOTW (ALCALDE_UI_BOTW, docs/ESTILO_BOTW.md): si el jugador la eligió en Ajustes y no hay variable, se deja
+    # en el entorno antes de construir nada, así las pantallas que solo miran la variable ven lo mismo.
+    ui_botw_calculos.publicar_en_entorno()
     _limpiar_temporales()
     fuentes_texto.instalar()         # antes del primer Text (ALCALDE_FUENTE_CACHE=0 deja el setter de Ursina)
     rendimiento.configurar_panda()   # opciones de Panda que deben ir antes de abrir la ventana

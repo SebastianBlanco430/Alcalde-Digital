@@ -101,9 +101,10 @@ class EscenaMundo(Escena):
         self.hud.puede_abrir_mapa = self._puede_abrir_mapa      # mapa a pantalla completa (tecla N)
         self.texto_turno = self.hud.panel_turno.texto_turno
         self.texto_mision = self.hud.panel_turno.texto_mision
+        from frontend.escenas.escena_ajustes import PantallaAjustes
         self.menu_pausa = MenuPausa(
             al_reanudar=lambda: self.alternar_pausa(False), al_menu=self._ir_al_menu,
-            al_salir=application.quit, parent=self.hud)
+            al_salir=application.quit, fabrica_ajustes=PantallaAjustes, parent=self.hud)
         # Pantalla de finales (A2d): sustituye al panel «Partida terminada» cuando el flujo da un final.
         from frontend.panel_final import PanelFinal
         self.panel_final = PanelFinal(self._ir_al_menu, parent=self.hud)

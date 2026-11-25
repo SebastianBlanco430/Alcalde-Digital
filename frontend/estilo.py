@@ -146,3 +146,54 @@ def tono_legible(tono, fondo, minimo=4.5):
         if contraste(candidato, fondo) >= minimo:
             return candidato
     return (0, 0, 0)
+
+
+# ===========================================================================
+# Piel BOTW (docs/ESTILO_BOTW.md, ALCALDE_UI_BOTW). Solo se AÑADEN constantes
+# con prefijo BOTW_: los valores de arriba no cambian (las pantallas que no se
+# pasan a la piel se ven igual). Sale del menú de inicio (menu_botw_calculos):
+# tinta violeta, velos translúcidos, amarillo de selección y texto lila claro.
+# Las piezas que las usan están en frontend/componentes.py (panel_botw,
+# BotonBotw*) y la bandera y las reglas en frontend/ui_botw_calculos.py.
+# ===========================================================================
+
+# --- Tinta, velo y superficies ---
+BOTW_TINTA = (30, 27, 46)             # contornos, sombras y texto sobre amarillo
+BOTW_VELO = (24, 18, 44)              # fondo translúcido de paneles (con BOTW_ALFA_VELO)
+BOTW_ALFA_VELO = 222                  # sobre 255: se ve un poco el mundo detrás, el texto se lee igual
+BOTW_PANEL = (36, 30, 58)             # panel opaco (cuando no conviene la transparencia)
+BOTW_TARJETA = (50, 43, 78)           # tarjeta o fila dentro de un panel
+BOTW_SUPERFICIE_ALTA = (66, 57, 100)  # hover de tarjeta, chip
+BOTW_FONDO = (20, 16, 34)             # fondo de pantalla completa
+
+# --- Texto ---
+BOTW_TEXTO = (244, 240, 255)          # texto principal (TEXTO_PIE del menú)
+BOTW_TEXTO_DETALLE = (237, 231, 255)  # texto secundario claro
+BOTW_TEXTO_TENUE = (184, 176, 214)    # ayudas y rótulos apagados
+
+# --- Acento y estados ---
+BOTW_ACENTO = (255, 217, 61)          # amarillo de la opción elegida y de la acción principal
+BOTW_ACENTO_TEXTO = BOTW_TINTA        # texto sobre el amarillo
+BOTW_ACENTO_SUAVE = (255, 232, 140)   # hover del amarillo
+BOTW_EXITO = (110, 214, 140)
+BOTW_AVISO = (255, 186, 72)
+BOTW_ERROR = (240, 98, 98)
+BOTW_INFO = (120, 214, 255)
+
+# --- Botones ---
+BOTW_BOTON = (60, 51, 96)
+BOTW_BOTON_RESALTADO = (78, 67, 122)
+BOTW_BOTON_PRESIONADO = (44, 37, 72)
+BOTW_BOTON_DESHABILITADO = (48, 44, 62)
+BOTW_BOTON_TEXTO = BOTW_TEXTO
+
+# --- Filo, radios y sombra (más finos y suaves que la tinta del cómic) ---
+BOTW_FILO = (237, 231, 255)           # borde fino claro (con BOTW_ALFA_FILO)
+BOTW_ALFA_FILO = 96
+BOTW_GROSOR_FILO_PX = 2
+BOTW_RADIO_CHIP_PX = 4
+BOTW_RADIO_TARJETA_PX = 6
+BOTW_RADIO_PANEL_PX = 8
+BOTW_DESPLAZAMIENTO_SOMBRA_PX = (0, -4)   # sombra que cae recta, sin desplazamiento lateral
+BOTW_ALFA_SOMBRA = 120
+BOTW_ALTO_FOCO_PX = 2                 # anillo amarillo del foco de teclado

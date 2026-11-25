@@ -12,13 +12,16 @@
 #     .animando()               True durante la transición
 # La transición dura tgc.DURACION_TRANSICION con ease_in_out y avanza con time.dt en update(): no traba el juego.
 # Número de entidades fijo (≈ 20): se crea una vez y se reutiliza.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Text, camera, color, time
 
 from frontend import estilo, tipografia
 from frontend import hud_contextual_calculos as hctx
 from frontend import telefono_grande_calculos as tgc
-from frontend.componentes import BotonSecundario, a_unidades, escala_fuente, modelo_redondeado, rgb
+from frontend.componentes import a_unidades, escala_fuente, modelo_redondeado, rgb
+from frontend.componentes import boton_piel_secundario
 
 COLOR_CUERPO = (14, 15, 22)
 COLOR_CANTO = (64, 68, 96)
@@ -65,7 +68,7 @@ class MarcoTelefono(Entity):
         izquierda = -tgc.PANTALLA_ANCHO / 2 + 0.03
         derecha = tgc.PANTALLA_ANCHO / 2 - 0.03
         self.hora = Text("", parent=self.pantalla, origin=(-0.5, 0), position=(izquierda, arriba, -0.01),
-                         scale=escala_fuente(13), color=rgb(estilo.COLOR_TEXTO), font=tipografia.FUENTE_TITULO)
+                         scale=escala_fuente(13), color=rgb(estilo.COLOR_TEXTO), font=tipografia.fuente_piel(titulo=True))
         for i in range(4):
             alto_barra = 0.006 + i * 0.003
             _quad(self.pantalla, 0.005, alto_barra, estilo.COLOR_TEXTO,
@@ -77,8 +80,8 @@ class MarcoTelefono(Entity):
         # «?» para releer la explicación del tipo de aviso (solo si hay a quién llamar)
         self.boton_ayuda = None
         if al_ayuda is not None:
-            self.boton_ayuda = BotonSecundario("?", al_clic=al_ayuda, ancho=0.05, alto=0.05, tamano_fuente_px=20,
-                                               parent=self, position=(ancho / 2 + 0.045, alto / 2 - 0.05, -0.01))
+            self.boton_ayuda = boton_piel_secundario("?", al_clic=al_ayuda, ancho=0.05, alto=0.05, tamano_fuente_px=20,
+                                                     parent=self, position=(ancho / 2 + 0.045, alto / 2 - 0.05, -0.01))
         self._desde = None
         self._t = 0.0
         self._sentido = 0              # 1 abriendo, -1 cerrando, 0 quieto

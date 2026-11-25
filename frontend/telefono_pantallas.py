@@ -14,6 +14,8 @@
 # anillo grueso y el panel lateral dice «[x]». Sin emojis ni flechas (la fuente no los tiene).
 # Número de entidades FIJO: cada pantalla crea su pool (líneas, tramos, números, chips) una vez y solo cambia textos,
 # posiciones y colores al pasar de un aviso a otro.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Text, color
 
@@ -22,7 +24,8 @@ from frontend import red_social_calculos as rsc
 from frontend import red_social_iconos as ico
 from frontend import hud_contextual_calculos as hctx
 from frontend import telefono_grande_calculos as tgc
-from frontend.componentes import BotonSecundario, a_unidades, escala_fuente, modelo_redondeado, panel_tinta, rgb
+from frontend.componentes import a_unidades, escala_fuente, modelo_redondeado, rgb
+from frontend.componentes import boton_piel_secundario, panel_piel
 from frontend.red_social_vista import AccionPost, Avatar, Medidor
 from frontend.texto import envolver_texto
 
@@ -58,7 +61,7 @@ def alto_linea(px):
 
 
 def _texto(padre, px, pos, tono=estilo.COLOR_TEXTO, origen=(-0.5, 0.5), negrita=False, z=-0.01):
-    opciones = {"font": tipografia.FUENTE_TITULO} if negrita else {}
+    opciones = {"font": tipografia.fuente_piel(titulo=True)} if negrita else {}
     return Text("", parent=padre, origin=origen, position=(pos[0], pos[1], z), scale=escala_fuente(px), color=rgb(tono),
                 **opciones)
 
@@ -137,7 +140,7 @@ class Numero(Entity):
         self.disco = Entity(parent=self, model="circle", scale=0.024, z=0.001, collider="sphere")
         self.disco.on_click = lambda: self.numero is not None and al_clic(self.numero)
         self.texto = Text("", parent=self, origin=(0, 0), position=(0, 0.001, -0.002), scale=escala_fuente(12),
-                          color=rgb(estilo.TINTA), font=tipografia.FUENTE_TITULO)
+                          color=rgb(estilo.TINTA), font=tipografia.fuente_piel(titulo=True))
 
     def fijar(self, numero, x, y, marcado):
         self.numero = numero
@@ -186,7 +189,7 @@ class PanelLateral(Entity):
         super().__init__(enabled=False, **opciones)
         ancho, alto = tgc.LATERAL_ANCHO, tgc.LATERAL_ALTO
         self.ancho_texto = ancho - 0.07
-        self.marco = panel_tinta(self, ancho, alto, tono=estilo.COLOR_PANEL)
+        self.marco = panel_piel(self, ancho, alto, tono=estilo.COLOR_PANEL)
         x0 = -ancho / 2 + 0.035
         self.x0 = x0
         self.arriba = alto / 2 - 0.035
@@ -196,8 +199,8 @@ class PanelLateral(Entity):
         self.instruccion = _texto(self, 15, (x0, 0), estilo.COLOR_ACENTO)
         self.filas = []
         for i in range(self.MAX_FILAS):
-            boton = BotonSecundario(" ", al_clic=lambda n=i + 1: al_clic(n), ancho=self.ancho_texto, alto=0.048,
-                                    tamano_fuente_px=15, parent=self)
+            boton = boton_piel_secundario(" ", al_clic=lambda n=i + 1: al_clic(n), ancho=self.ancho_texto, alto=0.048,
+                                          tamano_fuente_px=15, parent=self)
             boton.text_entity.origin = (-0.5, 0)
             boton.text_entity.x = -0.47
             boton.enabled = False

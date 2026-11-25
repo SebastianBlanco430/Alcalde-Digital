@@ -32,6 +32,8 @@ from frontend import (
 from frontend.componentes import (
     BarraIndicador, BotonAccion, BotonPrimario, a_unidades, destruir_arbol, escala_fuente,
     modelo_redondeado, panel_tinta, rgb)
+from frontend.componentes import boton_piel, panel_piel, piel_botw
+from frontend import ui_botw_calculos
 from frontend.texto import envolver_texto
 
 MARGEN = 0.02                       # separación de los bordes de la pantalla
@@ -41,6 +43,31 @@ COLOR_RUTA = estilo.COLOR_RUTA          # cian: la ruta (minimapa y mundo); fuen
 COLOR_DESTINO = estilo.COLOR_DESTINO    # amarillo: el destino (igual que la baliza del mundo)
 COLOR_ALERTA = (214, 62, 62)        # insignia de no leídos
 COLOR_RESALTADO = (62, 78, 138)     # mensaje sin leer en el teléfono
+
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW, encendida por defecto, =0 o Ajustes › Estilo «Clásico»
+# la apagan): los chips y marcos del HUD pasan a velo violeta translúcido con filo claro. Los nombres de arriba no
+# cambian; los fondos se piden a _fondo_hud() y los tonos a _tono().
+COLOR_FONDO_HUD_BOTW = color.rgba32(*estilo.BOTW_VELO, estilo.BOTW_ALFA_VELO)
+
+
+# ¿El tutorial está señalando el HUD? La consulta la pone frontend/registro_tutorial.py con fijar_consulta_senalando():
+# una vista no importa controladores (contrato MVC, R3). Sin consulta, nada se está señalando.
+_CONSULTA_SENALANDO = None
+
+
+def fijar_consulta_senalando(consulta):
+    global _CONSULTA_SENALANDO
+    _CONSULTA_SENALANDO = consulta
+
+
+# Fondo de los bloques del HUD que no usan el estilo único: el de siempre o el velo BOTW.
+def _fondo_hud():
+    return COLOR_FONDO_HUD_BOTW if piel_botw() else COLOR_FONDO_HUD
+
+
+# Tono de estilo.py con su equivalente BOTW si la piel está puesta.
+def _tono(tono):
+    return ui_botw_calculos.tono(tono)
 
 
 # Curva de salida cuadrática (rápida al inicio, suave al final) para t en [0, 1].
@@ -110,7 +137,9 @@ def _fondo(padre, ancho, alto, tono, radio_px=8, **opciones):
 # panel_tinta con el estilo único del bloque (M3.3, panel_unico_calculos): mismo radio, borde y tono por categoría.
 def _tinta(padre, bloque, ancho, alto, **opciones):
     e = pu.estilo_de(bloque)
-    return panel_tinta(padre, ancho, alto, tono=e.tono, radio_px=e.radio_px, borde_px=e.borde_px, **opciones)
+    # con la piel BOTW el fondo de los bloques es el velo violeta translúcido del menú (panel_piel lo pone con COLOR_PANEL)
+    tono = estilo.COLOR_PANEL if piel_botw() and tuple(e.tono) == estilo.COLOR_FONDO else e.tono
+    return panel_piel(padre, ancho, alto, tono=tono, radio_px=e.radio_px, borde_px=e.borde_px, **opciones)
 
 
 # Fondo de tamaño variable (FondoTinta o el _fondo de antes) y su alfa de aparición.
@@ -126,7 +155,8 @@ def _alfa_fondo(fondo, nivel):
     if isinstance(fondo, FondoTinta):
         fondo.fijar_alfa(nivel)
     else:
-        fondo.color = color.rgba32(12, 14, 24, int(round(240 * nivel)))
+        base = _fondo_hud()
+        fondo.color = color.rgba(base.r, base.g, base.b, base.a * nivel)
 
 
 # Fondo de un bloque del HUD con el estilo único que cambia de tamaño (lo rehace solo si cambia) y se funde con
@@ -290,7 +320,7 @@ class TelefonoUI(Entity):
             self.fondo_icono = _tinta(self, "telefono", self.ANCHO_ICONO, self.ALTO_ICONO,
                                       position=(centro_x, centro_y, 0.001))
         ancho_pantalla, alto_pantalla = self.ANCHO_ICONO - 0.014, self.ALTO_ICONO - 0.026
-        _fondo(self, ancho_pantalla, alto_pantalla, rgb(estilo.COLOR_BOTON), 5,
+        _fondo(self, ancho_pantalla, alto_pantalla, rgb(_tono(estilo.COLOR_BOTON)), 5,
                position=(centro_x, centro_y + 0.004, -0.001))
         # icono del teléfono (frontend/iconos.py) dentro de la pantalla
         _icono(self, "telefono", ancho_pantalla, (centro_x, centro_y + 0.004, -0.002))
@@ -452,7 +482,7 @@ class TelefonoUI(Entity):
         if pu.activo():
             _tinta(self.banner, "toast", ancho, alto, z=0.002)
         else:
-            _fondo(self.banner, ancho, alto, rgb(estilo.COLOR_PANEL), 10, z=0.002)
+            _fondo(self.banner, ancho, alto, rgb(_tono(estilo.COLOR_PANEL)), 10, z=0.002)
         izquierda = -ancho / 2 + relleno
         _icono(self.banner, "telefono", lado_icono, (izquierda + lado_icono / 2, 0, -0.001))
         linea.position = (izquierda + lado_icono + 0.008, 0, -0.001)
@@ -479,7 +509,7 @@ class TelefonoUI(Entity):
         cuerpo, alto_texto = _texto_envuelto(
             self.banner, texto, self.ANCHO_BANNER - 2 * relleno, 18, estilo.COLOR_TEXTO, (0, 0))
         self._alto_banner = a_unidades(15) * 1.3 + alto_texto + 2 * relleno
-        _fondo(self.banner, self.ANCHO_BANNER, self._alto_banner, rgb(estilo.COLOR_PANEL), 10,
+        _fondo(self.banner, self.ANCHO_BANNER, self._alto_banner, rgb(_tono(estilo.COLOR_PANEL)), 10,
                z=0.002)
         izquierda, arriba = -self.ANCHO_BANNER / 2 + relleno, self._alto_banner / 2 - relleno
         _icono(self.banner, "telefono", lado_icono,
@@ -506,7 +536,7 @@ class TelefonoUI(Entity):
         centro_x = self.x_derecho - ancho / 2
         centro_y = self.y_inferior + self.ALTO_ICONO + 0.012 + alto / 2
         self.panel.position = (centro_x, centro_y)
-        _fondo(self.panel, ancho, alto, rgb(estilo.COLOR_PANEL), 12, z=0.002)
+        _fondo(self.panel, ancho, alto, rgb(_tono(estilo.COLOR_PANEL)), 12, z=0.002)
 
         y = alto / 2 - relleno
         lado_icono = a_unidades(30)
@@ -552,7 +582,7 @@ class TelefonoUI(Entity):
             if y - alto_fila < limite_inferior:   # no cabe: se omiten los más antiguos
                 destruir_arbol(cuerpo)
                 break
-            tono = COLOR_RESALTADO if fila.resaltado else estilo.COLOR_TARJETA
+            tono = COLOR_RESALTADO if fila.resaltado else _tono(estilo.COLOR_TARJETA)
             _fondo(self.panel, ancho_texto, alto_fila, rgb(tono), 6,
                    position=(0, y - alto_fila / 2, -0.001))
             capa = _capa_sello(fila.texto, self._obtener_mision())
@@ -568,19 +598,19 @@ class TelefonoUI(Entity):
         centro_y = y - alto / 2
         fila = BotonAccion("", al_clic=self.alternar_seguir, ancho=ancho_texto, alto=alto, parent=self.panel,
                            position=(0, centro_y, -0.001))
-        fila.color = rgb(estilo.COLOR_TARJETA)
+        fila.color = rgb(_tono(estilo.COLOR_TARJETA))
         fila.highlight_color = rgb(estilo.COLOR_SUPERFICIE_ALTA)
         fila.pressed_color = rgb(estilo.COLOR_SUPERFICIE_ALTA)
         lado = a_unidades(20)
         cx = izquierda + 0.012 + lado / 2
         borde = a_unidades(3)
-        _fondo(self.panel, lado + 2 * borde, lado + 2 * borde, rgb(estilo.TINTA), 4, position=(cx, centro_y, -0.002))
-        _fondo(self.panel, lado, lado, rgb(COLOR_DESTINO if vista.sigue_mision else estilo.COLOR_FONDO), 3,
+        _fondo(self.panel, lado + 2 * borde, lado + 2 * borde, rgb(_tono(estilo.TINTA)), 4, position=(cx, centro_y, -0.002))
+        _fondo(self.panel, lado, lado, rgb(COLOR_DESTINO if vista.sigue_mision else _tono(estilo.COLOR_FONDO)), 3,
                position=(cx, centro_y, -0.003))
         if vista.sigue_mision:              # visto de tinta: un trazo corto y uno largo
-            Entity(parent=self.panel, model="quad", color=rgb(estilo.TINTA), rotation_z=45,
+            Entity(parent=self.panel, model="quad", color=rgb(_tono(estilo.TINTA)), rotation_z=45,
                    position=(cx - lado * 0.2, centro_y - lado * 0.06, -0.004), scale=(lado * 0.42, lado * 0.16))
-            Entity(parent=self.panel, model="quad", color=rgb(estilo.TINTA), rotation_z=-55,
+            Entity(parent=self.panel, model="quad", color=rgb(_tono(estilo.TINTA)), rotation_z=-55,
                    position=(cx + lado * 0.1, centro_y + lado * 0.06, -0.004), scale=(lado * 0.7, lado * 0.16))
         Text(vista.texto_seguir, parent=self.panel, origin=(-0.5, 0), position=(cx + lado / 2 + 0.012, centro_y, -0.004),
              scale=escala_fuente(17), color=rgb(estilo.COLOR_TEXTO))
@@ -629,7 +659,7 @@ class Minimapa(Entity):
         if self.panel_unico:
             self.fondo = FondoTinta(self, "minimapa", self.ANCHO, self.ALTO)
         else:
-            self.fondo = _fondo(self, self.ANCHO, self.ALTO, COLOR_FONDO_HUD, 10)
+            self.fondo = _fondo(self, self.ANCHO, self.ALTO, _fondo_hud(), 10)
         self.capa_calles = Entity(parent=self, z=-0.001)
         self.capa_casas = Entity(parent=self, z=-0.0015)      # casas y escaleras (una malla cada una)
         self.capa_ruta = Entity(parent=self, z=-0.002)
@@ -670,7 +700,7 @@ class Minimapa(Entity):
         if self.panel_unico:
             self.fondo_etiqueta = FondoTinta(self, "lugar", 0.1, 0.03, z=-0.0065, enabled=False)
         else:
-            self.fondo_etiqueta = _fondo(self, 0.1, 0.03, COLOR_FONDO_HUD, 6, z=-0.0065, enabled=False)
+            self.fondo_etiqueta = _fondo(self, 0.1, 0.03, _fondo_hud(), 6, z=-0.0065, enabled=False)
         self._iniciar_capas()
         self._gestor = None
         if modelo_ajustes.AJUSTES:
@@ -689,7 +719,7 @@ class Minimapa(Entity):
         for lugar in self._mapa.lugares():
             # contorno de tinta: separa el color del lugar del aro amarillo del destino
             self.contornos_lugar[lugar] = Entity(parent=self.capa_plazas, model="circle", z=0.0002,
-                                                 scale=g.diametro_plaza() * 1.22, color=rgb(estilo.TINTA))
+                                                 scale=g.diametro_plaza() * 1.22, color=rgb(_tono(estilo.TINTA)))
             self.lugares[lugar] = Entity(parent=self.capa_plazas, model="circle",
                                          scale=g.diametro_plaza(),
                                          color=rgb(self.color_de_lugar(lugar)))
@@ -897,7 +927,7 @@ class Minimapa(Entity):
         self.reconstrucciones_capas = 0         # cuántas veces se rehicieron marcadores y zonas (lo usan las pruebas)
         forma = Mesh(vertices=[(0, 1.4, 0), (-0.45, 0.8, 0), (0.45, 0.8, 0)], triangles=[(0, 1, 2)])
         self.flecha_mirada = Entity(parent=self, z=-0.0068, scale=self.LARGO_FLECHA * 0.45, enabled=False)
-        Entity(parent=self.flecha_mirada, model=forma, double_sided=True, color=rgb(estilo.TINTA), scale=1.35, z=0.0001)
+        Entity(parent=self.flecha_mirada, model=forma, double_sided=True, color=rgb(_tono(estilo.TINTA)), scale=1.35, z=0.0001)
         Entity(parent=self.flecha_mirada, model=forma, double_sided=True, color=color.white)
 
     def _casas_activas(self):
@@ -1165,7 +1195,7 @@ class AvisoInteraccion(Entity):
             self.RELLENO = 2 * pu.relleno("aviso_e")
             self.fondo = FondoTinta(self, "aviso_e", self.ANCHO_MIN, self.ALTO, z=0.001)
         else:
-            self.fondo = _fondo(self, self.ANCHO_MIN, self.ALTO, COLOR_FONDO_HUD, 12, z=0.001)
+            self.fondo = _fondo(self, self.ANCHO_MIN, self.ALTO, _fondo_hud(), 12, z=0.001)
         self.tecla = _icono(self, "interactuar", self.LADO_TECLA, (0, 0, -0.001))
         self.texto = Text(self.TEXTO, parent=self, origin=(-0.5, 0), position=(0, 0, -0.001),
                           scale=escala_fuente(22), color=rgb(estilo.COLOR_TEXTO))
@@ -1223,7 +1253,7 @@ class AvisoInteraccion(Entity):
         alfa = int(round(255 * self.nivel))
         _alfa_fondo(self.fondo, self.nivel)
         self.tecla.color = color.rgba32(255, 255, 255, alfa)
-        self.texto.color = color.rgba32(*estilo.COLOR_TEXTO, alfa)
+        self.texto.color = color.rgba32(*_tono(estilo.COLOR_TEXTO), alfa)
 
 
 # -- Aviso genérico adaptable --------------------------------------------------------
@@ -1256,7 +1286,7 @@ class AvisoGenerico(Entity):
             self.RELLENO = 2 * pu.relleno("aviso")
             self.fondo = FondoTinta(self, "aviso", self.ANCHO_MIN, self.ALTO, z=0.001)
         else:
-            self.fondo = _fondo(self, self.ANCHO_MIN, self.ALTO, COLOR_FONDO_HUD, 12, z=0.001)
+            self.fondo = _fondo(self, self.ANCHO_MIN, self.ALTO, _fondo_hud(), 12, z=0.001)
         self.texto = Text("", parent=self, origin=(0, 0), position=(0, 0, -0.001),
                           scale=escala_fuente(self.PX), color=rgb(estilo.COLOR_TEXTO))
         self.texto.line_height = self.LINEA
@@ -1333,7 +1363,7 @@ class AvisoGenerico(Entity):
         self.y = self.y_base + (self._alto - self.ALTO) / 2 + apilado - a_unidades(self.SUBIDA_PX) * (1 - self.nivel)
         alfa = int(round(255 * self.nivel))
         _alfa_fondo(self.fondo, self.nivel)
-        self.texto.color = color.rgba32(*estilo.COLOR_TEXTO, alfa)
+        self.texto.color = color.rgba32(*_tono(estilo.COLOR_TEXTO), alfa)
 
 
 # -- Panel de turno ----------------------------------------------------------------
@@ -1353,7 +1383,7 @@ class PanelTurno(Entity):
             self.RELLENO = pu.relleno("mision")
             self.fondo = FondoTinta(self, "mision", 0.1, 0.1, z=0.001)
         else:
-            self.fondo = _fondo(self, 0.1, 0.1, COLOR_FONDO_HUD, 8, z=0.001)
+            self.fondo = _fondo(self, 0.1, 0.1, _fondo_hud(), 8, z=0.001)
         self.texto_turno = Text("", parent=self, origin=(-0.5, 0.5), scale=escala_fuente(22),
                                 color=rgb(estilo.COLOR_TEXTO), enabled=not self.esquinas)
         # «Misión:» va aparte, en el color del destino; texto_mision lleva el título.
@@ -1463,7 +1493,7 @@ class PanelFinPartida(Entity):
 
     def __init__(self, al_menu, **opciones):
         super().__init__(**opciones)
-        self.panel = panel_tinta(self, self.ANCHO, self.ALTO, tono=estilo.COLOR_FONDO)
+        self.panel = panel_piel(self, self.ANCHO, self.ALTO, tono=estilo.COLOR_FONDO)
         Text(self.TITULO, parent=self, origin=(0, 0), position=(0, self.ALTO / 2 - 0.07, -0.001),
              scale=escala_fuente(32), color=rgb(estilo.COLOR_TEXTO))
         Text("Indicadores finales de Ciudad Nova", parent=self, origin=(0, 0),
@@ -1481,8 +1511,8 @@ class PanelFinPartida(Entity):
                                    parent=self, position=(izquierda + self.LADO_ICONO + 0.02, arriba, -0.001))
             self.barras[nombre] = barra
             self.textos[nombre] = barra.texto_etiqueta
-        self.boton_menu = BotonPrimario(
-            "Volver al menú", al_clic=al_menu, ancho=0.36, alto=a_unidades(56),
+        self.boton_menu = boton_piel(
+            "Volver al menú", "primario", al_clic=al_menu, ancho=0.36, alto=a_unidades(56),
             parent=self, position=(0, -self.ALTO / 2 + 0.09, -0.001))
         self.DURACION_BARRAS = hctx.tiempo("BARRAS_FIN")              # M3.6: 0,8 -> 0,3 s (nada de UI > 300 ms)
         self.tiempo = self.DURACION_BARRAS          # animación terminada
@@ -1668,8 +1698,7 @@ class HudMundo(Entity):
     @staticmethod
     def _tutorial_senalando():
         try:
-            from frontend import registro_tutorial
-            return registro_tutorial.senalando_hud()
+            return _CONSULTA_SENALANDO is not None and bool(_CONSULTA_SENALANDO())
         except Exception:
             return False
 

@@ -135,9 +135,26 @@ def construir_seccion(s):
     s.anadir_boton("Tutoriales", "Volver a mostrar todos", olvidar_todos)
 
 
+# Da a las vistas de los tutoriales (ruta y bandeja) las funciones que usan: así no importan este controlador (MVC, R3).
+def conectar_vistas():
+    from frontend import tutorial_mision_bandeja, tutorial_mision_ruta
+    tutorial_mision_ruta.conectar(toca=toca, abrir_si_toca=abrir_si_toca)
+    extra = {}
+    for nombre, clave in (("registro_habitos", "crear_vigia_habitos"), ("registro_dilemas", "crear_vigia_dilemas")):
+        try:
+            extra[clave] = getattr(__import__(f"frontend.{nombre}", fromlist=["_crear_vigia"]), "_crear_vigia")
+        except Exception as error:               # noqa: BLE001  sin ese panel, su demo no se abre
+            bv.avisar_una_vez(f"tutorial_{nombre}", error)
+    tutorial_mision_bandeja.conectar(toca=toca, abrir_si_toca=abrir_si_toca, **extra)
+
+
 def registrar(gestor=None, conexion=None, escena_mundo=None):
     if not activo():                             # bandera apagada: ni la sección de Ajustes (idéntico a hoy)
         return
+    try:
+        conectar_vistas()
+    except Exception as error:                   # noqa: BLE001  sin vistas conectadas: sin esos tutoriales
+        bv.avisar_una_vez("tutorial_conectar", error)
     from frontend.escenas import escena_ajustes
     escena_ajustes.registrar_seccion(NOMBRE_SECCION, construir_seccion)
     if conexion is not None and escena_mundo is not None:       # bandeja de Civitas, rectificar y dilemas (teclas L y K)

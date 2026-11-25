@@ -22,6 +22,8 @@
 #
 # Rendimiento: pocas entidades (4 paneles del oscurecido + bloqueador, mano, bocadillo, 2 textos, 1 botón), creadas al abrir y
 # destruidas al cerrar; un solo update() que llama a avanzar(dt).
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import time as _reloj_real
 
@@ -46,6 +48,7 @@ from frontend import banderas_visuales as bv
 from frontend import estilo, tipografia
 from frontend.cinematica import ease_in_out, lerp
 from frontend.componentes import a_unidades, destruir_arbol, escala_fuente, rgb
+from frontend.componentes import panel_piel
 from frontend.minijuegos import ui
 
 Z_TUTORIAL = -0.5
@@ -181,8 +184,7 @@ class TutorialMision(Entity):
         y = cy - medio - MARGEN_HUECO - alto / 2 - 0.03 if cy > -0.05 else cy + medio + MARGEN_HUECO + alto / 2 + 0.03
         y = max(-0.40 + alto / 2, min(0.40 - alto / 2, y))
         x = max(-0.9 + ANCHO_BOCADILLO / 2, min(0.9 - ANCHO_BOCADILLO / 2, self.hueco[0] if self.hueco else 0.0))
-        from frontend.componentes import panel_tinta
-        panel_tinta(self.burbuja, ANCHO_BOCADILLO, alto, tono=estilo.COLOR_PANEL, position=(x, y, 0))
+        panel_piel(self.burbuja, ANCHO_BOCADILLO, alto, tono=estilo.COLOR_PANEL, position=(x, y, 0))
         ui.texto(self.burbuja, texto, PX_BOCADILLO, ANCHO_BOCADILLO - 0.06, tono or estilo.COLOR_TEXTO,
                  (x - ANCHO_BOCADILLO / 2 + 0.03, y + alto / 2 - 0.035))
         if not self.en_turno:

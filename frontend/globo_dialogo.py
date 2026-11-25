@@ -6,11 +6,14 @@
 #   ocultar()
 #
 # El texto se parte midiendo su ancho real con la fuente (frontend/texto.envolver_texto), como las viñetas.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Text, color
 
 from frontend import estilo, tipografia
-from frontend.componentes import a_unidades, destruir_arbol, escala_fuente, panel_tinta, rgb
+from frontend.componentes import a_unidades, destruir_arbol, escala_fuente, rgb
+from frontend.componentes import panel_piel
 
 ANCHO_DIALOGO = 1.0
 Y_DIALOGO = -0.33               # centro del bocadillo en camera.ui
@@ -52,7 +55,7 @@ class GloboDialogo(Entity):
         self.texto = Text("", parent=self, origin=(-0.5, 0.5), z=-0.01, scale=escala_fuente(PX_TEXTO), color=rgb(estilo.TINTA))
         self.texto.line_height = 1.2
         self.nombre = Text("", parent=self, origin=(-0.5, 0), z=-0.03, scale=escala_fuente(PX_NOMBRE),
-                           color=rgb(estilo.TINTA), font=tipografia.FUENTE_TITULO)
+                           color=rgb(estilo.TINTA), font=tipografia.fuente_piel(titulo=True))
         self.enabled = False
 
     def _limpiar_paneles(self):
@@ -84,8 +87,8 @@ class GloboDialogo(Entity):
         ancho_texto = ANCHO_DIALOGO - 2 * RELLENO
         n = _partir(self.texto, texto, ancho_texto)
         alto = 2 * RELLENO + n * a_unidades(PX_TEXTO) * 1.2 + (0.012 if hablante else 0.0)
-        self.fondo = panel_tinta(self, ANCHO_DIALOGO, alto, tono=estilo.PAPEL, radio_px=estilo.RADIO_TARJETA_PX,
-                                 position=(0, Y_DIALOGO, 0.01))
+        self.fondo = panel_piel(self, ANCHO_DIALOGO, alto, tono=estilo.PAPEL, radio_px=estilo.RADIO_TARJETA_PX,
+                                position=(0, Y_DIALOGO, 0.01))
         izquierda, arriba = -ANCHO_DIALOGO / 2 + RELLENO, Y_DIALOGO + alto / 2 - RELLENO - (0.012 if hablante else 0.0)
         self.texto.position = (izquierda, arriba, -0.01)
         self.nombre.text = hablante or ""
@@ -93,9 +96,9 @@ class GloboDialogo(Entity):
             from frontend import hud as hud_mod
             ancho_nombre = hud_mod._medidor(self.nombre)(hablante) + 2 * RELLENO_NOMBRE
             y_etiqueta = Y_DIALOGO + alto / 2
-            self.etiqueta = panel_tinta(self, ancho_nombre, ALTO_ETIQUETA, tono=estilo.ACENTO_PRIMARIO,
-                                        radio_px=estilo.RADIO_TARJETA_PX, sombra=False,
-                                        position=(izquierda + ancho_nombre / 2, y_etiqueta, -0.02))
+            self.etiqueta = panel_piel(self, ancho_nombre, ALTO_ETIQUETA, tono=estilo.ACENTO_PRIMARIO,
+                                       radio_px=estilo.RADIO_TARJETA_PX, sombra=False,
+                                       position=(izquierda + ancho_nombre / 2, y_etiqueta, -0.02))
             self.nombre.position = (izquierda + RELLENO_NOMBRE, y_etiqueta, -0.03)
 
     def _bajo_titulo(self, texto):

@@ -3,11 +3,14 @@
 # fila elegida resaltada); abajo el saldo, el mensaje de la última compra (rojo si se rechazó) y las teclas. Toda la
 # lógica vive en frontend/tienda_calculos.py (ControlTienda); aquí solo se dibuja, y solo cuando cambia la firma.
 # Pantallas 16:9 y 4:3: el ancho se mide en unidades de camera.ui y los textos largos se ajustan (diseno_adaptable).
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Circle, Entity, Text
 
 from frontend import diseno_adaptable, estilo, tienda_calculos as calc, tipografia
-from frontend.componentes import BotonSecundario, destruir_arbol, escala_fuente, modelo_redondeado, panel_tinta, rgb
+from frontend.componentes import destruir_arbol, escala_fuente, modelo_redondeado, rgb
+from frontend.componentes import boton_piel_secundario, panel_piel
 
 ANCHO, ALTO = 0.84, 0.70
 ALTO_FILA = 0.062
@@ -16,7 +19,7 @@ TECLA_EXTRA = "t"               # = trabajo_npc_calculos.TECLA_TRABAJAR
 
 
 def _texto(padre, cadena, px, tono, pos, origen=(-0.5, 0), negrita=False, z=-0.01):
-    opciones = {"font": tipografia.FUENTE_TITULO} if negrita else {}
+    opciones = {"font": tipografia.fuente_piel(titulo=True)} if negrita else {}
     return Text(cadena.replace("<", "(").replace(">", ")"), parent=padre, origin=origen, position=(pos[0], pos[1], z),
                 scale=escala_fuente(px), color=rgb(tono), **opciones)
 
@@ -43,7 +46,7 @@ class PanelTienda(Entity):
         self._titulo_fn = titulo_fn or (lambda: ("", ""))
         self._extra_fn = extra_fn or (lambda: None)
         self._firma = None
-        self.marco = panel_tinta(self, ANCHO, ALTO, z=-0.02)
+        self.marco = panel_piel(self, ANCHO, ALTO, z=-0.02)
         self.dinamico = Entity(parent=self, z=-0.03)
         self.z = -0.05
 
@@ -143,7 +146,7 @@ class PanelTienda(Entity):
         teclas = "Flechas elegir · Enter comprar · Esc cierra"
         if extra is not None:
             teclas = "Flechas elegir · Enter comprar · T trabajar · Esc cierra"
-            BotonSecundario(extra[0], al_clic=extra[1], ancho=0.3, alto=0.06, tamano_fuente_px=16, parent=d,
-                            position=(ANCHO / 2 - 0.03 - 0.15, abajo + 0.096, -0.02))
+            boton_piel_secundario(extra[0], al_clic=extra[1], ancho=0.3, alto=0.06, tamano_fuente_px=16, parent=d,
+                                  position=(ANCHO / 2 - 0.03 - 0.15, abajo + 0.096, -0.02))
         a = _texto(d, teclas, 12, estilo.COLOR_TEXTO_TENUE, (izq, abajo + 0.026))
         diseno_adaptable.ajustar_texto(a, ancho, escala_min=0.6)

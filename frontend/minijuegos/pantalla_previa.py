@@ -7,6 +7,8 @@
 #   - botón «Empezar» grande (Enter, Espacio o clic).
 # Los textos viven en backend/datos/minijuegos_instrucciones.py (se recortan con frontend/minijuegos/previa_calculos.py).
 # GUARDIÁN: si el dibujo rico falla, se cae a un dibujo mínimo funcional (título, rumor y botón). Sin animación.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Text, color, destroy
 
@@ -120,14 +122,14 @@ def _ilu_cronologia(p, w, h):      # tira de 3 viñetas numeradas con flechas y 
         Entity(parent=p, model="circle", scale=a_unidades(30), color=rgb(TINTA), position=(px, py, -0.012))
         Entity(parent=p, model="circle", scale=a_unidades(24), color=rgb(AMARILLO), position=(px, py, -0.014))
         Text(str(i + 1), parent=p, origin=(0, 0), position=(px, py, -0.02), scale=escala_fuente(17), color=rgb(TINTA),
-             font=ui.tipografia.FUENTE_TITULO)
+             font=ui.tipografia.fuente_piel(titulo=True))
         if i < 2:
             _flecha_abajo(p, cx, cy - alto / 2 - h * 0.04, h * 0.05)
     gx, gy = w * 0.34, h * 0.3
     _r(p, w * 0.2 + 0.008, w * 0.17 + 0.008, TINTA, gx, gy, -0.006, 8)
     _r(p, w * 0.2, w * 0.17, PAPEL, gx, gy, -0.008, 7)
     Text("?", parent=p, origin=(0, 0), position=(gx, gy, -0.02), scale=escala_fuente(34), color=rgb(ROJO),
-         font=ui.tipografia.FUENTE_TITULO)
+         font=ui.tipografia.fuente_piel(titulo=True))
     _r(p, a_unidades(14), a_unidades(14), TINTA, gx - w * 0.05, gy - w * 0.1, -0.006, 1).rotation_z = 45
     _r(p, a_unidades(9), a_unidades(9), PAPEL, gx - w * 0.05, gy - w * 0.095, -0.009, 1).rotation_z = 45
 
@@ -289,7 +291,7 @@ class PantallaPrevia(Entity):
                 Entity(parent=self, model="circle", scale=a_unidades(28), color=rgb(AMARILLO),
                        position=(px_i + margen + a_unidades(16), y_disco, -0.012))
                 Text(str(i + 1), parent=self, origin=(0, 0), position=(px_i + margen + a_unidades(16), y_disco, -0.02),
-                     scale=escala_fuente(20), color=rgb(TINTA), font=ui.tipografia.FUENTE_TITULO)
+                     scale=escala_fuente(20), color=rgb(TINTA), font=ui.tipografia.fuente_piel(titulo=True))
                 ui.texto(self, p, px, wp - 2 * margen, TINTA if marco else estilo.COLOR_TEXTO,
                          (px_i + margen, y_disco - a_unidades(22)))
             y -= alto_p + sep
@@ -362,7 +364,7 @@ class PantallaPrevia(Entity):
         _r(cinta, ancho_c + a_unidades(4), alto_c + a_unidades(4), TINTA, z=0.001, radio=1)
         _r(cinta, ancho_c, alto_c, (255, 226, 90), z=0, radio=1)
         Text(txt, parent=cinta, origin=(0, 0), position=(0, 0, ui.Z_TEXTO), scale=escala_fuente(mc.PX_ETIQUETA),
-             color=rgb(TINTA), font=ui.tipografia.FUENTE_TITULO)
+             color=rgb(TINTA), font=ui.tipografia.fuente_piel(titulo=True))
         marco_mesa.titulo_con_contorno(self, titulo, mc.PX_TITULO, ancho, (x0, Y_ENCABEZADO - alto_c - a_unidades(2)))
 
     def _sombra_papel(self, x, y, ancho, alto):

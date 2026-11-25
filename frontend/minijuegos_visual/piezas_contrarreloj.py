@@ -1,6 +1,8 @@
 # Piezas dibujadas con primitivas para «Contrarreloj» visual (Ursina): sombra plana, tarjeta-titular de papel, cronómetro,
 # línea discontinua, iconos (mano, flecha, aspa, palomita) y pulsador-sello. Los cálculos viven en
 # contrarreloj_piezas_calculos.py (puro). Propias de esta vista: no dependen de otras piezas.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 from ursina import Entity, Mesh, Text, Vec3, color
 
@@ -91,7 +93,7 @@ class TarjetaTitular(ui.Tarjeta):
         self.disco = Entity(parent=self, model="circle", color=rgba(TINTA), scale=0.054, position=(cx, cy, -0.01))
         self.disco_fondo = Entity(parent=self, model="circle", color=rgba(AMARILLO), scale=0.046, position=(cx, cy, -0.011))
         self.numero = Text(str(numero), parent=self, origin=(0, 0), position=(cx, cy, -0.012), scale=escala_fuente(15),
-                           font=tipografia.FUENTE_TITULO, color=rgb(TINTA))
+                           font=tipografia.fuente_piel(titulo=True), color=rgb(TINTA))
         self.icono = None
         self.centro_disco = (cx, cy)
 
@@ -138,7 +140,7 @@ class Cronometro(Entity):
         self.relleno = Entity(parent=self, model="quad", color=rgba(CIAN), origin=(-0.5, 0), z=0.002,
                               position=(-ancho / 2 + 0.006, 0), scale=(ancho - 0.012, alto * 0.62))
         self.etiqueta = Text("TIEMPO", parent=self, origin=(0, 0), position=(0, 0, -0.002), scale=escala_fuente(13),
-                             font=tipografia.FUENTE_TITULO, color=rgb(TINTA))
+                             font=tipografia.fuente_piel(titulo=True), color=rgb(TINTA))
 
     def fijar(self, restante):
         self.relleno.scale_x = max(0.0001, (self.ancho - 0.012) * restante)
@@ -188,7 +190,7 @@ class SelloTinta(Entity):
         self.marco = ui.rect(self, ancho, alto, rgba(tono, 0), z=0.0, radio_px=6)
         self.hueco = ui.rect(self, ancho - 2 * borde, alto - 2 * borde, rgba(PAPEL, 0), z=-0.001, radio_px=4)
         self.texto = Text(texto, parent=self, origin=(0, 0), position=(0, 0, -0.002), scale=escala_fuente(px),
-                          font=tipografia.FUENTE_TITULO, color=rgba(tono, 0))
+                          font=tipografia.fuente_piel(titulo=True), color=rgba(tono, 0))
 
     ALFA_MAX = 0.6          # MIN-014: el sello deja leer la noticia frenada que tiene debajo
     ALFA_HUECO = 0.25       # antes 0,92: el papel casi opaco del hueco tapaba el texto
@@ -317,7 +319,7 @@ class Chapa(Entity):
         Entity(parent=self, model="circle", color=rgba(TINTA), scale=tam, z=0.0)
         Entity(parent=self, model="circle", color=rgba(AMARILLO), scale=tam * 0.84, z=-0.0005)
         Text(str(numero), parent=self, origin=(0, 0), position=(0, 0, -0.001), scale=escala_fuente(15),
-             font=tipografia.FUENTE_TITULO, color=rgb(TINTA))
+             font=tipografia.fuente_piel(titulo=True), color=rgb(TINTA))
 
 
 class LineaPeligro(Entity):
@@ -341,7 +343,7 @@ class LineaPeligro(Entity):
         ui.rect(self, ancho_tab + 0.006, 0.034, TINTA, (0, y_tab), z=0.002, radio_px=6)
         ui.rect(self, ancho_tab, 0.028, PAPEL, (0, y_tab), z=0.001, radio_px=5)
         Text(etiqueta, parent=self, origin=(0, 0), position=(0, y_tab, -0.002), scale=escala_fuente(14),
-             font=tipografia.FUENTE_TITULO, color=rgb(TINTA))
+             font=tipografia.fuente_piel(titulo=True), color=rgb(TINTA))
 
 
 def tira_leyenda(parent, texto, px, posicion, ancho_max):

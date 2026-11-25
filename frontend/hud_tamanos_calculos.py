@@ -118,6 +118,10 @@ def tono_texto(tono, fondo=estilo.COLOR_FONDO):
     return tono_legible_claro(tono, fondo)
 
 
+# Tonos de estado ya aclarados para texto (tono_texto), con nombre para la tabla de abajo.
+ERROR_TEXTO, EXITO_TEXTO = tono_texto(estilo.ESTADO_ERROR), tono_texto(estilo.ESTADO_EXITO)
+AVISO_TEXTO, INFO_TEXTO = tono_texto(estilo.ESTADO_AVISO), tono_texto(estilo.ESTADO_INFO)
+
 # Pares texto/fondo del HUD: (nombre, texto, fondo, px de referencia, escala, negrita). Con la bandera.
 FONDOS_HUD = (estilo.COLOR_FONDO, estilo.COLOR_PANEL)
 PARES_HUD = [
@@ -130,11 +134,11 @@ PARES_HUD = [
     ("cian_fondo", estilo.ACENTO_SECUNDARIO, estilo.COLOR_FONDO, 13, 1.0, True),
     ("etapa_exito", estilo.ESTADO_EXITO, estilo.COLOR_FONDO, 14, 1.0, True),
     ("etapa_aviso", estilo.ESTADO_AVISO, estilo.COLOR_FONDO, 14, 1.0, True),
-    ("etapa_error", tono_texto(estilo.ESTADO_ERROR), estilo.COLOR_FONDO, 14, 1.0, True),
-    ("remitente_error", tono_texto(estilo.ESTADO_ERROR), estilo.COLOR_FONDO, 14, ESCALA_HUD, True),
-    ("remitente_exito", tono_texto(estilo.ESTADO_EXITO), estilo.COLOR_FONDO, 14, ESCALA_HUD, True),
-    ("remitente_aviso", tono_texto(estilo.ESTADO_AVISO), estilo.COLOR_FONDO, 14, ESCALA_HUD, True),
-    ("remitente_info", tono_texto(estilo.ESTADO_INFO), estilo.COLOR_FONDO, 14, ESCALA_HUD, True),
+    ("etapa_error", ERROR_TEXTO, estilo.COLOR_FONDO, 14, 1.0, True),
+    ("remitente_error", ERROR_TEXTO, estilo.COLOR_FONDO, 14, ESCALA_HUD, True),
+    ("remitente_exito", EXITO_TEXTO, estilo.COLOR_FONDO, 14, ESCALA_HUD, True),
+    ("remitente_aviso", AVISO_TEXTO, estilo.COLOR_FONDO, 14, ESCALA_HUD, True),
+    ("remitente_info", INFO_TEXTO, estilo.COLOR_FONDO, 14, ESCALA_HUD, True),
     ("boton_secundario", estilo.COLOR_BOTON_TEXTO, estilo.COLOR_BOTON, 22, 1.0, False),
     ("boton_resaltado", estilo.COLOR_BOTON_TEXTO, estilo.COLOR_BOTON_RESALTADO, 22, 1.0, False),
     ("boton_primario", estilo.COLOR_ACENTO_TEXTO, estilo.COLOR_ACENTO, 22, 1.0, False),

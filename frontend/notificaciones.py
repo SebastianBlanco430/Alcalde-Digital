@@ -12,6 +12,8 @@
 # Los avisos de INTERACCIÓN («E: comprar», «Presiona E…») no pasan por aquí: se quedan abajo como siempre.
 # La cola y los tiempos son puros (frontend/notificaciones_calculos.py). ALCALDE_NOTIF_TELEFONO=0 lo apaga: quien
 # llama conserva su aviso de antes (cada sitio pregunta `activo()`).
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW, =0 o Ajustes › Estilo la apagan): la tarjeta es un panel de velo
+# violeta con filo claro, como los chips del HUD.
 
 import sys
 
@@ -142,6 +144,7 @@ def _crear_pila(escena):
 
     from frontend import estilo, hud as hud_mod, tipografia
     from frontend.componentes import a_unidades, destruir_arbol, escala_fuente, panel_tinta, rgb
+    from frontend.componentes import panel_piel, piel_botw
     from frontend.texto import envolver_texto
 
     escala = getattr(hud_mod, "ESCALA_HUD", 1.0)
@@ -164,7 +167,9 @@ def _crear_pila(escena):
                 lineas[-1] = lineas[-1].rstrip()[:-1].rstrip() + "…"
             cuerpo.text = "\n".join(lineas)
             self.alto = 2 * RELLENO + a_unidades(PX_REMITENTE) * 1.4 + len(lineas) * alto_linea
-            self.fondo = panel_tinta(self, ANCHO_TARJETA, self.alto, tono=estilo.COLOR_FONDO, radio_px=estilo.RADIO_CHIP_PX,
+            # con la piel, el velo del HUD (panel_piel lo pone con COLOR_PANEL)
+            tono_fondo = estilo.COLOR_PANEL if piel_botw() else estilo.COLOR_FONDO
+            self.fondo = panel_piel(self, ANCHO_TARJETA, self.alto, tono=tono_fondo, radio_px=estilo.RADIO_CHIP_PX,
                                      borde_px=estilo.GROSOR_BORDE_DENSO_PX, z=0.002)
             izquierda, arriba = -ANCHO_TARJETA / 2 + RELLENO, self.alto / 2 - RELLENO
             x_icono = izquierda + LADO_ICONO / 2

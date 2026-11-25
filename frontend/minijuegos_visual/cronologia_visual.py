@@ -10,6 +10,8 @@
 #     con cada reenvío (mayúsculas, signos y «¡¡COMPARTE YA!!»).
 # APAGADO: ALCALDE_CRONOLOGIA_VISUAL=0. GUARDIÁN: si la página falla al montarse, el minijuego se construye como siempre
 # (la lista); si falla después, se avisa una vez y lo añadido se queda quieto. REDUCIR MOVIMIENTO: sin levantar ni latir.
+# Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
 
 import math
 
@@ -62,7 +64,7 @@ def dibujar_vineta(padre, figuras, alto, position=(0, 0, 0)):
         z = -0.002 * (i + 1)
         if f["f"] == "texto":
             Text(f["t"], parent=raiz, origin=(0, 0), position=(f["x"], f["y"], z - 0.001), scale=f["tam"] / Text.size,
-                 font=tipografia.FUENTE_TITULO, color=_rgba(f["c"]))
+                 font=tipografia.fuente_piel(titulo=True), color=_rgba(f["c"]))
             continue
         modelo = {"rect": "quad", "circulo": "circle"}.get(f["f"])
         contorno = i >= 2 and min(f["w"], f["h"]) >= 0.045 and f["c"] != vin.TINTA
@@ -111,7 +113,7 @@ class Vineta(Entity):
                color=_rgba(vin.TINTA))
         self._ancho_cartela = ancho_cartela
         self.titulo = Text("", parent=self.cartela, origin=(-0.5, 0), x=-ancho_cartela / 2 + 0.008,
-                           scale=escala_fuente(12), font=tipografia.FUENTE_TITULO, color=_rgba(vin.TINTA))
+                           scale=escala_fuente(12), font=tipografia.fuente_piel(titulo=True), color=_rgba(vin.TINTA))
         # Globo de diálogo (blanco con borde de tinta y cola hacia el personaje, que está a la derecha de la escena).
         alto_globo = alto - 2 * BORDE - alto_escena - 0.016
         y_globo = -alto / 2 + BORDE + 0.006 + alto_globo / 2
@@ -131,13 +133,13 @@ class Vineta(Entity):
         Entity(parent=self.numero, model="circle", scale=0.042, color=_rgba(vin.TINTA), z=0.001)
         Entity(parent=self.numero, model="circle", scale=0.034, color=_rgba(PAPEL))
         Text(str(numero), parent=self.numero, origin=(0, 0), z=-0.001, scale=escala_fuente(15),
-             font=tipografia.FUENTE_TITULO, color=_rgba(vin.TINTA))
+             font=tipografia.fuente_piel(titulo=True), color=_rgba(vin.TINTA))
         # Cartel «AGARRADA» y sello del resultado.
         self.agarre = Entity(parent=self, position=(0, self.y_escena - alto_escena / 2 + 0.024, -0.04), enabled=False)
         Entity(parent=self.agarre, model="quad", scale=(min(ancho - 0.03, 0.34), 0.034), color=_rgba(vin.TINTA), z=0.002)
         Entity(parent=self.agarre, model="quad", scale=(min(ancho - 0.036, 0.334), 0.028), color=_rgba(AGARRE), z=0.001)
         Text("AGARRADA: muévela con las flechas", parent=self.agarre, origin=(0, 0), scale=escala_fuente(10),
-             font=tipografia.FUENTE_TITULO, color=_rgba(vin.TINTA))
+             font=tipografia.fuente_piel(titulo=True), color=_rgba(vin.TINTA))
         # Marca del resultado (discreta, en la esquina inferior izquierda de la escena): icono (palomita / aspa) + texto corto.
         # Se llama `sello` por contrato histórico (el tutorial y los humos la conocen por ese nombre).
         self._alto_marca = 0.04
@@ -148,7 +150,7 @@ class Vineta(Entity):
         self.sello_fondo = Entity(parent=self.sello, model="quad")
         self.sello_icono = Entity(parent=self.sello)
         self.sello_txt = Text("", parent=self.sello, origin=(-0.5, 0), z=-0.001, scale=escala_fuente(17),
-                              font=tipografia.FUENTE_TITULO, color=_rgba(PAPEL))
+                              font=tipografia.fuente_piel(titulo=True), color=_rgba(PAPEL))
         # Zona de clic.
         self.golpe = Entity(parent=self, model="quad", scale=(ancho, alto), collider="box", color=_rgba((0, 0, 0), 0),
                             z=-0.06)
@@ -329,7 +331,7 @@ class CronologiaVisual(CapaVisual, MinijuegoCronologia):
             ui.rect(cinta, ancho, alto, vin.TINTA, (0, 0), z=0.002, radio_px=8)
             Entity(parent=cinta, model="circle", scale=0.04, position=(-ancho / 2 + 0.032, 0, -0.001), color=_rgba(AMARILLO))
             Text(str(i + 1), parent=cinta, origin=(0, 0), position=(-ancho / 2 + 0.032, 0, -0.002),
-                 scale=escala_fuente(17), font=tipografia.FUENTE_TITULO, color=_rgba(vin.TINTA))
+                 scale=escala_fuente(17), font=tipografia.fuente_piel(titulo=True), color=_rgba(vin.TINTA))
             Text("\n".join(lineas[i]), parent=cinta, origin=(-0.5, 0), position=(-ancho / 2 + ancho_num + 0.012, 0, -0.002),
                  scale=escala_fuente(px), color=_rgba(PAPEL), line_height=1.1)
         return raiz
@@ -347,15 +349,15 @@ class CronologiaVisual(CapaVisual, MinijuegoCronologia):
         ui.rect(portada, ancho - 0.04, caja_alto + 0.006, vin.TINTA, (0, 0.04), z=0.002, radio_px=6)
         ui.rect(portada, ancho - 0.046, caja_alto, AMARILLO, (0, 0.04), z=0.001, radio_px=5)
         Text("\n".join(titulo), parent=portada, origin=(0, 0), position=(0, 0.04, -0.001), scale=escala_fuente(18),
-             font=tipografia.FUENTE_TITULO, color=_rgba(vin.TINTA))
+             font=tipografia.fuente_piel(titulo=True), color=_rgba(vin.TINTA))
         banda_y = 0.04 - caja_alto / 2 - 0.05
         Entity(parent=portada, model="quad", scale=(ancho - 2 * BORDE, 0.05), y=banda_y, z=0.001, color=_rgba(vin.TINTA))
         self._ancho_portada, self._alto_portada, self._sitio_portada = ancho, alto, portada
         self.portada_txt = Text("Se lee de izquierda a derecha", parent=portada, origin=(0, 0),
-                                position=(0, banda_y, -0.001), scale=escala_fuente(14), font=tipografia.FUENTE_TITULO,
+                                position=(0, banda_y, -0.001), scale=escala_fuente(14), font=tipografia.fuente_piel(titulo=True),
                                 color=_rgba(PAPEL))
         Text("FIN", parent=portada, origin=(0.5, -0.5), position=(ancho / 2 - 0.02, -alto / 2 + 0.015, -0.001),
-             scale=escala_fuente(14), font=tipografia.FUENTE_TITULO, color=_rgba(AMARILLO))
+             scale=escala_fuente(14), font=tipografia.fuente_piel(titulo=True), color=_rgba(AMARILLO))
 
     # -- Pintar la página según la partida --
 
@@ -433,7 +435,7 @@ class CronologiaVisual(CapaVisual, MinijuegoCronologia):
             Entity(parent=sello, model="quad", position=(cx, cy, -0.001), scale=(largo, 0.007), rotation_z=-ang,
                    color=_rgba(PAPEL))
         Text(marcas.TEXTO_EN_ORDEN, parent=sello, origin=(0, 0), position=(0.025, 0, -0.001), scale=escala_fuente(17),
-             font=tipografia.FUENTE_TITULO, color=_rgba(PAPEL))
+             font=tipografia.fuente_piel(titulo=True), color=_rgba(PAPEL))
         self.sello_en_orden = sello
 
     def _empezar_reproduccion(self):
@@ -446,7 +448,7 @@ class CronologiaVisual(CapaVisual, MinijuegoCronologia):
         self.burbuja = Entity(parent=self, position=(x_der - ANCHO_BOTONES / 2, self.y0 - 0.005, -0.1))
         self.burbuja_forma = Entity(parent=self.burbuja)
         self.burbuja_quien = Text("", parent=self.burbuja, origin=(-0.5, 0.5), position=(0.016, -0.016, -0.003),
-                                  scale=escala_fuente(13), font=tipografia.FUENTE_TITULO, color=_rgba((90, 90, 110)))
+                                  scale=escala_fuente(13), font=tipografia.fuente_piel(titulo=True), color=_rgba((90, 90, 110)))
         self.burbuja_txt = Text("", parent=self.burbuja, origin=(-0.5, 0.5), position=(0.016, -0.05, -0.003),
                                 scale=escala_fuente(15), color=_rgba((25, 25, 35)), line_height=1.1)
         self._t_reproduccion = 0.0

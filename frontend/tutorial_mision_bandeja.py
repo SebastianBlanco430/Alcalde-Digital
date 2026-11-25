@@ -17,6 +17,7 @@
 # estado guardado en la partida.
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from backend.logica import habitos_digitales as hd
 
@@ -24,6 +25,19 @@ RUTA_CIVITAS = Path(__file__).resolve().parent.parent / "backend" / "datos" / "c
 HORA_DEMO = "hoy 20:00"
 ID_DILEMAS = "dilemas"           # tutorial guiado de los dilemas: solo desde la pausa
 MINUTOS_FEED_DEMO = 30
+
+# Lo que esta vista necesita del controlador (frontend/registro_tutorial_mision.py) se lo da él con conectar(): una vista no
+# importa controladores (contrato MVC, R3 de tests/test_arquitectura_mvc.py). Sin conectar no se abre ningún tutorial.
+_CONTROL = {}
+
+
+def conectar(**funciones):
+    _CONTROL.update(funciones)
+
+
+def _controlador():
+    """Las funciones conectadas (toca, abrir_si_toca, crear_vigia_*) o None si el controlador aún no las puso."""
+    return SimpleNamespace(**_CONTROL) if "toca" in _CONTROL else None
 
 
 # ---------------------------------------------------------------- flujos de demo (puros: no tocan nada de la partida)
@@ -203,9 +217,8 @@ class AdaptadorBandeja:
 
     def crear_vista(self, padre, al_terminar):
         from frontend import banderas_visuales as bv
-        from frontend import registro_habitos
         escena = EscenaDemo(self.real, FlujoDemoBandeja(self.tipo))
-        vigia = registro_habitos._crear_vigia(escena)
+        vigia = _CONTROL["crear_vigia_habitos"](escena)
         vigia.input = lambda key: None                    # las teclas las manda el tutorial, no el panel por su cuenta
         vigia.vista.chip = lambda *a, **k: None           # sin chip «L · Civitas» de la demo
         control = vigia.control
@@ -313,9 +326,8 @@ class AdaptadorDilema:
 
     def crear_vista(self, padre, al_terminar):
         from frontend import banderas_visuales as bv
-        from frontend import registro_dilemas
         escena = EscenaDemo(self.real, FlujoDemoDilema())
-        vigia = registro_dilemas._crear_vigia(escena)
+        vigia = _CONTROL["crear_vigia_dilemas"](escena)
         vigia.input = lambda key: None
         vigia.vista.chip = lambda *a, **k: None
         control = vigia.control
@@ -398,7 +410,9 @@ def id_de_evento(evento):
 
 def instalar(conexion, escena_mundo):
     """Envuelve `abrir` de los controles reales. Devuelve el estado (para pruebas) o None si no hay controles."""
-    from frontend import registro_tutorial_mision as rtm
+    rtm = _controlador()
+    if rtm is None:
+        return None
 
     estado = {"tutorial": None}
 
