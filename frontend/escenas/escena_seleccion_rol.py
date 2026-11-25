@@ -14,7 +14,8 @@
 # (`al_entrar(jugadores=n)`; sin decirlo, 1) y el paso 1 no sale; «Atrás» llama entonces a `al_volver` (el menú).
 # Con =0, el paso 1 de siempre.
 # Piel BOTW (docs/ESTILO_BOTW.md; ALCALDE_UI_BOTW=0 o Ajustes › Estilo «Clásico» la apagan): paneles, botones y
-# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel).
+# títulos con la piel del menú de inicio (componentes.panel_piel / boton_piel_*, tipografia.fuente_piel) y, de fondo,
+# el póster del menú desenfocado bajo su velo violeta (frontend/fondo_seleccion_botw.py).
 
 from panda3d.core import TextNode
 from ursina import Button, Entity, Text, color, window
@@ -29,7 +30,8 @@ from frontend.componentes import (
 )
 from frontend.componentes import boton_piel_primario, boton_piel_secundario, panel_piel
 from frontend.escenas.escena_base import Escena
-from frontend.fondo_menu import FocoTeclado, FondoMenu, anadir_filo
+from frontend.fondo_menu import FocoTeclado, anadir_filo
+from frontend.fondo_seleccion_botw import FondoSeleccionBotw
 from frontend.texto import envolver_texto
 
 ANCHO_TARJETA = 0.38
@@ -257,7 +259,8 @@ class EscenaSeleccionRol(Escena):
         self._candidata = None      # rol resaltado a la espera de «Seleccionar»
         self._elecciones = []       # roles ya confirmados, en orden (para «Cambiar»)
 
-        self.fondo = FondoMenu(velo=ALFA_VELO, parent=self)
+        # Piel BOTW: el póster del menú de inicio desenfocado; Clásico: el atardecer en capas de siempre.
+        self.fondo = FondoSeleccionBotw(velo_clasico=ALFA_VELO, parent=self)
 
         dx, dy = a_unidades(3), -a_unidades(3)
         self.sombra_instruccion = Text(

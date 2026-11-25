@@ -18,16 +18,16 @@ from frontend.componentes import (
 from frontend.componentes import boton_piel, panel_piel, piel_botw
 from frontend.fondo_menu import FocoTeclado, anadir_filo
 
-ANCHO, ALTO = 1.22, 0.70        # VIS-005/006: más ancho para 3 columnas de teclas y la fila de ayuda (antes 0.74)
+ANCHO, ALTO = 1.30, 0.70        # VIS-005/006: ancho para 3 columnas de teclas sin salirse del panel (antes 1.22)
 ALTO_CON_AJUSTES = 0.80      # (ya no se usan para el alto: lo calcula _medidas según botones y filas de teclas)
 Z_FRENTE = -50
 ALFA_VELO = 170
 ALFA_VELO_AJUSTES = 245     # con «Ajustes» abierto el HUD del mundo no debe asomar por detrás
 ANCHO_BOTON = 0.42
-ALTO_BOTON = a_unidades(56)
+ALTO_BOTON = a_unidades(50)
 
-# (tecla, acción) de la guía; dos columnas, en orden de lectura (izquierda, derecha, siguiente fila...). Con más
-# de 2 filas el panel crece FILA_TECLAS por fila y todo su contenido sube la mitad, para seguir centrado.
+# (tecla, acción) de la guía; tres columnas, en orden de lectura (izquierda, centro, derecha, siguiente fila...). El
+# panel crece FILA_TECLAS por fila y todo su contenido se reparte desde arriba, para seguir centrado.
 # En vehículo: Shift = caballito, Ctrl = turbo, Espacio = freno de mano (frontend/vehiculo_mundo.py). Sin caballitos
 # (vehiculo_calculos.CABALLITOS = False) Shift sigue siendo el turbo y no hay Ctrl.
 if vehiculo_calculos.CABALLITOS:
@@ -40,25 +40,45 @@ else:
 TECLAS = TECLAS + (("L", "bandeja de Civitas"), ("K", "dilemas"), ("B", "pulseras"), ("N", "mapa"),
                    ("I", "mochila"))
 FILA_TECLAS = 0.052
-X_COLUMNAS = (-0.56, -0.15, 0.26)   # x de la tecla de cada columna (VIS-006: 3 columnas para que quepan todas)
-PASO_BOTON = 0.1
-CABECERA = 0.13                 # alto del título
-FILA_EXTRA = 0.09              # fila de ayuda dentro del panel: «Cómo se juega» y «Avisos de Civitas» (VIS-005)
-X_EXTRA = (-0.17, 0.17)         # x de cada hueco de la fila de ayuda
-ANCHO_EXTRA = 0.30
-SEPARACION_TECLAS = 0.035
-PIE = 0.04
+X_COLUMNAS = (-0.58, -0.18, 0.22)   # x de la tecla de cada columna (3 columnas; centradas en el panel de 1.30)
+PASO_BOTON = 0.098              # alto de cada hueco de botón (botón de 0.083 + 0.015 de aire)
+CABECERA = 0.12                 # alto del título
+# Fila de ayuda dentro del panel: «Cómo se juega» y «Avisos de Civitas» (VIS-005), entre dos separadores con título.
+# Los botones los ponen otros módulos con posicion_extra() y ANCHO_EXTRA / ALTO_EXTRA.
+ALTO_EXTRA = a_unidades(44)
+ANCHO_EXTRA = 0.29
+X_EXTRA = (-0.16, 0.16)         # x de cada hueco de la fila de ayuda (0.03 de aire entre los dos)
+FUENTE_EXTRA_PX = 19
+FILA_EXTRA = ALTO_EXTRA + 0.004
+SEPARADOR = 0.052               # alto de la franja de un separador con título (línea + rótulo centrado)
+ANCHO_SEPARADOR = ANCHO - 0.18
+HUECO_ROTULO = 0.16             # hueco de la línea donde va el rótulo
+PIE = 0.045
 
 
 def _medidas(n_botones, n_teclas):
-    """(alto del panel, [y de cada botón], y de la fila de ayuda, y de la primera fila de teclas); y relativas al centro."""
+    """(alto del panel, [y de cada botón], y de la fila de ayuda, y de la primera fila de teclas, (y de cada separador));
+    y relativas al centro."""
     filas = -(-n_teclas // len(X_COLUMNAS))
-    alto = CABECERA + n_botones * PASO_BOTON + FILA_EXTRA + SEPARACION_TECLAS + filas * FILA_TECLAS + PIE
+    alto = CABECERA + n_botones * PASO_BOTON + 2 * SEPARADOR + FILA_EXTRA + filas * FILA_TECLAS + PIE
     arriba = alto / 2 - CABECERA
     ys = [arriba - PASO_BOTON * (i + 0.5) for i in range(n_botones)]
-    y_extra = arriba - n_botones * PASO_BOTON - FILA_EXTRA / 2
-    y_teclas = arriba - n_botones * PASO_BOTON - FILA_EXTRA - SEPARACION_TECLAS - FILA_TECLAS / 2
-    return alto, ys, y_extra, y_teclas
+    y_sep_ayuda = arriba - n_botones * PASO_BOTON - SEPARADOR / 2
+    y_extra = y_sep_ayuda - SEPARADOR / 2 - FILA_EXTRA / 2
+    y_sep_teclas = y_extra - FILA_EXTRA / 2 - SEPARADOR / 2
+    y_teclas = y_sep_teclas - SEPARADOR / 2 - FILA_TECLAS / 2
+    return alto, ys, y_extra, y_teclas, (y_sep_ayuda, y_sep_teclas)
+
+
+# Separador con título: dos líneas finas a los lados de un rótulo pequeño en mayúsculas («AYUDA», «CONTROLES»).
+def _separador(padre, rotulo, y):
+    tono = color.rgba32(*estilo.COLOR_TEXTO_TENUE, 90)
+    largo = (ANCHO_SEPARADOR - HUECO_ROTULO) / 2
+    for lado in (-1, 1):
+        Entity(parent=padre, model="quad", color=tono, scale=(largo, a_unidades(1.5)),
+               position=(lado * (HUECO_ROTULO + largo) / 2, y, -0.001))
+    Text(rotulo.upper(), parent=padre, origin=(0, 0), position=(0, y, -0.001), scale=escala_fuente(14),
+         font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO_TENUE))
 
 
 # Tecla estilo teclado: papel con borde de tinta y base gruesa; devuelve la entidad.
@@ -84,14 +104,14 @@ class MenuPausa(Entity):
             from backend.logica.ajustes import AJUSTES
             con_ajustes = AJUSTES and fabrica_ajustes is not None
         self.con_ajustes = bool(con_ajustes)
-        alto, ys_botones, self._y_extra, y0 = _medidas(4 if self.con_ajustes else 3, len(TECLAS))
+        alto, ys_botones, self._y_extra, y0, ys_separadores = _medidas(4 if self.con_ajustes else 3, len(TECLAS))
         self.velo = Entity(parent=self, model="quad", color=color.rgba32(*ui_botw_calculos.tono(estilo.TINTA), ALFA_VELO),
                            scale=(4, 4), z=0.01)
         self.panel = panel_piel(self, ANCHO, alto, estilo.COLOR_PANEL, estilo.RADIO_PANEL_PX)
         if not piel_botw():          # el panel BOTW ya trae su filo claro
             anadir_filo(self.panel, ANCHO, alto, estilo.RADIO_PANEL_PX)
         self.texto_titulo = Text(
-            "Pausa", parent=self, origin=(0, 0), position=(0, alto / 2 - 0.075, -0.001),
+            "Pausa", parent=self, origin=(0, 0), position=(0, alto / 2 - 0.068, -0.001),
             scale=escala_fuente(40), font=tipografia.fuente_piel(titulo=True), color=rgb(estilo.COLOR_TEXTO))
 
         # Posiciones de los botones: 3 de siempre, o 4 (con «Ajustes» tras «Reanudar»).
@@ -118,6 +138,10 @@ class MenuPausa(Entity):
         self.pantalla_ajustes = None      # se crea al abrir «Ajustes» por primera vez
         self._frame_cierre_ajustes = -1   # frame en que se cerró «Ajustes» (para el Escape compartido)
         self._ocultos_por_ajustes = []
+
+        # Separadores con título: «Ayuda» sobre la fila de ayuda y «Controles» sobre la guía de teclas.
+        _separador(self, "Ayuda", ys_separadores[0])
+        _separador(self, "Controles", ys_separadores[1])
 
         # Guía de teclas: 3 columnas bajo la fila de ayuda.
         self.teclas = []

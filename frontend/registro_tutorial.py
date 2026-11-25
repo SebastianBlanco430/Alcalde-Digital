@@ -324,7 +324,10 @@ def _instalar(conexion, escena, datos):
         from frontend import menu_pausa
         posicion = (escena.menu_pausa.posicion_extra(0) if hasattr(escena.menu_pausa, "posicion_extra")  # VIS-005
                     else (menu_pausa.ANCHO / 2 + 0.04 + 0.15, 0.19, -0.001))
-        boton = boton_piel_secundario(TEXTO_BOTON_PAUSA, al_clic=ver_de_nuevo, ancho=0.30, alto=a_unidades(50), tamano_fuente_px=20,
+        boton = boton_piel_secundario(TEXTO_BOTON_PAUSA, al_clic=ver_de_nuevo,
+                                      ancho=getattr(menu_pausa, "ANCHO_EXTRA", 0.30),
+                                      alto=getattr(menu_pausa, "ALTO_EXTRA", a_unidades(50)),
+                                      tamano_fuente_px=getattr(menu_pausa, "FUENTE_EXTRA_PX", 20),
                                       parent=escena.menu_pausa, position=posicion)
     except Exception as error:
         boton = None
