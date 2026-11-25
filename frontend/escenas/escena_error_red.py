@@ -5,7 +5,7 @@
 
 from ursina import Entity
 
-from frontend import diseno_adaptable, estilo, tipografia
+from frontend import diseno_adaptable, estilo, tipografia, ui_botw_b
 from frontend import online_lobby_calculos as lobby
 from frontend.componentes import BotonPrimario, BotonSecundario, a_unidades, panel_tinta, rgb
 from frontend.escenas.escena_base import Escena
@@ -38,9 +38,14 @@ class EscenaErrorRed(Escena):
         self.btn_menu = BotonSecundario("Volver al menú", al_clic=self.volver, ancho=0.40, alto=a_unidades(54),
                                         tamano_fuente_px=22, parent=self.raiz, position=(-0.22, -0.22, -0.003))
         self.foco = FocoTeclado(lambda: [self.btn_menu, self.btn_reintentar], parent=self)
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra, velo, flecha del foco y
+        # entrada desde la derecha. None = la pantalla de siempre.
+        self.piel = ui_botw_b.vestir(self.raiz, titulos=(self.t_titulo,), foco=self.foco, piezas=(self.raiz,), velo=True)
 
     def al_entrar(self, **datos):
         self.fondo.t = 0.0
+        if self.piel is not None:
+            self.piel.reiniciar()
         self.pagina = datos.get("pagina") or "unirse"
         self.mostrar(datos.get("motivo"))
 

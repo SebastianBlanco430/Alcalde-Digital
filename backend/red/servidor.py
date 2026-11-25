@@ -18,7 +18,7 @@ from backend.datos.noticias_semilla import construir_arboles
 from backend.grafos.grafo_social import construir_grafo_social_ejemplo
 from backend.logica import recta_final
 from backend.logica.estado_partida import EstadoPartida
-from backend.red import huellas
+from backend.red import huellas, multi_reloj
 from backend.red.anfitrion import AMBITOS, Anfitrion, calcular_huellas
 from backend.red.partida_coop import MazoSembrado, PartidaCooperativa
 
@@ -47,6 +47,8 @@ def construir_anfitrion(puerto=0, ambito="lan", semilla=SEMILLA_CASAS, abierto=F
         # semilla_misiones: la semana de misiones se sortea con la semilla del MUNDO (todos la comparten; contrato-dias §2)
         **{"consecuencias": True, "semilla_misiones": semilla, **(partida_opciones or {})})
     recta_final.preparar_coop(partida)        # recta final en el anfitrión (ALCALDE_SIN_RECTA_FINAL=1 la apaga)
+    # Reloj de la sala (ALCALDE_MULTI_PARIDAD=0 lo apaga).
+    multi_reloj.preparar(partida)
     h_mundo, h_contenido = calcular_huellas(mundo, semilla, catalogo, vehiculos=opciones.get("vehiculos"))
     return Anfitrion(partida, mundo, semilla, codigo, h_mundo, h_contenido, ambito=ambito,
                      puerto=puerto, abierto=abierto, **opciones)

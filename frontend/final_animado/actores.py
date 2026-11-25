@@ -53,6 +53,19 @@ def pieza(padre, modelo, posicion, escala, tono, giro=(0, 0, 0), luz=1.0):
 
 # -- Gestos ------------------------------------------------------------------------------------------------------------
 
+# Clave del horneado: antes solo el rol, así todos los NPC (sin rol: «?») y el protagonista v2 con el vecino v1 del
+# mismo rol compartían las poses horneadas en el PRIMER esqueleto y salían torcidas en los demás. Con
+# ALCALDE_FINALES_PULIDOS la clave lleva también el tipo de cuerpo y su archivo de modelo.
+def _clave_esqueleto(personaje):
+    from frontend.final_animado import final_pulido_calculos as pulido
+    rol = getattr(personaje, "rol", "?")
+    if not pulido.activo():
+        return rol
+    plan = getattr(personaje, "_plan", None)
+    plan = plan if isinstance(plan, dict) else {}
+    return (type(personaje).__name__, rol, str(plan.get("archivo")), str(plan.get("v2")))
+
+
 class Gestos:
     """Poses propias enlazadas al Actor de un personaje, con su peso suavizado."""
 
@@ -65,7 +78,7 @@ class Gestos:
             return
         try:
             parte = actor.getPartBundle("modelRoot")
-            clave = getattr(personaje, "rol", "?")
+            clave = _clave_esqueleto(personaje)
             flags = PartGroup.HMFOkPartExtra | PartGroup.HMFOkAnimExtra | PartGroup.HMFOkWrongRootName
             medidas = [None]
 
@@ -176,11 +189,30 @@ def _crear_npc_etapa(raiz, tipo):
 
 def _crear_vecino(raiz, k):
     from frontend.npc_modelo import crear_npc
+    # ALCALDE_FINALES_PULIDOS: la gente del barrio del elenco v2; sin ella, como siempre
+    v2 = _vecino_v2(raiz, k)
+    if v2 is not None:
+        return v2
     from frontend.peatones import ROPA
     from frontend.peatones_calculos import aspecto_peaton, rasgos_peaton
     indice, semilla = P.reparto_vecino(k)
     aspecto = P.aspecto_vecino(aspecto_peaton(indice, semilla))
     return crear_npc(indice, semilla, aspecto, rasgos_peaton(indice, semilla), ROPA[indice % len(ROPA)], parent=raiz)
+
+
+def _vecino_v2(raiz, k):
+    """Vecino k con su cuerpo del elenco v2 (final_pulido_calculos.ELENCO_VECINOS); None sin pulido o si no carga."""
+    from frontend.final_animado import final_pulido_calculos as pulido
+    if not pulido.activo():
+        return None
+    try:
+        from backend.datos import personajes_loader as pl
+        from frontend.npc_modelo import crear_v2
+        receta = pl.por_id(pulido.receta_vecino(k)) if pulido.receta_vecino(k) else None
+        return crear_v2(receta, parent=raiz) if receta is not None else None
+    except Exception as error:      # noqa: BLE001
+        _aviso(f"vecino {k} v2 no disponible ({type(error).__name__}: {error})")
+        return None
 
 
 def crear_cuerpo(id_pool, raiz, mundo):
@@ -236,6 +268,10 @@ class Pancarta(Prop):
 
     def __init__(self, base, cadena, luz):
         super().__init__(Entity(parent=base))
+        # ALCALDE_FINALES_PULIDOS: abajo, el cartel ya no tapa la cara; arriba, va por encima de la cabeza.
+        from frontend.final_animado import final_pulido_calculos as pulido
+        if pulido.activo():
+            self.ABAJO, self.ARRIBA = pulido.PANCARTA_ABAJO, pulido.PANCARTA_ARRIBA
         pieza(self.raiz, "cube", (0, 0.35, 0), (0.045, 1.1, 0.045), (150, 104, 62), luz=luz)
         tabla = Entity(parent=self.raiz, y=0.95)
         pieza(tabla, "cube", (0, 0, 0), (1.15, 0.62, 0.03), (246, 242, 230), luz=luz)
@@ -314,7 +350,9 @@ def _bandeja(base, luz):
     pieza(raiz, "cube", (0, 1.06, 0.36), (0.52, 0.04, 0.30), (120, 124, 136), luz=luz)
     for k in range(3):
         pieza(raiz, "sphere", (-0.15 + 0.15 * k, 1.12, 0.36), (0.13, 0.10, 0.20), (214, 160, 90), luz=luz)
-    pieza(raiz, "cube", (0, 1.8, 0), (0.24, 0.14, 0.24), (240, 240, 232), luz=luz)
+    from frontend.final_animado import final_pulido_calculos as pulido
+    if not pulido.activo() or pulido.GORRO_PANADERO:
+        pieza(raiz, "cube", (0, 1.8, 0), (0.24, 0.14, 0.24), (240, 240, 232), luz=luz)
     return Fijo(raiz)
 
 
@@ -340,7 +378,13 @@ def crear_prop(tipo, cuerpo, base, luz, cadena=None):
 
 def vestir_fijo(id_pool, cuerpo, base):
     """Lo que el actor lleva SIEMPRE: la banda de Octavio y la corbata de Arenas."""
-    if id_pool == P.OCTAVIO:
+    from frontend.final_animado import final_pulido_calculos as pulido
+    if id_pool == P.OCTAVIO and pulido.activo():
+        # La banda ajustada al smoking v2 (antes asomaba como una tabla delante del cuerpo).
+        b = pulido.BANDA
+        pieza(base, "cube", b["pos"], b["escala"], (44, 138, 214), b["giro"])
+        pieza(base, "sphere", b["medalla"], (0.09, 0.09, 0.035), estilo.ACENTO_PRIMARIO)
+    elif id_pool == P.OCTAVIO:
         pieza(base, "cube", (0, 1.24, 0.0), (0.5, 0.09, 0.3), (44, 138, 214), (0, 0, 38))
         pieza(base, "sphere", (0.13, 1.37, 0.15), (0.1, 0.1, 0.04), estilo.ACENTO_PRIMARIO)
     elif id_pool == P.ARENAS and not getattr(cuerpo, "_plan", {}).get("v2"):    # v2: la corbata va en la malla

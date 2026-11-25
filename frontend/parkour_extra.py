@@ -22,7 +22,7 @@ from ursina import Entity, Text, camera, color
 from backend.logica import parkour_calculos as pk
 from frontend import banderas_visuales as bv
 from frontend import efectos_ui_calculos as fx_calc
-from frontend import estilo, tipografia
+from frontend import estilo, tipografia, ui_botw_b
 from frontend import parkour_extra_calculos as calc
 from frontend.componentes import escala_fuente
 
@@ -120,6 +120,8 @@ class ControladorParkour:
                                  scale=escala_fuente(20), font=tipografia.FUENTE_TITULO, color=_rgba(estilo.COLOR_ACENTO))
         self.grande.letra = Text("", parent=self.grande, origin=(0, 0), z=-0.002, scale=escala_fuente(40),
                                  font=tipografia.FUENTE_TITULO, color=_rgba(estilo.TINTA))
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): el nombre de la medalla en cursiva con sombra de tinta.
+        ui_botw_b.vestir(self.grande, titulos=(self.grande.texto,))
         self._t_grande = None
         self._alcanzable = None
 

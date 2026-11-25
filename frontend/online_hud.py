@@ -11,7 +11,7 @@
 
 from ursina import Entity, Text, color
 
-from frontend import estilo
+from frontend import estilo, ui_botw_b
 from frontend import online_lobby_calculos as lobby
 from frontend import online_mundo_calculos as omc
 from frontend.componentes import BotonPrimario, a_unidades, escala_fuente, modelo_redondeado, panel_tinta, rgb
@@ -105,6 +105,8 @@ class HudOnline(Entity):
         self.cierre_texto.line_height = 1.25
         self.cierre_boton = BotonPrimario("Volver al menú", al_clic=self._volver, ancho=0.40, alto=a_unidades(54),
                                           tamano_fuente_px=22, parent=self.cierre, position=(0, -0.15, -0.004))
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): el título del cierre en cursiva con sombra de tinta.
+        ui_botw_b.vestir(self.cierre, titulos=(self.cierre_titulo,))
 
     # -- Pastilla de ping --
 

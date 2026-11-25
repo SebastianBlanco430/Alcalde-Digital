@@ -522,6 +522,18 @@ def _candidato(pid, final):
 
 
 PUESTAS = _construir()
+_pulidas = {}
+
+
+# Las puestas que valen ahora: con ALCALDE_FINALES_PULIDOS (final_pulido_calculos.py), las corregidas; si no, las de
+# siempre. Las corregidas se calculan una vez.
+def vigentes():
+    from frontend.final_animado import final_pulido_calculos as pulido
+    if not pulido.activo():
+        return PUESTAS
+    if not _pulidas:
+        _pulidas.update(pulido.corregir_puestas(PUESTAS))
+    return _pulidas
 
 
 def ids():
@@ -530,14 +542,14 @@ def ids():
 
 def puesta(plano_id):
     """La puesta del plano (KeyError si no hay)."""
-    return PUESTAS[plano_id]
+    return vigentes()[plano_id]
 
 
 def actores_del_pool(ids_planos):
     """Ids del pool que hacen falta para esos planos (sin repetir, en orden estable)."""
     vistos = []
     for pid in ids_planos:
-        pz = PUESTAS.get(pid)
+        pz = vigentes().get(pid)
         if pz is None:
             continue
         for actor in pz.actores:

@@ -162,12 +162,18 @@ def _cajas_cerca(cajas, puntos, radio):
 
 # -- Construcción -------------------------------------------------------------------------------------------------------
 
+# Las tomas que valen ahora: con ALCALDE_FINALES_PULIDOS, las corregidas de final_pulido_calculos encima de TOMAS.
+def _tomas():
+    from frontend.final_animado import final_pulido_calculos as pulido
+    return pulido.tomas(TOMAS) if pulido.activo() else TOMAS
+
+
 def definicion(plano_id):
-    return TOMAS.get(plano_id)
+    return _tomas().get(plano_id)
 
 
 def _definicion_y_ancla(plano_id, anclas):
-    propia = TOMAS.get(plano_id)
+    propia = _tomas().get(plano_id)
     if propia is not None and propia["ancla"] in anclas:
         return propia, anclas[propia["ancla"]]
     nombre = ANCLA_DE_PREFIJO.get(str(plano_id)[:1], "plaza")

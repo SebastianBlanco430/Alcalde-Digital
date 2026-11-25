@@ -314,6 +314,10 @@ class ClienteRed:
     def enviar_saludo(self, indice):
         return self._enviar_critico({"t": "saludo_rapido", "indice": indice})
 
+    # v7 (backend/red/multi_reloj.py): este cliente cerró la radio de la noche del día `dia`.
+    def enviar_noche_lista(self, dia):
+        return self._enviar_critico({"t": "noche_lista", "dia": int(dia)})
+
     # ======================================================================
     # Hilo de red
     # ======================================================================

@@ -14,7 +14,7 @@
 from ursina import Entity
 
 from backend.logica.roles import ORDEN_ROLES
-from frontend import diseno_adaptable, estilo, tipografia
+from frontend import diseno_adaptable, estilo, tipografia, ui_botw_b
 from frontend import online_lobby_calculos as lobby
 from frontend.campo_texto import copiar_al_portapapeles
 from frontend.componentes import BotonPrimario, BotonSecundario, a_unidades, panel_tinta, rgb
@@ -154,6 +154,9 @@ class EscenaSala(Escena):
         self.btn_iniciar = BotonPrimario("Iniciar partida", al_clic=self.iniciar, ancho=0.56, alto=a_unidades(52),
                                          tamano_fuente_px=22, parent=self.raiz, position=(0.52, -0.425, -0.003))
         self.foco = FocoOnline(self._controles_activos, al_escape=self.salir, parent=self)
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra, velo, flecha del foco y
+        # entrada desde la derecha. None = la sala de siempre.
+        self.piel = ui_botw_b.vestir(self.raiz, titulos=(self.titulo,), foco=self.foco, piezas=(self.raiz,), velo=True)
 
     # ------------------------------------------------------------------ foco
     def _controles_activos(self):
@@ -175,6 +178,8 @@ class EscenaSala(Escena):
         self.ayuda_visible = False
         self._aviso_local = ""
         self.fondo.t = 0.0
+        if self.piel is not None:
+            self.piel.reiniciar()
         self.caja_ayuda.enabled = False
         host = bool(self.sesion and self.sesion.es_anfitrion)
         self.caja_codigo.enabled = True

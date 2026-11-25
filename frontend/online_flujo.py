@@ -34,10 +34,11 @@ from backend.logica.estado_partida import NOMBRES_INDICADORES, VALOR_INICIAL, re
 from backend.logica.flujo_partida import MENSAJE_SIN_MISIONES
 from backend.logica.misiones import COMPLETADA, EN_MINIJUEGO
 from backend.logica.roles import ROLES
+from backend.red import multi_reloj
 from backend.red.interpolacion_calculos import InterpoladorRemoto
 from backend.red.mision_coop import ReservaMisiones, SistemaMisionesCoop
 from backend.red.sesion_en_linea import JugadorEnLinea, SesionEnLinea, mascara_a_banderas
-from frontend import online_config
+from frontend import multi_reloj_linea, online_config
 
 _registro = logging.getLogger("alcalde.online.flujo")
 
@@ -300,6 +301,11 @@ class FlujoEnLinea:
         self._aplicar_roster(jugadores)
         if tu_id not in self._jugadores:
             raise ValueError("El jugador local no está en el roster de la sala.")
+        # Paridad del multijugador (ALCALDE_MULTI_PARIDAD): el reloj de la sala que reparte el anfitrión («reloj», v7)
+        # se refleja aquí con la cara de FlujoConTiempo (frontend/multi_reloj_linea.py). Apagada: sin reloj, como antes.
+        self.tiempo_en_linea = None
+        if multi_reloj.activo():
+            multi_reloj_linea.instalar(self, self._enviar_noche_lista)
 
     # Construye el flujo a partir de los eventos retenidos de la sala (BucleRed.eventos_retenidos()):
     # toma tu_id y el último roster y luego reproduce el resto en orden (inicio, mision, ind...).
@@ -467,6 +473,14 @@ class FlujoEnLinea:
 
     def _ev_sala(self, ev):
         self._aplicar_roster(ev["jugadores"])
+
+    def _ev_reloj(self, ev):
+        multi_reloj_linea.aplicar(self, ev)
+
+    def _enviar_noche_lista(self, dia):
+        enviar = getattr(self.cliente, "enviar_noche_lista", None)
+        if callable(enviar):
+            enviar(dia)
 
     def _ev_inicio(self, ev):
         self.en_juego = True

@@ -16,7 +16,7 @@ from ursina import Entity
 
 from backend.logica import ajustes as modelo_ajustes
 from frontend import campo_texto_calculos as calc_campo
-from frontend import diseno_adaptable, estilo, tipografia
+from frontend import diseno_adaptable, estilo, tipografia, ui_botw_b
 from frontend import online_lobby_calculos as lobby
 from frontend.campo_texto import CampoTexto
 from frontend.componentes import BotonPrimario, BotonSecundario, a_unidades, panel_tinta, rgb
@@ -58,6 +58,9 @@ class EscenaOnlineMenu(Escena):
         self._construir_unirse()
         self._construir_conectando()
         self.foco = FocoOnline(self._controles_activos, al_escape=self.atras, parent=self)
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra, velo, flecha del foco y
+        # entrada desde la derecha. None = el menú en línea de siempre.
+        self.piel = ui_botw_b.vestir(self.raiz, titulos=(self.titulo,), foco=self.foco, piezas=(self.raiz,), velo=True)
         self._construido = True
         self._mostrar(PAGINA_PRINCIPAL)
 
@@ -290,6 +293,8 @@ class EscenaOnlineMenu(Escena):
     # ------------------------------------------------------------------ ciclo de vida
     def al_entrar(self, **datos):
         self.fondo.t = 0.0
+        if self.piel is not None:
+            self.piel.reiniciar()
         pagina = datos.get("pagina")
         self._cargar_recordados()
         self._mostrar(pagina if pagina in (PAGINA_CREAR, PAGINA_UNIRSE) else PAGINA_PRINCIPAL)

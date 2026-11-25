@@ -9,6 +9,7 @@ from ursina import Entity, Text, camera, color
 from backend.logica import parkour_calculos as pk
 from frontend import diseno_adaptable, estilo, materiales as mat, minimapa_calculos as mm, parkour_minimapa, tipografia
 from frontend import parkour_visual_calculos as pvc
+from frontend import ui_botw_b
 from frontend.componentes import BotonPrimario, BotonSecundario, a_unidades, escala_fuente, panel_tinta, rgb
 
 DURACION_AVISO = 2.2
@@ -281,7 +282,9 @@ class HudParkour(Entity):
         self.ocultar_resultado()
         panel = panel_tinta(self, 0.9, 0.78)
         panel.z = -0.5
-        _texto(panel, "¡Nivel completado!", 32, estilo.COLOR_ACENTO, (0, 0.32), negrita=True)
+        titulo = _texto(panel, "¡Nivel completado!", 32, estilo.COLOR_ACENTO, (0, 0.32), negrita=True)
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra de tinta y entrada del panel.
+        ui_botw_b.vestir(panel, titulos=(titulo,), piezas=(panel,))
         lineas = [
             f"Tiempo: {pk.formatear_tiempo(resultado['tiempo_s'])}      Caídas: {resultado['caidas']}",
             f"{pk.NOMBRE_CATEGORIA[resultado['categoria']]}      Eficiencia: {resultado['eficiencia']:.0f} %",

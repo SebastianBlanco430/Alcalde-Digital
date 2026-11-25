@@ -10,7 +10,7 @@
 
 from ursina import Entity, Text
 
-from frontend import diseno_adaptable, estilo, reloj_calculos as rc, tipografia
+from frontend import diseno_adaptable, estilo, reloj_calculos as rc, tipografia, ui_botw_b
 from frontend.componentes import BarraIndicador, BotonPrimario, a_unidades, escala_fuente, panel_tinta, rgb
 from frontend.hud import _medidor
 from frontend.texto import envolver_texto
@@ -56,6 +56,9 @@ class PanelFinalSemana(Entity):
         self.boton_menu = BotonPrimario("Volver al menú", al_clic=al_menu, ancho=0.36, alto=a_unidades(56),
                                         parent=self, position=(0, -self.ALTO / 2 + 0.07, -0.001))
         self.contenido = None
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra de tinta, velo detrás del panel
+        # y entrada desde la derecha al mostrarse. None = el panel de siempre.
+        self.piel = ui_botw_b.vestir(self, titulos=(self.titulo,), piezas=(self,), velo=True)
         self.enabled = False
         diseno_adaptable.ajustar_escala(self)      # ventanas más estrechas que el panel: se encoge entero
 
@@ -72,6 +75,8 @@ class PanelFinalSemana(Entity):
             # Sin GameState no hay fila de grupos: la de la ciudad sube a su sitio.
             self._poner_fila(self.barras_ciudad, ciudad, self.Y_CIUDAD if grupos else self.Y_GRUPOS - 0.03)
             self.resumen.text = "\n".join(contenido["resumen"])
+        if not self.enabled and self.piel is not None:
+            self.piel.reiniciar()
         self.enabled = True
 
     def ocultar(self):

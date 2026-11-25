@@ -97,6 +97,26 @@ class EstadoCiudad:
         for hijo in list(getattr(e, "children", ())):
             if self._fuera(hijo):
                 poner(hijo)
+            elif type(hijo).__name__ == "ControladorCiudadViva":
+                for npc in self._npc_de_capas(getattr(hijo, "raiz", None)):
+                    poner(npc)
+        return out
+
+    @staticmethod
+    def _npc_de_capas(raiz, hondo=4):
+        """ALCALDE_FINALES_PULIDOS: los NPC sentados en los bancos y los corros (frontend/bancos_sentados.py) cuelgan de
+        las capas de ciudad_viva, no de la escena: se colaban en los planos de la plaza mirando la fiesta."""
+        from frontend.final_animado import final_pulido_calculos as pulido
+        if raiz is None or not pulido.activo():
+            return []
+        out, pila = [], [(raiz, 0)]
+        while pila:
+            nodo, nivel = pila.pop()
+            for hijo in list(getattr(nodo, "children", ())):
+                if type(hijo).__name__ == "PersonajeNPC":
+                    out.append(hijo)
+                elif nivel < hondo:
+                    pila.append((hijo, nivel + 1))
         return out
 
     @staticmethod

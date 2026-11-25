@@ -9,7 +9,7 @@
 
 from ursina import Entity, Text
 
-from frontend import estilo
+from frontend import estilo, ui_botw_b
 from frontend import veredicto_calculos as vc
 from frontend.componentes import BarraIndicador, BotonPrimario, a_unidades, escala_fuente, panel_tinta, rgb
 from frontend.hud import _medidor
@@ -29,8 +29,16 @@ class PanelFinal(Entity):
     def __init__(self, al_menu, **opciones):
         super().__init__(**opciones)
         self.z = -0.5                         # por delante del resto del HUD
-        self.panel = panel_tinta(self, self.ANCHO, self.ALTO, tono=estilo.COLOR_FONDO)
-        arriba = self.ALTO / 2
+        # ALCALDE_FINALES_PULIDOS: el panel deja el mismo hueco que PanelFinalSemana entre el resumen y el botón; ahí va la
+        # franja del desenlace de la recta final (frontend/recta_final_vista.FRANJA_Y), que antes tapaba la última línea
+        # del resumen y medio botón «Volver al menú» (el panel final en línea y el del modo por turnos sin reloj).
+        from frontend.final_animado import final_pulido_calculos as pulido
+        if pulido.activo():
+            alto, y_barras, y_resumen = pulido.PANEL_FINAL_ALTO, pulido.PANEL_FINAL_Y_BARRAS, pulido.PANEL_FINAL_Y_RESUMEN
+        else:
+            alto, y_barras, y_resumen = self.ALTO, -0.045, -0.175
+        self.panel = panel_tinta(self, self.ANCHO, alto, tono=estilo.COLOR_FONDO)
+        arriba = alto / 2
         self.titulo = Text("", parent=self, origin=(0, 0), position=(0, arriba - 0.075, -0.001),
                            scale=escala_fuente(self.PX_TITULO), color=rgb(estilo.COLOR_TEXTO))
         Text(self.SUBTITULO, parent=self, origin=(0, 0), position=(0, arriba - 0.13, -0.001),
@@ -45,13 +53,16 @@ class PanelFinal(Entity):
         self.barras = []
         for i in range(3):
             x = -self.ANCHO / 2 + self.MARGEN + i * (self.ancho_barra + hueco)
-            self.barras.append(BarraIndicador("", self.ancho_barra, 0, parent=self, position=(x, -0.045, -0.001)))
-        self.resumen = Text("", parent=self, origin=(0, 0.5), position=(0, -0.175, -0.001),
+            self.barras.append(BarraIndicador("", self.ancho_barra, 0, parent=self, position=(x, y_barras, -0.001)))
+        self.resumen = Text("", parent=self, origin=(0, 0.5), position=(0, y_resumen, -0.001),
                             scale=escala_fuente(self.PX_RESUMEN), color=rgb(estilo.COLOR_TEXTO_TENUE))
         self.resumen.line_height = self.LINEA
         self.boton_menu = BotonPrimario("Volver al menú", al_clic=al_menu, ancho=0.36, alto=a_unidades(56),
-                                        parent=self, position=(0, -self.ALTO / 2 + 0.075, -0.001))
+                                        parent=self, position=(0, -alto / 2 + (0.07 if pulido.activo() else 0.075), -0.001))
         self.contenido = None
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título en cursiva con sombra de tinta, velo detrás del panel
+        # y entrada desde la derecha al mostrarse. None = el panel de siempre.
+        self.piel = ui_botw_b.vestir(self, titulos=(self.titulo,), piezas=(self,), velo=True)
         self.enabled = False
 
     # `final`: dict de confianza_misiones.evaluar_final. `indicadores`: los de la ciudad (opcional, van al resumen).
@@ -67,6 +78,8 @@ class PanelFinal(Entity):
                 barra.etiqueta = nombre
                 barra.actualizar(valor)
             self.resumen.text = "\n".join(contenido["resumen"])
+        if not self.enabled and self.piel is not None:
+            self.piel.reiniciar()
         self.enabled = True
 
     def ocultar(self):

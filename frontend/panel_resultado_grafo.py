@@ -14,7 +14,7 @@
 from panda3d.core import TextNode
 from ursina import Entity, Text, color
 
-from frontend import estilo, grafo_social_vista as vista, hud_calculos, iconos, tipografia
+from frontend import estilo, grafo_social_vista as vista, hud_calculos, iconos, tipografia, ui_botw_b
 from frontend import resultado_grafo_calculos as calc
 from frontend.componentes import (
     BotonPrimario, a_unidades, destruir_arbol, escala_fuente, modelo_redondeado, panel_tinta, rgb,
@@ -80,6 +80,10 @@ class PanelResultadoGrafo(Entity):
                           position=(0.19, -0.41, -0.01), scale=escala_fuente(13),
                           color=rgb(estilo.COLOR_TEXTO_TENUE))
         self._dinamico = Entity(parent=self.contenedor, z=-0.01)
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): los títulos en cursiva con sombra plana de tinta (el velo y
+        # el «pop» de este panel ya son suyos). None = el panel de siempre.
+        self.piel = ui_botw_b.vestir(self.contenedor, titulos=(self.titulo, self.titulo_resumen,
+                                                                self.titulo_indicadores))
 
         self._al_continuar = None
         self._reiniciar_estado()

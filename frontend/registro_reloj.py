@@ -79,10 +79,17 @@ class ControlReloj:
         en_curso = getattr(self.conexion, "_transicion_en_curso", None)
         return bool(en_curso()) if callable(en_curso) else False
 
+    # En línea sin reloj (como antes). Con ALCALDE_MULTI_PARIDAD el FlujoEnLinea lleva el reloj de la sala
+    # (frontend/multi_reloj_linea.py): el chip, la radio y el final por tiempo funcionan como en la partida local.
+    def _en_linea_sin_reloj(self, flujo):
+        if getattr(self.escena, "online", None) is None:
+            return False
+        return getattr(flujo, "tiempo_en_linea", None) is None
+
     def motivo_de_pausa(self, flujo):
         escena = self.escena
         return rc.motivo_de_pausa(
-            con_reloj=self._con_reloj(flujo), en_linea=getattr(escena, "online", None) is not None,
+            con_reloj=self._con_reloj(flujo), en_linea=self._en_linea_sin_reloj(flujo),
             terminada=bool(flujo is not None and flujo.partida_terminada()), en_pausa=bool(escena.en_pausa),
             cinematica=bool(escena._cinematica), mapa_abierto=self._mapa_abierto(), panel_abierto=self._panel_abierto(),
             telefono_abierto=self._telefono_abierto(flujo) if flujo is not None else False,
@@ -94,7 +101,7 @@ class ControlReloj:
     def avanzar(self, dt):
         """Un frame con el mundo activo. Devuelve el motivo por el que el tiempo no corrió (None = corrió)."""
         flujo = self.escena.flujo
-        if not self._con_reloj(flujo) or getattr(self.escena, "online", None) is not None:
+        if not self._con_reloj(flujo) or self._en_linea_sin_reloj(flujo):
             self._clave = None
             self.motivo = rc.SIN_RELOJ if not self._con_reloj(flujo) else rc.EN_LINEA
             self.vista.chip("", "sol", 0.0, False)
@@ -217,7 +224,9 @@ def _cinematica_del_final(escena_mundo, panel, resumen, conexion=None):
         from backend.logica import etapas_final
         if not etapas_final.activo():
             return False
-        sesion = escena_mundo._sesion
+        # En línea la sesión se reconstruye cada vez que alguien sale de la sala (online_flujo): la marca de «ya vista» va
+        # con la partida (su reloj de la sala, ALCALDE_MULTI_PARIDAD), si no la cinemática volvería a empezar.
+        sesion = getattr(escena_mundo.flujo, "tiempo_en_linea", None) or escena_mundo._sesion
         if _cine_final["sesion"] is not sesion:
             _cine_final.update(sesion=sesion, vista=False, entidad=None)
         final = resumen.get("final")
@@ -386,6 +395,9 @@ def registrar(gestor, conexion, escena_mundo):
         vigia = _crear_vigia(escena_mundo, conexion)
         conexion.vigia_reloj = vigia
         escena_mundo.pintar_final = lambda flujo: pintar_final_de(escena_mundo, vigia.vista.panel_final, conexion)
+        # Radio de la mañana y de la noche en línea, sobre el reloj de la sala (ALCALDE_MULTI_PARIDAD).
+        from frontend import multi_radio_linea
+        multi_radio_linea.registrar(escena_mundo, conexion)
         return vigia
     except Exception as error:
         print(f"[reloj] no instalado ({type(error).__name__}: {error})", file=sys.stderr)

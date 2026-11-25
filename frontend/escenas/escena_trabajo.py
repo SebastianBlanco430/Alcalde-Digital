@@ -20,7 +20,7 @@ from ursina import Button, Entity, Mesh, Text, color, time
 
 from backend.logica.perfil_economia import FATIGA_MAX, perfil_de
 from backend.logica.trabajos import ATENDER, BARRA, ENTREGAS, MENSAJE_AGOTADO, RITMO, SECUENCIA, TurnoTrabajo
-from frontend import diseno_adaptable, estilo, tipografia
+from frontend import diseno_adaptable, estilo, tipografia, ui_botw_b
 from frontend.componentes import (BotonPrimario, BotonSecundario, destruir_arbol, escala_fuente, modelo_redondeado,
                                   panel_tinta, rgb)
 from frontend.escenas.escena_base import Escena
@@ -334,7 +334,9 @@ class EscenaTrabajo(Escena):
         self._velo(s)
         panel = panel_tinta(s, 0.9, 0.5, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX, z=0)
         _texto(panel, "Tu turno", 15, estilo.COLOR_TEXTO_TENUE, (0, 0.205), z=-0.01)
-        _texto(panel, t.nombre, 28, estilo.COLOR_ACENTO, (0, 0.155), negrita=True, z=-0.01)
+        titulo = _texto(panel, t.nombre, 28, estilo.COLOR_ACENTO, (0, 0.155), negrita=True, z=-0.01)
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título con sombra de tinta y el panel entra desde la derecha.
+        ui_botw_b.vestir(panel, titulos=(titulo,), piezas=(panel,))
         texto = self._instrucciones() + (" " + TEMAS[t.id] if t.id in TEMAS else "")
         if t.motor == RITMO:
             # Taller: líneas cortas a tamaño fijo (el ajuste automático encogía el párrafo hasta que no se leía).
@@ -372,7 +374,9 @@ class EscenaTrabajo(Escena):
             destruir_arbol(hijo)
         self._velo(s)
         panel = panel_tinta(s, 0.9, 0.66, tono=estilo.COLOR_TARJETA, radio_px=estilo.RADIO_TARJETA_PX, z=0)
-        _texto(panel, "TURNO TERMINADO", 28, estilo.COLOR_ACENTO, (0, 0.265), negrita=True, z=-0.01)
+        titulo = _texto(panel, "TURNO TERMINADO", 28, estilo.COLOR_ACENTO, (0, 0.265), negrita=True, z=-0.01)
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): título con sombra de tinta y el panel entra desde la derecha.
+        ui_botw_b.vestir(panel, titulos=(titulo,), piezas=(panel,))
         if self.trabajo.motor == RITMO:
             from backend.logica.taller_ritmo import etiqueta_calidad
             from frontend.taller_vista import dibujar_pieza

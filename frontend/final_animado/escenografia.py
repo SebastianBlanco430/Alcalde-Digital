@@ -132,7 +132,7 @@ class Escenografia:
         # poses que necesita cada actor del pool en estos planos
         poses = {}
         for pid in ids:
-            pz = P.PUESTAS.get(pid)
+            pz = P.vigentes().get(pid)
             if pz is None:
                 continue
             for linea in pz.actores:
@@ -149,7 +149,7 @@ class Escenografia:
             act.vestir_fijo(id_pool, cuerpo, base)
             gestos[id_pool] = act.Gestos(cuerpo, sorted(poses.get(id_pool, ())))
         for pid in ids:
-            pz = P.PUESTAS.get(pid)
+            pz = P.vigentes().get(pid)
             if pz is None:
                 _aviso(f"plano sin puesta: {pid}")
                 continue

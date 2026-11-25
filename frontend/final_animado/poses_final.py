@@ -91,6 +91,9 @@ POSES = {
     "frotar_b": (_r(cabeza=(0, 8, 0)), _b((24, 8, 78, -44), (28, 8, 90, -32)), 0.0),
     "abrir_a": (_r(pecho=(0, 8, 0)), _b((76, 22, 90, 18)), 0.01),
     "abrir_b": (_r(pecho=(0, 10, 0)), _b((82, 52, 88, 74)), 0.01),
+    # ALCALDE_FINALES_PULIDOS: el puño a media altura con el codo doblado junto a la cabeza. El «puno_medio» de antes
+    # estiraba el brazo hacia delante y arriba con la palma abajo: parecía un saludo de otra cosa, no una protesta.
+    "puno_medio_alto": (_r(pecho=(0, -2, -2), cabeza=(0, -6, 0)), _b(REPOSO, (142, 34, 184, 12)), 0.0),
 }
 
 
@@ -146,6 +149,19 @@ ACCIONES = {
 }
 
 
+# Acciones que cambian con ALCALDE_FINALES_PULIDOS (final_pulido_calculos.py); el resto, las de ACCIONES.
+ACCIONES_PULIDAS = {
+    "puno": Accion(a="puno_medio_alto", b="puno_arriba", hz=1.1),
+}
+
+
+def _accion(nombre):
+    from frontend.final_animado import final_pulido_calculos as pulido
+    if pulido.activo() and nombre in ACCIONES_PULIDAS:
+        return ACCIONES_PULIDAS[nombre]
+    return ACCIONES.get(nombre, ACCIONES["quieto"])
+
+
 @dataclass(frozen=True)
 class Objetivo:
     clip: str                    # clip lógico del personaje (Idle, Saludar, Hablar)
@@ -156,14 +172,14 @@ class Objetivo:
 
 def poses_de(accion):
     """Poses que necesita una acción (para hornear solo esas)."""
-    a = ACCIONES.get(accion, ACCIONES["quieto"])
+    a = _accion(accion)
     return tuple(p for p in (a.a, a.b) if p is not None)
 
 
 def objetivo(accion, segundos, fase=0.0, k=0.0):
     """Lo que hace el cuerpo `segundos` después de empezar el plano con esa acción. `fase` desfasa la alternancia
     (0..1) y `k` es el avance del paso (para las acciones por_k). Total: una acción desconocida = quieto."""
-    a = ACCIONES.get(accion, ACCIONES["quieto"])
+    a = _accion(accion)
     if a.clip is not None:
         return Objetivo(a.clip, {}, 0.0, 0.0)
     if a.a is None:

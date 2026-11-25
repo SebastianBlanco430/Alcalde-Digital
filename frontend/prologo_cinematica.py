@@ -257,6 +257,23 @@ def crear_prologo(escena, conexion, al_terminar=None, guion=None, fabrica_animad
     return Prologo3D()
 
 
+# En línea el prólogo no salía. Con ALCALDE_MULTI_PARIDAD cada cliente lo ve en local al entrar a la partida (es una
+# cinemática: no hay nada que sincronizar; el reloj de la sala sigue corriendo y se puede saltar como siempre).
+# Al volver a una sala ya empezada (reconexión) no sale otra vez: solo si el reloj de la sala sigue en las 08:00 del día 1
+# (el anfitrión lo tiene parado mientras dura el prólogo, multi_reloj.ESPERA_INICIO) o aún no llegó su hora.
+def _en_linea_sin_prologo(escena_mundo):
+    if getattr(escena_mundo, "online", None) is None:
+        return False
+    from backend.red import multi_reloj
+    if not multi_reloj.activo():
+        return True
+    reloj = getattr(getattr(escena_mundo.flujo, "tiempo_en_linea", None), "reloj", None)
+    if reloj is None or not reloj.recibido:
+        return False
+    from backend.logica import reloj_partida
+    return reloj.dia() > 1 or reloj.hora() > reloj_partida.HORA_INICIO + 0.05
+
+
 def registrar(gestor, conexion, escena_mundo):
     """Engancha la entrada al mundo: la primera vez que se ve una partida local nueva, el prólogo toma la escena ANTES
     del primer frame (el vigía del tutorial espera a que termine)."""
@@ -284,7 +301,7 @@ def registrar(gestor, conexion, escena_mundo):
             restaurada = bool(getattr(conexion, "partida_restaurada", False))
             if not registro_tutorial.activo():
                 conexion.partida_restaurada = False     # sin tutorial nadie la limpia: que no tape la próxima partida
-            if not registro_tutorial.debe_abrirse(flujo, restaurada, getattr(escena_mundo, "online", None) is not None):
+            if not registro_tutorial.debe_abrirse(flujo, restaurada, _en_linea_sin_prologo(escena_mundo)):
                 return
             estado["entidad"] = crear_prologo(escena_mundo, conexion)
 

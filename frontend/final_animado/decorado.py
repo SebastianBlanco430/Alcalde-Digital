@@ -13,7 +13,7 @@ from ursina import Entity, Text, color
 from ursina.shaders import unlit_shader
 
 from frontend import estilo, tipografia
-from frontend.ciudad_viva import DibujoTinta, mesh_confeti, mesh_fiesta, mesh_flores, mesh_guirnalda
+from frontend.ciudad_viva import DibujoTinta, mesh_confeti, mesh_fiesta, mesh_flores, mesh_fuego_vivo, mesh_guirnalda
 from frontend.contorno_calculos import realzar_color
 from frontend.final_animado import lugares, puesta as P
 from frontend.props_mundo import caja, icosfera, prisma
@@ -261,14 +261,23 @@ class VentanaMorro(PiezaViva):
 
     def __init__(self, raiz, pieza, luz):
         super().__init__(raiz)
+        # ALCALDE_FINALES_PULIDOS: paño más alto y ancho (tapa el letrero de la casa), hueco a la altura de la cara de
+        # los protagonistas v2, zócalo bajo el suelo y postigos que abren hacia fuera (final_pulido_calculos.py).
+        from frontend.final_animado import final_pulido_calculos as pulido
+        pulir = pulido.activo()
         l = Lienzo(luz)
-        a, h = self.ANCHO, self.ALTO
-        w, y0, y1 = self.HUECO
+        a, h = (pulido.VENTANA_ANCHO, pulido.VENTANA_ALTO) if pulir else (self.ANCHO, self.ALTO)
+        w, y0, y1 = pulido.VENTANA_HUECO if pulir else self.HUECO
+        zocalo = pulido.VENTANA_ZOCALO if pulir else 0.0
+        self.giro = pulido.GIRO_POSTIGOS if pulir else -1.0
         fondo = 0.22
         lado = (a - w) / 2
         for sx in (-1, 1):
-            l.caja((sx * (w / 2 + lado / 2), h / 2, 0), (lado, h, fondo), LADRILLO)
-        l.caja((0, y0 / 2, 0), (w, y0, fondo), LADRILLO)
+            l.caja((sx * (w / 2 + lado / 2), (h - zocalo) / 2, 0), (lado, h + zocalo, fondo), LADRILLO)
+        l.caja((0, (y0 - zocalo) / 2, 0), (w, y0 + zocalo, fondo), LADRILLO)
+        # Alero de chapa: el paño se lee como una casa, no como un muro
+        if pulir:
+            l.caja((0, h + 0.05, 0.2), (a + 0.3, 0.1, fondo + 0.5), (120, 124, 136), inclinacion=-8)
         l.caja((0, (y1 + h) / 2, 0), (w, h - y1, fondo), LADRILLO)
         l.caja((0, y0 + 0.03, 0.08), (w + 0.3, 0.07, fondo + 0.18), (226, 214, 196))          # alféizar
         l.caja((0, y1 + 0.04, 0.03), (w + 0.2, 0.08, fondo + 0.06), (226, 214, 196))          # dintel
@@ -304,7 +313,7 @@ class VentanaMorro(PiezaViva):
             if self.modo == 1:
                 k = 1.0 - k
         for bisagra, sx in self.postigos:
-            bisagra.rotation_y = -sx * 165 * k        # abiertos: contra la pared, a cada lado
+            bisagra.rotation_y = self.giro * sx * 165 * k        # abiertos: contra la pared, a cada lado
 
 
 ICONOS = {0: ("corazon", "visto"), 1: ("pregunta", "cruz"), 2: ("corazon", "pregunta")}
@@ -404,6 +413,22 @@ class Tripode(PiezaViva):
         self.aro.color = color.rgb(g, g, g)
 
 
+class Fogata(PiezaViva):
+    """Fogata de la calle (m2, ALCALDE_FINALES_PULIDOS): la hoguera de cómic de la ciudad (ciudad_viva.mesh_fuego_vivo:
+    leños, llamas rojas, naranja y amarillas y humo) con un latido suave. Unos conos sueltos se leían como conos de
+    tráfico."""
+
+    def __init__(self, raiz, pieza, luz):
+        super().__init__(raiz)
+        self.fase = 1.7 * pieza.variante
+        self.hoguera = _entidad(raiz, mesh_fuego_vivo(pieza.variante))
+        self.avanzar(0.0, 0.0)
+
+    def avanzar(self, t, segundos):
+        latido = 1.0 + 0.07 * math.sin(segundos * 9.0 + self.fase) + 0.04 * math.sin(segundos * 23.0 + self.fase)
+        self.hoguera.scale = (1.0, latido, 1.0)
+
+
 class Confeti(PiezaViva):
     """Nubes de confeti que caen sobre el podio en bucle (además del confeti de la capa de fiesta de la ciudad)."""
 
@@ -454,6 +479,9 @@ def construir(pieza, plano_id, raiz_plano, anclas, ancla_plano, mundo, final):
         _atril(l)
     elif tipo == "confeti":
         viva = Confeti(raiz, pieza.medida, luz)
+    elif tipo == "fogata":
+        raiz.scale = pieza.medida
+        viva = Fogata(raiz, pieza, luz)
     elif tipo == "baranda":
         _baranda(l, pieza.medida)
     elif tipo == "puesto_flores":

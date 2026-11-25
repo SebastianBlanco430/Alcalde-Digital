@@ -109,6 +109,20 @@ def desenlace_activo():
 _avisados = set()
 
 
+# Misiones completadas del flujo. En el modo feria FlujoConTiempo oculta misiones_a_dict (así no se guarda la partida):
+# la lectura lanzaba AttributeError, el progreso quedaba en 0 y la recta final no empezaba nunca en la feria. Con
+# ALCALDE_FINALES_PULIDOS (encendida por defecto; =0 lo deja como antes) se cuentan las de la feria (ritmo_feria) y,
+# si tampoco hay, 0: el progreso sale entonces del reloj, que en la feria avanza con las misiones.
+def _hechas(flujo):
+    if os.environ.get("ALCALDE_FINALES_PULIDOS", "").strip().lower() in ("0", "false", "no", "off"):
+        return len((flujo.misiones_a_dict() or {}).get("completadas") or ())
+    try:
+        return len((flujo.misiones_a_dict() or {}).get("completadas") or ())
+    except AttributeError:
+        ritmo = getattr(flujo, "ritmo_feria", None)
+        return int(getattr(ritmo, "hechas_total", 0) or 0)
+
+
 def _avisar_una_vez(clave, mensaje):
     if clave not in _avisados:
         _avisados.add(clave)
@@ -499,7 +513,7 @@ class FlujoConRectaFinal:
     def _progreso(self):
         flujo = self._flujo
         total = len(flujo.catalogo_misiones())
-        hechas = len((flujo.misiones_a_dict() or {}).get("completadas") or ())
+        hechas = _hechas(flujo)
         reloj = getattr(flujo, "reloj", None)
         fraccion = reloj.fraccion_partida() if reloj is not None and hasattr(reloj, "fraccion_partida") else None
         return progreso(hechas, total, fraccion)

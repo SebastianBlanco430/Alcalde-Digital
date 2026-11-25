@@ -4,6 +4,7 @@
 # Nada de lo que llega se usa como ruta, modelo ni escena: aquí solo se obtienen datos tipados.
 import json
 import math
+import os
 
 # ---------------------------------------------------------------------------
 # Constantes de versión, límites y tiempos
@@ -16,7 +17,11 @@ import math
 # porque nada que usara el mundo chico cambia en el cable.)
 # v6 (2026-11, recta final): campos OPCIONALES `mult`/`nivel` en «ind» y `desenlace`/`claves` en «fin»
 # (backend/logica/recta_final.py). Ningún campo obligatorio cambia; un equipo con v5 se rechaza con «version».
-PROTOCOLO_V = 6
+# v7 (2026-11, paridad del multijugador, backend/red/multi_reloj.py): mensajes «reloj» (anfitrión -> todos: día, hora,
+# noche pendiente, fin y diario de la noche) y «noche_lista» (cliente: cerró la radio de la noche). Solo con
+# ALCALDE_MULTI_PARIDAD encendida (por defecto); apagada se anuncia la v6 de siempre y nada de esto viaja. La bandera se
+# lee aquí con os.environ (este módulo es solo stdlib), con la misma regla que multi_reloj.activo().
+PROTOCOLO_V = 6 if os.environ.get("ALCALDE_MULTI_PARIDAD", "").strip().lower() in ("0", "false", "no", "off") else 7
 JUEGO = "AlcaldeDigital"
 
 DIR_C2H = "c2h"   # cliente -> anfitrión
@@ -238,6 +243,12 @@ ESQUEMAS = {
     "error": ((DIR_H2C,), {"motivo": _s(200)}),
     "saludo_rapido": ((DIR_C2H,), {"indice": _i(0, 15)}),
     "saludo": ((DIR_H2C,), {"id": _ID, "indice": _i(0, 15)}),   # reenvío del saludo rápido
+    # v7: reloj de la sala (multi_reloj.RelojSala.estado) y aviso de radio de la noche cerrada.
+    "reloj": ((DIR_H2C,), {
+        "dia": _i(1, 31), "hora": _n(0.0, 24.0), "noche": _b(), "fin": _b(),
+        "diario": Campo("lista_str", largo=16, largo_item=64, obligatorio=False),
+    }),
+    "noche_lista": ((DIR_C2H,), {"dia": _i(1, 31)}),
 }
 # NOTA: en ping/pong y snap el campo de tiempo se llama «tt» en el esquema porque «t» está
 # reservada para el tipo de mensaje (el diseño escribe «t» para ambos; aquí se desambigua).

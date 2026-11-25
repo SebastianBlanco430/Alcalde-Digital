@@ -32,6 +32,7 @@ from backend.logica import confianza_misiones, recta_final
 from backend.logica.lote_mision import LoteMision
 from backend.logica.mazo_noticias import MazoNoticias
 from backend.logica.misiones import EN_MINIJUEGO, RADIO_INTERACCION
+from backend.red import multi_reloj
 from backend.red.mision_coop import ReservaMisiones, SistemaMisionesCoop
 from backend.red.sesion_en_linea import SesionEnLinea
 
@@ -94,6 +95,11 @@ class PartidaCooperativa:
         self._catalogo = list(catalogo)
         # Recta final: ControladorRectaFinal o None (lo fija recta_final.preparar_coop desde el servidor).
         self.recta_final = None
+        # Reloj de la sala: multi_reloj.RelojSala o None (lo fija multi_reloj.preparar desde el servidor con
+        # ALCALDE_MULTI_PARIDAD; None = sin reloj en línea, como antes).
+        self.reloj_sala = None
+        self._t_reloj = None
+        self._t_gracia_fin = None
         self._grafo = grafo_social
         self._reloj = reloj
         self._gracia = gracia
@@ -298,7 +304,31 @@ class PartidaCooperativa:
                     and ahora - j.desconectado_desde >= self._gracia]
         for id_jugador in vencidos:
             self.salir(id_jugador, "gracia_agotada")
+        if self.reloj_sala is not None and self._fase == FASE_JUEGO:
+            self._avanzar_reloj_sala(ahora)
         return vencidos
+
+    # Reloj de la sala (multi_reloj): avanza con el tiempo real entre dos ticks, reparte «reloj» cuando toca y, con la
+    # semana terminada, cierra la partida por tiempo como la local.
+    def _avanzar_reloj_sala(self, ahora):
+        dt = 0.0 if self._t_reloj is None else max(0.0, ahora - self._t_reloj)
+        self._t_reloj = ahora
+        campos = self.reloj_sala.avanzar(dt, [j.id for j in self.sesion.jugadores_conectados()])
+        if campos is not None:
+            self._emitir("reloj", **campos)
+        if not self.reloj_sala.terminado():
+            return
+        # Quien está dentro de un minijuego al acabar la semana lo termina (la local para el reloj con la misión en
+        # curso): se espera hasta GRACIA_FIN s; si no, su decisión llegaría con la partida ya cerrada y se perdería.
+        self._t_gracia_fin = (self._t_gracia_fin or 0.0) + dt
+        ocupados = any(s.estado() == EN_MINIJUEGO for s in self._sistemas.values())
+        if not ocupados or self._t_gracia_fin >= multi_reloj.GRACIA_FIN:
+            self._terminar("tiempo")
+
+    # El jugador cerró la radio de la noche del día `dia` (mensaje «noche_lista»).
+    def noche_lista(self, id_jugador, dia):
+        if self.reloj_sala is not None and self._fase == FASE_JUEGO:
+            self.reloj_sala.noche_lista(id_jugador, dia)
 
     # -- Juego --
 
@@ -566,6 +596,9 @@ class PartidaCooperativa:
         sistema.terminar()
         self._cierres.append({"mision": mision.id, "jugador": id_jugador, "nombre": jugador.nombre,
                               "decisiones": resultado["decisiones"]})
+        # El diario del día de la sala (la radio de la noche lo cuenta).
+        if self.reloj_sala is not None:
+            self.reloj_sala.anotar(mision.id, veredicto)
         consecuencia = {}
         if self._gs is not None:
             delta = confianza_misiones.aplicar_veredicto(self._gs, self._tabla, mision, veredicto)
@@ -651,4 +684,7 @@ class PartidaCooperativa:
         self._emitir("jugador_reconectado", id=jugador.id)
         if self._fase == FASE_JUEGO:
             self._emitir_mision(jugador)
+            # Quien vuelve recibe ya la hora (no espera al siguiente segundo).
+            if self.reloj_sala is not None:
+                self._emitir("reloj", para=jugador.id, **self.reloj_sala.estado())
         return jugador

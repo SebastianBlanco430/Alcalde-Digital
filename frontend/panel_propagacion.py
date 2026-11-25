@@ -11,7 +11,7 @@ from panda3d.core import TextNode
 from ursina import Entity, Text
 
 from backend.logica.propagacion import resumen_red_social
-from frontend import estilo, grafo_social_vista as vista, hud_calculos
+from frontend import estilo, grafo_social_vista as vista, hud_calculos, ui_botw_b
 from frontend.componentes import destruir_arbol, escala_fuente, modelo_redondeado, rgb
 from frontend.texto import envolver_texto
 
@@ -51,8 +51,10 @@ class PanelPropagacion(Entity):
         super().__init__(**opciones)
         Entity(parent=self, model=modelo_redondeado(self.ANCHO, self.ALTO, 10),
                scale=(self.ANCHO, self.ALTO), color=rgb(COLOR_FONDO_PANEL), z=0.001)
-        Text(self.TITULO, parent=self, origin=(0, 0), position=(0, self.ALTO / 2 - 0.028, -0.001),
-             scale=escala_fuente(15), color=rgb(estilo.COLOR_TEXTO))
+        titulo = Text(self.TITULO, parent=self, origin=(0, 0), position=(0, self.ALTO / 2 - 0.028, -0.001),
+                      scale=escala_fuente(15), color=rgb(estilo.COLOR_TEXTO))
+        # Piel BOTW (ALCALDE_UI_BOTW, frontend/ui_botw_b.py): el título en cursiva con sombra plana de tinta.
+        ui_botw_b.vestir(self, titulos=(titulo,))
         self.texto_resultado = Text(
             "", parent=self, origin=(0, 0), position=(0, -self.ALTO / 2 + 0.042, -0.001),
             scale=escala_fuente(12), color=rgb(estilo.COLOR_TEXTO_TENUE))

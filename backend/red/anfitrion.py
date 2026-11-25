@@ -743,6 +743,9 @@ class Anfitrion:
                 par.validador.colocar(jugador.x, jugador.z)
         elif t == "saludo_rapido":
             self._difundir({"t": "saludo", "id": i, "indice": msg["indice"]})
+        # v7: cerró la radio de la noche (multi_reloj)
+        elif t == "noche_lista":
+            partida.noche_lista(i, msg["dia"])
         elif t == "adios":
             par.cierre = "adios"
             partida.salir(i, "adios")
@@ -965,6 +968,12 @@ class Anfitrion:
         if t == "sala_cerrada":
             self._sala_cerrada = True
             return [(para, {"t": "sala_cerrada"})]
+        # v7: reloj de la sala (backend/red/multi_reloj.py)
+        if t == "reloj":
+            msg = {"t": "reloj", "dia": ev["dia"], "hora": ev["hora"], "noche": ev["noche"], "fin": ev["fin"]}
+            if "diario" in ev:
+                msg["diario"] = [_texto(e, 64) for e in ev["diario"]][:16]
+            return [(para, msg)]
         return []
 
     # ======================================================================
