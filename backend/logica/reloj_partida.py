@@ -17,6 +17,14 @@
 # BANDERA. RELOJ = False (o ALCALDE_RELOJ=0) lo apaga: main.py no envuelve el flujo y el juego es el de antes (la partida
 # termina solo al agotar el catálogo). En línea no existe (el protocolo no lo conoce): ver docs/PLAN_FINAL.md.
 #
+# NOCHES SALTADAS (hilo conductor, docs/HILO_CONDUCTOR.md; NOCHES = True o ALCALDE_HILO_NOCHES=1/0). Cada día se juega de
+# 08:00 a HORA_CIERRE (20:00): el reloj se DETIENE a las 20:00 (noche_pendiente() -> True) hasta que alguien llama a
+# pasar_noche(), que salta a las 08:00 del día siguiente (lo hace la radio tras su emisión de la noche, o FlujoConTiempo
+# si nadie la retiene). La partida termina el día 7 a las 20:00: 7 x 12 = 84 h activas. La escala por defecto pasa a
+# SEGUNDOS_REALES_POR_HORA_NOCHES = 900 / 84 ≈ 10,71 s (partida de 15 min); ALCALDE_SEG_POR_HORA sigue mandando.
+# fraccion_partida() cuenta solo horas activas; horas_restantes() sigue siendo de reloj (hasta el fin, noches incluidas).
+# Con la bandera apagada todo es como antes (días de 24 h, fin a las 24:00 del día 7).
+#
 #   reloj = RelojPartida()
 #   reloj.avanzar(dt)            -> horas de juego que avanzó (0.0 si está en pausa o terminado)
 #   reloj.pausar() / reanudar() / en_pausa()
@@ -27,16 +35,24 @@
 #   reloj.fraccion_partida()     -> 0.0..1.0
 #   reloj.terminado()            -> True al completar el día 7
 #   reloj.a_dict() / RelojPartida.desde_dict(datos)
+#   reloj.noche_pendiente()      -> True parado a las 20:00 de un día 1..6 (solo con noches saltadas)
+#   reloj.pasar_noche()          -> salta a las 08:00 del día siguiente; True si saltó
+#   reloj.avanzar_hacia(t, h)    -> avanza como mucho `h` horas hacia la marca absoluta `t` (modo feria)
 
 import math
 import os
 
 RELOJ = True
+NOCHES = True                       # noches saltadas y partida de 15 min (ALCALDE_HILO_NOCHES=0 la apaga)
 
 DIAS = 7
 HORAS_POR_DIA = 24.0
 HORA_INICIO = 8.0                   # el día 1 empieza a las 08:00
+HORA_CIERRE = 20.0                  # con noches saltadas, el día se cierra a las 20:00
 SEGUNDOS_REALES_POR_HORA = 11.25    # 1 día = 4,5 min reales; partida (160 h) = 30 min
+# Objetivo de 15 min reales con noches saltadas: 7 días x 12 h activas = 84 h -> 900 / 84 ≈ 10,71 s por hora.
+MINUTOS_OBJETIVO_NOCHES = 15.0
+SEGUNDOS_REALES_POR_HORA_NOCHES = MINUTOS_OBJETIVO_NOCHES * 60.0 / (DIAS * (HORA_CIERRE - HORA_INICIO))
 DT_MAX = 0.5                        # s reales: tope de un paso de avanzar()
 
 _VERSION = 1
@@ -54,8 +70,19 @@ def activo():
     return bool(RELOJ)
 
 
-def segundos_por_hora():
-    """Segundos reales por hora de juego: ALCALDE_SEG_POR_HORA si es un número positivo; si no, la constante."""
+def noches_activas():
+    """¿Se saltan las noches (días de 08:00 a 20:00)? ALCALDE_HILO_NOCHES=1/0 manda sobre NOCHES (se lee en cada llamada)."""
+    valor = os.environ.get("ALCALDE_HILO_NOCHES", "").strip().lower()
+    if valor in _SI:
+        return True
+    if valor in _NO:
+        return False
+    return bool(NOCHES)
+
+
+def segundos_por_hora(noches=None):
+    """Segundos reales por hora de juego: ALCALDE_SEG_POR_HORA si es un número positivo; si no, la constante (la de 15
+    min si se saltan las noches). `noches` None = noches_activas()."""
     crudo = os.environ.get("ALCALDE_SEG_POR_HORA", "").strip()
     if crudo:
         try:
@@ -64,7 +91,8 @@ def segundos_por_hora():
             valor = 0.0
         if math.isfinite(valor) and valor > 0:
             return valor
-    return SEGUNDOS_REALES_POR_HORA
+    noches = noches_activas() if noches is None else bool(noches)
+    return SEGUNDOS_REALES_POR_HORA_NOCHES if noches else SEGUNDOS_REALES_POR_HORA
 
 
 def _numero(valor, nombre, minimo=None):
@@ -85,9 +113,10 @@ def texto_de(tiempo_absoluto):
 class RelojPartida:
 
     # `seg_por_hora`: None = segundos_por_hora() (constante o variable de entorno). `dias` y `hora_inicio` existen para
-    # las pruebas; el juego usa los valores por defecto.
-    def __init__(self, seg_por_hora=None, dias=DIAS, hora_inicio=HORA_INICIO):
-        self._seg_por_hora = _numero(seg_por_hora if seg_por_hora is not None else segundos_por_hora(),
+    # las pruebas; el juego usa los valores por defecto. `noches`: True, False o None (= noches_activas()).
+    def __init__(self, seg_por_hora=None, dias=DIAS, hora_inicio=HORA_INICIO, noches=None):
+        self._noches = noches_activas() if noches is None else bool(noches)
+        self._seg_por_hora = _numero(seg_por_hora if seg_por_hora is not None else segundos_por_hora(self._noches),
                                      "seg_por_hora", 1e-6)
         if isinstance(dias, bool) or not isinstance(dias, int) or dias < 1:
             raise ValueError(f"dias inválido: {dias!r}.")
@@ -113,9 +142,38 @@ class RelojPartida:
     def _sumar(self, horas):
         if self._pausado or self.terminado():
             return 0.0
-        nuevo = min(self._fin(), self._absoluto + horas)
+        nuevo = min(self._tope(), self._absoluto + horas)
         avance, self._absoluto = nuevo - self._absoluto, nuevo
         return avance
+
+    # Modo feria: avanza como mucho `horas` hacia la marca absoluta `objetivo` (nunca pasa del cierre del día ni vuelve
+    # atrás). Respeta la pausa y el fin, como _sumar.
+    def avanzar_hacia(self, objetivo, horas):
+        falta = _numero(objetivo, "objetivo") - self._absoluto
+        if falta <= 0:
+            return 0.0
+        return self._sumar(min(falta, _numero(horas, "horas", 0.0)))
+
+    # -- Noches saltadas --
+
+    def noches(self):
+        return self._noches
+
+    # Hasta dónde puede llegar el reloj sin que nadie salte la noche: el cierre del día (20:00) o el fin de la partida.
+    def _tope(self):
+        if not self._noches:
+            return self._fin()
+        return min(self._fin(), (self.dia() - 1) * HORAS_POR_DIA + HORA_CIERRE)
+
+    def noche_pendiente(self):
+        return self._noches and not self.terminado() and self._absoluto >= self._tope() - 1e-9
+
+    # Salta a las 08:00 (hora de inicio) del día siguiente. Solo con la noche pendiente; True si saltó.
+    def pasar_noche(self):
+        if not self.noche_pendiente():
+            return False
+        self._absoluto = self.dia() * HORAS_POR_DIA + self._hora_inicio
+        return True
 
     def pausar(self):
         self._pausado = True
@@ -129,6 +187,8 @@ class RelojPartida:
     # -- Lectura --
 
     def _fin(self):
+        if self._noches:
+            return (self._dias - 1) * HORAS_POR_DIA + HORA_CIERRE
         return self._dias * HORAS_POR_DIA
 
     def seg_por_hora(self):
@@ -154,10 +214,15 @@ class RelojPartida:
 
     def hora_texto(self):
         if self.terminado():
-            return f"Día {self._dias} · 24:00"
+            return texto_de(self._fin()) if self._noches else f"Día {self._dias} · 24:00"
         return texto_de(self._absoluto)
 
+    # Con noches saltadas solo cuentan las horas activas (08:00-20:00 de cada día).
     def fraccion_partida(self):
+        if self._noches:
+            activas_dia = HORA_CIERRE - self._hora_inicio
+            hechas = (self.dia() - 1) * activas_dia + min(activas_dia, max(0.0, self.hora() - self._hora_inicio))
+            return min(1.0, max(0.0, hechas / (self._dias * activas_dia)))
         return min(1.0, max(0.0, self.horas_transcurridas() / (self._fin() - self._hora_inicio)))
 
     def terminado(self):
@@ -169,13 +234,14 @@ class RelojPartida:
         return {"version": _VERSION, "absoluto": self._absoluto, "pausado": self._pausado, "dias": self._dias,
                 "hora_inicio": self._hora_inicio}
 
-    # La escala (seg_por_hora) NO se guarda: es un ajuste de la sesión, no de la partida. ValueError si los datos no son
-    # válidos (quien restaura decide: flujo_tiempo vuelve al reloj recién creado).
+    # La escala (seg_por_hora) NO se guarda: es un ajuste de la sesión, no de la partida. Las noches saltadas tampoco
+    # (las decide la bandera al restaurar; un guardado de días de 24 h con hora pasada de las 20:00 queda con la noche
+    # pendiente). ValueError si los datos no son válidos (quien restaura decide: flujo_tiempo vuelve al reloj recién creado).
     @classmethod
-    def desde_dict(cls, datos, seg_por_hora=None):
+    def desde_dict(cls, datos, seg_por_hora=None, noches=None):
         if not isinstance(datos, dict) or datos.get("version") != _VERSION:
             raise ValueError("Reloj guardado con formato desconocido.")
-        reloj = cls(seg_por_hora, datos.get("dias", DIAS), datos.get("hora_inicio", HORA_INICIO))
+        reloj = cls(seg_por_hora, datos.get("dias", DIAS), datos.get("hora_inicio", HORA_INICIO), noches)
         absoluto = _numero(datos.get("absoluto"), "absoluto", 0.0)
         reloj._absoluto = min(reloj._fin(), max(reloj._hora_inicio, absoluto))
         reloj._pausado = bool(datos.get("pausado", False))

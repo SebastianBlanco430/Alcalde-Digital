@@ -49,12 +49,25 @@
 # `fijar_dia_misiones(dia, hora)` del flujo; entre cambios no llama a nada (comparar una tupla por frame). RED DE
 # SEGURIDAD: si eso falla, se avisa por stderr, se pide al flujo `apagar_reparto_dias()` (reparto de siempre) y no se
 # vuelve a intentar; nunca lanza hacia el frame. Un flujo sin `fijar_dia_misiones` (pruebas) se deja tal cual.
+#
+# NOCHES SALTADAS (ALCALDE_HILO_NOCHES, reloj_partida.py): a las 20:00 el reloj se para con la noche pendiente. Si nadie
+# la retiene (sin radio) se salta en el mismo paso; con la radio encendida (frontend/radio_registro.py llama a
+# `flujo.retener_noches(True)`; es un método porque los envoltorios de fuera solo delegan lecturas) la radio emite la
+# noche y llama a `flujo.pasar_noche()`.
+#
+# DIARIO (hilo conductor): `flujo.diario` = {día: [{"id", "veredicto"}...]} con las misiones cerradas cada día (veredicto
+# "pasada" | "fallada" | None). Lo lee la radio (backend/logica/radio_guion.py) para el recuento de la noche y los NPC para
+# el «tema del día anterior». No se guarda (es solo narrativo): tras «Continuar» la radio habla de lo que pase desde ahí.
+#
+# MODO FERIA (ALCALDE_FERIA, backend/logica/modo_feria.py): el reloj no corre con el tiempo real; la hora la marca el
+# progreso del día (RitmoFeria) y el día se cierra al cerrar `por_dia` misiones. La noche se pasa igual que en el modo
+# normal. La partida de feria no se guarda: misiones_a_dict deja de existir (guardado.se_puede_guardar -> False).
 
 import os
 import sys
 
 from backend.logica import (ambiente_ciudad, confianza_misiones, costo_aislamiento, efectos_retardados, etapas_final,
-                            reloj_partida, reparto_dias)
+                            modo_feria, reloj_partida, reparto_dias)
 from backend.logica.estado_partida import NOMBRES_INDICADORES
 from backend.logica.misiones import SIN_MISION
 
@@ -65,7 +78,9 @@ PESO_CIUDAD = 0.5       # peso del índice de la ciudad en el final ponderado (0
 
 _PROPIOS = ("_flujo", "reloj", "cola_efectos", "aislamiento", "ambiente_suave", "avisos_retardados",
             "ultimo_aviso_retardado", "_indice_etapas", "_t_indice_etapas", "_etapa_vista", "_clave_dia_misiones",
-            "_reparto_roto")
+            "_reparto_roto", "retener_noche", "diario", "ritmo_feria")
+# Lo que una partida de feria NO expone (sin guardado: guardado.se_puede_guardar mira hasattr(flujo, "misiones_a_dict")).
+_OCULTOS_FERIA = ("misiones_a_dict",)
 PERIODO_INDICE_ETAPAS = 0.5     # s reales entre dos lecturas del índice para el ambiente (finales por etapas)
 
 
@@ -137,9 +152,16 @@ def _etapa_guardada(valor):
 class FlujoConTiempo:
 
     # `reloj`: RelojPartida (None = uno nuevo). `efectos` / `aislamiento`: True, False o None (= la bandera de su módulo).
-    def __init__(self, flujo, reloj=None, efectos=None, aislamiento=None):
+    # `feria`: True, False o None (= modo_feria.activo()); en feria el reloj nuevo siempre salta noches.
+    def __init__(self, flujo, reloj=None, efectos=None, aislamiento=None, feria=None):
         self._flujo = flujo
-        self.reloj = reloj if reloj is not None else reloj_partida.RelojPartida()
+        con_feria = modo_feria.activo() if feria is None else bool(feria)
+        self.ritmo_feria = modo_feria.RitmoFeria(modo_feria.por_dia(self._catalogo())) if con_feria else None
+        if reloj is None:
+            reloj = reloj_partida.RelojPartida(noches=True) if con_feria else reloj_partida.RelojPartida()
+        self.reloj = reloj
+        self.retener_noche = False          # True = alguien (la radio) emite la noche y llama a pasar_noche()
+        self.diario = {}                    # {día: [{"id", "veredicto"}]} de las misiones cerradas (no se guarda)
         con_efectos = efectos_retardados.activo() if efectos is None else bool(efectos)
         con_aislamiento = costo_aislamiento.activo() if aislamiento is None else bool(aislamiento)
         self.cola_efectos = efectos_retardados.ColaEfectos() if con_efectos else None
@@ -185,16 +207,67 @@ class FlujoConTiempo:
     # -- Tiempo --
 
     # Un frame con el mundo activo: `dt` segundos reales. Devuelve los avisos que nacieron en este paso.
+    # En feria la hora no sigue a dt: se acerca (animada) a la que marca el progreso del día.
     def avanzar_tiempo(self, dt):
-        self.reloj.avanzar(dt)
+        if self.ritmo_feria is not None:
+            self.ritmo_feria.observar(dt, self._hay_mision())
+            inicio = (self.reloj.dia() - 1) * reloj_partida.HORAS_POR_DIA
+            objetivo = inicio + self.ritmo_feria.hora_objetivo(reloj_partida.HORA_INICIO, reloj_partida.HORA_CIERRE)
+            self.reloj.avanzar_hacia(objetivo, max(0.0, dt) * modo_feria.VELOCIDAD_HORAS_POR_SEG)
+        else:
+            self.reloj.avanzar(dt)
         nuevos = self._procesar_tiempo()
+        self._revisar_noche()
         self.actualizar_ambiente(dt)
         return nuevos
 
+    def _hay_mision(self):
+        hay = getattr(self._flujo, "hay_mision_activa", None)
+        return bool(hay()) if callable(hay) else True
+
+    # -- Noches saltadas --
+
+    def noche_pendiente(self):
+        return self.reloj.noche_pendiente()
+
+    # True = alguien (la radio) emite la noche y llama a pasar_noche(); False = la noche se salta sola.
+    def retener_noches(self, si=True):
+        self.retener_noche = bool(si)
+
+    # Sin nadie que retenga la noche (sin radio), se salta en el mismo paso.
+    def _revisar_noche(self):
+        if not self.retener_noche and self.reloj.noche_pendiente():
+            self.pasar_noche()
+
+    # Salta a las 08:00 del día siguiente y pone las misiones al día (la misma ruta fijar_dia_misiones de siempre). True
+    # si saltó. Lo llama la radio tras la emisión de la noche (o _revisar_noche).
+    def pasar_noche(self):
+        if not self.reloj.pasar_noche():
+            return False
+        if self.ritmo_feria is not None:
+            self.ritmo_feria.nuevo_dia()
+        self._procesar_tiempo()
+        return True
+
+    # Misiones cerradas el día `dia` (copias): [{"id", "veredicto"}].
+    def diario_de(self, dia):
+        return [dict(e) for e in self.diario.get(dia, [])]
+
     # Avanza `horas` de juego de golpe (pruebas, simulación, depuración). No suaviza el ambiente.
+    # Con noches saltadas y nadie que retenga la noche, al llegar a las 20:00 se salta como en avanzar_tiempo y se sigue
+    # avanzando. `horas` son horas de reloj (la noche saltada también cuenta), como antes de las noches; con la radio
+    # reteniéndola, el reloj se queda a las 20:00.
     def avanzar_horas(self, horas):
-        self.reloj.avanzar_horas(horas)
-        return self._procesar_tiempo()
+        nuevos = []
+        destino = self.reloj.tiempo_absoluto() + float(horas)
+        while True:
+            self.reloj.avanzar_horas(max(0.0, destino - self.reloj.tiempo_absoluto()))
+            nuevos += self._procesar_tiempo() or []
+            if (self.reloj.tiempo_absoluto() >= destino - 1e-9 or self.retener_noche
+                    or not self.reloj.noche_pendiente()):
+                return nuevos
+            if not self.pasar_noche():
+                return nuevos
 
     def pausar_tiempo(self):
         self.reloj.pausar()
@@ -293,12 +366,34 @@ class FlujoConTiempo:
     # Misiones digitales (parkour / investigación): cerrarlas también es participar. Los argumentos se pasan tal cual
     # (FlujoConGameState no recibe ninguno; FlujoConEconomia y FlujoPartida reciben el game_state).
     def revisar_misiones_digitales(self, *argumentos):
+        leer_mision = getattr(self._flujo, "mision_actual", None)
+        mision = leer_mision() if callable(leer_mision) else None
         cerro = self._flujo.revisar_misiones_digitales(*argumentos)
         if cerro and self.aislamiento is not None:
             self.aislamiento.participar(self.reloj.tiempo_absoluto())
+        if cerro:
+            self._anotar_cierre(mision)
         return cerro
 
+    # Diario del día y ritmo de la feria. Nunca lanza (es narrativo).
+    def _anotar_cierre(self, mision):
+        if self.ritmo_feria is not None:
+            self.ritmo_feria.registrar_cierre()
+        id_mision = getattr(mision, "id", None)
+        if id_mision is None:
+            return
+        veredicto = None
+        try:
+            if id_mision in (getattr(self._flujo, "misiones_pasadas", lambda: [])() or []):
+                veredicto = confianza_misiones.PASADA
+            elif id_mision in (getattr(self._flujo, "misiones_falladas", lambda: [])() or []):
+                veredicto = confianza_misiones.FALLADA
+        except Exception as error:
+            print(f"[tiempo] veredicto del diario no leído: {error}", file=sys.stderr)
+        self.diario.setdefault(self.reloj.dia(), []).append({"id": id_mision, "veredicto": veredicto})
+
     def _tras_cerrar(self, mision, resultado):
+        self._anotar_cierre(mision)
         ahora = self.reloj.tiempo_absoluto()
         if self.aislamiento is not None:
             self.aislamiento.participar(ahora)
@@ -374,8 +469,11 @@ class FlujoConTiempo:
     # guardado nunca puede impedir jugar. La pausa del reloj no se restaura (la decide el frontend).
     def restaurar_tiempo(self, datos):
         datos = datos if isinstance(datos, dict) else {}
-        self.reloj = self._leer(datos, "reloj", lambda d: reloj_partida.RelojPartida.desde_dict(d, self.reloj.seg_por_hora()),
-                                reloj_partida.RelojPartida(self.reloj.seg_por_hora()))
+        noches = self.reloj.noches()
+        self.reloj = self._leer(datos, "reloj",
+                                lambda d: reloj_partida.RelojPartida.desde_dict(d, self.reloj.seg_por_hora(), noches),
+                                reloj_partida.RelojPartida(self.reloj.seg_por_hora(), noches=noches))
+        self.diario = {}
         self.reloj.reanudar()
         if self.cola_efectos is not None:
             self.cola_efectos = self._leer(datos, "efectos_retardados", efectos_retardados.ColaEfectos.desde_dict,
@@ -405,4 +503,14 @@ class FlujoConTiempo:
     def __getattr__(self, nombre):
         if nombre.startswith("__") or nombre in _PROPIOS:
             raise AttributeError(nombre)
+        if nombre in _OCULTOS_FERIA and self.__dict__.get("ritmo_feria") is not None:
+            raise AttributeError(nombre)
         return getattr(self._flujo, nombre)
+
+    # El catálogo del flujo envuelto (para las misiones por día de la feria); () si no lo expone.
+    def _catalogo(self):
+        leer = getattr(self._flujo, "catalogo_misiones", None)
+        try:
+            return tuple(leer()) if callable(leer) else ()
+        except Exception:
+            return ()

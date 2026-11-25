@@ -12,7 +12,7 @@
 
 from ursina import Entity, scene
 
-from frontend import estilo
+from frontend import estilo, sello_marca_agua
 from frontend.componentes import destruir_arbol, rgb
 from frontend.minijuegos import ui as ui_2d
 from frontend.minijuegos_3d import mesa_calculos as mc
@@ -85,6 +85,8 @@ class Comparar3D(Minijuego3D):
         self.hojas = [papel_3d.papel(self.raiz_luz, ancho, alto, posicion=(xa, mc.Y_HOJAS), giro=-0.8, iluminado=False),
                       papel_3d.papel(self.raiz_luz, ancho, alto, posicion=(xb, mc.Y_HOJAS), giro=0.7, tono=PAPEL_VIEJO,
                                      capa=1, iluminado=False)]
+        # Marca de agua del sello de la Tradición en la copia que circula si el rumor lo lleva (hilo conductor).
+        sello_marca_agua.poner_en_papel(self.hojas[1], getattr(self.ctx, "mision", None))
         y_arriba = alto / 2 - mc.MARGEN_HOJA
         x0 = -ancho_texto / 2
         self.cabeceras = []

@@ -1,0 +1,146 @@
+{
+  "_nota": "Textos de la Rádio Comunitária (hilo conductor, docs/HILO_CONDUCTOR.md). Los elige backend/logica/radio_guion.py: «manana»[día][estado] (una línea; estado = bien | tenso | mal, de los tres indicadores de la ciudad), «noche» en tres líneas: «hizo»[resultado] (acierto | mixto | error | nada), «red»[día][quedaron | limpio] (lo que pasó en la red sin el jugador; quedaron = hubo misiones del día sin verificar) y «ciudad»[día][estado] (una consecuencia visible). En modo corto (feria) la noche usa solo «hizo» y «ciudad». Sin números ni indicadores en la noche. La radio NUNCA nombra a nadie ni muestra el sello: desde el día 6 solo pregunta. «puente»[estado]: la línea antes del final del día 7. «temas»: tema de cada misión (lo usan los NPC: «tema del día anterior»). Cada lista es de variantes: se elige una sin repetir la última.",
+  "emisora": "Rádio Comunitária",
+  "locutora": "Jandira Lopes",
+  "manana": {
+    "1": {
+      "bien": ["Rádio Comunitária: faltan 7 días. ¿Votará Ciudad Nova informada o engañada?"],
+      "tenso": ["Rádio Comunitária: faltan 7 días. ¿Votará Ciudad Nova informada o engañada?"],
+      "mal": ["Rádio Comunitária: faltan 7 días. ¿Votará Ciudad Nova informada o engañada?"]
+    },
+    "2": {
+      "bien": ["Faltan 6 días. Ayer el barrio preguntó antes de reenviar. Que siga así."],
+      "tenso": ["Faltan 6 días. En los chats ya corren cadenas raras. Ojo con lo que llega."],
+      "mal": ["Faltan 6 días y ya hay vecinos peleando por audios que nadie comprobó."]
+    },
+    "3": {
+      "bien": ["Faltan 5 días. La plaza amanece tranquila. ¿Cuánto durará la calma?"],
+      "tenso": ["Faltan 5 días. Hoy los rumores hablan de dinero y de salud. Cuidado."],
+      "mal": ["Faltan 5 días. El miedo ya llegó a la fila del hospital y a la del mercado."]
+    },
+    "4": {
+      "bien": ["Faltan 4 días. Ciudad Nova aprendió a mirar dos veces. Hoy toca otra vez."],
+      "tenso": ["Faltan 4 días. Mismos audios, mismas prisas. ¿Quién gana con el susto?"],
+      "mal": ["Faltan 4 días. Medio barrio ya no le cree a nadie. Ni a esta radio."]
+    },
+    "5": {
+      "bien": ["Faltan 3 días. La campaña llega a la ladera con carteles nuevos. Mírelos bien."],
+      "tenso": ["Faltan 3 días. Carteles de campaña en cada esquina y rumores en cada chat."],
+      "mal": ["Faltan 3 días. La ladera desconfía hasta del agua del grifo."]
+    },
+    "6": {
+      "bien": ["Faltan 2 días. Hoy se habla de urnas. ¿A quién le sirve que dudemos?"],
+      "tenso": ["Faltan 2 días. Encuestas, fotos de mitin, canastas... ¿quién reparte tanto?"],
+      "mal": ["Faltan 2 días. Hay vecinos que dicen que no irán a votar. ¿Por qué será?"]
+    },
+    "7": {
+      "bien": ["Falta 1 día. ¿A quién le conviene que la ladera no vote? Mañana se sabrá."],
+      "tenso": ["Falta 1 día. ¿A quién le conviene que la ladera no vote? Piénselo hoy."],
+      "mal": ["Falta 1 día. ¿A quién le conviene que la ladera no vote? Nadie responde."]
+    }
+  },
+  "noche": {
+    "hizo": {
+      "acierto": [
+        "Hoy alguien fue a mirar con sus ojos antes de compartir.",
+        "Hoy hubo quien comprobó en la calle lo que decían los chats.",
+        "Hoy un rumor se apagó porque alguien preguntó primero."
+      ],
+      "mixto": [
+        "Hoy se desmintió un rumor, pero otro se coló sin revisar.",
+        "Hoy hubo una de cal y una de arena en los chats del barrio.",
+        "Hoy se verificó una parte; la otra viajó sin freno."
+      ],
+      "error": [
+        "Hoy se reenvió lo que no era cierto y el barrio lo creyó.",
+        "Hoy un rumor falso recibió ayuda para llegar más lejos.",
+        "Hoy se confió en el audio equivocado."
+      ],
+      "nada": [
+        "Hoy los rumores quedaron sin verificar. Nadie fue a mirar.",
+        "Hoy nadie revisó nada: los chats hablaron solos.",
+        "Hoy los mensajes llegaron y se quedaron sin verificar."
+      ]
+    },
+    "red": {
+      "1": {
+        "quedaron": ["La cadena del premio siguió saltando de teléfono en teléfono."],
+        "limpio": ["En la terminal, los vecinos se rieron del audio del primo."]
+      },
+      "2": {
+        "quedaron": ["El rumor del teleférico llegó a los grupos de la escuela."],
+        "limpio": ["Los vecinos subieron al teleférico como siempre, sin miedo."]
+      },
+      "3": {
+        "quedaron": ["La cadena del subsidio dio la vuelta al barrio dos veces."],
+        "limpio": ["En el mercado se habló de precios, pero nadie entró en pánico."]
+      },
+      "4": {
+        "quedaron": ["El nuevo audio del primo llegó antes que cualquier desmentido."],
+        "limpio": ["Alguien contestó al audio del primo con la foto del hospital abierto."]
+      },
+      "5": {
+        "quedaron": ["El rumor del desalojo bajó por la ladera más rápido que el agua."],
+        "limpio": ["En la ladera se leyó el decreto real y el rumor perdió fuerza."]
+      },
+      "6": {
+        "quedaron": ["La encuesta falsa se compartió sin firma. ¿A quién le conviene que la ladera no vote?"],
+        "limpio": ["La encuesta falsa no pasó del primer grupo. ¿A quién le conviene que la ladera no vote?"]
+      }
+    },
+    "ciudad": {
+      "1": {
+        "bien": ["En la Praça da Sé, los vecinos conversan hasta tarde."],
+        "tenso": ["En la Praça da Sé, más de uno mira el teléfono con desconfianza."],
+        "mal": ["En la Praça da Sé, dos vecinos discutieron por una cadena."]
+      },
+      "2": {
+        "bien": ["La feria de trueque se arma con risas y puestos llenos."],
+        "tenso": ["La feria de trueque abre, pero con menos puestos que otros años."],
+        "mal": ["La feria de trueque quedó a medias: muchos no vinieron por miedo."]
+      },
+      "3": {
+        "bien": ["En la fila del hospital la gente espera tranquila su turno."],
+        "tenso": ["En la fila del hospital se cuchichea más de lo que se espera."],
+        "mal": ["La fila del hospital se llenó de gente asustada por nada."]
+      },
+      "4": {
+        "bien": ["La jornada de vacunación tiene filas largas y buen ánimo."],
+        "tenso": ["La jornada de vacunación tiene huecos: algunos dudaron."],
+        "mal": ["La jornada de vacunación quedó casi vacía. Ganó el miedo."]
+      },
+      "5": {
+        "bien": ["En la ladera, las ventanas siguen encendidas y las puertas abiertas."],
+        "tenso": ["En la ladera, varias familias empacan por si acaso."],
+        "mal": ["En la ladera, hay vecinos que ya cargan sus cosas en carretillas."]
+      },
+      "6": {
+        "bien": ["En el debate del barrio, la gente llegó con preguntas propias."],
+        "tenso": ["En el debate del barrio, se gritó más de lo que se preguntó."],
+        "mal": ["El debate del barrio terminó a empujones y con sillas vacías."]
+      }
+    }
+  },
+  "puente": {
+    "bien": ["Rádio Comunitária, última emisión: la ladera fue a votar. Ahora, el resultado."],
+    "tenso": ["Rádio Comunitária, última emisión: las urnas cerraron. Ciudad Nova ya decidió."],
+    "mal": ["Rádio Comunitária, última emisión: muchas sillas vacías en las mesas. Ahora, el resultado."]
+  },
+  "temas": {
+    "ciudadano_praca": "fiesta", "generica_rodoviaria": "transporte", "influencer_samba": "fiesta",
+    "generica_corrente": "cadena", "generica_primo_audio": "transporte",
+    "influencer_parque": "seguridad", "generica_universidade": "transporte", "ciudadano_teleferico": "transporte",
+    "generica_feira": "fiesta", "ciudadano_biblioteca": "fiesta",
+    "generica_santa_casa": "salud", "candidato_mercado": "precios", "generica_mutirao": "estafa",
+    "generica_subsidio_cadena": "subsidio", "generica_agua_corte": "agua",
+    "periodista_radio": "precios", "periodista_vacunas": "salud", "generica_subsidio_gestor": "subsidio",
+    "generica_primo_hospital": "salud", "influencer_te_dengue": "salud",
+    "candidato_morro": "ladera", "generica_auxilio_transporte": "subsidio", "generica_agua_turbia": "agua",
+    "candidato_tarifa_luz": "precios", "ciudadano_tarjeta_bus": "estafa",
+    "periodista_prefeitura": "elecciones", "generica_encuesta": "elecciones", "periodista_foto_mitin": "elecciones",
+    "candidato_debate": "elecciones", "generica_canastas_votos": "elecciones",
+    "generica_mesas_votacion": "elecciones", "influencer_voto_celular": "elecciones",
+    "ciudadano_teleferico_eleccion": "elecciones", "periodista_boletin": "elecciones", "candidato_ley_seca": "elecciones"
+  },
+  "lectura": {"base": 1.5, "por_caracter": 0.06, "minimo": 2.5}
+}

@@ -410,5 +410,78 @@
       {"t": "Ahora no."},
       {"t": "Ajá…"}
     ]
+  },
+  "_nota_hilo": "Hilo conductor (backend/logica/globos.py, ALCALDE_HILO_NPC): «hilo.tema»[tema del día anterior], «hilo.resultado»[lo que hizo el jugador el día anterior] y «hilo.radio» (vecinos que oyeron la radio). Los temas son los de backend/datos/radio_textos.json.",
+  "hilo": {
+    "tema": {
+      "fiesta": [
+        {"t": "Dijeron en la radio que la fiesta de la plaza sí va. Yo iré."},
+        {"t": "Ayer tanto lío por un concierto, y era verdad."}
+      ],
+      "transporte": [
+        {"t": "Dijeron en la radio que lo del pasaje era un audio sin fuente."},
+        {"t": "Yo casi no subo al teleférico por un rumor. Qué tontería."}
+      ],
+      "cadena": [
+        {"t": "Dijeron en la radio que la cadena del premio era falsa. Yo ya la había mandado."},
+        {"t": "Mi tía reenvió la cadena a todo el grupo. Ay, tía."}
+      ],
+      "seguridad": [
+        {"t": "Dijeron en la radio que el parque cierra solo por las luces nuevas."},
+        {"t": "Ayer media calle asustada por el parque, y era una obra."}
+      ],
+      "salud": [
+        {"t": "Dijeron en la radio que el hospital sigue abierto. Menos mal."},
+        {"t": "Mi vecina no fue a urgencias por un audio. Eso no puede ser."}
+      ],
+      "precios": [
+        {"t": "Dijeron en la radio que nadie duplicó los precios del mercado."},
+        {"t": "Ayer todos hablando de la luz y nadie vio el recibo."}
+      ],
+      "estafa": [
+        {"t": "Dijeron en la radio que nadie pide claves por mensaje. Ojo."},
+        {"t": "A mi primo casi le sacan la clave con un enlace."}
+      ],
+      "subsidio": [
+        {"t": "Dijeron en la radio que el subsidio se pide en ventanilla, no por enlace."},
+        {"t": "Yo llené el formulario del enlace... ¿y ahora qué?"}
+      ],
+      "agua": [
+        {"t": "Dijeron en la radio que el corte de agua era de verdad, pero corto."},
+        {"t": "Ayer nadie tomaba agua del grifo por un audio."}
+      ],
+      "ladera": [
+        {"t": "Dijeron en la radio que no hay desalojo en la ladera. ¿Quién inventó eso?"},
+        {"t": "Ayer la ladera casi empaca por un rumor."}
+      ],
+      "elecciones": [
+        {"t": "Dijeron en la radio: ¿a quién le conviene que la ladera no vote?"},
+        {"t": "Ese sello de la torre otra vez en el chat. Raro, ¿no?"},
+        {"t": "Siempre los mismos sellos en los rumores de la votación..."}
+      ]
+    },
+    "resultado": {
+      "acierto": [
+        {"t": "Alguien fue a mirar antes de compartir. Así sí."},
+        {"t": "Por fin alguien revisa antes de reenviar."}
+      ],
+      "mixto": [
+        {"t": "Ayer se desmintió una cosa, pero otra se coló."},
+        {"t": "Unos revisan, otros reenvían. Así estamos."}
+      ],
+      "error": [
+        {"t": "Ayer me llegó lo mismo por tres grupos. Y era mentira."},
+        {"t": "Ya ni sé qué reenvié ayer. Qué vergüenza."}
+      ],
+      "nada": [
+        {"t": "Ayer nadie revisó nada y los chats hablaron solos."},
+        {"t": "Llegaron rumores todo el día y nadie fue a mirar."}
+      ]
+    },
+    "radio": [
+      {"t": "¿Oíste a Jandira en la Rádio Comunitária?"},
+      {"t": "La Rádio Comunitária no para de preguntar quién gana con el miedo."},
+      {"t": "Dijeron en la radio que faltan pocos días para votar."}
+    ]
   }
 }

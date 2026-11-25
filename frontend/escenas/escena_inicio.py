@@ -5,9 +5,13 @@
 # Menú BOTW (sesión G, ALCALDE_MENU_BOTW, encendido por defecto): frontend/menu_botw.py pone encima una piel con el fondo
 # del póster, logo y opciones en cursiva; estos botones siguen siendo los controles (mismos callbacks y confirmaciones).
 # Con =0, sin recursos o si la piel falla, este menú se ve tal cual.
+# Hilo conductor (docs/MODO_FERIA.md, docs/HILO_CONDUCTOR.md): botón «Modo feria» tras «Empezar» (ALCALDE_FERIA_MENU=0 lo
+# quita): deja ALCALDE_FERIA=1 en el entorno y empieza como «Empezar»; «Empezar» y «Continuar» lo dejan en 0. Antes de
+# una partida nueva (normal o de feria) se ve el PRÓLOGO (frontend/prologo_cinematica.py, ALCALDE_PROLOGO=0 lo quita).
 
 from ursina import Entity, Text, color, time
 
+from backend.logica import modo_feria
 from frontend import diseno_adaptable, estilo
 from frontend import menu_botw_calculos as mbc
 from frontend import menu_inicio_calculos as mic
@@ -56,17 +60,29 @@ class EscenaInicio(Escena):
         diseno_adaptable.ajustar_texto(self.texto_subtitulo, ancho_sub - 0.04, escala_base=escala_fuente(21),
                                        escala_min=0.8, max_lineas=1)
 
-        # Con «En línea» hay un botón más: se compacta la columna (alto y paso menores) para que Salir quepa.
-        alto_b = self.ALTO_BOTON if al_online is None else a_unidades(50)
-        paso = a_unidades(80) if al_online is None else a_unidades(62)
+        # Con «En línea» hay un botón más: se compacta la columna (alto y paso menores) para que Salir quepa. Con
+        # «Modo feria» y «En línea» a la vez, más compacta aún.
+        con_feria = modo_feria.menu_activo()
+        alto_b = self.ALTO_BOTON if al_online is None and not con_feria else a_unidades(50)
+        paso = a_unidades(80) if al_online is None and not con_feria else a_unidades(62)
+        if con_feria and al_online is not None:
+            alto_b, paso = a_unidades(44), a_unidades(54)
         self.boton_comenzar = BotonPrimario(
             "Empezar", al_clic=self._clic_comenzar, ancho=self.ANCHO_BOTON, alto=alto_b,
             tamano_fuente_px=26, parent=self, position=(0, self.Y_BOTON),
         )
+        y_salir = self.Y_BOTON - paso
+        # Botón «Modo feria» (hilo conductor): partida corta que avanza por misiones, sin guardado.
+        self.boton_feria = None
+        if con_feria:
+            self.boton_feria = BotonSecundario(
+                "Modo feria", al_clic=self._clic_feria, ancho=self.ANCHO_BOTON, alto=alto_b,
+                tamano_fuente_px=24, parent=self, position=(0, y_salir),
+            )
+            y_salir = y_salir - paso
         # Botón «Ajustes» (opcional: solo si main.py pasa `al_ajustes`): va entre Empezar y Salir y Salir baja
         # un puesto. Sin `al_ajustes` el menú queda exactamente como siempre.
         self.boton_ajustes = None
-        y_salir = self.Y_BOTON - paso
         if al_ajustes is not None:
             self.boton_ajustes = BotonSecundario(
                 "Ajustes", al_clic=al_ajustes, ancho=self.ANCHO_BOTON, alto=alto_b,
@@ -91,6 +107,9 @@ class EscenaInicio(Escena):
         if self.boton_online is not None:
             self.botones = tuple(b for b in self.botones if b is not self.boton_salir) + (
                 self.boton_online, self.boton_salir)
+        if self.boton_feria is not None:
+            self.botones = (self.boton_comenzar, self.boton_feria) + self.botones[1:]
+        self.prologo = None
         self.foco = FocoTeclado(lambda: self.botones, parent=self)
         # «Continuar» (guardado de partida): oculto hasta que frontend/registro_guardado.py lo ofrece y hay un guardado.
         self.boton_continuar = BotonPrimario(
@@ -118,6 +137,7 @@ class EscenaInicio(Escena):
 
     def _clic_continuar(self):
         if self._al_continuar is not None:
+            modo_feria.encender(False)
             self._al_continuar()
 
     def _refrescar_continuar(self):
@@ -194,12 +214,44 @@ class EscenaInicio(Escena):
     def _clic_comenzar(self):
         if self._al_comenzar is None:
             return
+        empezar = lambda: self._empezar(feria=False)     # noqa: E731
         if mic.necesita_confirmar_nueva(self.boton_continuar.enabled):
-            self._pedir(mic.NUEVA, self._al_comenzar)
+            self._pedir(mic.NUEVA, empezar)
         else:
+            empezar()
+
+    # La partida de feria no se guarda ni pisa el guardado al empezar: no pide confirmación.
+    def _clic_feria(self):
+        if self._al_comenzar is not None:
+            self._empezar(feria=True)
+
+    # Partida nueva: fija el modo (ALCALDE_FERIA, lo lee crear_flujo) y pasa por el prólogo antes de `al_comenzar`.
+    def _empezar(self, feria):
+        if self.prologo is not None:
+            return
+        modo_feria.encender(feria)
+        from frontend import prologo_cinematica
+        if not prologo_cinematica.activo():
+            self._al_comenzar()
+            return
+
+        def al_terminar():
+            self.prologo = None
+            self.foco.enabled = True
+            self._al_comenzar()
+
+        self.foco.enabled = False               # Enter/Espacio adelantan el prólogo, no activan otro botón
+        try:
+            self.prologo = prologo_cinematica.crear_prologo(self, al_terminar)
+        except Exception as error:              # noqa: BLE001  sin prólogo: se empieza como siempre
+            print(f"[prologo] omitido ({type(error).__name__}: {error})")
+            self.prologo = None
+            self.foco.enabled = True
             self._al_comenzar()
 
     def input(self, key):
+        if self.prologo is not None:
+            return
         if self.confirmacion.tecla(key):
             self._cerrar_confirmacion()
 
@@ -209,6 +261,11 @@ class EscenaInicio(Escena):
 
     def al_salir(self):
         self._cerrar_confirmacion()
+        negro = getattr(self, "negro_prologo", None)
+        if negro is not None:                   # el negro del prólogo (frontend/prologo_cinematica.py) ya cumplió
+            from ursina import destroy
+            destroy(negro)
+            self.negro_prologo = None
         if self.botw is not None:
             self.botw.al_salir()
 

@@ -226,6 +226,18 @@ class EscenaMinijuego(Escena):
             self._en_3d(lambda v: v.usar_minijuego(minijuego))
         else:
             self._montar_3d()
+        self._marca_sello_2d()
+
+    # Hilo conductor (frontend/sello_marca_agua.py): en 2D, la marca de agua del sello sobre la captura («Señales», a la
+    # izquierda) o la copia que circula («Comparar», a la derecha). En 3D la pone la propia mesa sobre su papel.
+    def _marca_sello_2d(self):
+        if self.vista3d is not None or self.minijuego is None:
+            return
+        from frontend import sello_marca_agua
+        if self.minijuego_id not in sello_marca_agua.MINIJUEGOS_CON_MARCA:
+            return
+        x = -0.34 if self.minijuego_id == "senales" else 0.34
+        sello_marca_agua.poner_en_2d(self.minijuego, self.mision, (x, -0.04, -0.05), 0.3)
 
     def _previa_en_monitor(self):
         """¿La pantalla previa va dentro del monitor 3D? Solo con presentación 3D de la familia PC y la bandera

@@ -51,6 +51,12 @@ FPS_MAXIMOS = 60
 DURACION_TRANSICION = 0.25   # segundos de salida y de entrada del fundido a negro
 DURACION_CINEMATICA = 1.0    # factor de las duraciones del guion (0 = cinemáticas instantáneas, para los scripts)
 RADIO_INTERACCION = radio_misiones      # m: "llegué" = a menos de esto de la PUERTA del destino (única fuente: backend)
+# Extensiones del hilo conductor y del modo feria (se cargan tras frontend/extensiones.MODULOS).
+MODULOS_HILO = (
+    "frontend.radio_registro",             # Rádio Comunitária: mañana, noche y puente del final (ALCALDE_HILO_RADIO)
+    "frontend.modo_feria_registro",        # modo feria: sin chip del reloj (ALCALDE_FERIA)
+    "frontend.carteles_campana",           # día 5: carteles de campaña con el sello (ALCALDE_HILO_SELLO)
+)
 
 
 # Espacio / Enter saltan la cinemática (y el fundido) en curso, en cualquier escena.
@@ -201,6 +207,9 @@ def registrar_escenas(gestor, mundo, duracion_transicion=DURACION_TRANSICION,
     from frontend import extensiones      # escenas de las olas nuevas (mundo digital, parkour)
     pantalla_carga.avance("extensiones")
     extensiones.aplicar(gestor, conexion, escena_mundo)
+    # Hilo conductor y modo feria (docs/HILO_CONDUCTOR.md, docs/MODO_FERIA.md): después de las de siempre porque se
+    # apoyan en el vigía del reloj (frontend/registro_reloj.py). Cada módulo tiene su bandera; sin él, se omite.
+    extensiones.aplicar(gestor, conexion, escena_mundo, modulos=MODULOS_HILO)
     pantalla_carga.avance("final")
     conexion.atajos = AtajosCinematica(destino)
     if online_config.ONLINE:

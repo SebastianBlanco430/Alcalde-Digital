@@ -319,6 +319,22 @@ def crear_vinetas(vinetas, al_terminar, segundos=None, guardia=None, rotulos=Non
                 self._disco(x, y, 0.026, TINTA, z, lados=10, borde=False, alto=0.02)
                 self._quad(x + 0.011, y + 0.03, 0.005, 0.06, TINTA, z, borde=False)
                 self._quad(x + 0.022, y + 0.055, 0.024, 0.008, TINTA, z, giro=20, borde=False)
+            elif tipo_f == "radio":
+                # Rádio Comunitária (hilo conductor, frontend/radio_emision.py): caja, altavoz, dial, antena y ondas.
+                tono = tuple(f.get("color", (196, 92, 60)))
+                self._quad(x + 0.07, y + 0.21, 0.006, 0.12, (200, 200, 210), z + 0.0002, giro=-28, borde=False)
+                self._quad(x, y + 0.08, 0.34, 0.18, tono, z)
+                self._quad(x, y + 0.185, 0.16, 0.022, tuple(int(c * 0.75) for c in tono), z - 0.0002)
+                self._disco(x - 0.07, y + 0.075, 0.12, (40, 36, 40), z - 0.0003, lados=20)
+                for r in (0.085, 0.05):
+                    self._disco(x - 0.07, y + 0.075, r, (70, 64, 70), z - 0.0004 - r * 0.001, lados=20, borde=False)
+                self._quad(x + 0.085, y + 0.11, 0.11, 0.05, estilo.PAPEL, z - 0.0003)
+                self._quad(x + 0.07, y + 0.11, 0.004, 0.04, estilo.ESTADO_ERROR, z - 0.0005, borde=False)
+                for k3, dx in enumerate((0.06, 0.11)):
+                    self._disco(x + dx, y + 0.04, 0.03, (40, 36, 40), z - 0.0003 - k3 * 0.0001, lados=12)
+                for k3, (dx, alto_o) in enumerate(((0.21, 0.07), (0.25, 0.11), (0.29, 0.15))):
+                    self._quad(x + dx, y + 0.1, 0.008, alto_o, estilo.PAPEL, z - 0.0002, borde=False)
+                    self._quad(x - dx, y + 0.1, 0.008, alto_o, estilo.PAPEL, z - 0.0002, borde=False)
 
         # -- Viñetas ------------------------------------------------------------------------------------------------
 

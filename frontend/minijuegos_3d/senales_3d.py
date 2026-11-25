@@ -16,7 +16,7 @@ import math
 
 from ursina import Entity, color
 
-from frontend import estilo
+from frontend import estilo, sello_marca_agua
 from frontend.componentes import destruir_arbol, rgb
 from frontend.minijuegos import ui as ui_2d
 from frontend.minijuegos_3d import mesa_calculos as mc
@@ -214,6 +214,8 @@ class Senales3D(Minijuego3D):
         cx, cy = CAPTURA["centro"]
         w, h = CAPTURA["ancho"], CAPTURA["alto"]
         self.hoja = papel_3d.papel(mesa.entidad, w, h, posicion=(cx, cy), giro=-1.2)
+        # Marca de agua del sello de la Tradición si el rumor lo lleva (hilo conductor, frontend/sello_marca_agua.py).
+        sello_marca_agua.poner_en_papel(self.hoja, getattr(self.ctx, "mision", None))
         caso = getattr(mj, "caso", None) or {}
         # marco del teléfono (tinta) y barra amarilla con el título de la captura
         mp_quad = lambda pos, esc, tono, z: Entity(parent=self.hoja, model="quad", position=(pos[0], pos[1], z),  # noqa: E731

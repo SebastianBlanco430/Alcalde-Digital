@@ -314,8 +314,9 @@ class MenuBotw(Entity):
 
     def _botones_posibles(self):
         e = self.escena
-        return [b for b in (e.boton_continuar, e.boton_comenzar, e.boton_online, e.boton_ajustes, e.boton_salir)
-                if b is not None]
+        # «Modo feria» (hilo conductor, docs/MODO_FERIA.md) va tras «Partida nueva»; sin él (bandera), como siempre.
+        return [b for b in (e.boton_continuar, e.boton_comenzar, getattr(e, "boton_feria", None), e.boton_online,
+                            e.boton_ajustes, e.boton_salir) if b is not None]
 
     def montar(self):
         e = self.escena
@@ -327,9 +328,9 @@ class MenuBotw(Entity):
                                      *self._botones_posibles()) if x is not None]
         for x in self._ocultos:
             x.parent = self.oculto
-        # Orden del diseño: Continuar, Partida nueva, En línea, Ajustes, Salir.
-        e._botones_base = tuple(b for b in (e.boton_comenzar, e.boton_online, e.boton_ajustes, e.boton_salir)
-                                if b is not None)
+        # Orden del diseño: Continuar, Partida nueva, (Modo feria), En línea, Ajustes, Salir.
+        e._botones_base = tuple(b for b in (e.boton_comenzar, getattr(e, "boton_feria", None), e.boton_online,
+                                            e.boton_ajustes, e.boton_salir) if b is not None)
         # El ratón «está encima» de un botón lógico cuando está sobre su opción dibujada.
         for op in self.opciones:
             op.boton.bajo_el_raton = op.bajo_el_raton

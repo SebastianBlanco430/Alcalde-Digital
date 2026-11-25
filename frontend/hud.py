@@ -169,6 +169,54 @@ class FondoTinta(Entity):
         self.setAlphaScale(alfa)
 
 
+# -- Sello de la Tradición y silencio de la noche (hilo conductor, docs/HILO_CONDUCTOR.md) ----------------------------
+
+
+# Capa del sello (1..4) si `texto` es el mensaje de la misión `mision` y su rumor lleva sello, o el anuncio de campaña
+# del día 5 (frontend/carteles_campana.py); None si no
+# (ALCALDE_HILO_SELLO=0 o ALCALDE_HILO=0: nunca). El día sale del reloj de la partida (día 1 sin reloj).
+def _capa_sello(texto, mision):
+    if not texto:
+        return None
+    from backend.logica import sello_rumores
+    from frontend import ambiente_vivo
+    anuncio = sello_rumores.capa_anuncio(texto, ambiente_vivo.dia() or 1)
+    if anuncio is not None or mision is None:
+        return anuncio
+    mensaje = hud_calculos.glosar_texto(getattr(mision, "mensaje", "") or "")
+    if not mensaje or mensaje not in texto:
+        return None
+    return sello_rumores.capa_de(getattr(mision, "id", None), ambiente_vivo.dia() or 1)
+
+
+# Silencio de la noche (modo normal con noches saltadas): desde las 19:30 el mensaje de una misión nueva no sale en el
+# banner (sigue en el teléfono). En feria la hora no es de reloj: no hay silencio.
+def _en_silencio(texto, mision):
+    if mision is None or not texto:
+        return False
+    from backend.logica import modo_feria, reloj_partida
+    from frontend import ambiente_vivo, radio_calculos
+    hora = ambiente_vivo.hora()
+    if hora is None or modo_feria.activo() or not reloj_partida.noches_activas():
+        return False
+    mensaje = hud_calculos.glosar_texto(getattr(mision, "mensaje", "") or "")
+    return bool(mensaje) and mensaje in texto and radio_calculos.en_silencio(hora)
+
+
+# Pone el sello de la capa `capa` en un bloque de `ancho` x `alto` centrado en 0 (banner, toast o fila del panel).
+def _poner_sello(padre, capa, ancho, alto, toast=False):
+    from frontend import sello_tradicion, sello_tradicion_calculos as stc
+    lado_px, _alfa, sitio = stc.estilo_de_capa(capa)
+    lado = a_unidades(lado_px)
+    if toast:                                   # una línea: el sello va pegado a la izquierda, por fuera
+        posicion = (-ancho / 2 - lado / 2 - 0.006, 0, -0.003)
+    elif sitio == "esquina":
+        posicion = (ancho / 2 - lado / 2 - 0.006, -alto / 2 + lado / 2 + 0.006, -0.003)
+    else:                                       # junto al remitente (arriba a la derecha), más grande en la capa 3-4
+        posicion = (ancho / 2 - lado / 2 - 0.008, alto / 2 - lado / 2 - 0.006, -0.003)
+    return sello_tradicion.crear_sello_capa(padre, capa, posicion)
+
+
 # -- Teléfono ------------------------------------------------------------------
 
 
@@ -306,6 +354,10 @@ class TelefonoUI(Entity):
         else:
             self.tiempo_notificacion = 0.0
 
+        if telefono.estado() == hud_calculos.NOTIFICANDO and telefono.mensajes():
+            # Silencio desde las 19:30 (hilo conductor): la misión nueva no se anuncia en el banner.
+            if _en_silencio(hud_calculos.glosar_texto(telefono.mensajes()[-1].texto), self._obtener_mision()):
+                telefono.terminar_notificacion()
         objetivo = 1.0 if telefono.estado() == hud_calculos.NOTIFICANDO else 0.0
         if self._fundido_banner is not None:          # M3.6: nivel_banner = alfa ya con su curva
             self.nivel_banner = self._fundido_banner.avanzar(objetivo > 0, dt)
@@ -404,6 +456,9 @@ class TelefonoUI(Entity):
         izquierda = -ancho / 2 + relleno
         _icono(self.banner, "telefono", lado_icono, (izquierda + lado_icono / 2, 0, -0.001))
         linea.position = (izquierda + lado_icono + 0.008, 0, -0.001)
+        capa = _capa_sello(texto, self._obtener_mision())
+        if capa is not None:
+            _poner_sello(self.banner, capa, ancho, alto, toast=True)
         self.banner.setTransparency(TransparencyAttrib.M_alpha)
         self._alfa_toast = None
         if self._arbol_toast is not None:
@@ -431,6 +486,9 @@ class TelefonoUI(Entity):
                (izquierda + lado_icono / 2, arriba - a_unidades(8), -0.001))
         titulo.position = (izquierda + lado_icono + 0.006, arriba, -0.001)
         cuerpo.position = (izquierda, arriba - a_unidades(15) * 1.3, -0.001)
+        capa = _capa_sello(texto, self._obtener_mision())
+        if capa is not None:
+            _poner_sello(self.banner, capa, self.ANCHO_BANNER, self._alto_banner)
 
     _alto_banner = 0.12
 
@@ -497,6 +555,10 @@ class TelefonoUI(Entity):
             tono = COLOR_RESALTADO if fila.resaltado else estilo.COLOR_TARJETA
             _fondo(self.panel, ancho_texto, alto_fila, rgb(tono), 6,
                    position=(0, y - alto_fila / 2, -0.001))
+            capa = _capa_sello(fila.texto, self._obtener_mision())
+            if capa is not None:                 # sello de la Tradición en el mensaje (hilo conductor)
+                fila_sello = Entity(parent=self.panel, position=(0, y - alto_fila / 2, 0))
+                _poner_sello(fila_sello, capa, ancho_texto, alto_fila)
             y -= alto_fila + 0.008
 
     # Casilla «Seguir misión» (docs/DISENO.md): toda la fila es un botón; caja con borde de tinta, amarilla y con

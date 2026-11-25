@@ -38,3 +38,13 @@ dist/
 buildings/textures/
 
 Obsidian-Alcade-digital/
+
+# Claude Code y herramientas locales (no se versionan)
+.claude/
+.agents/
+.claude-tmp/
+skills-lock.json
+CLAUDE.local.md
+pruebas_claude/
+capturas_claude/
+*.claude.log

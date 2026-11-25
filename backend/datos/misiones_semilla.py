@@ -31,6 +31,8 @@
 # Cada rol tiene al menos una misión cuyo destino NO es su lugar de inicio (si no, el jugador ya estaría «llegado» al
 # aparecer). rol=None = genérica. El orden importa: SistemaMisiones y la reserva del online reparten en orden de catálogo.
 
+import os
+
 from backend.logica import misiones_digitales
 from backend.logica.misiones import Mision
 
@@ -154,6 +156,14 @@ CATALOGO_MISIONES = (
         pista="Mesas apiladas con números y la lista de inscritos del domingo clavada en un poste.", dia=2,
     ),
 )
+
+# Hilo conductor (docs/HILO_CONDUCTOR.md; ALCALDE_HILO_LEY_SECA=0 o ALCALDE_HILO=0 vuelven al de antes): el rumor
+# VERDADERO de la ley seca suena alarmista («¡Atención!»), para que «alarmista» no sea sinónimo de «falso». Solo cambia el
+# mensaje; el rumor y la pista son los de siempre. Se lee al importar.
+_MENSAJE_LEY_SECA = ("¡Atención! El Mercado Municipal ya no vende licor por la elección. Compruébalo en persona."
+                     if os.environ.get("ALCALDE_HILO_LEY_SECA", os.environ.get("ALCALDE_HILO", "1")).strip().lower()
+                     not in ("0", "false", "no", "off")
+                     else "Dicen que el Mercado Municipal no vende licor por la elección. Compruébalo en persona.")
 
 # REPARTO POR DÍAS (sesión D, 2026-11-23; ALCALDE_MISIONES_DIAS, backend/logica/reparto_dias.py). 21 misiones nuevas: con
 # las 14 de arriba son 35, cinco por día de la semana (`dia`). Cada partida sortea 4 por día (28); las de un mismo `arco`
@@ -362,7 +372,7 @@ MISIONES_NUEVAS_DIAS = (
     ),
     Mision(
         "candidato_ley_seca", "candidato", "Ley seca",
-        "Dicen que el Mercado Municipal no vende licor por la elección. Compruébalo en persona.",
+        _MENSAJE_LEY_SECA,
         "Mercado Municipal",
         pago=30, dificultad="media",
         es_verdadera=True, grupo="instituciones",

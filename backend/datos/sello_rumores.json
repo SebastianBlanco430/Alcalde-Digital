@@ -1,0 +1,23 @@
+{
+  "_nota": "Sello de la Torre de la Tradición (hilo conductor, docs/HILO_CONDUCTOR.md): emblema del Partido de la Tradición que firma la mayoría de los rumores falsos. «con_sello»: ids de misión cuyo rumor lo lleva (15 de las 22 falsas). «sin_sello»: falsas oportunistas que no lo llevan (rompen el atajo «sin sello = verdadero»); no se usa en el código, documenta la decisión. «capas»: día de la semana -> capa (1 diminuto y desvaído en la esquina; 2 junto al remitente y como marca de agua en los minijuegos; 3 tamaño completo y carteles de campaña en el mundo; 4 como la 3, días de rumores sin sello y de la pregunta de la radio). Lo lee backend/logica/sello_rumores.py.",
+  "con_sello": [
+    "generica_corrente",
+    "ciudadano_teleferico",
+    "generica_santa_casa", "candidato_mercado", "generica_subsidio_cadena",
+    "periodista_radio", "generica_primo_hospital",
+    "candidato_morro", "generica_agua_turbia", "candidato_tarifa_luz",
+    "periodista_prefeitura", "generica_encuesta", "generica_canastas_votos",
+    "generica_mesas_votacion", "periodista_boletin"
+  ],
+  "sin_sello": [
+    "generica_primo_audio",
+    "generica_mutirao",
+    "generica_subsidio_gestor", "influencer_te_dengue",
+    "ciudadano_tarjeta_bus",
+    "periodista_foto_mitin",
+    "influencer_voto_celular"
+  ],
+  "capas": {"1": 1, "2": 1, "3": 2, "4": 2, "5": 3, "6": 4, "7": 4},
+  "remitente_campana": "Campaña Arenas · Partido de la Tradición",
+  "anuncio_debate": "Debate del sábado: Tomás Arenas, la experiencia que Ciudad Nova conoce."
+}

@@ -8,6 +8,7 @@
 #    "ciudad": {"florece": [...], "sano": [...], "tenso": [...], "apagado": [...]},                  por nivel del Ambiente
 #    "hora":   {"madrugada": [...], "manana": [...], "tarde": [...], "noche": [...]}}                por franja horaria
 #   cada elemento = {"t": "texto", "dia_min": n}   (dia_min opcional: la frase no sale antes de ese día de la partida)
+#   "hilo": {"tema": {tema: [...]}, "resultado": {resultado: [...]}, "radio": [...]}     hilo conductor (opcional)
 # Si el archivo falta o está dañado se usa RESPALDO (unas pocas frases embebidas) y se avisa una vez por stderr; una
 # categoría que falte o venga vacía se completa con la del respaldo. Un elemento mal formado se ignora.
 #
@@ -15,6 +16,12 @@
 #   Escoge primero la categoría (estado 60 %, ciudad 25 %, hora 15 %; solo entre las que tienen frases) y luego la frase
 #   por ROTACIÓN: cada categoría es una baraja que se recorre entera antes de volver a barajar. Además una MEMORIA de las
 #   últimas `memoria` frases dichas (en cualquier categoría) impide repetir una frase en los siguientes N globos.
+#
+# HILO CONDUCTOR (docs/HILO_CONDUCTOR.md; HILO_NPC = True o ALCALDE_HILO_NPC=1/0; ALCALDE_HILO=0 lo apaga todo): la radio
+#   (frontend/radio_registro.py) llama a fijar_contexto_hilo(tema, resultado) tras cada emisión de la noche con el TEMA
+#   del día que acaba (el de sus misiones, backend/datos/radio_textos.json) y lo que hizo el jugador. Desde entonces
+#   elegir() suma tres categorías más: «hilo.tema»[tema], «hilo.resultado»[resultado] y «hilo.radio» (vecinos anónimos
+#   que oyeron la radio), con PESO_HILO cada una. Mismas reglas de siempre: rotación, memoria y una ranura por NPC.
 #
 # PlanificadorGlobos: piscina de `ranuras` globos REASIGNABLES (no uno por NPC).
 #   avanzar(dt, candidatos, nivel, hora, dia)   candidatos = [(clave_npc, estado, distancia_m, peso)] YA filtrados por
@@ -42,6 +49,8 @@ VERSION = 1
 LARGO_MAXIMO = 90               # caracteres: una frase más larga se descarta (no cabe en un globo)
 
 PESO_ESTADO, PESO_CIUDAD, PESO_HORA = 0.60, 0.25, 0.15
+PESO_HILO = 0.15                # cada categoría del hilo conductor (tema, resultado, radio) cuando hay contexto
+HILO_NPC = True
 MEMORIA = 8                     # frases recientes que no se repiten
 
 RANURAS = 4
@@ -82,6 +91,28 @@ RESPALDO = {
 }
 
 _avisados = set()
+_contexto_hilo = {"tema": None, "resultado": None}
+
+
+def hilo_activo():
+    """¿Reaccionan los NPC al hilo conductor? ALCALDE_HILO_NPC=1/0 manda sobre HILO_NPC; ALCALDE_HILO=0 lo apaga."""
+    if os.environ.get("ALCALDE_HILO", "").strip().lower() in ("0", "false", "no", "off"):
+        return False
+    valor = os.environ.get("ALCALDE_HILO_NPC", "").strip().lower()
+    if valor in ("1", "true", "si", "sí", "on"):
+        return True
+    if valor in ("0", "false", "no", "off"):
+        return False
+    return bool(HILO_NPC)
+
+
+def fijar_contexto_hilo(tema=None, resultado=None):
+    """Lo llama la radio tras la noche: tema y resultado del día anterior (None = sin contexto: partida nueva)."""
+    _contexto_hilo["tema"], _contexto_hilo["resultado"] = tema, resultado
+
+
+def contexto_hilo():
+    return dict(_contexto_hilo)
 
 
 def _avisar(motivo):
@@ -147,6 +178,17 @@ def normalizar(datos):
         poner(("ciudad", nivel), ciudad.get(nivel), RESPALDO["ciudad"][nivel])
     for franja in FRANJAS:
         poner(("hora", franja), hora.get(franja), RESPALDO["hora"][franja])
+    # Hilo conductor: sin respaldo (si falta, los NPC hablan como siempre).
+    hilo = datos.get("hilo") if isinstance(datos.get("hilo"), dict) else {}
+    for grupo in ("tema", "resultado"):
+        claves = hilo.get(grupo) if isinstance(hilo.get(grupo), dict) else {}
+        for nombre, crudo in claves.items():
+            frases = _limpiar_lista(crudo)
+            if frases:
+                catalogo[("hilo_" + grupo, nombre)] = frases
+    radio = _limpiar_lista(hilo.get("radio"))
+    if radio:
+        catalogo[("hilo_radio",)] = radio
     return catalogo
 
 
@@ -217,6 +259,11 @@ class SelectorFrases:
         franja = franja_de(hora)
         if franja is not None:
             opciones.append((("hora", franja), PESO_HORA))
+        if hilo_activo() and (_contexto_hilo["tema"] or _contexto_hilo["resultado"]):
+            for clave in (("hilo_tema", _contexto_hilo["tema"]), ("hilo_resultado", _contexto_hilo["resultado"]),
+                          ("hilo_radio",)):
+                if clave in self._catalogo:
+                    opciones.append((clave, PESO_HILO))
         while opciones:
             total = sum(peso for _, peso in opciones)
             tirada, acumulado, elegido = self._azar.random() * total, 0.0, len(opciones) - 1
