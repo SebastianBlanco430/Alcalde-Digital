@@ -124,9 +124,12 @@ class DecoracionTrabajo:
         t = getattr(self.escena, "trabajo", None)
         return None if t is None else t.motor
 
+    # Con una vista 3D (mostrador o taller: tienen cerrar_3d) la decoración 2D sobra y se solapa con el set: no se pinta.
     def _jugando(self):
         from frontend.trabajo_constantes import JUGANDO
         e = self.escena
+        if getattr(getattr(e, "_vista", None), "cerrar_3d", None) is not None:
+            return False
         return e.fase == JUGANDO and e.turno is not None and not e.turno.terminado()
 
     # -- Envolturas (las llama la instancia envuelta) --
@@ -213,16 +216,12 @@ class DecoracionTrabajo:
             self._frame_barra()
 
     def _frame_atender(self, dt):
-        from frontend.trabajo_dibujos import dibujar_cliente
         e = self.escena
         reducir = bv.reducir_movimiento()
-        if self._n_cliente != e._n_pedido:          # cliente nuevo: la fila avanza y la paciencia se rellena
+        # Cliente nuevo: la paciencia se rellena. Ya no se dibuja la fila de clientes que esperan (las dos cabezas).
+        if self._n_cliente != e._n_pedido:
             self._n_cliente = e._n_pedido
             self._t_espera = 0.0
-            for hijo in list(self.fila.children):
-                destruir_arbol(hijo)
-            dibujar_cliente(self.fila, e._n_pedido + 2, (-0.53, 0.0), 0.55)
-            dibujar_cliente(self.fila, e._n_pedido + 1, (-0.49, 0.015), 0.7).z = -0.002
         self._t_espera += dt
         f = calc.paciencia(self._t_espera, sum(e.turno.pedido().values()))
         self.pac_barra.scale_x = max(0.0001, 0.14 * f)

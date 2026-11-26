@@ -101,6 +101,23 @@ class FlechaFoco(Entity):
         x = calc.x_flecha(control.x - ancho_control / 2, self.ancho)
         self.position = (x, control.y, control.z - 0.01)
         self.scale = (self.ancho, self.alto)
+        # Sin solapes (frontend/flecha_botw_calculos.py): el lado libre se busca solo al cambiar de control (mirar toda
+        # la pantalla cada frame costaría) y se guarda para los frames siguientes.
+        if getattr(self, "_sitio_de", None) is not control:
+            self._sitio_de = control
+            self._sitio = None
+            try:
+                self._sitio = componentes.colocar_flecha_botw(
+                    self, control, componentes.rect_en_ui(control), self.alto, calc.u(calc.SEPARACION_FLECHA_PX))
+                if self._sitio is not None:
+                    # relativo al control: si el control se mueve (listas, entradas), la flecha lo sigue
+                    self._sitio = (self.x - control.x, self.y - control.y, tuple(self.scale), self.texture)
+            except Exception:                    # noqa: BLE001
+                self._sitio = None
+        if getattr(self, "_sitio", None) is not None:
+            dx, dy, escala, textura = self._sitio
+            self.position = (control.x + dx, control.y + dy, control.z - 0.01)
+            self.scale, self.texture = escala, textura
 
 
 class Piel(Entity):

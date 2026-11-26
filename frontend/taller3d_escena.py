@@ -216,9 +216,21 @@ def esconder_fondo(escena, bandas=BANDAS_TALLER, extra=()):
 
 def devolver_fondo(ocultos, bandas):
     for entidad in ocultos:
+        # La EscenaTrabajo pudo destruir ya esa entidad (_limpiar vacía sus capas antes de soltar la vista): encender
+        # un nodo vacío hace saltar el assert de Panda «!is_singleton() && !is_empty()».
+        if _destruida(entidad):
+            continue
         entidad.enabled = True
     for banda in bandas:
         destruir_arbol(banda)
+
+
+# True si la entidad ya se destruyó (su nodo de Panda quedó vacío) o no se puede preguntar.
+def _destruida(entidad):
+    try:
+        return entidad is None or entidad.is_empty()
+    except Exception:                            # noqa: BLE001
+        return True
 
 
 def _fotograma():

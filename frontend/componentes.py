@@ -511,6 +511,7 @@ RADIOS_BOTW = {estilo.RADIO_CHIP_PX: estilo.BOTW_RADIO_CHIP_PX, estilo.RADIO_TAR
                estilo.RADIO_PANEL_PX: estilo.BOTW_RADIO_PANEL_PX}
 FLECHA_BOTW_PX = (26, 18)             # la flecha del menú de inicio (SVG 26 x 18)
 _TEXTURA_FLECHA = None
+_TEXTURA_FLECHA_ESPEJO = None
 
 
 # ¿Piel BOTW? (frontend/ui_botw_calculos.py: variable de entorno > ajuste guardado > por defecto encendida).
@@ -579,13 +580,116 @@ def textura_flecha_botw(escala=4):
         d.ellipse((23.5 * s, 7.5 * s, 26.5 * s, 10.5 * s), fill=amarillo)
         _TEXTURA_FLECHA = Texture(img)
         _TEXTURA_FLECHA.filtering = "mipmap"
+        _TEXTURA_FLECHA._imagen_botw = img
     return _TEXTURA_FLECHA
+
+
+# La misma flecha espejada (punta a la derecha), para cuando va a la DERECHA del control. Una escala negativa la
+# escondería (el quad se ve solo por delante): se espeja la imagen.
+def textura_flecha_botw_espejo():
+    global _TEXTURA_FLECHA_ESPEJO
+    if _TEXTURA_FLECHA_ESPEJO is None:
+        from PIL import ImageOps
+        from ursina import Texture
+        _TEXTURA_FLECHA_ESPEJO = Texture(ImageOps.mirror(textura_flecha_botw()._imagen_botw))
+        _TEXTURA_FLECHA_ESPEJO.filtering = "mipmap"
+    return _TEXTURA_FLECHA_ESPEJO
 
 
 # Flecha amarilla de la piel (`alto` en unidades de camera.ui; el ancho sale de la proporción 26 x 18).
 def flecha_botw(padre, alto=a_unidades(15), **opciones):
     ancho = alto * FLECHA_BOTW_PX[0] / FLECHA_BOTW_PX[1]
     return Entity(parent=padre, model="quad", texture=textura_flecha_botw(), scale=(ancho, alto), **opciones)
+
+
+# -- Flecha sin solapes (frontend/flecha_botw_calculos.py) --
+
+# Rectángulo (x0, y0, x1, y1) de `entidad` en camera.ui, o None si no tiene geometría.
+def rect_en_ui(entidad):
+    from ursina import camera
+    try:
+        limites = entidad.getTightBounds(camera.ui)
+    except Exception:                            # noqa: BLE001
+        return None
+    if not limites:
+        return None
+    bajo, alto = limites
+    if alto.x - bajo.x <= 1e-6 or alto.y - bajo.y <= 1e-6:
+        return None
+    return (bajo.x, bajo.y, alto.x, alto.y)
+
+
+# La pantalla de la que cuelga `entidad`: su antepasado justo debajo de camera.ui (o la raíz que tenga).
+def _raiz_ui(entidad):
+    from ursina import camera
+    nodo = entidad
+    while getattr(nodo, "parent", None) is not None and nodo.parent is not camera.ui and isinstance(nodo.parent, Entity):
+        nodo = nodo.parent
+    return nodo
+
+
+# Lo que rodea a `control` en su pantalla: (obstáculos, fondos). Obstáculos = controles con collider (botones,
+# deslizadores, campos) y textos a la vista. Fondos = piezas con modelo que envuelven al control (paneles, velos): la
+# flecha no debe salirse del más pequeño. No cuentan el propio control, sus hijos ni las flechas.
+def obstaculos_ui(control, excluir=(), rect_control=None):
+    fuera = {id(control), *(id(e) for e in excluir)}
+    rects, fondos = [], []
+    # Toda la interfaz a la vista: el panel de una pantalla suele ser hermano (otra rama de camera.ui) de sus botones.
+    pila = [_raiz_ui(control)]
+    from ursina import camera
+    if getattr(pila[0], "parent", None) is camera.ui:
+        pila = [e for e in camera.ui.children if isinstance(e, Entity)]
+    while pila:
+        nodo = pila.pop()
+        if id(nodo) in fuera or not getattr(nodo, "enabled", False) or not getattr(nodo, "visible", True):
+            continue
+        if getattr(nodo, "_flecha_botw", False):
+            continue
+        es_texto = isinstance(nodo, Text)
+        interactivo = getattr(nodo, "collider", None) is not None or (es_texto and getattr(nodo, "text", ""))
+        if interactivo or (getattr(nodo, "model", None) is not None and not es_texto):
+            rect = rect_en_ui(nodo)
+            if rect is not None and rect_control is not None and calc_flecha().contiene(rect, rect_control):
+                if not es_texto:
+                    fondos.append(rect)      # envuelve al control: es su panel, no lo de al lado
+            elif rect is not None and interactivo:
+                rects.append(rect)
+                if isinstance(nodo, Button):
+                    continue                 # su texto ya va dentro de su rectángulo
+        pila.extend(e for e in getattr(nodo, "children", ()) if isinstance(e, Entity))
+    return rects, fondos
+
+
+def calc_flecha():
+    from frontend import flecha_botw_calculos
+    return flecha_botw_calculos
+
+
+# Coloca `flecha` (hija de cualquier entidad) junto al rectángulo `rect_control` (camera.ui) donde no tape nada:
+# izquierda, derecha (espejada), más pequeña o dentro del control. `alto` y `hueco` en unidades de camera.ui.
+def colocar_flecha_botw(flecha, control, rect_control, alto, hueco, excluir=()):
+    from ursina import camera, window
+    from frontend import flecha_botw_calculos as fcalc
+    if rect_control is None:
+        return None
+    ancho = alto * FLECHA_BOTW_PX[0] / FLECHA_BOTW_PX[1]
+    medio = window.aspect_ratio / 2
+    obstaculos, fondos = obstaculos_ui(control, (flecha, *excluir), rect_control)
+    # la flecha cabe en la pantalla y dentro del panel más pequeño que envuelve al control
+    pantalla = (-medio, -0.5, medio, 0.5)
+    limites = fcalc.recortar(pantalla, fcalc.contenedor(rect_control, fondos, pantalla))
+    sitio = fcalc.elegir(rect_control, ancho, alto, hueco, obstaculos, limites)
+    flecha._flecha_botw = True
+    if sitio.lado == fcalc.ANILLO:
+        return sitio                         # sin flecha: quien llama marca el control de otra forma
+    flecha.texture = textura_flecha_botw_espejo() if sitio.lado == fcalc.DERECHA else textura_flecha_botw()
+    padre = flecha.getParent()
+    escala = padre.getScale(camera.ui)
+    sx, sy = abs(escala.x) or 1.0, abs(escala.y) or 1.0
+    flecha.scale = (sitio.ancho / sx, sitio.alto / sy)
+    z = flecha.getPos(camera.ui).z
+    flecha.setPos(camera.ui, sitio.x, sitio.y, z)
+    return sitio
 
 
 # Botón de la piel: misma API que BotonTinta (accion, fijar_habilitado, fijar_foco, encajar_texto...). Cambia el
@@ -643,7 +747,27 @@ class BotonBotw(BotonTinta):
     def _mostrar_flecha(self):
         flecha = getattr(self, "flecha", None)
         if flecha is not None:
-            flecha.enabled = self._habilitado and (self._foco or bool(self.hovered))
+            ver = self._habilitado and (self._foco or bool(self.hovered))
+            if ver and not getattr(self, "_marcado", False):
+                self._colocar_flecha()
+            self._marcado = ver
+            anillo = ver and getattr(self, "_sin_flecha", False)
+            flecha.enabled = ver and not anillo
+            # Sin sitio para la flecha: el anillo amarillo de foco marca el botón (también con el ratón encima).
+            self.foco.enabled = (self._foco and self._habilitado) or anillo
+
+    # Al aparecer, la flecha busca el lado libre (frontend/flecha_botw_calculos.py): si a la izquierda hay otro botón o
+    # un texto, va a la derecha espejada o más pequeña; si no cabe en ningún lado, no hay flecha y se ve el anillo. Si
+    # algo falla, se queda donde estaba.
+    def _colocar_flecha(self):
+        from frontend import flecha_botw_calculos as fcalc
+        self._sin_flecha = False
+        try:
+            sitio = colocar_flecha_botw(self.flecha, self, rect_en_ui(self.borde), a_unidades(self.ALTO_FLECHA_PX),
+                                        a_unidades(self.SEPARACION_FLECHA_PX), excluir=(self.foco, self.sombra))
+            self._sin_flecha = sitio is not None and sitio.lado == fcalc.ANILLO
+        except Exception as error:               # noqa: BLE001
+            print(f"[botw] flecha sin colocar ({type(error).__name__}: {error})", file=sys.stderr)
 
     def fijar_foco(self, valor):
         super().fijar_foco(valor)

@@ -54,6 +54,12 @@ def instalar(gestor=None):
         return _estado["instalado"]
     if not activo():
         return None
+    # Pestaña «Mando» de Ajustes con el esquema de botones (frontend/mando_ajustes.py), haya o no mando conectado.
+    try:
+        from frontend import mando_ajustes
+        mando_ajustes.registrar()
+    except Exception as error:                         # noqa: BLE001
+        _avisar_una_vez("ajustes", error)
     try:
         _estado["instalado"] = _crear()
     except Exception as error:                         # noqa: BLE001
@@ -116,6 +122,14 @@ def _crear():
             self.hay_mando = bool(dispositivos)
             if hubo and not self.hay_mando:
                 self._liberar_todo()                   # se desenchufó con algo apretado: nada se queda pegado
+            # Iconos de mando en las ayudas con un mando conectado; al desconectarlo, vuelven las teclas y el ratón
+            # (frontend/mando_iconos.py). Un fallo ahí nunca rompe el mando.
+            if hubo != self.hay_mando or forzar:
+                try:
+                    from frontend import mando_iconos
+                    mando_iconos.fijar_mando(self.hay_mando, aviso=avisar and hubo != self.hay_mando)
+                except Exception as error:             # noqa: BLE001
+                    _avisar_una_vez("iconos", error)
             previos = getattr(input_handler, "gamepads", None)
             if previos is not None and list(previos) == dispositivos and not forzar:
                 return
@@ -137,6 +151,9 @@ def _crear():
             if self._corriendo:
                 self._mandar("left shift", False)
             self._corriendo = False
+            for tecla in getattr(self, "_gatillos", {}).values():
+                self._mandar(tecla, False)
+            self._gatillos = {}
             self._cursor = None
             for clave in [k for k in list(held_keys) if isinstance(k, str) and k.startswith(mc.PREFIJO)]:
                 held_keys[clave] = 0
@@ -230,6 +247,7 @@ def _crear():
                 return
             modo = mc.modo_de(mouse.locked)
             self._gatillo_correr(held_keys, modo)
+            self._gatillos_tecla(held_keys, modo)
             if modo == mc.MODO_MENU and not _estado["sin_cursor"]:
                 self._cursor_con_palo(held_keys, dt, mouse)
                 self._rueda_con_palo(held_keys, dt)
@@ -249,6 +267,22 @@ def _crear():
                 self._corriendo = False
                 if not self._rb_apretado():                 # RB comparte Mayús: no se suelta si sigue apretado
                     self._mandar("left shift", False)
+
+        def _gatillos_tecla(self, held_keys, modo):
+            """Gatillos que son una tecla en este modo (mando_calculos.GATILLOS_TECLA: el izquierdo del mundo = T). Se
+            pulsa al pasar del umbral y se suelta al bajar o al cambiar de modo."""
+            apretados = getattr(self, "_gatillos", None)
+            if apretados is None:
+                apretados = self._gatillos = {}
+            deseados = mc.GATILLOS_TECLA.get(modo, {})
+            for nombre, tecla in list(apretados.items()):
+                if nombre not in deseados or deseados[nombre] != tecla or not mc.gatillo(held_keys, nombre):
+                    self._mandar(tecla, False)
+                    del apretados[nombre]
+            for nombre, tecla in deseados.items():
+                if nombre not in apretados and mc.gatillo(held_keys, nombre):
+                    apretados[nombre] = tecla
+                    self._mandar(tecla, True)
 
         def _cursor_con_palo(self, held_keys, dt, mouse):
             palo = mc.palo(held_keys, mc.PALO_IZQUIERDO)

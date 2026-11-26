@@ -7,10 +7,16 @@
 #   MODO MUNDO (el ratón está capturado: se camina, se corre, se salta):
 #       palo izquierdo = caminar · palo derecho = girar la cámara · A = saltar (Espacio) · B = interactuar (E)
 #       X = reaparecer en el parkour (R) · Y = teléfono (Tab) · Atrás = seguir/dejar la misión (M) · Inicio = pausa (Escape)
-#       gatillo derecho o botón RB = correr (Shift) · cruceta = flechas
+#       gatillo derecho o botón RB = correr (Shift) · LB = mapa grande (N) · gatillo izquierdo = trabajar (T)
+#       cruceta: arriba = archivo de casos (J) · abajo = inventario (I) · izquierda = dilemas (K) · derecha = Civitas (L)
+#       pulsar el palo izquierdo = saludos en línea (G)
 #   MODO MENÚ (hay cursor: menús, teléfono, minijuegos, diálogos):
 #       palo izquierdo = mover el cursor · palo derecho = rueda (listas) · A = clic si hay un botón bajo el cursor, si no Espacio
 #       B / Inicio = Escape · X = Enter · Y = Tab · cruceta = flechas · LB / RB = Mayús+Tab / Tab (cambiar de campo)
+#       Atrás = Retroceso · pulsar el palo izquierdo = N (nada raro / cerrar el mapa) · pulsar el derecho = C (confirmar)
+#       gatillo derecho = T (trabajar desde la tienda)
+# (2026-11-25) Antes la cruceta del mundo repetía las flechas (ya las hace el palo) y LB repetía M: así ninguna acción del
+# mundo se queda sin botón. Los iconos de cada botón en las ayudas los pone frontend/mando_iconos.py.
 #
 # Los botones del mando NUNCA llegan al juego con su nombre: se traducen a las teclas de siempre, así que cada escena, el
 # tutorial, los minijuegos y las pausas funcionan sin saber que existe el mando.
@@ -42,17 +48,24 @@ BOTONES = {
     MODO_MUNDO: {
         "a": ["space"], "b": ["e"], "x": ["r"], "y": ["tab"],
         "back": ["m"], "start": ["escape"],
-        "right shoulder": ["left shift"], "left shoulder": ["m"],
-        "dpad up": ["up arrow"], "dpad down": ["down arrow"], "dpad left": ["left arrow"], "dpad right": ["right arrow"],
-        "left stick": [], "right stick": [],
+        "right shoulder": ["left shift"], "left shoulder": ["n"],
+        "dpad up": ["j"], "dpad down": ["i"], "dpad left": ["k"], "dpad right": ["l"],
+        "left stick": ["g"], "right stick": [],
     },
     MODO_MENU: {
         "a": [CLIC], "b": ["escape"], "x": ["enter"], "y": ["tab"],
-        "back": ["tab"], "start": ["escape"],
+        "back": ["backspace"], "start": ["escape"],
         "right shoulder": ["tab"], "left shoulder": ["shift tab"],
         "dpad up": ["up arrow"], "dpad down": ["down arrow"], "dpad left": ["left arrow"], "dpad right": ["right arrow"],
-        "left stick": [], "right stick": [],
+        "left stick": ["n"], "right stick": ["c"],
     },
+}
+
+# Gatillos que se comportan como una tecla en cada modo (pulsada al pasar de UMBRAL_GATILLO). El derecho del mundo
+# (correr) lo lleva aparte frontend/mando.py porque comparte Mayús con RB.
+GATILLOS_TECLA = {
+    MODO_MUNDO: {GATILLO_IZQUIERDO: "t"},
+    MODO_MENU: {GATILLO_DERECHO: "t"},          # el izquierdo es la puntería fina del cursor
 }
 
 NOMBRES_BOTON = tuple(BOTONES[MODO_MUNDO])
@@ -188,3 +201,22 @@ class RuedaDelPalo:
             return None
         self._espera = PERIODO_RUEDA
         return "scroll up" if y > 0 else "scroll down"
+
+# Esquema del mando de Xbox One para la pestaña «Mando» de Ajustes (frontend/mando_ajustes.py): (icono, botón de
+# BOTONES o gatillo, nombre del botón, qué hace caminando, qué hace en menús). Los textos dicen la acción, no la tecla;
+# test: cada botón listado existe en BOTONES (o es un gatillo/palo de los que mueve frontend/mando.py).
+ESQUEMA = (
+    ("palo_izq", "left stick", "Palo izquierdo", "Caminar · pulsado: saludos", "Mover el cursor · pulsado: nada raro"),
+    ("palo_der", "right stick", "Palo derecho", "Girar la cámara", "Bajar y subir listas · pulsado: confirmar"),
+    ("a", "a", "A", "Saltar", "Clic / aceptar"),
+    ("b", "b", "B", "Interactuar (hablar, entrar)", "Atrás / cerrar"),
+    ("x", "x", "X", "Reaparecer en el parkour", "Elegir (Enter)"),
+    ("y", "y", "Y", "Teléfono", "Cambiar de campo"),
+    ("lb", "left shoulder", "LB", "Mapa grande", "Campo anterior"),
+    ("rb", "right shoulder", "RB", "Correr", "Campo siguiente"),
+    ("lt", GATILLO_IZQUIERDO, "LT", "Trabajar con un vecino", "Cursor lento (puntería fina)"),
+    ("rt", GATILLO_DERECHO, "RT", "Correr", "Trabajar (en la tienda)"),
+    ("dpad", "dpad up", "Cruceta", "Arriba casos · abajo mochila · izq. dilemas · der. Civitas", "Moverse por las opciones"),
+    ("back", "back", "Vista", "Seguir / dejar la misión", "Borrar (Retroceso)"),
+    ("start", "start", "Menú", "Pausa", "Atrás / cerrar"),
+)

@@ -148,11 +148,13 @@ class EscenaTrabajo(Escena):
         self._limpiar()
 
     def _limpiar(self):
+        # La vista 3D se suelta ANTES de vaciar las capas: devuelve el pie y el aviso que escondió mientras siguen vivos.
+        self._soltar_vista()
+        self._marco_2d(True)
         for padre in (self.estatico, self.juego, self.superpuesto):
             for hijo in list(padre.children):
                 destruir_arbol(hijo)
         self._tiles, self._flash, self._barra, self._cliente = [], {}, {}, None
-        self._soltar_vista()
         self._firma_juego = None
         self.fase = None
 
@@ -223,6 +225,7 @@ class EscenaTrabajo(Escena):
             return
         for hijo in list(self.superpuesto.children):
             destruir_arbol(hijo)
+        self._marco_2d(True)
         self.fase = JUGANDO
         self._firma_juego = None
         self._refrescar()
@@ -326,9 +329,27 @@ class EscenaTrabajo(Escena):
 
     # -- Intro y resultado --
 
+    # True si el turno se jugará en 3D (mostrador de los ATENDER o taller 3D): su entrada no enseña el marco 2D antiguo.
+    def _con_vista_3d(self):
+        t = self.trabajo
+        if t is None or self.turno is None:
+            return False
+        if t.motor == ATENDER:
+            return hasattr(self.turno, "entregar")
+        if t.motor == RITMO:
+            return hasattr(getattr(self.turno, "pieza", None), "tono")
+        return False
+
+    # Esconde (False) o devuelve (True) el marco y la cabecera 2D. Con vista 3D solo se ve la tarjeta «Tu turno» al
+    # entrar; al empezar vuelven y la vista 3D esconde lo suyo (taller3d_escena.esconder_fondo).
+    def _marco_2d(self, mostrar):
+        for entidad in (self.marco, self.estatico):
+            entidad.enabled = mostrar
+
     def _mostrar_intro(self):
         self.fase = INTRO
         s, t = self.superpuesto, self.trabajo
+        self._marco_2d(not self._con_vista_3d())
         for hijo in list(s.children):
             destruir_arbol(hijo)
         self._velo(s)

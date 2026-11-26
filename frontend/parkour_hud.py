@@ -185,43 +185,15 @@ class HudParkour(Entity):
         self._progreso = -1.0
         self.destello_cuadro = quad(self, 0, 0, 3.2, 1.2, (255, 255, 255), 0.0, 0.9)
         self.destello_cuadro.enabled = False
-        # Leyenda de tipos: cada tipo tiene color Y patrón en el mundo; aquí además su nombre.
-        self.leyenda = Entity(parent=self)
-        x0 = -diseno_adaptable.aspecto() / 2 + MARGEN
-        quad(self.leyenda, x0 + 0.14, -0.092, 0.31, 0.034 * 6 + 0.03, (6, 8, 20), 0.5, 0.02)
-        for i, clave in enumerate(pvc.CLAVES):
-            e = pvc.ESTILOS[clave]
-            y = -0.02 - 0.034 * i
-            quad(self.leyenda, x0 + 0.012, y - 0.0, 0.026, 0.02, e["borde"], 1.0, 0.012)
-            quad(self.leyenda, x0 + 0.012, y - 0.0, 0.016, 0.011, e["acento"] if clave != "fija" else e["panel"], 1.0, 0.01)
-            _texto(self.leyenda, e["nombre"], 16, estilo.COLOR_TEXTO_TENUE, (x0 + 0.04, y), origen=(-0.5, 0))
-        diseno_adaptable.anclar(self.leyenda, "izquierda")
+        # Leyenda de tipos de baldosa: se quitó del HUD (cada tipo ya se distingue por color y patrón en el mundo). Queda
+        # la entidad vacía por si alguien la consulta.
+        self.leyenda = Entity(parent=self, enabled=False)
 
-    # Leyenda de los tipos de la sesión E presentes en el nivel (y de la purga), bajo la de siempre.
+    # Leyenda de los tipos de la sesión E presentes en el nivel (y de la purga): también se quitó; solo borra la anterior.
     def _leyenda_nueva(self, nivel):
         if self.leyenda_extra is not None:
             self.leyenda_extra.disable()
             self.leyenda_extra = None
-        tipos = [c for c in pvc.CLAVES_NUEVAS if any(p.tipo == c for p in nivel.plataformas.values())]
-        filas = [(pvc.ESTILOS[c]["borde"], pvc.ESTILOS[c]["acento"], pvc.ESTILOS[c]["nombre"]) for c in tipos]
-        if nivel.purga:
-            filas.append((pvc.COLOR_PURGA, (255, 200, 210), "Purga (se borra)"))
-        if not filas:
-            return
-        self.leyenda_extra = Entity(parent=self)
-        x0 = -diseno_adaptable.aspecto() / 2 + MARGEN
-        y_base = -0.02 - 0.034 * len(pvc.CLAVES)
-        alto = 0.034 * len(filas) + 0.02
-        Entity(parent=self.leyenda_extra, model="quad", position=(x0 + 0.14, y_base - alto / 2 + 0.027, 0.02),
-               scale=(0.31, alto), color=color.rgba(6 / 255, 8 / 255, 20 / 255, 0.5))
-        for i, (borde, acento, nombre) in enumerate(filas):
-            y = y_base - 0.034 * i
-            Entity(parent=self.leyenda_extra, model="quad", position=(x0 + 0.012, y, 0.012), scale=(0.026, 0.02),
-                   color=color.rgb32(*borde))
-            Entity(parent=self.leyenda_extra, model="quad", position=(x0 + 0.012, y, 0.01), scale=(0.016, 0.011),
-                   color=color.rgb32(*acento))
-            _texto(self.leyenda_extra, nombre, 16, estilo.COLOR_TEXTO_TENUE, (x0 + 0.04, y), origen=(-0.5, 0))
-        diseno_adaptable.anclar(self.leyenda_extra, "izquierda")
 
     def destello(self, tono, alfa=0.38, duracion=0.45):
         if self.visual:
