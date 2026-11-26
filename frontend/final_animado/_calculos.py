@@ -14,6 +14,8 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 
+from frontend import narrador_calculos
+
 FINALES = ("bueno", "neutro", "malo")
 ROLES = ("ciudadano", "periodista", "influencer", "candidato")
 ROL_POR_DEFECTO = "ciudadano"
@@ -61,6 +63,29 @@ def salida(t):
 CURVAS = {"lineal": lineal, "suave": suave, "muy_suave": muy_suave, "salida": salida}
 
 
+# -- Voz de la narradora (frontend/narrador_calculos.py, puro; ALCALDE_NARRADOR=0 o sin audios = todo como siempre) --------
+# El margen de los tramos con voz es FUNDIDO_CORTE, el mismo de reparto_subtitulos: la frase (y su voz, que arranca con
+# ella) empieza cuando el corte ya aclaró y acaba antes de que el siguiente funda a negro. Se pasa igual a las dos.
+
+def _segundos_con_voz(subtitulos, segundos):
+    """Segundos del plano para que quepan sus voces (>= `segundos`); sin voces o ante cualquier error, `segundos`."""
+    try:
+        return max(float(segundos), float(narrador_calculos.segundos_plano(subtitulos, segundos, FUNDIDO_CORTE)))
+    except Exception:
+        return float(segundos)
+
+
+def _reparto(subtitulos, segundos):
+    """[(inicio, fin)] de cada subtítulo: al ritmo de su voz si alguna frase la tiene; si no, reparto_subtitulos."""
+    try:
+        tramos = narrador_calculos.reparto_con_voz(subtitulos, segundos, FUNDIDO_CORTE)
+        if tramos is not None and len(tramos) == len(tuple(subtitulos or ())):
+            return [(float(a), float(b)) for a, b in tramos]
+    except Exception:
+        pass
+    return reparto_subtitulos(subtitulos, segundos)
+
+
 # -- Guion ----------------------------------------------------------------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -98,7 +123,8 @@ def roles_validos(roles, por_rol=None):
 
 def planos_de(final, roles, guion=None):
     """Planos del final en orden. El hueco {"rol": true} se cambia por el plano de cada rol presente (solo: 8 s; varios:
-    5 s cada uno, «segundos_rol»). Lanza KeyError si el final no existe."""
+    5 s cada uno, «segundos_rol»). Con voz de la narradora cada plano se alarga lo justo para que quepan sus frases.
+    Lanza KeyError si el final no existe."""
     g = cargar_guion() if guion is None else cargar_guion(guion)
     seccion = g[final]
     por_rol = seccion.get("por_rol", {})
@@ -110,12 +136,14 @@ def planos_de(final, roles, guion=None):
         if entrada.get("rol"):
             for rol in presentes:
                 propio = por_rol[rol]
+                subtitulos = tuple(propio.get("subtitulos", ()))
                 planos.append(Plano(str(propio["id"]), final, str(propio["ancla"]),
-                                    float(propio.get("segundos", segundos_rol)), tuple(propio.get("subtitulos", ())),
-                                    rol, len(planos)))
+                                    _segundos_con_voz(subtitulos, float(propio.get("segundos", segundos_rol))),
+                                    subtitulos, rol, len(planos)))
             continue
-        planos.append(Plano(str(entrada["id"]), final, str(entrada["ancla"]), float(entrada["segundos"]),
-                            tuple(entrada.get("subtitulos", ())), None, len(planos)))
+        subtitulos = tuple(entrada.get("subtitulos", ()))
+        planos.append(Plano(str(entrada["id"]), final, str(entrada["ancla"]),
+                            _segundos_con_voz(subtitulos, float(entrada["segundos"])), subtitulos, None, len(planos)))
     return planos
 
 
@@ -255,7 +283,7 @@ class LineaTiempo:
         for plano in planos:
             dur = plano.segundos * escala
             subs = tuple((texto, inicio + a * escala, inicio + b * escala)
-                         for texto, (a, b) in zip(plano.subtitulos, reparto_subtitulos(plano.subtitulos, plano.segundos)))
+                         for texto, (a, b) in zip(plano.subtitulos, _reparto(plano.subtitulos, plano.segundos)))
             tramos.append(Tramo(plano, inicio, inicio + dur, subs))
             inicio += dur
         self.tramos = tuple(tramos)

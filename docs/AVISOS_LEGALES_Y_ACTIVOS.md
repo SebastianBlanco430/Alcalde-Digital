@@ -160,3 +160,21 @@ Fecha: [...]
 - **Elenco (13):** autor «equipo Alcalde Digital»; cuerpos generados con **MPFB2 (MakeHuman para Blender)**, cuya salida es **CC0** (el addon es GPLv3, lo que genera no); cabezas copiadas de `npc_hombre_*`/`npc_mujer_*` (ver §5: su autoría sigue por confirmar); piezas (pelo, ropa, accesorios) hechas por script en `D:\Proyectos\JuegoEstructura2\blender\kit\` (fuera del repo). Licencia declarada en el archivo: CC0-1.0, en `asset.extras.alcalde` (`autor`, `base`, `licencia`, `generador`, `fecha`, `referencia`). **Ojo:** la cabeza y el esqueleto vienen de los NPC de §5; mientras su autoría no se confirme, la licencia CC0 aplica a lo nuevo (cuerpo MPFB2 y piezas), no a esa parte.
 - **Protagonistas v2 (4):** el modelo original del dueño (ver `MODELOS_3D.md`, «Personajes con modelo»), con arreglos por script (`blender\protagonistas\arreglar_protagonista.py`): jerarquía de huesos, pelo modelado a partir del pelo por código, Idle, materiales unidos. Licencia: la del original (del dueño); en `asset.extras.alcalde` consta «equipo Alcalde Digital (modelo original de Sam; arreglos por script)».
 - No se usó generación de modelos con IA ni modelos de terceros nuevos.
+
+## 11. Voces de la narradora y de la Rádio Comunitária (25-nov)
+
+- **Voces generadas con IA: ElevenLabs, plan de pago de Samuel Castañeda.** Modelo Eleven v3, con dos voces
+  **diseñadas** para el proyecto en Voice Design a partir de una descripción escrita: «Alcalde Digital - Narradora»
+  (prólogo y finales) y «Alcalde Digital - Jandira (radio)» (la locutora Jandira Lopes, personaje del juego).
+- **Archivos:** `assets/voz/narradora/*.ogg` (66), `assets/voz/radio/*.ogg` (64) y `assets/voz/indice.json`. Los textos
+  son los del juego (`prologo_cinematica.json`, `finales_historia.json`, `radio_textos.json`), escritos por el equipo.
+- **No se clonó ninguna voz:** ni de una persona real ni de un actor de doblaje. La referencia de la narradora (estilo
+  de cuentacuentos) es solo de tono; no se usó ningún audio ajeno como muestra.
+- **Derechos:** los planes de pago de ElevenLabs incluyen licencia de uso comercial de lo generado; el plan gratuito no
+  (uso no comercial y con atribución). Si la cuenta cambia de plan, lo ya generado con el plan de pago se conserva; para
+  generar frases nuevas hace falta seguir en un plan de pago. **Pendiente del dueño:** guardar una captura del plan
+  vigente en la fecha de generación (25-nov-2026) y revisar las condiciones de ElevenLabs antes de publicar el juego
+  fuera de la Feria.
+- **Aviso al jugador:** añadir «Voces generadas con IA (ElevenLabs)» a los créditos y a `sitio_web/legal.html`
+  (pendiente).
+- Para quitarlas sin tocar archivos: `ALCALDE_NARRADOR=0`. Detalle técnico y cómo regenerar: `docs/NARRADOR.md`.

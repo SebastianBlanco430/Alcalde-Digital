@@ -15,6 +15,9 @@
 #     vigía del tutorial espera a que _cinematica vuelva a False: así su cinemática sale justo después.
 #   - Saltar: mantener Espacio/Escape en los planos (como el final) o Escape en una cartela salta TODO el prólogo; Espacio,
 #     Enter o clic en una cartela pasan a lo siguiente. Si algo falla, se salta lo que falta y el juego sigue.
+#   - Voz de la narradora (frontend/narrador.py, ALCALDE_NARRADOR): en los planos la pone el director; en las cartelas,
+#     este módulo (la cartela dura lo que su voz si hace falta, pc.duracion_cartela) y la calla al avanzar, saltar,
+#     abortar o cerrar.
 #
 # BANDERA. PROLOGO = True; ALCALDE_PROLOGO=0 lo quita (se va directo al tutorial). Lo carga main.py (MODULOS_HILO).
 #
@@ -25,6 +28,7 @@
 import os
 import sys
 
+from frontend import narrador
 from frontend import prologo_calculos as pc
 
 PROLOGO = True
@@ -49,6 +53,20 @@ def activo():
 
 def _aviso(texto):
     print(f"[prologo] {texto}", file=sys.stderr)
+
+
+def _decir(texto):
+    try:
+        narrador.decir(texto)
+    except Exception as error:
+        _aviso(f"voz: {type(error).__name__}: {error}")
+
+
+def _callar():
+    try:
+        narrador.callar()
+    except Exception as error:
+        _aviso(f"callar: {type(error).__name__}: {error}")
 
 
 def _roles(escena):
@@ -171,8 +189,9 @@ def crear_prologo(escena, conexion, al_terminar=None, guion=None, fabrica_animad
             if tramo["tipo"] == "cartela":
                 self.fase = "cartela"
                 self._t = 0.0
-                self._duracion = pc.segundos_cartela(tramo["texto"])
+                self._duracion = pc.duracion_cartela(tramo["texto"])
                 self.texto.text = tramo["texto"]
+                _decir(tramo["texto"])
                 return
             self._tramo_listo = None
             try:
@@ -205,6 +224,7 @@ def crear_prologo(escena, conexion, al_terminar=None, guion=None, fabrica_animad
             self._fin_tramo(False)
 
         def _al_cierre(self):
+            _callar()
             self.fase = "cierre"
             self._t = 0.0
             self._velo(1.0)
@@ -214,6 +234,7 @@ def crear_prologo(escena, conexion, al_terminar=None, guion=None, fabrica_animad
             if self.terminada:
                 return
             self.terminada = True
+            _callar()
             self._soltar()
             self.fase = "aclarar"
             self._t = 0.0
@@ -224,6 +245,7 @@ def crear_prologo(escena, conexion, al_terminar=None, guion=None, fabrica_animad
                     _aviso(f"aviso final: {type(error).__name__}: {error}")
 
         def _abortar(self):
+            _callar()
             animado, self.animado = self.animado, None
             if animado is not None and not getattr(animado, "terminada", True):
                 try:
@@ -243,11 +265,13 @@ def crear_prologo(escena, conexion, al_terminar=None, guion=None, fabrica_animad
             if key in TECLAS_SALTAR:
                 self.saltar()
             elif key in TECLAS_AVANZAR:
+                _callar()
                 self._t = max(self._t, self._duracion - pc.CARTELA_SALIDA)
 
         def saltar(self):
             if self.terminada:
                 return
+            _callar()
             self.saltada = True
             if self.fase == "animado" and self.animado is not None:
                 self.animado.saltar()       # su aviso llega a _fin_tramo y de ahí al cierre

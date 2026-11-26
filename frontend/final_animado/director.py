@@ -13,12 +13,15 @@
 #     las capas de efectos (no se apaga ningún efecto); al terminar vuelve cada cosa a como estaba.
 #   - Todo lo creado cuelga de dos raíces: raiz3d (hija de `scene`, para la escenografía) y raizui (camera.ui).
 #   - Cualquier excepción (al crear, al cargar o en un frame) -> limpiar y al_fallo(error): el registro abre las viñetas.
+#   - Voz de la narradora (frontend/narrador.py, ALCALDE_NARRADOR): cada subtítulo NUEVO se dice una vez, al empezar su
+#     tramo; se calla al saltar, al cerrar, al limpiar y si falla. Con escala != 1 (pruebas) no suena.
 
 import math
 import sys
 
 from ursina import Entity, Text, camera, color, destroy, held_keys, scene, time, window
 
+from frontend import narrador
 from frontend.final_animado import _calculos as calc
 from frontend.final_animado import camaras
 
@@ -102,6 +105,7 @@ class FinalAnimado(Entity):
         self.raiz3d = self.raizui = None
         self.tomas = {}
         self._texto_sub = None
+        self._texto_voz = None          # último subtítulo dicho por la narradora (no se toca al cambiar la ventana)
         self._alto_ventana = None
         self._tiempo_real = 0.0
         self.mediciones = []            # dt de cada frame de la fase «reproducir» (rendimiento)
@@ -260,6 +264,25 @@ class FinalAnimado(Entity):
         self.sub_texto.color = color.rgba(1, 1, 1, alfa)
         self.sub_fondo.color = color.rgba(0, 0, 0, ALFA_FONDO_SUBTITULO * alfa)
 
+    def _decir_subtitulo(self, texto):
+        """La voz del subtítulo, una vez, cuando empieza su tramo (aunque su alfa aún sea 0). Nunca lanza."""
+        if texto == self._texto_voz:
+            return
+        self._texto_voz = texto
+        if not texto or self.escala != 1.0:
+            return
+        try:
+            narrador.decir(texto)
+        except Exception as error:
+            _aviso(f"voz: {type(error).__name__}: {error}")
+
+    @staticmethod
+    def _callar():
+        try:
+            narrador.callar()
+        except Exception as error:
+            _aviso(f"callar: {type(error).__name__}: {error}")
+
     def _poner_aviso_saltar(self):
         ctrl = self.saltar_ctrl
         visible = ctrl.aviso_visible and self.fase == "reproducir"
@@ -395,6 +418,7 @@ class FinalAnimado(Entity):
                 self._alfa_saltar = self.telon.color.a
                 self.sub.enabled = False
                 self.salto.enabled = False
+                self._callar()
                 return
             if self.tiempo >= self.duracion_total:
                 self._colocar_plano(self.duracion_total, dt)
@@ -403,7 +427,9 @@ class FinalAnimado(Entity):
                 return
             self._colocar_plano(self.tiempo, dt)
             self._telon(self.linea.negro(self.tiempo))
-            self._poner_subtitulo(*self.linea.subtitulo(self.tiempo))
+            texto, alfa = self.linea.subtitulo(self.tiempo)
+            self._decir_subtitulo(texto)
+            self._poner_subtitulo(texto, alfa)
             self._poner_aviso_saltar()
             return
         if self.fase == "saliendo":
@@ -452,6 +478,7 @@ class FinalAnimado(Entity):
         """Salta ya (sin mantener): fundido corto a negro y cierre como al mantener."""
         if self.terminada or self.fase == "saliendo":
             return
+        self._callar()
         if self.fase != "reproducir":
             self._cerrar(lambda: self._al_terminar(True))
             self.saltada = True
@@ -465,6 +492,7 @@ class FinalAnimado(Entity):
 
     def _fallar(self, error):
         _aviso(f"falló ({type(error).__name__}: {error}); cae a las viñetas")
+        self._callar()
         self._cerrar(lambda: self._al_fallo(error) if self._al_fallo is not None else self._al_terminar(True))
 
     def _cerrar(self, aviso):
@@ -472,6 +500,7 @@ class FinalAnimado(Entity):
             return
         self.terminada = True
         self._cola_guardia = FRAMES_GUARDIA
+        self._callar()
         self.limpiar()
         try:                                     # la pantalla estaba en negro: el panel aparece con un fundido corto
             self._velo = Entity(parent=camera.ui, model="quad", scale=(8.0, 2.2), z=Z_CAPA, color=color.rgba(0, 0, 0, 1))
@@ -486,6 +515,7 @@ class FinalAnimado(Entity):
     def limpiar(self):
         """Limpia la escenografía, destruye las raíces y devuelve la escena. Idempotente; nunca lanza."""
         from frontend.componentes import destruir_arbol
+        self._callar()
         escenografia, self.escenografia = self.escenografia, None
         if escenografia is not None:
             try:

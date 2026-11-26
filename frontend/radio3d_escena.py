@@ -11,13 +11,17 @@
 # salta la emisión entera. La pausa, el reloj y los controles ya los frena frontend/radio_registro.py (la emisión es un
 # bloqueador de la escena del mundo).
 # Las cuentas (órbita, horas, estrellas, rótulo) están en frontend/radio3d_camara_calculos.py.
+# VOZ: cada línea suena con la voz de Jandira (frontend/narrador.py; el audio se busca por el texto exacto de la línea) y
+# dura al menos lo que su voz + 0,6 s (narrador_calculos.segundos_radio). Adelantar corta la voz y dice la siguiente;
+# saltar o terminar la calla. Una línea sin audio queda muda con su globo y su tiempo de siempre. BANDERAS:
+# ALCALDE_NARRADOR=0 o ALCALDE_NARRADOR_RADIO=0 -> sin voz y con los tiempos de antes.
 # BANDERA: ALCALDE_RADIO3D. REDUCIR MOVIMIENTO: plano fijo de la torre, sin acercamiento ni giro.
 
 import sys
 
 from ursina import Entity, Mesh, camera, color, destroy, time
 
-from frontend import ambiente_vivo, banderas_visuales
+from frontend import ambiente_vivo, banderas_visuales, narrador, narrador_calculos
 from frontend import radio3d_camara_calculos as r3c
 from frontend.componentes import destruir_arbol
 from frontend.globo_dialogo import GloboDialogo
@@ -63,6 +67,8 @@ class EmisionRadio3D(Entity):
         self._previo = None
         self._estrellas = None
         self._frames_guardia = 0
+        self._voz_cerrada = False      # tras saltar o terminar ya no se dice ninguna línea más
+        self._voz_usada = False        # ¿esta emisión ha pedido alguna voz? (solo entonces calla al cerrar)
         self.reducir = bool(banderas_visuales.reducir_movimiento())
         self.preset = r3c.orbita()
         self.globo = GloboDialogo(parent=self)
@@ -193,16 +199,48 @@ class EmisionRadio3D(Entity):
 
     # -- Líneas -----------------------------------------------------------------------------------------------------
 
+    def _callar(self, cerrar=False):
+        """Corta la voz de la línea en curso. `cerrar`: la emisión se acaba (el fundido de salida de radio_fundido.py
+        la deja viva medio segundo más) y ya no se dice ninguna otra línea. Nunca lanza."""
+        if cerrar:
+            self._voz_cerrada = True
+        if not getattr(self, "_voz_usada", False):
+            return                     # esta emisión no ha dicho nada: no se toca la voz de otra pantalla
+        try:
+            narrador.callar()
+        except Exception:
+            pass
+
+    def _segundos_de(self, vineta):
+        """Tiempo en pantalla de la línea: el de lectura o, con voz, lo que dura la voz y un respiro."""
+        base = r3c.segundos_vineta(vineta)
+        try:
+            return narrador_calculos.segundos_radio(vineta.get("texto"), base)
+        except Exception:
+            return base
+
+    def _decir(self, vineta):
+        if self._voz_cerrada or not narrador_calculos.radio_activa():
+            return                     # sin bandera no se toca el canal de voz
+        self._callar()                 # una línea sin audio no deja sonando la anterior
+        self._voz_usada = True
+        try:
+            narrador.decir(vineta.get("texto"), radio=True)
+        except Exception:
+            pass
+
     def _siguiente(self):
         self.indice += 1
         if self.indice >= len(self.vinetas):
+            self._callar(cerrar=True)
             self._terminar()
             return
         vineta = self.vinetas[self.indice]
         self.t_vineta = 0.0
-        self._segundos = r3c.segundos_vineta(vineta)
+        self._segundos = self._segundos_de(vineta)
         self._aplicar_momento(vineta.get("radio_momento"))
         self.globo.mostrar(r3c.nombre_rotulo(vineta.get("titulo")), str(vineta.get("texto") or ""))
+        self._decir(vineta)
         if self._al_poner is not None:
             try:
                 self._al_poner(vineta, self.indice)
@@ -211,9 +249,11 @@ class EmisionRadio3D(Entity):
 
     def saltar(self):
         if not self.terminada:
+            self._callar(cerrar=True)
             self._terminar()
 
     def _terminar(self):
+        self._callar(cerrar=True)
         self.terminada = True
         self._frames_guardia = FRAMES_GUARDIA
         try:
@@ -255,10 +295,15 @@ class EmisionRadio3D(Entity):
             self._colocar_camara()
         except Exception as error:     # sin torre o sin cámara: se cierra limpia y la noche sigue su curso
             _aviso(f"cámara: {type(error).__name__}: {error}")
+            self._callar(cerrar=True)
             self._terminar()
             return
         if self.t_vineta >= self._segundos:
             self._siguiente()
+
+    def on_destroy(self):
+        if not getattr(self, "terminada", True):   # destruida sin pasar por _terminar (p. ej. al salir del mundo)
+            self._callar(cerrar=True)
 
     def input(self, key):
         if self.terminada:
