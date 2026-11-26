@@ -1,7 +1,7 @@
 {
-  "_nota": "Sello de la Torre de la Tradición (hilo conductor, docs/HILO_CONDUCTOR.md): emblema del Partido de la Tradición que firma la mayoría de los rumores falsos. «con_sello»: ids de misión cuyo rumor lo lleva (15 de las 22 falsas). «sin_sello»: falsas oportunistas que no lo llevan (rompen el atajo «sin sello = verdadero»); no se usa en el código, documenta la decisión. «capas»: día de la semana -> capa (1 diminuto y desvaído en la esquina; 2 junto al remitente y como marca de agua en los minijuegos; 3 tamaño completo y carteles de campaña en el mundo; 4 como la 3, días de rumores sin sello y de la pregunta de la radio). Lo lee backend/logica/sello_rumores.py.",
+  "_nota": "Sello de la Torre de la Tradición (hilo conductor, docs/HILO_CONDUCTOR.md): emblema del Partido de la Tradición que firma la mayoría de los rumores falsos. «con_sello»: ids de misión cuyo rumor lo lleva (16 de las 22 falsas; el día 1 lleva dos para que haya indicios desde el principio). «sin_sello»: falsas oportunistas que no lo llevan (rompen el atajo «sin sello = verdadero»); no se usa en el código, documenta la decisión. «capas»: día de la semana -> capa (1 pequeño en la esquina, ya se distingue; 2 junto al remitente y como marca de agua en los minijuegos; 3 tamaño completo y carteles de campaña en el mundo; 4 como la 3, días de rumores sin sello y de la pregunta de la radio). Lo lee backend/logica/sello_rumores.py.",
   "con_sello": [
-    "generica_corrente",
+    "generica_corrente", "generica_primo_audio",
     "ciudadano_teleferico",
     "generica_santa_casa", "candidato_mercado", "generica_subsidio_cadena",
     "periodista_radio", "generica_primo_hospital",
@@ -10,7 +10,6 @@
     "generica_mesas_votacion", "periodista_boletin"
   ],
   "sin_sello": [
-    "generica_primo_audio",
     "generica_mutirao",
     "generica_subsidio_gestor", "influencer_te_dengue",
     "ciudadano_tarjeta_bus",

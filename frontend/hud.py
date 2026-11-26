@@ -233,14 +233,14 @@ def _capa_sello(texto, mision):
 
 
 # Silencio de la noche (modo normal con noches saltadas): desde las 19:30 el mensaje de una misión nueva no sale en el
-# banner (sigue en el teléfono). En feria la hora no es de reloj: no hay silencio.
+# banner (sigue en el teléfono). También en la feria, que ya corre con el reloj.
 def _en_silencio(texto, mision):
     if mision is None or not texto:
         return False
-    from backend.logica import modo_feria, reloj_partida
+    from backend.logica import reloj_partida
     from frontend import ambiente_vivo, radio_calculos
     hora = ambiente_vivo.hora()
-    if hora is None or modo_feria.activo() or not reloj_partida.noches_activas():
+    if hora is None or not reloj_partida.noches_activas():
         return False
     mensaje = hud_calculos.glosar_texto(getattr(mision, "mensaje", "") or "")
     return bool(mensaje) and mensaje in texto and radio_calculos.en_silencio(hora)

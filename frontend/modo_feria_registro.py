@@ -1,12 +1,9 @@
 # Modo feria en el juego real (docs/MODO_FERIA.md; lógica en backend/logica/modo_feria.py y flujo_tiempo.py). main.py lo
 # carga con extensiones.aplicar(..., modulos=MODULOS_HILO), después de frontend/registro_reloj.py.
 #
-# En una partida de feria (flujo.ritmo_feria no es None) el chip «Día N · hh:mm» NO se ve: la hora no corre con el tiempo
-# real, solo el ciclo día-noche avanza con cada misión cerrada (el cielo sigue a ambiente_vivo.hora(), que lee el reloj).
-# Se consigue envolviendo el método chip() de la vista del vigía del reloj (conexion.vigia_reloj.vista), sin editar
-# registro_reloj.py: el resto del vigía (avance, avisos y pantalla final) sigue igual. En modo normal no cambia nada.
-#
-# BANDERA: ALCALDE_FERIA (la pone el menú de inicio); el envoltorio se instala siempre y mira la partida en cada frame.
+# La feria corre ahora con el reloj de siempre (más rápido): el chip «Día N · hh:mm» y los avisos «Último día» /
+# «Quedan 2 horas» se ven igual que en el modo normal. Antes la hora no era de reloj y este módulo los escondía;
+# instalar_sin_chip / instalar_sin_avisos_fin quedan para ALCALDE_FERIA_SIN_RELOJ=1 (la feria de antes, sin chip).
 
 import sys
 
@@ -39,6 +36,9 @@ def instalar_sin_avisos_fin(control, escena_mundo):
 
 
 def registrar(gestor, conexion, escena_mundo):
+    import os
+    if os.environ.get("ALCALDE_FERIA_SIN_RELOJ", "").strip().lower() not in ("1", "true", "si", "sí", "on"):
+        return None
     vigia = getattr(conexion, "vigia_reloj", None)
     vista = getattr(vigia, "vista", None)
     if vista is None:

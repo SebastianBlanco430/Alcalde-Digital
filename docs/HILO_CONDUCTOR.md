@@ -28,9 +28,11 @@ prólogo y la feria.
 
 ### Sello de la Torre de la Tradición
 - Qué rumores lo llevan: `backend/datos/sello_rumores.json` y `backend/logica/sello_rumores.py`. De los 22 rumores
-  falsos, 15 llevan sello y 7 no.
-- Capas por día: **1**, diminuto y desvaído en la esquina del mensaje; **2**, junto al remitente y como marca de agua
-  en «Señales de edición» y «Comparar»; **3**, tamaño completo y espejo en el mundo; **4**, igual que la 3.
+  falsos, 16 llevan sello y 6 no (el día 1 lleva dos, para que haya indicios desde el principio).
+- Capas por día, el sello crece con la semana: **1** (días 1-2), pequeño en la esquina del mensaje pero ya se
+  distingue, y marca de agua muy tenue; **2** (días 3-4), junto al remitente y marca de agua en «Señales de edición» y
+  «Comparar»; **3** (día 5), tamaño completo y espejo en el mundo; **4** (días 6-7), todavía más grande. Firma, pero
+  nunca dice «falso».
 - Dibujo con primitivas (sin texturas): `frontend/sello_tradicion.py` y `sello_tradicion_calculos.py`.
 - Dónde se ve: banner y teléfono (`frontend/hud.py`) y marca de agua (`frontend/sello_marca_agua.py`, que usan
   `minijuegos_3d/senales_3d.py`, `comparar_3d.py` y la vista 2D de `escenas/escena_minijuego.py`).
@@ -52,12 +54,10 @@ prólogo y la feria.
 - **Puente** (día 7): una línea antes del final de siempre, que no cambia.
 - Cuándo emite: `frontend/radio_calculos.py` espera a un momento libre (sin minijuego, diálogo, dilema, teléfono ni
   pausa). Desde las 19:30 no se anuncian misiones nuevas en el banner (siguen llegando al teléfono).
-- Cómo se ve: `frontend/radio_emision.py`, sobre el componente de viñetas (`crear_vinetas`; Escape la salta), con
-  una radio animada en 2D (cálculos puros en `frontend/radio_animacion_calculos.py`): cielo según el momento
-  (`radio_momento`: noche estrellada con luna, amanecer con el sol subiendo o atardecer del día 7), silueta de la
-  ladera con ventanas, radio que respira, altavoz que late con la voz, antena con luz, aguja del dial, ondas, letrero
-  «AO VIVO» y texto letra a letra. Con «reducir movimiento» queda quieta y el texto sale entero. Más adelante se quiere
-  pasar a 3D. La
+- Cómo se ve: solo en 3D (`frontend/radio_emision.py` → `frontend/radio3d_escena.py`, ver `docs/RADIO_3D.md`): la
+  cámara orbita la torre de la radio, el cielo cambia según el momento y el globo dice cada línea; Escape la salta.
+  Entra y sale con un fundido a negro (`frontend/radio_fundido.py`). La radio 2D animada de antes se quitó: si la 3D
+  no se puede montar, no hay emisión y la noche pasa igual. La
   engancha `frontend/radio_registro.py`, que retiene la noche hasta que termina la emisión y luego llama a
   `pasar_noche()`. Si algo falla, suelta la noche y el juego sigue sin radio. En línea no hay radio porque no hay reloj.
 

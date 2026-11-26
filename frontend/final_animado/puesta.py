@@ -249,7 +249,8 @@ def _cierre(acciones):
         accion, pasos = acciones.get(rol, ("quieto", ()))
         actores.append(Actor(f"prota:{rol}", d, FRENTE_CIERRE, 0.0, accion, tuple(pasos), sobre_ancla=True,
                              fase=0.23 * k, fuera_de_calle=True))
-    piezas = (Pieza("baranda", 0.0, FRENTE_CIERRE + 1.05, 0.0, sobre_ancla=True, medida=7.6),)
+    # Pisan un risco de roca (antes una baranda suelta en el aire): su filo, a 1 m delante de ellos.
+    piezas = (Pieza("risco", 0.0, 0.0, 0.0, sobre_ancla=True, medida=FRENTE_CIERRE + 1.0),)
     return tuple(actores), piezas
 
 
@@ -424,10 +425,11 @@ def _construir():
     return p
 
 
-# Ventana del Morro: un paño de fachada con ventana delante de la pared de verdad (que no tiene hueco), con el ciudadano
-# entre las dos, visible de la cintura para arriba.
-VENTANA_MORRO = (2.2, -0.62)          # (derecha, frente) del paño
-CIUDADANO_MORRO = (2.2, -0.98)
+# Ventana del Morro: un paño de fachada con ventana y un cuarto detrás (decorado.VentanaMorro), delante de la pared de
+# verdad (que no tiene hueco), con el ciudadano dentro, visible de la cintura para arriba. El paño está 1,3 m por delante
+# de la pared para que quepa el cuarto: al retirarse, el ciudadano ya no atraviesa la fachada.
+VENTANA_MORRO = (2.2, 0.68)           # (derecha, frente) del paño
+CIUDADANO_MORRO = (2.2, 0.32)
 
 
 def _ciudadano(pid, final):

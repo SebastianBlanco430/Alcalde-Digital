@@ -1,7 +1,7 @@
 # Marca de agua del sello de la Tradición en las imágenes de los minijuegos «Señales de edición» y «Comparar» (hilo
-# conductor, capa 2 en adelante: días 3-7; docs/HILO_CONDUCTOR.md). Solo si el rumor de la misión lleva sello
-# (backend/logica/sello_rumores.py). La ponen frontend/minijuegos_3d/senales_3d.py y comparar_3d.py sobre su papel, y
-# frontend/escenas/escena_minijuego.py sobre la vista 2D cuando no hay 3D. No cambia la lógica ni el resultado.
+# conductor: desde el día 1, muy tenue, y más marcada cada capa; docs/HILO_CONDUCTOR.md). Solo si el rumor de la misión
+# lleva sello (backend/logica/sello_rumores.py). La ponen frontend/minijuegos_3d/senales_3d.py y comparar_3d.py sobre su
+# papel, y frontend/escenas/escena_minijuego.py sobre la vista 2D cuando no hay 3D. No cambia la lógica ni el resultado.
 # Bandera: ALCALDE_HILO_SELLO (ver sello_rumores). Nunca lanza: un fallo deja la imagen sin marca.
 #
 #   alfa_para(mision)                              -> alfa de la marca o None (sin marca)

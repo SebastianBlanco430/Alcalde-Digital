@@ -71,8 +71,9 @@ PANCARTA_ARRIBA = (1.78, 0.14)
 # El gorro de la bandeja quedaba sobre la cara de los cuerpos v2
 GORRO_PANADERO = False
 # Banda de Octavio: el cubo era más hondo que el torso del smoking v2 y asomaba como una tabla.
-BANDA = {"pos": (0.0, 1.22, 0.02), "escala": (0.46, 0.08, 0.24), "giro": (0, 0, 36),
-         "medalla": (0.12, 1.33, 0.13)}
+# anillo: (radio de lado, radio de fondo, ancho de la cinta) en m, inclinado `giro` del hombro a la cadera contraria
+# (el origen del smoking v2 queda ~0,25 m por debajo de los pies: con y = 1,3 la medalla caía en la cintura)
+BANDA = {"pos": (0.0, 1.52, 0.0), "giro": (0, 0, 48), "anillo": (0.34, 0.22, 0.075)}
 
 
 # -- Panel final (frontend/panel_final.py) ----------------------------------------------------------------------------
@@ -179,8 +180,9 @@ def corregir_puestas(puestas):
 # Encima de camaras.TOMAS. Ciudadano: más baja y más cerca, a la altura de la cara (desde 2,8-3,2 m se veía el letrero
 # de la casa encima del paño). b6: el final del travelling quedaba detrás del atril, que tapaba a Octavio.
 TOMAS_PULIDAS = {
-    "ciudadano": {"ancla": "morro", "pos": [(1.2, 2.1, 7.6), (1.8, 2.2, 6.3)],
-                  "mira": [(2.2, 1.85, -1.0), (2.2, 1.8, -1.0)], "fov": (52.0, 46.0)},
+    # (la ventana está 1,3 m más afuera que antes, con su cuarto detrás: la cámara se corre lo mismo)
+    "ciudadano": {"ancla": "morro", "pos": [(1.2, 2.1, 8.9), (1.8, 2.2, 7.6)],
+                  "mira": [(2.2, 1.85, 0.3), (2.2, 1.8, 0.3)], "fov": (52.0, 46.0)},
     # Candidato: más de frente (el vecino que le da la mano ya no queda entre la cámara y Octavio).
     "candidato": {"ancla": "tarima", "pos": [(1.3, 1.75, 4.6), (1.0, 1.75, 3.9)],
                   "mira": [(0.3, 1.5, 0.0), (0.3, 1.6, 0.0)], "fov": (56.0, 54.0)},

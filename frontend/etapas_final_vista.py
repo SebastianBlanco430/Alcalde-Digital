@@ -185,9 +185,11 @@ def crear_controlador(escena, conexion):
             izquierda = -ANCHO_BARRA / 2
             if hec.activo():
                 # Franja única: fila dentro del fondo del medidor, separada por una raya fina (sin panel propio).
-                self.position = (0, -ALTO_MEDIDOR / 2 - hec.ALTO_FILA_DESINFO / 2 + 0.002)
+                # el contenido baja AIRE_FILA_DESINFO y la raya sigue arriba: más aire bajo la fila de confianza
+                self.position = (0, -ALTO_MEDIDOR / 2 - hec.ALTO_FILA_DESINFO / 2 + 0.002 - hec.AIRE_FILA_DESINFO)
                 self.fondo = None
-                Entity(parent=self, model="quad", scale=(ANCHO_BARRA, 0.002), position=(0, hec.ALTO_FILA_DESINFO / 2 - 0.002, -0.008),
+                Entity(parent=self, model="quad", scale=(ANCHO_BARRA, 0.002),
+                       position=(0, hec.ALTO_FILA_DESINFO / 2 - 0.002 + hec.AIRE_FILA_DESINFO, -0.008),
                        color=rgb(estilo.COLOR_BARRA_FONDO))
             else:
                 self.position = (0, -ALTO_MEDIDOR / 2 - SEPARACION_DESINFO - ALTO_DESINFO / 2)

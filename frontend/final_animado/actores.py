@@ -376,14 +376,43 @@ def crear_prop(tipo, cuerpo, base, luz, cadena=None):
     raise ValueError(f"prop desconocido: {tipo}")
 
 
+def _anillo(rx, rz, ancho, n=36):
+    """Cinta cerrada de sección elíptica (rx de lado, rz de fondo, `ancho` de alto) alrededor del eje y."""
+    from ursina import Mesh
+    vertices, triangulos = [], []
+    for k in range(n):
+        a = 2 * math.pi * k / n
+        x, z = rx * math.cos(a), rz * math.sin(a)
+        vertices += [(x, -ancho / 2, z), (x, ancho / 2, z)]
+        i, j = 2 * k, 2 * ((k + 1) % n)
+        triangulos += [(i, j, j + 1), (i, j + 1, i + 1)]
+    return Mesh(vertices=vertices, triangles=triangulos, mode="triangle")
+
+
+def _banda_candidato(base, b):
+    """La banda de candidato: una cinta que RODEA el torso de un hombro a la cadera contraria (antes era un bloque que
+    sobresalía del cuerpo como una tabla), con su contorno de tinta y la medalla delante."""
+    giro = b["giro"]
+    raiz = Entity(parent=base, position=b["pos"], rotation=giro)
+    raiz.ignore = True
+    rx, rz, ancho = b["anillo"]
+    relleno = Entity(parent=raiz, model=_anillo(rx, rz, ancho), shader=unlit_shader, unlit=True, double_sided=True,
+                     color=color.rgb32(*realzar_color((44, 138, 214))))
+    casco = Entity(parent=raiz, model=_anillo(rx + GROSOR, rz + GROSOR, ancho + 2 * GROSOR), shader=unlit_shader,
+                   unlit=True, double_sided=True, color=color.rgb32(*estilo.TINTA))
+    relleno.ignore = casco.ignore = True
+    # el casco va un pelo por fuera: se ve como filo arriba y abajo de la cinta
+    casco.setAttrib(CullFaceAttrib.make(CullFaceAttrib.MCullCounterClockwise))
+    pieza(raiz, "sphere", (0.0, 0.0, rz + 0.012), (0.085, 0.085, 0.03), estilo.ACENTO_PRIMARIO)
+    return raiz
+
+
 def vestir_fijo(id_pool, cuerpo, base):
     """Lo que el actor lleva SIEMPRE: la banda de Octavio y la corbata de Arenas."""
     from frontend.final_animado import final_pulido_calculos as pulido
     if id_pool == P.OCTAVIO and pulido.activo():
-        # La banda ajustada al smoking v2 (antes asomaba como una tabla delante del cuerpo).
-        b = pulido.BANDA
-        pieza(base, "cube", b["pos"], b["escala"], (44, 138, 214), b["giro"])
-        pieza(base, "sphere", b["medalla"], (0.09, 0.09, 0.035), estilo.ACENTO_PRIMARIO)
+        # La banda rodea el smoking v2 en diagonal (antes asomaba como una tabla delante del cuerpo).
+        _banda_candidato(base, pulido.BANDA)
     elif id_pool == P.OCTAVIO:
         pieza(base, "cube", (0, 1.24, 0.0), (0.5, 0.09, 0.3), (44, 138, 214), (0, 0, 38))
         pieza(base, "sphere", (0.13, 1.37, 0.15), (0.1, 0.1, 0.04), estilo.ACENTO_PRIMARIO)

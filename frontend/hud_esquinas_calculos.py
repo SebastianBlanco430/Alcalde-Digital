@@ -46,7 +46,8 @@ ALTO_ETIQUETA_FACTOR = 1.5           # alto del chip = px * 1.5
 # entra en el MISMO fondo, sin panel propio).
 ANCHO_FRANJA = 0.60
 ALTO_FILA_CONFIANZA = 0.088
-ALTO_FILA_DESINFO = 0.040
+ALTO_FILA_DESINFO = 0.052             # con aire arriba: el texto no queda pegado a la fila de confianza
+AIRE_FILA_DESINFO = 0.004             # lo que baja el contenido de la fila (la raya se queda arriba)
 
 # Teléfono (hud.TelefonoUI): icono local + la insignia roja que asoma arriba a la izquierda.
 ANCHO_ICONO_TEL, ALTO_ICONO_TEL = 0.075, 0.12
@@ -220,8 +221,21 @@ def ancho_mini_pulseras(n=2):
     return 2 * RELLENO_MINI + n * hueco + (n - 1) * RELLENO_MINI
 
 
-def centro_mini_pulseras_junto_a(cx_reloj, cy_reloj, n=2, ancho_reloj=ANCHO_CHIP):
-    """Centro del chip de las mini-pulseras dado el centro del chip del reloj (pegado a su derecha, un PASO de aire)."""
+# Con el chip del dinero debajo del reloj, las pulseras son un bloque a la derecha de la pila que ocupa las DOS filas
+# (reloj y dinero), con las cintas más grandes: antes era un chip suelto pegado solo al reloj que sobresalía de la pila.
+ALTO_MINI_DOBLE = 2 * ALTO_CHIP + PASO
+ESCALA_MINI_DOBLE = 1.45
+
+
+def ancho_mini_pulseras_doble(n=2):
+    return ancho_mini_pulseras(n) * ESCALA_MINI_DOBLE
+
+
+def centro_mini_pulseras_junto_a(cx_reloj, cy_reloj, n=2, ancho_reloj=ANCHO_CHIP, doble=False):
+    """Centro del chip de las mini-pulseras dado el centro del chip del reloj (pegado a su derecha, un PASO de aire).
+    `doble`: el bloque baja media fila y cubre también la del dinero, que va debajo del reloj."""
+    if doble:
+        return cx_reloj + ancho_reloj / 2 + PASO + ancho_mini_pulseras_doble(n) / 2, cy_reloj - (ALTO_CHIP + PASO) / 2
     return cx_reloj + ancho_reloj / 2 + PASO + ancho_mini_pulseras(n) / 2, cy_reloj
 
 

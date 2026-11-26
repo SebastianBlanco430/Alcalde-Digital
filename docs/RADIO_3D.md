@@ -23,7 +23,9 @@ terminar, la cámara, el HUD, el cielo y el ratón vuelven como estaban.
 - `frontend/radio_emision.py` conserva `crear_emision(escena_mundo, vinetas, al_terminar, al_poner=None)`. Si el mundo
   tiene torre, la emisión es `frontend/radio3d_escena.EmisionRadio3D`, con el mismo contrato: `.terminada`,
   `.saltar()`, `al_poner(vineta, indice)` en cada línea y `al_terminar()` una sola vez, **después** de devolverlo todo.
-  Si no hay torre o la 3D falla al empezar, sale la emisión 2D animada de siempre, intacta.
+  Es la ÚNICA emisión: la radio 2D animada de antes se quitó. Si no hay torre o la 3D falla al crearse, no hay
+  emisión: `al_terminar()` se llama igual y la noche pasa sin pantalla negra. Entra y sale con un fundido a negro
+  (`frontend/radio_fundido.py`, `ALCALDE_RADIO_FUNDIDO=0` lo quita).
 - **Cámara** (`frontend/radio3d_camara_calculos.py`, puro):
   - En 1,6 s pasa de la cámara del jugador a la órbita, empezando del lado donde ya estaba.
   - Después gira 360° de forma continua alrededor del eje de la torre, mirando a su parte alta.
@@ -51,7 +53,7 @@ terminar, la cámara, el HUD, el cielo y el ratón vuelven como estaban.
 
 | Variable | Por defecto | Qué hace |
 |---|---|---|
-| `ALCALDE_RADIO3D` | encendida | `0` quita la torre y deja la emisión 2D animada de siempre. |
+| `ALCALDE_RADIO3D` | encendida | `0` quita la torre y con ella la emisión (las noches pasan sin radio). |
 | `ALCALDE_RADIO3D_ORBITA` | `media` | `aerea` usa la órbita alta y abierta. Los presets están en `ORBITAS` de `radio3d_camara_calculos.py`: cambiar un valor o añadir uno es editar ese diccionario. |
 | `ALCALDE_REDUCIR_MOVIMIENTO` (o Ajustes › Movimiento) | apagada | Plano fijo de la torre: sin acercamiento ni giro. |
 | `ALCALDE_HILO_RADIO` | encendida | La radio entera (ver `docs/HILO_CONDUCTOR.md`). |
@@ -68,7 +70,7 @@ Presets de órbita (m y s):
   puente del día 7 y «reducir movimiento». Comprueba que todo vuelve (HUD, cámara, hora del cielo, controles, que sigue
   en el mundo) y guarda capturas en `capturas_claude/radio/`.
 - En partida: modo normal hasta las 20:00 del día 1, o `ALCALDE_FERIA=1` y cerrar las misiones del día.
-- `ALCALDE_RADIO3D=0`: sin torre y con la radio 2D.
+- `ALCALDE_RADIO3D=0`: sin torre y sin emisión; las noches pasan igual.
 - Tests sin ventana: `tests/test_a_radio3d.py` (órbita, cielo, rótulo, lectura) y `tests/test_a_radio_torre.py` (sitio
   en el mundo real, celosía, parpadeo). `tests/test_hilo_conductor.py` sigue valiendo para el contrato de
   `crear_emision`.

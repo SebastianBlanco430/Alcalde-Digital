@@ -158,6 +158,37 @@ def _baranda(l, largo):
     l.caja((0, 0.55, 0), (largo, 0.04, 0.05), METAL)
 
 
+ROCA = ((112, 102, 94), (96, 88, 82), (128, 118, 106), (104, 96, 90))
+TIERRA_RISCO = (118, 132, 82)
+
+
+def _risco(l, fondo, borde):
+    """Risco del cierre: un saliente de roca con la parte de arriba a la altura del ancla (donde pisan los cuatro), que
+    termina en `borde` (frente) y cae `fondo` m hasta el suelo. Antes era una baranda suelta y los cuatro flotaban."""
+    atras = -10.0
+    largo = borde - atras
+    # meseta: tierra con pasto encima y una capa de roca debajo
+    l.caja((0, -0.12, atras + largo / 2), (11.0, 0.24, largo), TIERRA_RISCO)
+    l.caja((0, -0.62, atras + largo / 2 - 0.1), (11.4, 0.8, largo - 0.2), ROCA[0])
+    # cara del risco: bloques escalonados e irregulares que bajan hasta el suelo (se ven desde la cámara al asomarse)
+    y, k = -1.0, 0
+    while y > -fondo - 0.5:
+        alto = 1.3 + 0.35 * (k % 3)
+        salida = (0.25, -0.15, 0.4, 0.05)[k % 4]
+        ancho = 11.2 - 0.3 * (k % 2)
+        l.caja((0.15 * ((k % 3) - 1), y - alto / 2, borde - 0.9 + salida - 0.2 * k), (ancho, alto, 2.2 + 0.4 * k), ROCA[k % 4])
+        y -= alto * 0.92
+        k += 1
+    # cuerpo del risco, detrás de la cara
+    l.caja((0, -fondo / 2 - 0.6, atras + largo / 2 - 1.2), (11.6, fondo + 0.6, largo - 1.6), ROCA[1])
+    # piedras sueltas y matas al filo
+    for d, f, m, c in ((-4.6, borde - 0.35, 0.55, 2), (-3.4, borde - 0.2, 0.32, 0), (4.1, borde - 0.3, 0.5, 3),
+                       (5.0, borde - 0.6, 0.35, 0), (-5.1, borde - 1.4, 0.4, 1), (4.7, borde - 1.8, 0.3, 2)):
+        l.caja((d, m / 2 - 0.02, f), (m * 1.3, m, m), ROCA[c], giro=23 * d)
+    for d in (-2.9, 3.2, -0.2):
+        l.caja((d, 0.09, borde - 0.25), (0.5, 0.18, 0.3), (86, 120, 66), giro=17 * d)
+
+
 def _puesto_flores(raiz, l, luz):
     _mesa(l, 0, 0, 1.5, 0.8, 0.8, (120, 150, 90))
     for sx in (-1, 1):
@@ -287,9 +318,22 @@ class VentanaMorro(PiezaViva):
         for k, c in enumerate(((222, 64, 64), (248, 206, 56), (214, 70, 160))):
             l.solido(icosfera(0), (0.29 + 0.07 * k, y0 + 0.3 + 0.03 * (k % 2), 0.12), 0.11, c)
         _entidad(raiz, l.mesh())
-        interior = {0: (96, 80, 70), 1: (130, 98, 58), 2: (88, 76, 70)}[pieza.variante]
-        Entity(parent=raiz, model="quad", shader=unlit_shader, unlit=True, position=(0, (y0 + y1) / 2, -0.62),
-               scale=(w + 0.4, y1 - y0 + 0.3), rotation_y=180, color=color.rgb32(*_tono(interior, luz)))
+        # Cuarto de verdad detrás del hueco (fondo, lados, techo y suelo): el ciudadano puede retirarse hacia dentro sin
+        # atravesar nada. Más ancho y alto que el hueco, escondido tras el paño.
+        interior = {0: (150, 120, 96), 1: (130, 98, 58), 2: (120, 104, 92)}[pieza.variante]
+        osc = tuple(int(c * 0.72) for c in interior)
+        li = Lienzo(luz)
+        hondo, ancho_c = 1.7, w + 1.4
+        yc, alto_c = (y0 + y1) / 2, (y1 - y0) + 1.6
+        li.caja((0, yc, -0.12 - hondo), (ancho_c, alto_c, 0.06), interior)                        # fondo
+        for sx in (-1, 1):
+            li.caja((sx * ancho_c / 2, yc, -0.12 - hondo / 2), (0.06, alto_c, hondo), osc)        # lados
+        li.caja((0, yc + alto_c / 2, -0.12 - hondo / 2), (ancho_c, 0.06, hondo), osc)             # techo
+        li.caja((0, yc - alto_c / 2, -0.12 - hondo / 2), (ancho_c, 0.06, hondo), (92, 70, 54))    # suelo
+        li.caja((-0.55, y1 - 0.35, -0.08 - hondo), (0.5, 0.38, 0.03), (238, 230, 214))           # cuadro: marco
+        li.caja((-0.55, y1 - 0.35, -0.065 - hondo), (0.42, 0.3, 0.02), (90, 140, 170))            # cuadro: lámina
+        li.caja((0.6, y0 - 0.15, -0.35 - hondo / 2), (0.5, 0.9, 0.45), (110, 84, 60))             # mueble al fondo
+        _entidad(raiz, li.mesh())
         self.modo = pieza.variante                     # 0 abre, 1 cierra, 2 abiertos siempre
         self.tramo = pieza.tramo
         self.postigos = []
@@ -484,6 +528,10 @@ def construir(pieza, plano_id, raiz_plano, anclas, ancla_plano, mundo, final):
         viva = Fogata(raiz, pieza, luz)
     elif tipo == "baranda":
         _baranda(l, pieza.medida)
+    elif tipo == "risco":
+        # cae desde el ancla (azotea) hasta el suelo que hay debajo del filo
+        fx, _, fz = lugares.a_mundo(ancla, pieza.derecha, 0.0, pieza.frente + pieza.medida)
+        _risco(l, max(2.0, y - float(mundo.altura(fx, fz))), pieza.medida)
     elif tipo == "puesto_flores":
         _puesto_flores(raiz, l, luz)
     elif tipo == "guirnalda_calle":

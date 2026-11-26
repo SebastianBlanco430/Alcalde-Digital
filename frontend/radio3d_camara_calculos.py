@@ -3,8 +3,8 @@
 # PURA (sin ursina), con tests en tests/test_a_radio3d.py. La vista es frontend/radio3d_escena.py; la torre,
 # frontend/radio_torre_modelo.py (sitio y piezas en frontend/radio_torre_calculos.py).
 #
-# BANDERA: ALCALDE_RADIO3D (encendida por defecto). =0 deja la emisión 2D animada de siempre (frontend/radio_emision.py)
-# y no construye la torre. Si la torre no está (sin sitio, sin edificio de la radio) o la vista 3D falla, también la 2D.
+# BANDERA: ALCALDE_RADIO3D (encendida por defecto). =0 no construye la torre y, sin torre, no hay emisión (la radio 2D de
+# antes se quitó; frontend/radio_emision.py): las noches pasan igual. Lo mismo si falta el sitio o la vista 3D falla.
 # ÓRBITA: ORBITA elige el preset («media» por defecto, «aerea» más alta y abierta); ALCALDE_RADIO3D_ORBITA=aerea lo cambia
 # sin tocar el código. Cada preset es un diccionario de ORBITAS: añadir otro es añadir una entrada.
 # REDUCIR MOVIMIENTO (Ajustes › Movimiento o ALCALDE_REDUCIR_MOVIMIENTO=1): plano fijo de la torre, sin giro ni

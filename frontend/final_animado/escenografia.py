@@ -21,6 +21,9 @@ from frontend.final_animado import lugares, poses_final as pf, puesta as P
 from frontend.final_animado.ciudad import EstadoCiudad
 
 
+PIEZAS_SOLO_MALO = frozenset({"fogata"})
+
+
 def _aviso(texto):
     print(f"[final_animado] {texto}", file=sys.stderr)
 
@@ -158,6 +161,10 @@ class Escenografia:
             self.creadas.append(raiz)
             piezas = []
             for pieza in pz.piezas:
+                # Las fogatas son de la ciudad que arde (final malo): el prólogo reusa el plano aéreo con la ciudad de
+                # hoy (neutro) y ahí no debe haber fuego.
+                if pieza.tipo in PIEZAS_SOLO_MALO and final != "malo":
+                    continue
                 try:
                     piezas.append(deco.construir(pieza, pid, raiz, anclas, ancla, mundo, final))
                 except Exception as error:

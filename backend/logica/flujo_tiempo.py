@@ -59,9 +59,8 @@
 # "pasada" | "fallada" | None). Lo lee la radio (backend/logica/radio_guion.py) para el recuento de la noche y los NPC para
 # el «tema del día anterior». No se guarda (es solo narrativo): tras «Continuar» la radio habla de lo que pase desde ahí.
 #
-# MODO FERIA (ALCALDE_FERIA, backend/logica/modo_feria.py): el reloj no corre con el tiempo real; la hora la marca el
-# progreso del día (RitmoFeria) y el día se cierra al cerrar `por_dia` misiones. La noche se pasa igual que en el modo
-# normal. La partida de feria no se guarda: misiones_a_dict deja de existir (guardado.se_puede_guardar -> False).
+# MODO FERIA (ALCALDE_FERIA, backend/logica/modo_feria.py): el mismo reloj y ciclo día-noche que el modo normal, más
+# rápido (la semana en ~9 min reales, modo_feria.segundos_por_hora). La noche se pasa igual que en el modo normal. La partida de feria no se guarda: misiones_a_dict deja de existir (guardado.se_puede_guardar -> False).
 
 import os
 import sys
@@ -158,7 +157,9 @@ class FlujoConTiempo:
         con_feria = modo_feria.activo() if feria is None else bool(feria)
         self.ritmo_feria = modo_feria.RitmoFeria(modo_feria.por_dia(self._catalogo())) if con_feria else None
         if reloj is None:
-            reloj = reloj_partida.RelojPartida(noches=True) if con_feria else reloj_partida.RelojPartida()
+            # feria: el reloj de siempre, más rápido (modo_feria.segundos_por_hora: la semana en ~9 min)
+            reloj = (reloj_partida.RelojPartida(seg_por_hora=modo_feria.segundos_por_hora(), noches=True) if con_feria
+                     else reloj_partida.RelojPartida())
         self.reloj = reloj
         self.retener_noche = False          # True = alguien (la radio) emite la noche y llama a pasar_noche()
         self.diario = {}                    # {día: [{"id", "veredicto"}]} de las misiones cerradas (no se guarda)
@@ -206,16 +207,12 @@ class FlujoConTiempo:
 
     # -- Tiempo --
 
-    # Un frame con el mundo activo: `dt` segundos reales. Devuelve los avisos que nacieron en este paso.
-    # En feria la hora no sigue a dt: se acerca (animada) a la que marca el progreso del día.
+    # Un frame con el mundo activo: `dt` segundos reales. Devuelve los avisos que nacieron en este paso. En feria corre
+    # igual, con el reloj más rápido que se le dio al crearlo.
     def avanzar_tiempo(self, dt):
         if self.ritmo_feria is not None:
             self.ritmo_feria.observar(dt, self._hay_mision())
-            inicio = (self.reloj.dia() - 1) * reloj_partida.HORAS_POR_DIA
-            objetivo = inicio + self.ritmo_feria.hora_objetivo(reloj_partida.HORA_INICIO, reloj_partida.HORA_CIERRE)
-            self.reloj.avanzar_hacia(objetivo, max(0.0, dt) * modo_feria.VELOCIDAD_HORAS_POR_SEG)
-        else:
-            self.reloj.avanzar(dt)
+        self.reloj.avanzar(dt)
         nuevos = self._procesar_tiempo()
         self._revisar_noche()
         self.actualizar_ambiente(dt)

@@ -57,9 +57,18 @@ def crear(escena, textura, chip_reloj):
 
         def __init__(self):
             self.chip = Entity(parent=escena.hud, enabled=False)
-            self.chip.fondo = panel_piel(self.chip, ancho, hec.ALTO_CHIP, tono=estilo.COLOR_FONDO,
-                                          radio_px=estilo.RADIO_CHIP_PX, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
-            self.minis = [Mini(self.chip, ind, xc, xf)
+            # dos fondos: el de una fila (reloj solo) y el bloque de dos filas (reloj + dinero); las cintas van en
+            # `contenido`, que se agranda con el bloque doble
+            self.fondo_simple = panel_piel(self.chip, ancho, hec.ALTO_CHIP, tono=estilo.COLOR_FONDO,
+                                           radio_px=estilo.RADIO_CHIP_PX, borde_px=estilo.GROSOR_BORDE_DENSO_PX)
+            self.fondo_doble = panel_piel(self.chip, hec.ancho_mini_pulseras_doble(len(indicadores)), hec.ALTO_MINI_DOBLE,
+                                          tono=estilo.COLOR_FONDO, radio_px=estilo.RADIO_CHIP_PX,
+                                          borde_px=estilo.GROSOR_BORDE_DENSO_PX)
+            self.fondo_doble.enabled = False
+            self.chip.fondo = self.fondo_simple
+            self.contenido = Entity(parent=self.chip)
+            self.doble = False
+            self.minis = [Mini(self.contenido, ind, xc, xf)
                           for ind, (xc, xf) in zip(indicadores, hec.piezas_mini_pulseras(len(indicadores)))]
             # Puesto por defecto (reloj en la pila sin dinero); cada frame se pega al chip real del reloj.
             self.chip.position = hec.rect_mini_pulseras(diseno_adaptable.aspecto(), 0, len(indicadores)).centro
@@ -72,7 +81,17 @@ def crear(escena, textura, chip_reloj):
             if chip is None:
                 return
             try:
-                self.chip.position = hec.centro_mini_pulseras_junto_a(chip.x, chip.y, len(indicadores))
+                # ¿hay chip del dinero debajo del reloj? (el reloj no está en el puesto de abajo de la pila)
+                abajo = hec.centro_chip_pila(diseno_adaptable.aspecto(), 0)[1]
+                doble = chip.y > abajo + hec.ALTO_CHIP / 2
+                if doble != self.doble:
+                    self.doble = doble
+                    self.fondo_doble.enabled, self.fondo_simple.enabled = doble, not doble
+                    self.chip.fondo = self.fondo_doble if doble else self.fondo_simple
+                    self.contenido.scale = hec.ESCALA_MINI_DOBLE if doble else 1.0
+                    if self._fundido is not None:
+                        self._fundido.invalidar()
+                self.chip.position = hec.centro_mini_pulseras_junto_a(chip.x, chip.y, len(indicadores), doble=doble)
             except Exception:
                 pass
 

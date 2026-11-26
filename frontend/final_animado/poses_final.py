@@ -106,6 +106,8 @@ class Accion:
     salto: float = 0.0           # m del saltito (celebrar)
     bote: float = 0.0            # m de bote suave al compás
     por_k: bool = False          # de a a b una sola vez, con el avance del paso (abrir postigos)
+    rango: tuple = (0.0, 1.0)    # tramo de la mezcla a..b que recorre (no siempre de punta a punta)
+    variar: bool = False         # cada actor a su ritmo (la fase cambia un poco el tempo): nadie va al unísono
 
 
 ACCIONES = {
@@ -151,7 +153,10 @@ ACCIONES = {
 
 # Acciones que cambian con ALCALDE_FINALES_PULIDOS (final_pulido_calculos.py); el resto, las de ACCIONES.
 ACCIONES_PULIDAS = {
-    "puno": Accion(a="puno_medio_alto", b="puno_arriba", hz=1.1),
+    "puno": Accion(a="puno_medio_alto", b="puno_arriba", hz=0.95, bote=0.03, rango=(0.3, 1.0), variar=True),
+    # La pancarta arriba con las dos manos y un bombeo corto al corear (antes iba del pecho a sobre la cabeza y vuelta,
+    # todos al mismo compás: parecía un metrónomo).
+    "protestar": Accion(a="pancarta_abajo", b="pancarta_arriba", hz=0.7, bote=0.025, rango=(0.62, 1.0), variar=True),
 }
 
 
@@ -186,16 +191,18 @@ def objetivo(accion, segundos, fase=0.0, k=0.0):
         return Objetivo("Idle", {}, 0.0, 0.0)
     if a.b is None:
         return Objetivo("Idle", {a.a: 1.0}, 0.0, 0.0)
+    hz = a.hz * (0.82 + 0.36 * (fase % 1.0)) if a.variar else a.hz
     if a.por_k:
         m = max(0.0, min(1.0, k))
         m = m * m * (3 - 2 * m)
     else:
-        m = 0.5 - 0.5 * math.cos(2 * math.pi * (a.hz * segundos + fase))
+        m = 0.5 - 0.5 * math.cos(2 * math.pi * (hz * segundos + fase))
+        m = a.rango[0] + (a.rango[1] - a.rango[0]) * m
     dy = 0.0
     if a.salto:
-        dy = a.salto * max(0.0, math.sin(2 * math.pi * (a.hz * segundos + fase) - math.pi / 2)) ** 1.5
+        dy = a.salto * max(0.0, math.sin(2 * math.pi * (hz * segundos + fase) - math.pi / 2)) ** 1.5
     elif a.bote:
-        dy = a.bote * (0.5 - 0.5 * math.cos(4 * math.pi * (a.hz * segundos + fase)))
+        dy = a.bote * (0.5 - 0.5 * math.cos(4 * math.pi * (hz * segundos + fase)))
     return Objetivo("Idle", {a.a: 1.0 - m, a.b: m}, dy, m)
 
 

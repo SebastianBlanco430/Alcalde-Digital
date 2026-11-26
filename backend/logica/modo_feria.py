@@ -1,11 +1,12 @@
-# Modo feria (modelo puro, sin ursina): la semana avanza por MISIONES, no por reloj. Ver docs/MODO_FERIA.md.
+# Modo feria (modelo puro, sin ursina): una semana CORTA con el reloj de siempre. Ver docs/MODO_FERIA.md.
 #
-# QUÉ HACE. Con el modo encendido, FlujoConTiempo (backend/logica/flujo_tiempo.py) no deja correr el reloj con el tiempo
-# real: la hora del día la marca el progreso (08:00 al empezar; 08:00 + 12 h · hechas/por_dia tras cada misión cerrada,
-# animada a VELOCIDAD_HORAS_POR_SEG para que el cielo cambie de verdad) y el día se cierra (reloj a las 20:00, noche
-# pendiente) al cerrar `por_dia` misiones o cuando el jugador activo se queda sin misión del día. Pasar la noche usa la
-# misma ruta que el modo normal (reloj.pasar_noche() -> fijar_dia_misiones(dia, hora)); la radio lo dispara por conteo.
-# El día 7 cerrado = reloj en su fin = final de siempre.
+# QUÉ HACE. Con el modo encendido, FlujoConTiempo (backend/logica/flujo_tiempo.py) usa el mismo reloj y el mismo ciclo
+# día-noche que la partida normal (con noches saltadas: 08:00 a 20:00 y la radio entre días), solo que el tiempo corre
+# más rápido: la semana dura MINUTOS_OBJETIVO minutos reales (la normal, reloj_partida.MINUTOS_OBJETIVO_NOCHES = 15).
+# Da para probar varios tipos de misión y las mecánicas principales en una feria. El día 7 cerrado = final de siempre.
+# RitmoFeria solo cuenta las misiones cerradas (la recta final las lee, porque la feria no se guarda).
+#
+# ANTES la semana avanzaba por misiones (4 por día, ≈ 28): duraba lo mismo que una partida normal o más.
 #
 # MISIONES POR DÍA. POR_DIA = 4 (feria del 26-nov: ≈ 28 misiones). Son las mismas 4 por día que sortea
 # backend/logica/reparto_dias.py (quita 1 de las 5 de cada día): con menos, la que sobra caducaba cada noche sin verse y
@@ -33,7 +34,9 @@ FERIA = False
 VARIABLE = "ALCALDE_FERIA"
 POR_DIA = 4                         # None = catálogo de verificar ÷ DIAS
 DIAS = 7
-VELOCIDAD_HORAS_POR_SEG = 1.5       # h de juego por s real al animar la hora tras una misión (el cielo se mueve)
+VELOCIDAD_HORAS_POR_SEG = 1.5       # (ya no se usa: la hora corre con el reloj) h de juego por s real al animar la hora
+MINUTOS_OBJETIVO = 9.0              # minutos reales de la semana de feria (ALCALDE_FERIA_MINUTOS=<n> manda)
+HORAS_ACTIVAS = 7 * 12.0            # 7 días de 08:00 a 20:00 (noches saltadas, como reloj_partida)
 ESPERA_SIN_MISION = 4.0             # s reales sin misión (mundo activo) para dar el día por agotado
 
 _SI = ("1", "true", "si", "sí", "on")
@@ -48,6 +51,17 @@ def activo():
     if valor in _NO:
         return False
     return bool(FERIA)
+
+
+def segundos_por_hora():
+    """Segundos reales por hora de juego en la feria: MINUTOS_OBJETIVO (o ALCALDE_FERIA_MINUTOS) repartidos en las 84 h
+    activas de la semana. Con 9 min, 6,4 s por hora (un día ≈ 77 s)."""
+    crudo = os.environ.get("ALCALDE_FERIA_MINUTOS", "").strip().replace(",", ".")
+    try:
+        minutos = float(crudo) if crudo else MINUTOS_OBJETIVO
+    except ValueError:
+        minutos = MINUTOS_OBJETIVO
+    return max(0.5, minutos) * 60.0 / HORAS_ACTIVAS
 
 
 def menu_activo():

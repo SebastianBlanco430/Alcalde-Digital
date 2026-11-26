@@ -4,8 +4,9 @@
 # 7, según vineta["radio_momento"]) y el GLOBO: el de las cinemáticas (frontend/globo_dialogo.py), con el rótulo amarillo
 # «Rádio Comunitária» en la esquina y la línea del recuento. El HUD se esconde; los NPC siguen con lo suyo.
 #
-# Mismo contrato que la 2D (frontend/radio_emision.py, que es quien la crea): `.terminada`, `.saltar()`, `al_poner(vineta,
-# indice)` al poner cada línea y `al_terminar()` una sola vez, DESPUÉS de devolver cámara, HUD, cielo y ratón. Cada línea
+# Contrato (frontend/radio_emision.py la crea, dentro del fundido de frontend/radio_fundido.py): `.terminada`,
+# `.saltar()`, `al_poner(vineta, indice)` al poner cada línea y `al_terminar()` una sola vez, DESPUÉS de devolver cámara,
+# HUD, cielo y ratón. Cada línea
 # pasa sola a su tiempo de lectura (1,5 s + 0,06 s por carácter, mínimo 2,5 s); Espacio, Enter o clic adelantan y Escape
 # salta la emisión entera. La pausa, el reloj y los controles ya los frena frontend/radio_registro.py (la emisión es un
 # bloqueador de la escena del mundo).
