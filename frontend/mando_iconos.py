@@ -13,9 +13,11 @@ import sys
 MANDO_ICONOS = True
 VARIABLE = "ALCALDE_MANDO_ICONOS"
 LADO_PX = 64
-SEGUNDOS_CARTEL = 2.6
+SEGUNDOS_CARTEL = 3.5        # tiempo a la vista, sin contar los fundidos
+SEGUNDOS_FUNDIDO = 0.4
+SEGUNDOS_ENTRE_CARTELES = 300  # el mismo aviso no se repite antes de 5 min (si el mando parpadea, no molesta)
 
-_estado = {"mando": False, "texturas": False, "cartel": None}
+_estado = {"mando": False, "texturas": False, "cartel": None, "ultimo": {}}
 PREFIJO_ICONO = "mando_"
 ICONOS = ("a", "b", "x", "y", "lb", "rb", "lt", "rt", "back", "start", "l3", "r3", "palo_izq", "palo_der",
           "dpad", "dpad_arriba", "dpad_abajo", "dpad_izq", "dpad_der")
@@ -135,24 +137,50 @@ def icono_en(padre, icono, lado, posicion):
 # -- Cartel --
 
 def _cartel(texto):
-    from ursina import Entity, Func, Sequence, Text, Wait, camera, destroy
+    from ursina import Entity, Text, camera, destroy
     from frontend import estilo, tipografia
     from frontend.componentes import escala_fuente, panel_piel, rgb
     viejo = _estado["cartel"]
     if viejo is not None and not viejo.is_empty():
-        destroy(viejo)
-    raiz = Entity(parent=camera.ui, z=-0.9, position=(0, -0.38), eternal=True)
-    t = Text(texto, parent=raiz, origin=(0, 0), z=-0.01, scale=escala_fuente(20), font=tipografia.FUENTE_TITULO,
+        destroy(viejo, force_destroy=True)
+    # Arriba del todo y pequeño: antes iba abajo en el centro y tapaba lo que se estaba seleccionando
+    # (las esquinas ya las ocupan el minimapa y el teléfono).
+    # eternal: sobrevive a los cambios de escena; por eso se borra con force_destroy (Ursina ignora destroy() en los
+    # eternos y el cartel se quedaba pegado para siempre).
+    raiz = Entity(parent=camera.ui, z=-0.9, eternal=True)
+    t = Text(texto, parent=raiz, origin=(0, 0), z=-0.01, scale=escala_fuente(14), font=tipografia.FUENTE_TITULO,
              color=rgb(estilo.BOTW_FILO))
     # el panel se ajusta al texto (más un margen) para que nunca se salga
-    panel_piel(raiz, max(0.4, t.width * t.scale_x + 0.08), 0.075, z=0)
+    ancho, alto = t.width * t.scale_x + 0.05, 0.05
+    panel_piel(raiz, ancho, alto, z=0)
+    raiz.position = (0, 0.5 - alto / 2 - 0.012)
     _estado["cartel"] = raiz
 
-    def quitar():
-        if not raiz.is_empty():
-            destroy(raiz)
+    # Entra y sale con un fundido (el alpha escala a los hijos: panel y texto). Lo mueve su propio update, que sigue
+    # aunque el juego esté en pausa.
+    from panda3d.core import TransparencyAttrib
+    from ursina import time
+    raiz.setTransparency(TransparencyAttrib.M_alpha)
+    raiz.setAlphaScale(0)
+    raiz.ignore_paused = True
+    total = SEGUNDOS_CARTEL + 2 * SEGUNDOS_FUNDIDO
+    vida, reloj_real = [0.0], [0.0]
 
-    Sequence(Wait(SEGUNDOS_CARTEL), Func(quitar), auto_destroy=True, ignore_paused=True).start()
+    def update():
+        reloj_real[0] += min(time.dt, 0.25)      # un tirón largo de carga cuenta poco
+        if reloj_real[0] > 15:                   # red de seguridad: aunque el juego vaya lento, nunca se queda pegado
+            destroy(raiz, force_destroy=True)
+            return
+        if time.dt > 0.12:                       # cargando (fotogramas lentos): el cartel espera a que se pueda ver
+            return
+        vida[0] += time.dt
+        v = vida[0]
+        if v >= total:
+            destroy(raiz, force_destroy=True)
+            return
+        raiz.setAlphaScale(min(1.0, v / SEGUNDOS_FUNDIDO, (total - v) / SEGUNDOS_FUNDIDO))
+
+    raiz.update = update
 
 
 # -- API (frontend/mando.py) --
@@ -162,6 +190,11 @@ def fijar_mando(hay, aviso=False):
     _estado["mando"] = bool(hay)
     if not aviso or not activo():
         return
+    import time as reloj
+    ahora, ultimo = reloj.monotonic(), _estado["ultimo"]
+    if ahora - ultimo.get(bool(hay), -1e9) < SEGUNDOS_ENTRE_CARTELES:
+        return
+    ultimo[bool(hay)] = ahora
     try:
         _cartel("Mando conectado · esquema en Ajustes > Mando" if hay else "Mando desconectado: teclado y ratón")
     except Exception as error:                   # noqa: BLE001
